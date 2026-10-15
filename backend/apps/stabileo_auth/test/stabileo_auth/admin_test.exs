@@ -6,17 +6,13 @@ defmodule StabileoAuth.AdminTest do
   alias StabileoRepo.Schemas.{Account, Session}
 
   setup do
-    admin =
-      Repo.get_by(Account, email: "admin@stabileo.com") ||
-        Factory.insert(:account, email: "admin@stabileo.com", name: "Admin")
-
-    %{admin: admin}
+    %{admin: Factory.insert(:account, email: "admin@example.com", name: "Admin")}
   end
 
   describe "AdminAccess.admin?/1" do
     test "is true only for allowlisted emails, case-insensitively", %{admin: admin} do
       assert AdminAccess.admin?(admin)
-      assert AdminAccess.admin?(%Account{email: "ADMIN@stabileo.com"})
+      assert AdminAccess.admin?(%Account{email: "ADMIN@example.com"})
       refute AdminAccess.admin?(Factory.insert(:account))
       refute AdminAccess.admin?(nil)
     end
@@ -32,7 +28,7 @@ defmodule StabileoAuth.AdminTest do
     test "answers invalid_credentials to a valid non-admin account" do
       account = Factory.insert(:account)
       assert {:error, :invalid_credentials} = Admin.login(account.email, Factory.password())
-      assert Repo.aggregate(Session, :count) == 0
+      assert Repo.aggregate(from(s in Session, where: s.account_id == ^account.id), :count) == 0
     end
 
     test "answers invalid_credentials to a wrong password", %{admin: admin} do

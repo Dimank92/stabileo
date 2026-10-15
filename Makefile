@@ -135,10 +135,10 @@ deps:
 	$(NIX_RUN) bash -c "cd backend && mix local.hex --force --if-missing && mix local.rebar --force --if-missing && mix deps.get"
 
 backend.run: services
-	$(NIX_RUN) bash -c "cd backend && INST=$(INST) mix ecto.migrate && INST=$(INST) iex -S mix phx.server"
+	$(NIX_RUN) bash -c "cd backend && MIX_ENV=dev INST=$(INST) mix ecto.migrate && MIX_ENV=dev INST=$(INST) iex -S mix phx.server"
 
 console: services
-	$(NIX_RUN) bash -c "cd backend && INST=$(INST) iex -S mix"
+	$(NIX_RUN) bash -c "cd backend && MIX_ENV=dev INST=$(INST) iex -S mix"
 
 # The umbrella has no default router, so phx.routes needs it named.
 routes:
@@ -279,18 +279,18 @@ ai-backend.build:
 	$(NIX_RUN) cargo build -p dedaliano-backend --release
 
 db.setup: services
-	$(NIX_RUN) bash -c "cd backend && INST=$(INST) mix ecto.create && INST=$(INST) mix ecto.migrate"
-	$(NIX_RUN) bash -c "cd backend && INST=$(INST) mix run apps/stabileo_repo/priv/repo/seeds.exs"
+	$(NIX_RUN) bash -c "cd backend && MIX_ENV=dev INST=$(INST) mix ecto.create && MIX_ENV=dev INST=$(INST) mix ecto.migrate"
+	$(NIX_RUN) bash -c "cd backend && MIX_ENV=dev INST=$(INST) mix run apps/stabileo_repo/priv/repo/seeds.exs"
 
 db.reset: services
-	$(NIX_RUN) bash -c "cd backend && INST=$(INST) mix ecto.drop && INST=$(INST) mix ecto.create && INST=$(INST) mix ecto.migrate"
-	$(NIX_RUN) bash -c "cd backend && INST=$(INST) mix run apps/stabileo_repo/priv/repo/seeds.exs"
+	$(NIX_RUN) bash -c "cd backend && MIX_ENV=dev INST=$(INST) mix ecto.drop && MIX_ENV=dev INST=$(INST) mix ecto.create && MIX_ENV=dev INST=$(INST) mix ecto.migrate"
+	$(NIX_RUN) bash -c "cd backend && MIX_ENV=dev INST=$(INST) mix run apps/stabileo_repo/priv/repo/seeds.exs"
 
 db.migrate: services
-	$(NIX_RUN) bash -c "cd backend && INST=$(INST) mix ecto.migrate"
+	$(NIX_RUN) bash -c "cd backend && MIX_ENV=dev INST=$(INST) mix ecto.migrate"
 
 db.rollback: services
-	$(NIX_RUN) bash -c "cd backend && INST=$(INST) mix ecto.rollback"
+	$(NIX_RUN) bash -c "cd backend && MIX_ENV=dev INST=$(INST) mix ecto.rollback"
 
 db.gen.migration:
 ifndef name

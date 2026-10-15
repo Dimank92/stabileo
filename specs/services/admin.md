@@ -71,7 +71,7 @@ None beyond `stabileo_auth`.
 
 ## Demo Data
 
-Seeds create `admin@stabileo.com` / `stabileo-demo-password`, listed in the dev and test allowlist.
+Seeds create `admin@stabileo.com` / `stabileo-demo-password`, listed in the dev allowlist. Tests use their own `admin@example.com`, so they never depend on seeded rows.
 
 ## Test Scenarios
 

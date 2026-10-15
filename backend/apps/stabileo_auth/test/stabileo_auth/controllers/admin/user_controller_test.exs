@@ -8,7 +8,7 @@ defmodule StabileoAuth.Controllers.Admin.UserControllerTest do
   @keys ~w(active_sessions company country email email_verified_at id inserted_at is_active is_admin job_title last_sign_in_at locale name)
 
   setup do
-    admin = Factory.insert(:account, email: "admin@stabileo.com", name: "Admin")
+    admin = Factory.insert(:account, email: "admin@example.com", name: "Admin")
     %{admin: admin, token: admin_log_in(admin).access_token}
   end
 

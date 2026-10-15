@@ -45,6 +45,8 @@ defmodule StabileoAuth.Controllers.AuthControllerTest do
     end
 
     test "422 with every failing field" do
+      before = Repo.aggregate(Account, :count)
+
       body =
         request(:post, "/register", %{"email" => "bad", "password" => "short"}) |> json_body(422)
 
@@ -52,7 +54,7 @@ defmodule StabileoAuth.Controllers.AuthControllerTest do
       assert body["details"]["email"] == ["must have @ sign and no spaces"]
       assert body["details"]["password"] == ["should be at least 8 character(s)"]
       assert body["details"]["name"] == ["can't be blank"]
-      assert Repo.aggregate(Account, :count) == 0
+      assert Repo.aggregate(Account, :count) == before
     end
 
     test "422 for an email already registered" do

@@ -23,7 +23,7 @@ config :stabileo_auth,
   access_token_ttl: 900,
   refresh_token_ttl: 604_800,
   admin_refresh_token_ttl: 14_400,
-  admin_emails: ["admin@stabileo.com"]
+  admin_emails: ["admin@example.com"]
 
 config :logger, level: :warning
 

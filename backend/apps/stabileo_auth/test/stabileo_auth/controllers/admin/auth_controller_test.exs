@@ -2,7 +2,7 @@ defmodule StabileoAuth.Controllers.Admin.AuthControllerTest do
   use StabileoAuth.ConnCase, async: false
 
   setup do
-    %{admin: Factory.insert(:account, email: "admin@stabileo.com", name: "Admin")}
+    %{admin: Factory.insert(:account, email: "admin@example.com", name: "Admin")}
   end
 
   describe "POST /auth/login" do
@@ -67,7 +67,7 @@ defmodule StabileoAuth.Controllers.Admin.AuthControllerTest do
     test "answers the admin account", %{admin: admin} do
       token = admin_log_in(admin).access_token
       body = admin_request(:get, "/auth/me", %{}, token) |> json_body(200)
-      assert body["data"]["email"] == "admin@stabileo.com"
+      assert body["data"]["email"] == "admin@example.com"
     end
 
     test "401 invalid_token with a product token, even for an admin account", %{admin: admin} do

@@ -73,14 +73,18 @@ defmodule StabileoAuth.SessionsTest do
 
       assert {:ok, _new} = Sessions.rotate_session(old)
       assert {:error, :session_revoked} = Sessions.rotate_session(old)
-      assert Repo.aggregate(Session, :count) == 2
+
+      assert Repo.aggregate(from(s in Session, where: s.account_id == ^old.account_id), :count) ==
+               2
     end
 
     test "refuses a session already revoked" do
       old = Factory.insert(:session, revoked_at: ~U[2026-01-01 00:00:00Z])
 
       assert {:error, :session_revoked} = Sessions.rotate_session(old)
-      assert Repo.aggregate(Session, :count) == 1
+
+      assert Repo.aggregate(from(s in Session, where: s.account_id == ^old.account_id), :count) ==
+               1
     end
   end
 
