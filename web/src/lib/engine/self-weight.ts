@@ -14,21 +14,24 @@
 import { createSectionWeight } from '../section/weight';
 import type { ModelData } from './solver-service';
 import type { SolverLoad3D } from './types-3d';
+import type { Load } from '../store/model.svelte';
 import type { SelfWeightLoad } from './analysis-settings';
 import { GRAVITY_SELF_WEIGHT } from './analysis-settings';
+import { isCompositeCase } from './loads/combination-cases';
 import { globalDistributedToSolver, type MemberRef, type Vec3 } from './member-loads';
 import { plateSelfWeightLoads, quadSelfWeightLoads } from './solver-shells';
 
 /** The self-weight loads of one case, or of a single solve of every load when `caseRef` is null. */
 export function selfWeightFor(
   model: Pick<ModelData, 'analysis'>,
-  caseRef: { id: number; type?: string } | null,
+  caseRef: { id: number; type?: string; includes?: ReadonlyArray<unknown> } | null,
   includeSelfWeight: boolean,
 ): SelfWeightLoad[] {
   const stated = model.analysis?.selfWeight;
   if (stated) return caseRef ? stated.filter((s) => s.caseId === caseRef.id) : stated;
   if (!includeSelfWeight) return [];
-  if (caseRef && caseRef.type !== 'D') return [];
+  // A composite case typed D has it through the cases it takes in (`case-effects.ts`).
+  if (caseRef && (caseRef.type !== 'D' || isCompositeCase(caseRef))) return [];
   return [{ caseId: caseRef?.id ?? 0, ...GRAVITY_SELF_WEIGHT }];
 }
 
@@ -88,6 +91,42 @@ export function selfWeightSolverLoads(
     if (model.quads?.size) {
       const quads = scope.quads ? new Map([...model.quads].filter(([id]) => scope.quads!.has(id))) : model.quads;
       if (quads.size) out.push(...along(quadSelfWeightLoads(quads as never, model.nodes, model.materials)));
+    }
+  }
+  return out;
+}
+
+/**
+ * The member loads `entries` put on the members, as loads a drawing reads (the despiece): a
+ * uniform load of ρ·A times the factor along the row's direction, per metre of member, on every
+ * member the row covers. `plane`: as a plane model's load, global and vertical (the plane solve
+ * takes the weight straight down, `buildSolverLoads2D`); otherwise a global 3D member load. The
+ * shells' weight is not here: the despiece draws members only.
+ */
+export function selfWeightMemberLoads(
+  model: Pick<ModelData, 'elements' | 'materials' | 'sections' | 'groups'>,
+  entries: readonly SelfWeightLoad[],
+  opts: { plane: boolean; firstId: number },
+): Load[] {
+  const out: Load[] = [];
+  const weight = createSectionWeight(model.materials);
+  let id = opts.firstId;
+  for (const s of entries) {
+    const dir = UNIT[s.direction];
+    const scope = selfWeightScope(model, s);
+    for (const el of model.elements.values()) {
+      if (scope.members && !scope.members.has(el.id)) continue;
+      const sec = model.sections.get(el.sectionId);
+      if (!sec || !model.materials.get(el.materialId)) continue;
+      const w = weight(sec, el.materialId) * s.factor;
+      if (w === 0) continue;
+      if (opts.plane) {
+        if (s.direction !== 'Z') continue;
+        out.push({ type: 'distributed', data: { id: id++, elementId: el.id, qI: w, qJ: w, isGlobal: true, caseId: s.caseId } });
+      } else {
+        out.push({ type: 'distributed3d', data: { id: id++, elementId: el.id, frame: 'global',
+          qXI: dir[0] * w, qXJ: dir[0] * w, qYI: dir[1] * w, qYJ: dir[1] * w, qZI: dir[2] * w, qZJ: dir[2] * w, caseId: s.caseId } });
+      }
     }
   }
   return out;

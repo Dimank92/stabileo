@@ -13,29 +13,46 @@
  * - despiece: `drawFreeBody`, as on screen;
  * - M, V, N: each member's diagram in its own plane (the side the 3D view draws it on), the
  *   largest value of each member written; both bending planes when both carry load;
- * - deformed: the deflected members, scaled so the largest movement reads at about a twentieth of
- *   the structure, with the largest displacements written.
+ * - deformed: the deflected members, at the reader's scale, or at true scale scaled so the largest
+ *   movement reads at about a twentieth of the structure, with the largest displacements written;
+ * - shellMap (PRO): the shells painted by one of their results, each element its own value, with
+ *   the scale beside them.
+ *
+ * Shells are drawn in every figure, as faces under the members, the nearest last; the deformed
+ * figure moves their corners with the nodes. A figure can be drawn from a fixed view (plan, the
+ * two elevations, isometric) and from results other than the ones on screen (`FigureOptions`).
  */
 import { modelStore, resultsStore, uiStore } from '../store';
 import { computeLocalAxes3D } from '../engine/local-axes-3d';
 import { projectNodeToScene, shouldProjectModelToXZ } from '../geometry/coordinate-system';
-import { computeDiagram3D, computeGlobalMax3D, getDiagramLocalDirection, type Diagram3DKind } from '../engine/diagrams-3d';
+import { computeDiagram3D, computeGlobalMax3D, getDiagramLocalDirection, type Diagram3DKind, type ElementDiagram3D } from '../engine/diagrams-3d';
 import { computeDiagramDisplayDirection } from '../three/diagram-render-3d';
-import { computeDeformedShape3D, type ElementEI } from '../three/deformed-shape-3d';
+import { computeDeformedShape3DPair, type ElementEI } from '../three/deformed-shape-3d';
 import { eiOf } from '../engine/member-deflection';
+import { takesNoBending } from '../engine/member-loads';
+import { displayedLoads3D, despieceNote3D, despieceDrawsActions, despieceNoteText } from '../store/displayed-loads-3d';
 import { drawFreeBody, type P3 } from '../canvas/free-body';
 import { createLabelCollector } from '../canvas/label-layout';
 import { addMemberTags } from '../canvas/member-tags';
 import { freeBodyActions3D } from '../viewport3d/free-body-3d';
 import { fixedQuantity, displacementText } from '../utils/unit-format';
-import type { ExportFrame, Figure2DRenderer, FrameView } from './view-figure';
+import type { ExportFrame, Figure2DRenderer, FigureView, FrameView } from './view-figure';
+import type { AnalysisResults3D, ElementForces3D, FullEnvelope3D } from '../engine/types-3d';
+import { shellComponentMeta, shellComponentValue, type ShellContourComponent } from '../engine/shell-stress';
+import { shellContourColor } from '../three/stress-heatmap';
+import { RAW_INK } from './paper-ink';
 
 type V = [number, number, number];
 
-/** The view the figure is drawn from: the reader's camera direction, Z up, orthographic. */
-function viewBasis(): { right: V; up: V; dir: V } {
+/** The direction a fixed view looks along. */
+const FIXED_VIEW: Record<Exclude<FigureView, 'screen'>, V> = {
+  top: [0, 0, -1], front: [0, 1, 0], side: [-1, 0, 0], iso: [-1, 1, -1],
+};
+
+/** The view the figure is drawn from: the reader's camera direction or a fixed one, Z up, orthographic. */
+function viewBasis(view: FigureView = 'screen'): { right: V; up: V; dir: V } {
   const p = uiStore.cameraPosition3D, t = uiStore.cameraTarget3D;
-  let d: V = [t.x - p.x, t.y - p.y, t.z - p.z];
+  let d: V = view === 'screen' ? [t.x - p.x, t.y - p.y, t.z - p.z] : [...FIXED_VIEW[view]];
   const l = Math.hypot(...d) || 1;
   d = [d[0] / l, d[1] / l, d[2] / l];
   // right = d × Z; if looking straight down, along X.
@@ -65,15 +82,68 @@ const COLORS: Record<string, { fill: string; stroke: string }> = {
 };
 const SYM: Record<Diagram3DKind, string> = { momentY: 'My', momentZ: 'Mz', shearY: 'Vy', shearZ: 'Vz', axial: 'N', torsion: 'T' };
 
+/** Match the figure's result, including a named envelope or an export of a set off screen. */
+function envelopeOf(r: AnalysisResults3D): FullEnvelope3D | undefined {
+  return [resultsStore.fullEnvelope3D, resultsStore.envelope3D].find((e) => e?.maxAbsResults3D === r) ?? undefined;
+}
+
+function diagramMax(r: AnalysisResults3D, kind: Diagram3DKind): number {
+  return envelopeOf(r)?.[kind].globalMax ?? computeGlobalMax3D(r.elementForces, kind);
+}
+
+/** Envelope end forces are not a load state: draw both station envelopes directly. */
+function figureDiagrams(r: AnalysisResults3D, ef: ElementForces3D, kind: Diagram3DKind): ElementDiagram3D[] {
+  const env = envelopeOf(r);
+  if (!env) return [computeDiagram3D(ef, kind)];
+  const e = env[kind].elements.find((e) => e.elementId === ef.elementId);
+  if (!e) return [];
+  return [e.posValues, e.negValues].map((values) => {
+    let maxValue = -Infinity, minValue = Infinity, maxAbsValue = 0;
+    const points = e.tPositions.map((t, i) => {
+      const value = values[i] ?? 0;
+      maxValue = Math.max(maxValue, value); minValue = Math.min(minValue, value);
+      if (Math.abs(value) > Math.abs(maxAbsValue)) maxAbsValue = value;
+      return { t, value };
+    });
+    return { elementId: ef.elementId, points, maxValue, minValue, maxAbsValue };
+  }).filter((d) => d.points.length > 0);
+}
+
 /** The diagram components a content draws: both planes when both carry something. */
-export function components3D(content: 'moment' | 'shear' | 'axial'): Diagram3DKind[] {
-  const r3d = resultsStore.results3D;
+export function components3D(content: 'moment' | 'shear' | 'axial', results?: AnalysisResults3D | null): Diagram3DKind[] {
+  const r3d = results ?? resultsStore.results3D;
   if (content === 'axial') return ['axial'];
   const pair: Diagram3DKind[] = content === 'moment' ? ['momentZ', 'momentY'] : ['shearY', 'shearZ'];
   if (!r3d) return pair.slice(0, 1);
-  const max = pair.map((k) => computeGlobalMax3D(r3d.elementForces, k));
+  const max = pair.map((k) => diagramMax(r3d, k));
   const top = Math.max(...max);
   return pair.filter((_, i) => max[i]! > 0.1 * top && max[i]! > 1e-9);
+}
+
+/**
+ * The deformed shape's scale in a figure, by the 2D figures' rule: the reader's scale when they
+ * set one; at true scale (1), so the largest movement reads at about a twentieth of the
+ * structure, which is the diagonal of its box (one pass over the nodes: comparing every pair
+ * took seconds on a large model, twice per figure).
+ */
+export function deformedFigureScale(
+  pts: Iterable<{ x: number; y: number; z?: number }>,
+  displacements: Iterable<{ ux: number; uy: number; uz: number }>,
+  user: number,
+  memberDisplacement = 0,
+): number {
+  if (user !== 1) return user;
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (const p of pts) {
+    const z = p.z ?? 0;
+    if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x;
+    if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y;
+    if (z < z0) z0 = z; if (z > z1) z1 = z;
+  }
+  const span = Number.isFinite(x0) ? Math.hypot(x1 - x0, y1 - y0, z1 - z0) : 0;
+  let dmax = memberDisplacement;
+  for (const d of displacements) dmax = Math.max(dmax, Math.hypot(d.ux, d.uy, d.uz));
+  return dmax > 1e-12 && span > 0 ? (0.05 * span) / dmax : user;
 }
 
 export function createFigure3DRenderer(): Figure2DRenderer {
@@ -83,9 +153,17 @@ export function createFigure3DRenderer(): Figure2DRenderer {
     return n ? projectNodeToScene(n, flat()) : undefined;
   };
 
+  /** The shells as corner lists, keyed as the contour field keys them (`p12`, `q7`). */
+  const shellFaces = () => {
+    const out: Array<{ key: string; id: number; nodes: number[] }> = [];
+    for (const p of modelStore.plates.values()) out.push({ key: `p${p.id}`, id: p.id, nodes: [...p.nodes] });
+    for (const q of modelStore.quads.values()) out.push({ key: `q${q.id}`, id: q.id, nodes: [...q.nodes] });
+    return out;
+  };
+
   return {
-    nodes() {
-      const { right, up } = viewBasis();
+    nodes(frame?: ExportFrame) {
+      const { right, up } = viewBasis(frame?.options.view);
       const out: Array<{ x: number; y: number }> = [];
       for (const n of modelStore.nodes.values()) {
         const p = projectNodeToScene(n, flat());
@@ -96,7 +174,7 @@ export function createFigure3DRenderer(): Figure2DRenderer {
     },
 
     render(ctx: CanvasRenderingContext2D, _w: number, _h: number, frame: ExportFrame, view: FrameView) {
-      const { right, up, dir } = viewBasis();
+      const { right, up, dir } = viewBasis(frame.options.view);
       const toScreen = (p: P3) => {
         const v: V = [p.x, p.y, p.z ?? 0];
         const u = v[0] * right[0] + v[1] * right[1] + v[2] * right[2];
@@ -104,7 +182,7 @@ export function createFigure3DRenderer(): Figure2DRenderer {
         return { x: u * view.zoom + view.panX, y: -w * view.zoom + view.panY };
       };
       const towardViewer = (d: P3) => -(d.x * dir[0] + d.y * dir[1] + (d.z ?? 0) * dir[2]);
-      const r3d = resultsStore.results3D;
+      const r3d = frame.options.results ?? resultsStore.results3D;
       const content = frame.content;
       const opts = frame.options;
       const leftHand = uiStore.axisConvention3D === 'leftHand';
@@ -115,8 +193,12 @@ export function createFigure3DRenderer(): Figure2DRenderer {
         elements: modelStore.elements, nodes: modelStore.nodes, forces: r3d?.elementForces ?? [], reactions: r3d?.reactions ?? [],
         sections: modelStore.sections, project2D: flat(), leftHand, basis: uiStore.despieceBasis,
         resultant: uiStore.despieceCombineVectors, showReactions: content === 'reactions' || content === 'despiece',
-        loads: modelStore.loads, loadText: (v, q) => fmtF(v, q), negligible: 0.02,
+        // The loads of the result drawn, which the figure may have chosen, not of the one on screen.
+        loads: content === 'model' ? modelStore.loads : displayedLoads3D(r3d), loadText: (v, q) => fmtF(v, q), negligible: 0.02,
       });
+      // An envelope's or a magnitude's free body is no state of equilibrium: pieces and a note.
+      const fbNote = content === 'despiece' ? despieceNote3D(r3d) : null;
+      const fbActs = despieceDrawsActions(fbNote);
       for (const m of fbData.members) {
         const a = toScreen(m.i), b = toScreen(m.j);
         memberSegs.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y });
@@ -151,6 +233,33 @@ export function createFigure3DRenderer(): Figure2DRenderer {
             opts.lengths ? { text: fixedQuantity(modelStore.getElementLength(m.id), 'length', 2, uiStore.unitSystem), colour: '#88cc88' } : null);
         }
       };
+      /**
+       * The shells, farthest first, so a nearer face covers what it hides. `fill` gives each face
+       * its colour (a contour's band); without it they are a light tint under the members.
+       * `move` gives a corner's position (the deformed figure moves them with the nodes).
+       */
+      const drawShells = (fill?: (key: string) => string | null, move?: (nodeId: number) => P3 | undefined) => {
+        if (frame.options.shells === false && !fill) return;
+        const faces = shellFaces().map((f) => {
+          const pts = f.nodes.map((id) => move?.(id) ?? scenePos(id)).filter((p): p is P3 => !!p);
+          const depth = pts.reduce((a, p) => a + towardViewer(p), 0) / Math.max(1, pts.length);
+          return { ...f, pts, depth };
+        }).filter((f) => f.pts.length >= 3).sort((a, b) => a.depth - b.depth);
+        ctx.save();
+        ctx.lineJoin = 'round';
+        for (const f of faces) {
+          ctx.beginPath();
+          f.pts.forEach((p, k) => { const c = toScreen(p); if (k) ctx.lineTo(c.x, c.y); else ctx.moveTo(c.x, c.y); });
+          ctx.closePath();
+          const colour = fill?.(f.key);
+          ctx.fillStyle = colour ?? 'rgba(143, 163, 179, 0.16)';
+          ctx.fill();
+          ctx.strokeStyle = colour ? 'rgba(60, 70, 80, 0.45)' : 'rgba(143, 163, 179, 0.7)';
+          ctx.lineWidth = colour ? 0.5 : 0.8;
+          ctx.stroke();
+        }
+        ctx.restore();
+      };
       const drawMembers = (color = '#c7d3dd', width = 2.5, dash: number[] = []) => {
         ctx.save();
         ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round'; ctx.setLineDash(dash);
@@ -158,18 +267,28 @@ export function createFigure3DRenderer(): Figure2DRenderer {
         ctx.restore();
       };
 
+      if (content === 'shellMap') {
+        drawShellMap(ctx, frame.options.shellComponent ?? 'vonMises', frame.options.style, r3d, shellFaces, drawShells, toScreen, scenePos, opts.values, labels);
+        drawMembers('#8fa3b3', 1.4);
+        drawSupports();
+        labels.flush(ctx, memberSegs);
+        return;
+      }
+
       if (content === 'model' || content === 'reactions' || content === 'despiece') {
         // The free body draws its own pieces; the structure figures are its uncut form.
+        if (content !== 'despiece') drawShells();
         drawSupports();
         drawFreeBody({
           ctx, toScreen, towardViewer,
           members: fbData.members, nodes: fbData.nodes,
-          ends: content === 'despiece' ? fbData.ends : [],
-          supports: content === 'model' ? [] : fbData.supports,
+          ends: content === 'despiece' && fbActs ? fbData.ends : [],
+          supports: content === 'model' || !fbActs ? [] : fbData.supports,
           loads: (content === 'despiece' || opts.loads) ? fbData.loads : [],
           mode: opts.dcl ?? 'members',
           sep: content === 'despiece' ? 1 : 0,
           planar: false,
+          note: despieceNoteText(fbNote),
           fmt: (v, q) => fmtF(v, q),
           labels,
         });
@@ -178,34 +297,58 @@ export function createFigure3DRenderer(): Figure2DRenderer {
         return;
       }
 
+      if (content !== 'deformed') drawShells();
       drawSupports();
 
       if (content === 'deformed' && r3d) {
         drawMembers('#8fa3b3', 1.2, [5, 4]);
-        // Scaled so the largest movement reads at about a twentieth of the structure.
-        let span = 0, dmax = 0;
         const pts = [...modelStore.nodes.values()].map((n) => projectNodeToScene(n, flat()));
-        for (const a of pts) for (const b of pts) span = Math.max(span, Math.hypot(a.x - b.x, a.y - b.y, (a.z ?? 0) - (b.z ?? 0)));
         const disp = new Map(r3d.displacements.map((d) => [d.nodeId, d]));
-        for (const d of r3d.displacements) dmax = Math.max(dmax, Math.hypot(d.ux, d.uy, d.uz));
-        const scale = dmax > 1e-12 ? (0.05 * span) / dmax : 1;
         const efMap = new Map(r3d.elementForces.map((f) => [f.elementId, f]));
-        ctx.save();
-        ctx.strokeStyle = '#e5482a'; ctx.lineWidth = 2.2;
+        // Compute the actual member curves once at unit scale. Their interior movement counts
+        // even when all node translations are zero (a simple span or a fixed-fixed beam).
+        const curves: Array<{ p0: P3[]; p1: P3[] }> = [];
+        let memberDisplacement = 0;
         for (const e of modelStore.elements.values()) {
           const nI = modelStore.nodes.get(e.nodeI), nJ = modelStore.nodes.get(e.nodeJ);
           const dI = disp.get(e.nodeI), dJ = disp.get(e.nodeJ), ef = efMap.get(e.id);
-          if (!nI || !nJ || !dI || !dJ || !ef) continue;
+          if (!nI || !nJ || !dI || !dJ) continue;
           const pI = projectNodeToScene(nI, flat()), pJ = projectNodeToScene(nJ, flat());
           const ei: ElementEI | undefined = eiOf(modelStore.materials.get(e.materialId), modelStore.sections.get(e.sectionId));
           const localY = (e.localYx !== undefined && e.localYy !== undefined && e.localYz !== undefined) ? { x: e.localYx, y: e.localYy, z: e.localYz } : undefined;
           const roll = (e.rollAngle ?? 0) + (modelStore.sections.get(e.sectionId)?.rotation ?? 0);
-          const curve = computeDeformedShape3D(
-            { x: pI.x, y: pI.y, z: pI.z ?? 0 }, { x: pJ.x, y: pJ.y, z: pJ.z ?? 0 }, dI, dJ, ef, scale, ei, localY, roll || undefined,
+          const pair = takesNoBending(e) || !ef || !ei ? {
+            p0: [pI, pJ], p1: [
+              { x: pI.x + dI.ux, y: pI.y + dI.uy, z: (pI.z ?? 0) + dI.uz },
+              { x: pJ.x + dJ.ux, y: pJ.y + dJ.uy, z: (pJ.z ?? 0) + dJ.uz },
+            ],
+          } : computeDeformedShape3DPair(
+            { id: e.nodeI, x: pI.x, y: pI.y, z: pI.z ?? 0 }, { id: e.nodeJ, x: pJ.x, y: pJ.y, z: pJ.z ?? 0 },
+            dI, dJ, ef, ei, localY, roll || undefined,
           );
-          if (curve.length < 2) continue;
+          for (let k = 0; k < pair.p0.length; k++) {
+            const p = pair.p0[k]!, q = pair.p1[k]!;
+            memberDisplacement = Math.max(memberDisplacement, Math.hypot(q.x - p.x, q.y - p.y, (q.z ?? 0) - (p.z ?? 0)));
+          }
+          curves.push(pair);
+        }
+        const scale = deformedFigureScale(pts, r3d.displacements, resultsStore.deformedScale, memberDisplacement);
+        drawShells(undefined, (id) => {
+          const n = modelStore.nodes.get(id), d = disp.get(id);
+          if (!n) return undefined;
+          const p = projectNodeToScene(n, flat());
+          return d ? { x: p.x + d.ux * scale, y: p.y + d.uy * scale, z: (p.z ?? 0) + d.uz * scale } : p;
+        });
+        ctx.save();
+        ctx.strokeStyle = '#e5482a'; ctx.lineWidth = 2.2;
+        for (const { p0, p1 } of curves) {
+          if (p0.length < 2) continue;
           ctx.beginPath();
-          curve.forEach((p, k) => { const s = toScreen({ x: p.x, y: p.y, z: p.z }); if (k) ctx.lineTo(s.x, s.y); else ctx.moveTo(s.x, s.y); });
+          p0.forEach((p, k) => {
+            const q = p1[k]!;
+            const s = toScreen({ x: p.x + scale * (q.x - p.x), y: p.y + scale * (q.y - p.y), z: (p.z ?? 0) + scale * ((q.z ?? 0) - (p.z ?? 0)) });
+            if (k) ctx.lineTo(s.x, s.y); else ctx.moveTo(s.x, s.y);
+          });
           ctx.stroke();
         }
         ctx.restore();
@@ -225,10 +368,10 @@ export function createFigure3DRenderer(): Figure2DRenderer {
 
       if ((content === 'moment' || content === 'shear' || content === 'axial') && r3d) {
         drawMembers();
-        const kinds = components3D(content);
+        const kinds = components3D(content, r3d);
         // Every member's diagram on one scale per component, standing about 45 px off the member.
         for (const kind of kinds) {
-          const gmax = computeGlobalMax3D(r3d.elementForces, kind);
+          const gmax = diagramMax(r3d, kind);
           if (!(gmax > 1e-9)) continue;
           const pxPerUnit = 45 / gmax;
           const col = COLORS[kind] ?? COLORS.axial!;
@@ -243,7 +386,7 @@ export function createFigure3DRenderer(): Figure2DRenderer {
             let axes;
             try { axes = computeLocalAxes3D({ id: 0, x: pI.x, y: pI.y, z: pI.z ?? 0 }, { id: 0, x: pJ.x, y: pJ.y, z: pJ.z ?? 0 }, localY, roll || undefined, leftHand); } catch { continue; }
             const { perpVec, sign } = computeDiagramDisplayDirection(axes, perpDir, resultsStore.drawPositiveTowardLocalAxes);
-            const dg = computeDiagram3D(ef, kind);
+            const diagrams = figureDiagrams(r3d, ef, kind);
             // The offset in world units that stands `pxPerUnit` px per kN on the page.
             const sI = toScreen(pI), probe = toScreen({ x: pI.x + perpVec.x, y: pI.y + perpVec.y, z: (pI.z ?? 0) + perpVec.z });
             const pxPerMetre = Math.hypot(probe.x - sI.x, probe.y - sI.y);
@@ -251,20 +394,22 @@ export function createFigure3DRenderer(): Figure2DRenderer {
             const k = pxPerUnit / pxPerMetre;
             const base = (t: number): P3 => ({ x: pI.x + (pJ.x - pI.x) * t, y: pI.y + (pJ.y - pI.y) * t, z: (pI.z ?? 0) + ((pJ.z ?? 0) - (pI.z ?? 0)) * t });
             const tip = (t: number, v: number): P3 => { const b = base(t); const o = sign * v * k; return { x: b.x + perpVec.x * o, y: b.y + perpVec.y * o, z: (b.z ?? 0) + perpVec.z * o }; };
-            ctx.beginPath();
-            const b0 = toScreen(base(0)); ctx.moveTo(b0.x, b0.y);
-            for (const p of dg.points) { const s = toScreen(tip(p.t, p.value)); ctx.lineTo(s.x, s.y); }
-            const b1 = toScreen(base(1)); ctx.lineTo(b1.x, b1.y); ctx.closePath();
-            ctx.fillStyle = col.fill; ctx.fill();
-            ctx.beginPath();
-            dg.points.forEach((p, i) => { const s = toScreen(tip(p.t, p.value)); if (i) ctx.lineTo(s.x, s.y); else ctx.moveTo(s.x, s.y); });
-            ctx.strokeStyle = col.stroke; ctx.lineWidth = 1.4; ctx.stroke();
-            if (opts.values && Math.abs(dg.maxAbsValue) > 0.02 * gmax) {
-              const at = dg.points.find((p) => p.value === dg.maxAbsValue) ?? dg.points[0]!;
-              const s = toScreen(tip(at.t, at.value)), sb = toScreen(base(at.t));
-              const dx = s.x - sb.x, dy = s.y - sb.y, l = Math.hypot(dx, dy) || 1;
-              const shown = isMoment ? -dg.maxAbsValue : dg.maxAbsValue;
-              labels.add({ text: `${SYM[kind]} ${fmtF(shown, isMoment ? 'moment' : 'force')}`, colour: col.stroke, font: 'bold 10.5px sans-serif', box: { x: s.x + (dx / l) * 8, y: s.y + (dy / l) * 8 + 4, width: 0, height: 0, dirX: dx / l, dirY: dy / l, priority: Math.abs(dg.maxAbsValue), anchorX: 'center', sweep: 'any' } });
+            for (const dg of diagrams) {
+              ctx.beginPath();
+              const b0 = toScreen(base(0)); ctx.moveTo(b0.x, b0.y);
+              for (const p of dg.points) { const s = toScreen(tip(p.t, p.value)); ctx.lineTo(s.x, s.y); }
+              const b1 = toScreen(base(1)); ctx.lineTo(b1.x, b1.y); ctx.closePath();
+              ctx.fillStyle = col.fill; ctx.fill();
+              ctx.beginPath();
+              dg.points.forEach((p, i) => { const s = toScreen(tip(p.t, p.value)); if (i) ctx.lineTo(s.x, s.y); else ctx.moveTo(s.x, s.y); });
+              ctx.strokeStyle = col.stroke; ctx.lineWidth = 1.4; ctx.stroke();
+              if (opts.values && Math.abs(dg.maxAbsValue) > 0.02 * gmax) {
+                const at = dg.points.find((p) => p.value === dg.maxAbsValue) ?? dg.points[0]!;
+                const s = toScreen(tip(at.t, at.value)), sb = toScreen(base(at.t));
+                const dx = s.x - sb.x, dy = s.y - sb.y, l = Math.hypot(dx, dy) || 1;
+                const shown = isMoment && !r3d.magnitude ? -dg.maxAbsValue : dg.maxAbsValue;
+                labels.add({ text: `${SYM[kind]} ${fmtF(shown, isMoment ? 'moment' : 'force')}`, colour: col.stroke, font: 'bold 10.5px sans-serif', box: { x: s.x + (dx / l) * 8, y: s.y + (dy / l) * 8 + 4, width: 0, height: 0, dirX: dx / l, dirY: dy / l, priority: Math.abs(dg.maxAbsValue), anchorX: 'center', sweep: 'any' } });
+              }
             }
           }
         }
@@ -273,4 +418,86 @@ export function createFigure3DRenderer(): Figure2DRenderer {
       }
     },
   };
+}
+
+/** A value's colour on the figure: the screen's contour ramp, or a grey ramp in black and white. */
+function bandColour(v: number, min: number, max: number, style: string): string {
+  if (style === 'bw') {
+    const t = max > min ? (v - min) / (max - min) : 0.5;
+    const g = Math.round(235 - 175 * Math.max(0, Math.min(1, t)));
+    return `${RAW_INK}rgb(${g},${g},${g})`;
+  }
+  return `${RAW_INK}#${shellContourColor(v, min, max).toString(16).padStart(6, '0')}`;
+}
+
+/**
+ * The shells painted by one result, element by element (each its own value, as the table gives
+ * it), with the scale beside the structure: its colours, the range's ends and the component.
+ * The largest absolute value is written on its element when values are on.
+ */
+function drawShellMap(
+  ctx: CanvasRenderingContext2D,
+  component: ShellContourComponent,
+  style: string,
+  r3d: AnalysisResults3D | null | undefined,
+  shellFaces: () => Array<{ key: string; id: number; nodes: number[] }>,
+  drawShells: (fill?: (key: string) => string | null) => void,
+  toScreen: (p: P3) => { x: number; y: number },
+  scenePos: (id: number) => P3 | undefined,
+  values: boolean,
+  labels: ReturnType<typeof createLabelCollector>,
+): void {
+  const value = new Map<string, number>();
+  for (const s of r3d?.plateStresses ?? []) value.set(`p${s.elementId}`, shellComponentValue(s, component));
+  for (const s of r3d?.quadStresses ?? []) value.set(`q${s.elementId}`, shellComponentValue(s, component));
+  let min = Infinity, max = -Infinity;
+  for (const v of value.values()) { if (v < min) min = v; if (v > max) max = v; }
+  if (!Number.isFinite(min)) { drawShells(); return; }
+  drawShells((key) => {
+    const v = value.get(key);
+    return v === undefined ? null : bandColour(v, min, max, style);
+  });
+
+  // Where the structure lands on the page, to put the scale to its right.
+  let x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const f of shellFaces()) for (const id of f.nodes) {
+    const p = scenePos(id); if (!p) continue;
+    const c = toScreen(p);
+    x1 = Math.max(x1, c.x); y0 = Math.min(y0, c.y); y1 = Math.max(y1, c.y);
+  }
+  if (!Number.isFinite(x1)) return;
+  const meta = shellComponentMeta(component);
+  const fmt = (v: number) => (Math.abs(v) >= 1000 || (Math.abs(v) < 0.01 && v !== 0) ? v.toExponential(2) : v.toFixed(Math.abs(v) >= 100 ? 0 : 2));
+  const h = Math.max(120, Math.min(260, y1 - y0)), w = 14, x = x1 + 36, top = (y0 + y1) / 2 - h / 2;
+  const steps = 24;
+  ctx.save();
+  for (let k = 0; k < steps; k++) {
+    const v = max - ((max - min) * (k + 0.5)) / steps;
+    ctx.fillStyle = bandColour(v, min, max, style);
+    ctx.fillRect(x, top + (h * k) / steps, w, h / steps + 0.5);
+  }
+  ctx.strokeStyle = '#8fa3b3'; ctx.lineWidth = 0.8; ctx.strokeRect(x, top, w, h);
+  ctx.fillStyle = '#c7d3dd'; ctx.font = '10.5px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  if (max - min > 1e-9 * Math.max(1, Math.abs(max))) {
+    ctx.fillText(fmt(max), x + w + 6, top);
+    ctx.fillText(fmt((max + min) / 2), x + w + 6, top + h / 2);
+    ctx.fillText(fmt(min), x + w + 6, top + h);
+  } else {
+    // One value over every element: the scale says so rather than spreading it over a range.
+    ctx.fillText(fmt(max), x + w + 6, top + h / 2);
+  }
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText(`${meta.label} [${meta.unit}]`, x, top - 10);
+  ctx.restore();
+
+  if (values) {
+    let best: string | null = null, peak = -1;
+    for (const [k, v] of value) if (Math.abs(v) > peak) { peak = Math.abs(v); best = k; }
+    const f = best ? shellFaces().find((s) => s.key === best) : undefined;
+    const pts = f?.nodes.map(scenePos).filter((p): p is P3 => !!p) ?? [];
+    if (f && pts.length) {
+      const c = toScreen({ x: pts.reduce((a, p) => a + p.x, 0) / pts.length, y: pts.reduce((a, p) => a + p.y, 0) / pts.length, z: pts.reduce((a, p) => a + (p.z ?? 0), 0) / pts.length });
+      labels.add({ text: fmt(value.get(best!)!), colour: '#f4f7fa', font: 'bold 10.5px sans-serif', box: { x: c.x, y: c.y - 6, width: 0, height: 0, dirX: 0, dirY: -1, priority: peak, anchorX: 'center', sweep: 'any' } });
+    }
+  }
 }

@@ -4,7 +4,8 @@
   import QuickInfoCard from './viewport/QuickInfoCard.svelte';
   import { syncViewOverlays } from '../lib/viewport3d/view-overlays';
   import { deformedView } from '../lib/store/deformed-view.svelte';
-  import { viewState, selectionNodeIds, viewVisibility, visibleElements, visibleNodes, visiblePlates, visibleQuads } from '../lib/store/view-state.svelte';
+  import { focusNodeIds } from '../lib/model/select-like';
+  import { viewState, viewVisibility, visibleElements, visibleNodes, visiblePlates, visibleQuads } from '../lib/store/view-state.svelte';
   import { insidePolygon, extendLasso } from '../lib/viewport/lasso';
   import { timeHistoryView } from '../lib/store/time-history-view.svelte';
   import { contourOptions } from '../lib/store/contour-options.svelte';
@@ -20,7 +21,7 @@
   import { editPreview } from '../lib/store/edit-preview.svelte';
   import { snapToAxes } from '../lib/model/grid';
   import { addSupportFromTool3D } from '../lib/store/support-tool-3d';
-  import { nodeAtPlacement3D, resolveNodePlacement2D, memberParamOnRay, MIN_SPLIT_PX } from '../lib/viewport/node-placement';
+  import { resolveNodePlacement3D, memberParamOnRay, type NodePlacement3D } from '../lib/viewport/node-placement';
   import { toolStretch, loadedLength, loadedSegment } from '../lib/model/loads/load-stretch';
   import { boxSelect as boxSelectTargets, type BoxSelectMode } from '../lib/viewport/box-select';
   import { membersNearPointer, membersNearPointerWithDistance, nodesNearPointer } from '../lib/viewport3d/screen-pick';
@@ -72,6 +73,7 @@
   import BuildTimelapsePanel from './BuildTimelapsePanel.svelte';
   import { drawFreeBody, freeBodyFocus } from '../lib/canvas/free-body';
   import { freeBodyActions3D } from '../lib/viewport3d/free-body-3d';
+  import { displayedLoads3D, despieceNote3D, despieceDrawsActions, despieceNoteText } from '../lib/store/displayed-loads-3d';
 
   let container: HTMLDivElement;
   let renderer: THREE.WebGLRenderer;
@@ -421,13 +423,19 @@
   });
 
   /*
-   * Basic draws its node markers a fixed size on screen (`NodeMarkerStyle`), as the reader
-   * chose under Settings › Model: dots, small balls, or dots that turn into balls while a tool
-   * that clicks on nodes is armed. PRO keeps the sphere sized in metres.
+   * The node markers are a fixed size on screen (`NodeMarkerStyle`), as the reader chose under
+   * Settings › Model: dots, small balls, or dots that turn into balls while something that clicks
+   * on nodes is under way. A sphere sized in metres, which PRO drew until now, grew with every
+   * node nearer the camera than the orbit's target and covered the members. In PRO, aiming at
+   * nodes is also picking a plate's corners or a mesh outline, placing a generated structure or a
+   * paste with its ghost, and the joints tab, where a click on a node picks the joint.
    */
   $effect(() => {
-    const style = uiStore.appMode === 'pro' ? 'mesh' : resolveNodeStyle(uiStore.nodeStyle3D, uiStore.currentTool);
+    const aiming = uiStore.appMode === 'pro'
+      && (uiStore.shellNodePick.active || placementStore.active || uiStore.proActiveTab === 'connections');
+    const style = resolveNodeStyle(uiStore.nodeStyle3D, uiStore.currentTool, aiming);
     nodesInstanced.setStyle(style);
+    (window as unknown as { __nodeMarkerStyle?: string }).__nodeMarkerStyle = style;
     invalidate();
   });
 
@@ -1115,29 +1123,21 @@
 
     // Frame what is selected — the magnifier. Same fit as the whole model, over its nodes only.
     const handleZoomToSelection = () => {
-      const ids = selectionNodeIds(uiStore.selectedNodes, uiStore.selectedElements, modelStore.elements);
-      // A selected support or load is framed by the node or member it stands on.
-      for (const id of uiStore.selectedSupports) { const s = modelStore.supports.get(id); if (s) ids.add(s.nodeId); }
-      for (const l of modelStore.loads) {
-        if (!uiStore.selectedLoads.has(l.data.id)) continue;
-        const d = l.data as { nodeId?: number; elementId?: number };
-        if (d.nodeId !== undefined) ids.add(d.nodeId);
-        const e = d.elementId !== undefined ? modelStore.elements.get(d.elementId) : undefined;
-        if (e) { ids.add(e.nodeI); ids.add(e.nodeJ); }
-      }
+      // Every kind frames by its nodes: members by their ends, plates by their corners, supports and loads by where they sit.
+      const ids = focusNodeIds(modelStore.model as never, {
+        nodes: uiStore.selectedNodes, elements: uiStore.selectedElements, shells: uiStore.selectedShells,
+        supports: uiStore.selectedSupports, loads: uiStore.selectedLoads,
+      });
       if (ids.size === 0) return;
       const subset = new Map([...modelStore.nodes].filter(([id]) => ids.has(id)));
       if (subset.size === 1) {
-        // One node has no extent to fit; give it a metre around it. In Basic, where walking
-        // steps through supports and nodal loads one by one, about a third of the model around it,
-        // so what it holds stays in view.
+        // One node has no extent to fit: about a third of the model around it (at least a metre),
+        // so that walking through supports, nodal loads or nodes one by one keeps what each holds
+        // in view.
         const [n] = subset.values();
-        let pad = 0.5;
-        if (uiStore.appMode !== 'pro') {
-          const xs = [...modelStore.nodes.values()];
-          const span = (f: (p: { x: number; y: number; z?: number }) => number) => Math.max(...xs.map(f)) - Math.min(...xs.map(f));
-          pad = Math.max(0.5, 0.3 * Math.hypot(span((p) => p.x), span((p) => p.y), span((p) => p.z ?? 0)));
-        }
+        const xs = [...modelStore.nodes.values()];
+        const span = (f: (p: { x: number; y: number; z?: number }) => number) => Math.max(...xs.map(f)) - Math.min(...xs.map(f));
+        const pad = Math.max(0.5, 0.3 * Math.hypot(span((p) => p.x), span((p) => p.y), span((p) => p.z ?? 0)));
         subset.set(-1, { ...n!, id: -1, x: n!.x + pad });
         subset.set(-2, { ...n!, id: -2, x: n!.x - pad });
       }
@@ -1331,11 +1331,14 @@
     g.clearRect(0, 0, fbCanvas.width, fbCanvas.height);
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     const r3d = resultsStore.results3D!;
+    // An envelope or a magnitude is no state of equilibrium: its pieces, and a note saying so.
+    const fbNote = despieceNote3D(r3d);
+    const fbActs = despieceDrawsActions(fbNote);
     const data = freeBodyActions3D({
-      elements: modelStore.elements, nodes: modelStore.nodes, forces: r3d.elementForces, reactions: r3d.reactions ?? [],
+      elements: modelStore.elements, nodes: modelStore.nodes, forces: fbActs ? r3d.elementForces : [], reactions: fbActs ? r3d.reactions ?? [] : [],
       sections: modelStore.sections, project2D: shouldProject2DModel(), leftHand: uiStore.axisConvention3D === 'leftHand',
       basis: uiStore.despieceBasis, resultant: uiStore.despieceCombineVectors, showReactions: resultsStore.showReactions,
-      loads: modelStore.loads,
+      loads: displayedLoads3D(r3d),
       loadText: (v, q) => fixedQuantity(v, q, 1, uiStore.unitSystem),
       negligible: 0.02,
       loadMode: uiStore.despieceLoadMode === 'resultant' ? 'resultant' : 'all',
@@ -1352,6 +1355,7 @@
       planar: false,
       focus: freeBodyFocus(data.members, uiStore.selectedElements, uiStore.selectedNodes),
       hint: t('despiece.selectToSee'),
+      note: despieceNoteText(fbNote),
       fmt: (v, q) => fixedQuantity(v, q, 1, uiStore.unitSystem),
       labelPx: 10.5 * Math.max(0.6, uiStore.despieceLabelSize),
       arrowPx: 32 * Math.max(0.5, uiStore.despieceVectorSize),
@@ -2184,19 +2188,13 @@
     uiStore.toast(t('viewport3d.nodeCreated').replace('{id}', String(id)), 'success');
   }
 
-  type NodePlacement3D =
-    | { kind: 'onNode'; nodeId: number; sx: number; sy: number }
-    | { kind: 'onMember'; elementId: number; t: number; midpoint: boolean; sx: number; sy: number; a: { x: number; y: number }; b: { x: number; y: number } }
-    | { kind: 'free'; p: { x: number; y: number; z: number }; sx: number; sy: number };
-
   /**
-   * What a node-tool click at this pointer does, as in the plane (`resolveNodePlacement2D`), read
-   * on the screen: right on a drawn node, nothing; on a drawn member, a node splitting it where
-   * the pointer ray passes closest (on the grid along it, for a member in the working plane);
-   * elsewhere a new node on the working plane, unless one is already exactly there.
+   * What a node-tool click at this pointer does (`resolveNodePlacement3D`): read on the screen,
+   * with the pointer on the working plane and its ray for what the screen cannot tell.
    */
   function nodePlacement3D(e: MouseEvent): NodePlacement3D | null {
     if (!camera || !container) return null;
+    const cam = camera;
     const rect = container.getBoundingClientRect();
     const cursor = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     const screen = new Map<number, { x: number; y: number }>();
@@ -2205,46 +2203,19 @@
       const s = projectToScreen(n.x, n.y, n.z ?? 0);
       screen.set(n.id, s); nodes.push({ id: n.id, ...s });
     }
-    const members = [...visibleElements().values()];
-    const place = resolveNodePlacement2D({
-      cursor, snapped: cursor, pxPerM: 1, nodes, members, nodeAt: (id) => screen.get(id), split: uiStore.autoSplitOnNodePlace,
-    });
-    if (place.kind === 'onNode') return { kind: 'onNode', nodeId: place.nodeId, sx: place.x, sy: place.y };
-    if (place.kind === 'onMember') {
-      const el = modelStore.elements.get(place.elementId);
-      const A = el && modelStore.nodes.get(el.nodeI), B = el && modelStore.nodes.get(el.nodeJ);
-      if (!el || !A || !B) return null;
-      const a3 = { x: A.x, y: A.y, z: A.z ?? 0 }, b3 = { x: B.x, y: B.y, z: B.z ?? 0 };
-      let t = 0.5;
-      if (!place.midpoint) {
+    return resolveNodePlacement3D({
+      cursor, nodes, members: [...visibleElements().values()], nodeAt: (id) => screen.get(id),
+      split: uiStore.autoSplitOnNodePlace, model: modelStore.nodes,
+      plane: uiStore.workingPlane, planeLevel: uiStore.nodeCreateZ,
+      ground: getGroundIntersection(e),
+      snap: (p) => snapToStructure(new THREE.Vector3(p.x, p.y, p.z)),
+      rayParam: (A, B) => {
         updateMouseNDC(e);
-        raycaster.setFromCamera(mouse, camera);
-        const plane = uiStore.workingPlane;
-        const acrossOf = (p: { x: number; y: number; z: number }) => plane === 'XY' ? p.z : plane === 'XZ' ? p.y : p.x;
-        const inPlane = Math.abs(acrossOf(a3) - uiStore.nodeCreateZ) < 1e-6 && Math.abs(acrossOf(b3) - uiStore.nodeCreateZ) < 1e-6;
-        const ground = inPlane ? getGroundIntersection(e) : null;
-        const L2 = (b3.x - a3.x) ** 2 + (b3.y - a3.y) ** 2 + (b3.z - a3.z) ** 2;
-        if (ground && L2 > 1e-12) {
-          const g = snapToStructure(ground);
-          t = ((g.x - a3.x) * (b3.x - a3.x) + (g.y - a3.y) * (b3.y - a3.y) + (g.z - a3.z) * (b3.z - a3.z)) / L2;
-        } else {
-          t = memberParamOnRay(raycaster.ray.origin, raycaster.ray.direction, a3, b3) ?? place.t;
-        }
-        // Kept off the ends by a few pixels, like the plane.
-        const ends = { a: screen.get(el.nodeI)!, b: screen.get(el.nodeJ)! };
-        const minT = Math.max(0.01, MIN_SPLIT_PX / Math.max(Math.hypot(ends.b.x - ends.a.x, ends.b.y - ends.a.y), 1e-9));
-        t = Math.min(1 - minT, Math.max(minT, t));
-      }
-      const p = projectToScreen(a3.x + t * (b3.x - a3.x), a3.y + t * (b3.y - a3.y), a3.z + t * (b3.z - a3.z));
-      return { kind: 'onMember', elementId: place.elementId, t, midpoint: place.midpoint, sx: p.x, sy: p.y, a: screen.get(el.nodeI)!, b: screen.get(el.nodeJ)! };
-    }
-    const pos = getGroundIntersection(e);
-    if (!pos) return null;
-    const snapped = snapToStructure(pos);
-    const there = nodeAtPlacement3D(null, snapped, uiStore.workingPlane, modelStore.nodes);
-    const s = projectToScreen(snapped.x, snapped.y, snapped.z);
-    if (there !== null) return { kind: 'onNode', nodeId: there, sx: s.x, sy: s.y };
-    return { kind: 'free', p: snapped, sx: s.x, sy: s.y };
+        raycaster.setFromCamera(mouse, cam);
+        return memberParamOnRay(raycaster.ray.origin, raycaster.ray.direction, A, B);
+      },
+      project: (p) => projectToScreen(p.x, p.y, p.z),
+    });
   }
 
   /**
@@ -2395,10 +2366,9 @@
     // No pushState here: the mutation below pushes its own undo step, and a second one made the first Ctrl+Z a no-op.
 
     if (is3D) {
-      // PRO places the support its drawing bar describes; 3D Basic keeps its own strip.
-      const supId = uiStore.appMode === 'pro' ? drawState.addSupportAt(nodeId) : addSupportFromTool3D(nodeId);
-      // Basic stays in create mode: selecting it would turn the options row into its editor.
-      if (uiStore.appMode === 'pro') uiStore.selectSupport(supId, false);
+      // Basic's support tool; PRO adds supports from its panel's Add card. Basic stays in create
+      // mode: selecting it would turn the options row into its editor.
+      const supId = addSupportFromTool3D(nodeId);
       uiStore.toast(t('viewport3d.supportCreated').replace('{id}', String(supId)).replace('{nid}', String(nodeId)), 'success');
     } else {
       // 2D support creation (unchanged)
@@ -2441,7 +2411,11 @@
     const el = modelStore.elements.get(elemId);
     const a0 = el ? nodeScenePoint(el.nodeI) : null, b0 = el ? nodeScenePoint(el.nodeJ) : null;
     if (!el || !a0 || !b0) return false;
-    const a = memberPointerPosition(e, el) * a0.distanceTo(b0);
+    // Screen distance is not proportional to member distance in perspective.
+    // Use the same world-space projection as the load's dragging handles.
+    updateMouseNDC(e);
+    raycaster.setFromCamera(mouse, camera);
+    const a = stationOnRay({ I: a0, J: b0, L: a0.distanceTo(b0) }, raycaster.ray);
     modelStore.batch(() => {
       const id = modelStore.addPointLoadOnElement3D(elemId, a, 0, 0, uiStore.activeLoadCaseId);
       modelStore.updateLoad(id, {
@@ -2452,18 +2426,6 @@
     });
     uiStore.toast(t('viewport3d.pointLoadOnMemberApplied').replace('{id}', String(elemId)), 'success');
     return true;
-  }
-
-  /** The fraction of a member's length under the pointer, from its screen projection. */
-  function memberPointerPosition(e: MouseEvent, el: { nodeI: number; nodeJ: number }): number {
-    const a = nodeScenePoint(el.nodeI), b = nodeScenePoint(el.nodeJ);
-    if (!a || !b || !camera) return 0.5;
-    const rect = container.getBoundingClientRect();
-    const sa = projectToScreen(a.x, a.y, a.z), sb = projectToScreen(b.x, b.y, b.z);
-    const px = e.clientX - rect.left, py = e.clientY - rect.top;
-    const dx = sb.x - sa.x, dy = sb.y - sa.y;
-    const l2 = dx * dx + dy * dy;
-    return l2 < 1e-9 ? 0.5 : Math.max(0, Math.min(1, ((px - sa.x) * dx + (py - sa.y) * dy) / l2));
   }
 
   function handleLoadTool(e: MouseEvent) {
@@ -2484,12 +2446,7 @@
       }
 
       // No pushState here: the mutation below pushes its own undo step, and a second one made the first Ctrl+Z a no-op.
-      if (uiStore.appMode === 'pro') {
-        // PRO: all six components, as the drawing bar and the Loads table hold them.
-        const v = drawState.nodalLoad;
-        if ([v.fx, v.fy, v.fz, v.mx, v.my, v.mz].every((x) => x === 0)) { uiStore.toast(t('drawBar.loadIsZero'), 'info'); return; }
-        modelStore.addNodalLoad3D(nodeId, v.fx, v.fy, v.fz, v.mx, v.my, v.mz, uiStore.activeLoadCaseId);
-      } else if (is3D) {
+      if (is3D) {
         // Build 3D nodal load from direction + value
         const dir = uiStore.nodalLoadDir3D;
         const val = uiStore.loadValue;
@@ -2516,12 +2473,7 @@
       if (elemId === null) return;
 
       // No pushState here: the mutation below pushes its own undo step, and a second one made the first Ctrl+Z a no-op.
-      if (uiStore.appMode === 'pro') {
-        // PRO: uniform, along the axes the drawing bar names.
-        const q = drawState.memberLoad;
-        if (q.qx === 0 && q.qy === 0 && q.qz === 0) { uiStore.toast(t('drawBar.loadIsZero'), 'info'); return; }
-        modelStore.addDistributedLoad3D(elemId, q.qy, q.qy, q.qz, q.qz, undefined, undefined, uiStore.activeLoadCaseId, { frame: q.frame, qXI: q.qx, qXJ: q.qx });
-      } else if (is3D) {
+      if (is3D) {
         if ([uiStore.loadValueY3D, uiStore.loadValueYJ3D, uiStore.loadValueZ, uiStore.loadValueZJ].every((x) => x === 0)) {
           uiStore.toast(t('drawBar.loadIsZero'), 'info'); return;
         }
@@ -2699,13 +2651,15 @@
   }
 
   // ─── Helper: project a 3D world point to screen coords ────
-  function projectToScreen(wx: number, wy: number, wz: number): { x: number; y: number } {
+  // With its depth (`z`, smaller nearer): picking a load by its fill takes the nearer slab.
+  function projectToScreen(wx: number, wy: number, wz: number): { x: number; y: number; z: number } {
     const v = new THREE.Vector3(wx, wy, wz);
     v.project(camera);
     const rect = container.getBoundingClientRect();
     return {
       x: (v.x * 0.5 + 0.5) * rect.width,
       y: (-v.y * 0.5 + 0.5) * rect.height,
+      z: v.z,
     };
   }
 
@@ -3005,7 +2959,7 @@
     const rect = container.getBoundingClientRect();
     const pointLoads = new Set<number>();
     for (const l of modelStore.loads) if (l.type === 'nodal' || l.type === 'nodal3d' || l.type === 'pointOnElement' || l.type === 'pointOnElement3d') pointLoads.add(l.data.id);
-    return pickLoadsWithDistance(e.clientX - rect.left, e.clientY - rect.top, fp, projectToScreen, 10, pointLoads);
+    return pickLoadsWithDistance(e.clientX - rect.left, e.clientY - rect.top, fp, projectToScreen, 10, pointLoads, sceneCtx?.loadAreas);
   }
   /**
    * The load a click selects. Loads drawn on top of each other (the same load twice on a member,

@@ -22,6 +22,20 @@ import { initSolver, isWasmReady } from '../engine/wasm-solver';
 import { reportModelDiagnostics } from '../engine/solve-diagnostics';
 import { requestAutosave } from '../store/autosave-service';
 import { syncDefinedLoadsForAnalysis } from '../store/defined-loads';
+import { spectralCaseResults } from '../store/spectral-cases';
+
+/**
+ * The spectral cases' results, or nothing (said) when they cannot be had: those cases are left out.
+ * What the reader should know of results that were had (too little mass moving in a direction, a
+ * scale the regulation no longer gives) is said too.
+ */
+export function spectralOrSay() {
+  if (!modelStore.model.loadCases.some((c) => c.spectral)) return undefined;
+  const r = spectralCaseResults();
+  if (typeof r === 'string') { uiStore.toast(t('spectralCase.leftOut') + ' ' + r, 'error'); return undefined; }
+  for (const w of r.warnings) uiStore.toast(w, 'info');
+  return r.results;
+}
 
 /** How a solve ended: with results, or with the message the reader was shown. */
 export type SolveOutcome = { ok: true } | { ok: false; error: string };
@@ -153,7 +167,7 @@ export async function runSolve3D(): Promise<SolveOutcome> {
     let comboText = '';
     // Basic with load cases off shows no combinations: none are solved.
     if (modelStore.model.combinations.length > 0 && uiStore.showLoadCasePicker) {
-      const comboResult = modelStore.solveCombinations3D(uiStore.includeSelfWeight, uiStore.axisConvention3D === 'leftHand', isPro);
+      const comboResult = modelStore.solveCombinations3D(uiStore.includeSelfWeight, uiStore.axisConvention3D === 'leftHand', isPro, isPro ? spectralOrSay() : undefined);
       if (comboResult && typeof comboResult !== 'string') {
         publishCombinations3D(comboResult);
         comboText = t('toast.plusCombinations').replace('{n}', String(comboResult.perCombo.size));
