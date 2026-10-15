@@ -9993,7 +9993,7 @@ const en: Record<string, string> = {
   'config.tip.loadSize': 'Makes the loads drawn larger or smaller: point and distributed arrows, moments and thermal marks, in 2D and 3D. Their text follows the label size. Remembered in this browser.',
   'timelapse.envelope': 'Cladding and glass at the end',
   'timelapse.envelopeShort': 'cladding',
-  'timelapse.envelopeTip': 'Once the structure stands, closes the façades floor by floor with spandrels, glass and mullions. It is only for the video: nothing is added to the model. It needs a building with floors; the façades come from each floor\'s outline, and a wall on a façade is left as it is.',
+  'timelapse.envelopeTip': 'Once the structure stands, closes the façades floor by floor with spandrels, glass and mullions, and puts glass railings on the balconies. It is only for the video: nothing is added to the model. It needs a building with floors; the façades follow each floor\'s columns, and where a wall stands the bay is clad solid.',
   'figures.shellMap': 'Shell result',
   'proExport.resultsScreen': 'As on screen',
   'proExport.resultsCase': 'Case',

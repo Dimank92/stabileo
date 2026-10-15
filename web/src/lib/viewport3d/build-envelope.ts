@@ -1,13 +1,16 @@
 /**
  * The building's envelope for the build timelapse: cladding and glass put on the façades once
- * the structure stands. It is a picture, not part of the model: nothing here is analysed.
+ * the structure stands, and glass railings on the balconies. It is a picture, not part of the
+ * model: nothing here is analysed.
  *
- * Pure. From the pieces the timelapse builds (scene space, Z up) it finds the floors and, on each,
- * the façade lines: the beams and slab edges that lie on the outline of that floor's plan (its
- * convex hull, so a re-entrant corner of an L-shaped plan is left open). Each façade line between
- * a floor and the one below is split at its columns into bays, and a bay a wall (a vertical
- * shell) already closes is left out. `envelopeSchedule` then puts the bays up floor by floor, each
- * floor going round the building.
+ * Pure. From the pieces the timelapse builds (scene space, Z up) it finds the floors and, on each
+ * storey, the outline the envelope closes: the convex hull of the columns standing in it (of its
+ * beams and slab edges when it has no columns), so a slab cantilevered past the columns stays out,
+ * as a balcony, and a re-entrant corner of an L-shaped plan stays open. Each side of the outline
+ * that the floor's beams or slab edges cover is split into bays at the columns and at the ends of
+ * any wall (vertical shell) on it: a bay a wall stands in is clad solid, the others are glazed.
+ * A slab outside the outline is a balcony, and its free edges get a railing.
+ * `envelopeSchedule` then puts it all up floor by floor, each floor going round the building.
  */
 import type { BuildPiece, BuildStep, P3 } from './build-timelapse';
 
@@ -15,17 +18,25 @@ interface P2 { x: number; y: number }
 
 export interface EnvelopeBay {
   key: string;
-  /** The bay's ends on the façade line, in plan. */
+  /**
+   * `glazed`: a spandrel, glass and a slab-edge band. `solid`: cladding from floor to floor, where
+   * a wall stands. `rail`: a balcony's glass railing on the slab edge.
+   */
+  kind: 'glazed' | 'solid' | 'rail';
+  /** The bay's ends on its line, in plan. */
   a: P2;
   b: P2;
-  /** Its foot (the floor below, or the ground) and its head (its own floor). */
+  /** Its foot and its head: the floors below and above, or for a railing its slab and its top. */
   z0: number;
   z1: number;
-  /** Unit plan normal pointing out of the building. */
+  /** Unit plan normal pointing out of the building (out of the balcony, for a railing). */
   out: P2;
-  /** Floor index, from 1 at the first floor above the ground. */
+  /** Turn, by floor: 1 for the first storey above the ground; a railing goes with the storey above its slab. */
   floor: number;
 }
+
+/** A balcony railing's height above its slab (m). */
+export const RAIL_HEIGHT = 1.05;
 
 const cross2 = (o: P2, a: P2, b: P2) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
 
@@ -54,7 +65,30 @@ function onEdge(a: P2, b: P2, p: P2): { s: number; off: number; len: number } {
   return { s: rx * ux + ry * uy, off: Math.abs(-rx * uy + ry * ux), len };
 }
 
-/** The façade bays of the structure; none for a model with no floor above its foot. */
+/** Whether `p` is inside the counter-clockwise ring, at least `tol` in from its sides. */
+function inside(ring: P2[], p: P2, tol: number): boolean {
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i]!, b = ring[(i + 1) % ring.length]!;
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    if (cross2(a, b, p) / len < tol) return false;
+  }
+  return true;
+}
+
+/** Overlapping intervals merged (within `tol`). */
+function union(iv: Array<[number, number]>, tol: number): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  for (const c of [...iv].sort((u, v) => u[0] - v[0])) {
+    const last = out[out.length - 1];
+    if (last && c[0] <= last[1] + tol) last[1] = Math.max(last[1], c[1]);
+    else out.push([c[0], c[1]]);
+  }
+  return out;
+}
+
+const centroid2 = (poly: P2[]): P2 => poly.reduce((s, q) => ({ x: s.x + q.x / poly.length, y: s.y + q.y / poly.length }), { x: 0, y: 0 });
+
+/** The façade bays and balcony railings of the structure; none for a model with no floor above its foot. */
 export function facadeBays(pieces: readonly BuildPiece[]): EnvelopeBay[] {
   if (pieces.length === 0) return [];
   let zMin = Infinity, span = 0;
@@ -69,8 +103,9 @@ export function facadeBays(pieces: readonly BuildPiece[]): EnvelopeBay[] {
   const tol = Math.max(0.05, span * 0.005);
   const band = (z: number) => Math.round(z / tol);
 
-  // Horizontal lines (beams, slab edges) by floor; columns and walls to split and skip bays.
+  // Horizontal lines (beams, slab edges) and slabs by floor; columns and walls.
   const lines = new Map<number, Array<{ a: P2; b: P2; z: number }>>();
+  const slabs = new Map<number, P2[][]>();
   const addLine = (a: P3, b: P3) => {
     const z = (a.z + b.z) / 2;
     if (z <= zMin + tol) return;
@@ -92,6 +127,12 @@ export function facadeBays(pieces: readonly BuildPiece[]): EnvelopeBay[] {
       const lo = Math.min(...zs), hi = Math.max(...zs);
       if (hi - lo < tol) {
         for (let i = 0; i < p.pts.length; i++) addLine(p.pts[i]!, p.pts[(i + 1) % p.pts.length]!);
+        if (lo > zMin + tol) {
+          const k = band(lo);
+          const list = slabs.get(k) ?? [];
+          list.push(p.pts.map((q) => ({ x: q.x, y: q.y })));
+          slabs.set(k, list);
+        }
       } else {
         // A wall: its plan trace, the two points farthest apart.
         let best: [P3, P3] = [p.pts[0]!, p.pts[0]!], d = -1;
@@ -105,60 +146,92 @@ export function facadeBays(pieces: readonly BuildPiece[]): EnvelopeBay[] {
   }
 
   const floors = [...lines.keys()].sort((a, b) => a - b);
+  const levelZ = (k: number) => { const l = lines.get(k)!; return l.reduce((s, x) => s + x.z, 0) / l.length; };
   const bays: EnvelopeBay[] = [];
   floors.forEach((k, fi) => {
     const segs = lines.get(k)!;
-    const z1 = segs.reduce((s, l) => s + l.z, 0) / segs.length;
-    const z0 = fi === 0 ? zMin : lines.get(floors[fi - 1]!)!.reduce((s, l) => s + l.z, 0) / lines.get(floors[fi - 1]!)!.length;
-    const ring = hull(segs.flatMap((l) => [l.a, l.b]));
+    const z1 = levelZ(k);
+    const z0 = fi === 0 ? zMin : levelZ(floors[fi - 1]!);
+    const zm = (z0 + z1) / 2;
+    // The outline: the columns standing in this storey, else its beams and slab edges.
+    const colPts: P2[] = [];
+    for (const c of columns) {
+      if (c.z0 >= z1 - tol || c.z1 <= z0 + tol) continue;
+      if (!colPts.some((q) => Math.hypot(q.x - c.p.x, q.y - c.p.y) <= tol)) colPts.push(c.p);
+    }
+    let ring = colPts.length >= 3 ? hull(colPts) : [];
+    if (ring.length < 3) ring = hull(segs.flatMap((l) => [l.a, l.b]));
     if (ring.length < 3) return;
+
     for (let e = 0; e < ring.length; e++) {
       const A = ring[e]!, B = ring[(e + 1) % ring.length]!;
-      // The parts of this hull edge the floor's lines cover, and where its columns stand.
-      const cover: Array<[number, number]> = [];
       const len = Math.hypot(B.x - A.x, B.y - A.y) || 1;
-      for (const l of segs) {
-        const p = onEdge(A, B, l.a), q = onEdge(A, B, l.b);
-        if (p.off > tol || q.off > tol) continue;
-        const s0 = Math.max(0, Math.min(p.s, q.s)), s1 = Math.min(p.len, Math.max(p.s, q.s));
-        if (s1 - s0 > tol) cover.push([s0, s1]);
-      }
-      if (cover.length === 0) continue;
-      cover.sort((u, v) => u[0] - v[0]);
-      const merged: Array<[number, number]> = [];
-      for (const c of cover) {
-        const last = merged[merged.length - 1];
-        if (last && c[0] <= last[1] + tol) last[1] = Math.max(last[1], c[1]);
-        else merged.push([c[0], c[1]]);
-      }
+      // The stretch of a line (or wall) lying on this side, as lengths along it.
+      const along = (p: P2, q: P2, off: number): [number, number] | null => {
+        const u = onEdge(A, B, p), v = onEdge(A, B, q);
+        if (u.off > off || v.off > off) return null;
+        const s0 = Math.max(0, Math.min(u.s, v.s)), s1 = Math.min(len, Math.max(u.s, v.s));
+        return s1 - s0 > tol ? [s0, s1] : null;
+      };
+      const merged = union(segs.map((l) => along(l.a, l.b, tol)).filter((x): x is [number, number] => !!x), tol);
+      if (merged.length === 0) continue;
       const cuts: number[] = [];
       for (const c of columns) {
         if (c.z1 < z0 + tol || c.z0 > z1 - tol) continue;
         const r = onEdge(A, B, c.p);
         if (r.off <= tol) cuts.push(r.s);
       }
+      const walled = union(walls.filter((w) => zm >= w.z0 - tol && zm <= w.z1 + tol)
+        .map((w) => along(w.a, w.b, tol * 2)).filter((x): x is [number, number] => !!x), tol);
       const ux = (B.x - A.x) / len, uy = (B.y - A.y) / len;
-      // Counter-clockwise ring: the outside is to the right of each edge.
+      // Counter-clockwise ring: the outside is to the right of each side.
       const out = { x: uy, y: -ux };
       for (const [m0, m1] of merged) {
-        const stops = [m0, ...cuts.filter((s) => s > m0 + tol && s < m1 - tol).sort((u, v) => u - v), m1];
-        // No column anywhere on the line (a flat slab's edge): bays of about 3 m.
-        if (cuts.length === 0 && m1 - m0 > 4.5) {
+        const within = (s: number) => s > m0 + tol && s < m1 - tol;
+        const stops = [m0, ...cuts.filter(within), ...walled.flat().filter(within), m1].sort((u, v) => u - v)
+          .filter((s, i, all) => i === 0 || s - all[i - 1]! > tol);
+        // No column nor wall on the side (a flat slab's edge): bays of about 3 m.
+        if (cuts.length === 0 && walled.length === 0 && m1 - m0 > 4.5) {
           const n = Math.round((m1 - m0) / 3);
           stops.splice(1, 0, ...Array.from({ length: n - 1 }, (_, i) => m0 + ((i + 1) * (m1 - m0)) / n));
         }
         for (let i = 0; i + 1 < stops.length; i++) {
-          const s0 = stops[i]!, s1 = stops[i + 1]!;
-          const a = { x: A.x + ux * s0, y: A.y + uy * s0 }, b = { x: A.x + ux * s1, y: A.y + uy * s1 };
-          const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, zm = (z0 + z1) / 2;
-          const closed = walls.some((w) => {
-            const r = onEdge(w.a, w.b, mid);
-            return r.off <= tol * 2 && r.s >= -tol && r.s <= r.len + tol && zm >= w.z0 - tol && zm <= w.z1 + tol;
+          const s0 = stops[i]!, s1 = stops[i + 1]!, sm = (s0 + s1) / 2;
+          bays.push({
+            key: `f${fi + 1}:${e}:${i}:${Math.round(s0 * 100)}`,
+            kind: walled.some(([w0, w1]) => sm > w0 && sm < w1) ? 'solid' : 'glazed',
+            a: { x: A.x + ux * s0, y: A.y + uy * s0 }, b: { x: A.x + ux * s1, y: A.y + uy * s1 },
+            z0, z1, out, floor: fi + 1,
           });
-          if (!closed) bays.push({ key: `f${fi + 1}:${e}:${i}:${Math.round(s0 * 100)}`, a, b, z0, z1, out, floor: fi + 1 });
         }
       }
     }
+
+    // Balconies at this floor: slabs outside the outline, railed along their free edges (not
+    // shared with another balcony slab, not on the outline).
+    const onRing = (p: P2, q: P2) => ring.some((A, i) => {
+      const B = ring[(i + 1) % ring.length]!;
+      const u = onEdge(A, B, p), v = onEdge(A, B, q);
+      return u.off <= tol && v.off <= tol && u.s >= -tol && u.s <= u.len + tol && v.s >= -tol && v.s <= v.len + tol;
+    });
+    const balconies = (slabs.get(k) ?? []).filter((poly) => !inside(ring, centroid2(poly), -tol));
+    const edgeKey = (p: P2, q: P2) => {
+      const a = `${Math.round(p.x / tol)},${Math.round(p.y / tol)}`, b = `${Math.round(q.x / tol)},${Math.round(q.y / tol)}`;
+      return a < b ? `${a}|${b}` : `${b}|${a}`;
+    };
+    const count = new Map<string, number>();
+    for (const poly of balconies) poly.forEach((p, i) => { const key = edgeKey(p, poly[(i + 1) % poly.length]!); count.set(key, (count.get(key) ?? 0) + 1); });
+    balconies.forEach((poly, bi) => {
+      const c = centroid2(poly);
+      poly.forEach((p, i) => {
+        const q = poly[(i + 1) % poly.length]!;
+        const l = Math.hypot(q.x - p.x, q.y - p.y);
+        if (l <= tol || count.get(edgeKey(p, q))! > 1 || onRing(p, q)) return;
+        let out = { x: (q.y - p.y) / l, y: -(q.x - p.x) / l };
+        if (out.x * ((p.x + q.x) / 2 - c.x) + out.y * ((p.y + q.y) / 2 - c.y) < 0) out = { x: -out.x, y: -out.y };
+        bays.push({ key: `r${fi + 1}:${bi}:${i}`, kind: 'rail', a: p, b: q, z0: z1, z1: z1 + RAIL_HEIGHT, out, floor: fi + 2 });
+      });
+    });
   });
   return bays;
 }

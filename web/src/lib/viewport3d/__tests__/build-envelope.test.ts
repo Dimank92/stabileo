@@ -35,9 +35,25 @@ describe('façade bays', () => {
     }
   });
 
-  it('a wall on the façade closes its bay', () => {
+  it('a wall on the façade is clad solid, and only where it stands', () => {
     const wall: BuildPiece = { key: 'q1', kind: 'shell', nodes: [1, 2, 3, 4], pts: [{ x: 0, y: 0, z: 0 }, { x: 0, y: 6, z: 0 }, { x: 0, y: 6, z: 3 }, { x: 0, y: 0, z: 3 }] };
-    expect(facadeBays(frame(1, [wall]))).toHaveLength(5);
+    const whole = facadeBays(frame(1, [wall]));
+    expect(whole).toHaveLength(6);
+    expect(whole.filter((b) => b.kind === 'solid')).toHaveLength(1);
+    // A wall over part of a bay (a lift core in a corner): the bay splits at its end, no gap left.
+    const core: BuildPiece = { key: 'q2', kind: 'shell', nodes: [5, 6, 7, 8], pts: [{ x: 0, y: 0, z: 0 }, { x: 2.5, y: 0, z: 0 }, { x: 2.5, y: 0, z: 3 }, { x: 0, y: 0, z: 3 }] };
+    const part = facadeBays(frame(1, [core])).filter((b) => b.a.y === 0 && b.b.y === 0 && Math.min(b.a.x, b.b.x) < 5);
+    expect(part.map((b) => [b.kind, Math.round(Math.abs(b.b.x - b.a.x) * 10) / 10])).toEqual(expect.arrayContaining([['solid', 2.5], ['glazed', 2.5]]));
+  });
+
+  it('a slab past the columns is a balcony: left out of the envelope and railed on its free edges', () => {
+    // A 2 m balcony slab along x = 10, from y 0 to 6, at the first floor.
+    const balcony: BuildPiece = { key: 'q3', kind: 'shell', nodes: [9, 10, 11, 12], pts: [{ x: 10, y: 0, z: 3 }, { x: 12, y: 0, z: 3 }, { x: 12, y: 6, z: 3 }, { x: 10, y: 6, z: 3 }] };
+    const bays = facadeBays(frame(1, [balcony]));
+    expect(bays.filter((b) => b.kind !== 'rail').every((b) => Math.max(b.a.x, b.b.x) <= 10 + 1e-9)).toBe(true);
+    const rails = bays.filter((b) => b.kind === 'rail');
+    expect(rails).toHaveLength(3);
+    expect(rails.every((r) => r.z0 === 3 && r.z1 > 3.9)).toBe(true);
   });
 
   it('a lone beam or a flat model has no façade', () => {

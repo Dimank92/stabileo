@@ -92,15 +92,18 @@ const ENV_OUT = 0.28;
 const ENV_PANEL = 0.12;
 const ENV_GLASS = 0.03;
 const ENV_MULLION = { along: 0.06, deep: 0.1 };
+/** How far in from a balcony's edge its railing stands (m). */
+const ENV_RAIL_IN = 0.08;
 /** Seconds between the structure finishing and the envelope starting. */
 const ENV_PAUSE = 0.4;
 
 interface EnvPart { step: EnvelopeStep; cladding: THREE.Group; glass: THREE.Group }
 
 /**
- * The envelope's meshes, one cladding group and one glass group per bay, standing where they go:
- * a spandrel at the foot and a band at the floor's edge, the glass between them divided by
- * mullions about every 1.6 m.
+ * The envelope's meshes, one cladding group and one glass group per bay, standing where they go.
+ * A glazed bay: a spandrel at the foot and a band at the floor's edge, the glass between them
+ * divided by mullions about every 1.6 m. A solid one (a wall behind): cladding floor to floor. A
+ * balcony's railing: glass with posts and a handrail.
  */
 function buildEnvelopeMeshes(steps: readonly EnvelopeStep[]): { group: THREE.Group; parts: EnvPart[]; dispose: () => void } {
   const group = new THREE.Group();
@@ -118,25 +121,37 @@ function buildEnvelopeMeshes(steps: readonly EnvelopeStep[]): { group: THREE.Gro
     parent.add(m);
   };
   for (const step of steps) {
-    const { a, b, z0, z1, out } = step.bay;
+    const { a, b, z0, z1, out, kind } = step.bay;
     const w = Math.hypot(b.x - a.x, b.y - a.y);
     const H = z1 - z0;
     if (w < 0.2 || H < 0.5) continue;
     const yaw = Math.atan2(b.y - a.y, b.x - a.x);
     const ux = (b.x - a.x) / w, uy = (b.y - a.y) / w;
     const at = (s: number, off: number) => ({ x: a.x + ux * s + out.x * off, y: a.y + uy * s + out.y * off });
-    const mid = at(w / 2, ENV_OUT);
-    const spandrel = Math.min(0.9, H * 0.3), band = Math.min(0.35, H * 0.12);
     const cladding = new THREE.Group(), glass = new THREE.Group();
-    piece(cladding, cladMat, mid.x, mid.y, z0 + spandrel / 2, yaw, w - 0.04, ENV_PANEL, spandrel);
-    piece(cladding, cladMat, mid.x, mid.y, z1 - band / 2, yaw, w - 0.04, ENV_PANEL, band);
-    const g0 = z0 + spandrel, g1 = z1 - band, gh = g1 - g0;
-    const gm = at(w / 2, ENV_OUT - ENV_PANEL / 4);
-    piece(glass, glassMat, gm.x, gm.y, (g0 + g1) / 2, yaw, w - 0.04, ENV_GLASS, gh);
-    const panes = Math.max(1, Math.round(w / 1.6));
-    for (let i = 0; i <= panes; i++) {
-      const p = at(Math.min(w - 0.03, Math.max(0.03, (i * w) / panes)), ENV_OUT);
-      piece(glass, frameMat, p.x, p.y, (g0 + g1) / 2, yaw, ENV_MULLION.along, ENV_MULLION.deep, gh);
+    if (kind === 'rail') {
+      // A balcony's railing: glass on the slab's edge, a little in, posts at its ends and a handrail.
+      const m = at(w / 2, -ENV_RAIL_IN);
+      piece(glass, glassMat, m.x, m.y, z0 + H / 2, yaw, w - 0.04, ENV_GLASS, H - 0.05);
+      piece(glass, frameMat, m.x, m.y, z1 - 0.025, yaw, w, 0.06, 0.05);
+      for (const s of [0.03, w - 0.03]) { const p = at(s, -ENV_RAIL_IN); piece(glass, frameMat, p.x, p.y, z0 + H / 2, yaw, 0.05, 0.05, H); }
+    } else if (kind === 'solid') {
+      // Where a wall stands: cladding from floor to floor.
+      const mid = at(w / 2, ENV_OUT);
+      piece(cladding, cladMat, mid.x, mid.y, z0 + H / 2, yaw, w - 0.04, ENV_PANEL, H - 0.02);
+    } else {
+      const mid = at(w / 2, ENV_OUT);
+      const spandrel = Math.min(0.9, H * 0.3), band = Math.min(0.35, H * 0.12);
+      piece(cladding, cladMat, mid.x, mid.y, z0 + spandrel / 2, yaw, w - 0.04, ENV_PANEL, spandrel);
+      piece(cladding, cladMat, mid.x, mid.y, z1 - band / 2, yaw, w - 0.04, ENV_PANEL, band);
+      const g0 = z0 + spandrel, g1 = z1 - band, gh = g1 - g0;
+      const gm = at(w / 2, ENV_OUT - ENV_PANEL / 4);
+      piece(glass, glassMat, gm.x, gm.y, (g0 + g1) / 2, yaw, w - 0.04, ENV_GLASS, gh);
+      const panes = Math.max(1, Math.round(w / 1.6));
+      for (let i = 0; i <= panes; i++) {
+        const p = at(Math.min(w - 0.03, Math.max(0.03, (i * w) / panes)), ENV_OUT);
+        piece(glass, frameMat, p.x, p.y, (g0 + g1) / 2, yaw, ENV_MULLION.along, ENV_MULLION.deep, gh);
+      }
     }
     for (const g of [cladding, glass]) { g.matrixAutoUpdate = false; g.visible = false; group.add(g); }
     parts.push({ step, cladding, glass });

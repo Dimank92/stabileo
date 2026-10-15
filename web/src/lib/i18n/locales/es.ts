@@ -9982,7 +9982,7 @@ const es: Record<string, string> = {
   'config.tip.loadSize': 'Agranda o achica el dibujo de las cargas: flechas puntuales y distribuidas, momentos y térmicas, en 2D y 3D. Los textos siguen el tamaño de rótulos. Se recuerda en este navegador.',
   'timelapse.envelope': 'Cerramientos y vidrios al final',
   'timelapse.envelopeShort': 'cerramientos',
-  'timelapse.envelopeTip': 'Cuando la estructura está en pie, cierra las fachadas piso por piso con antepechos, vidrios y parantes. Es solo para el video: no se agrega nada al modelo. Hace falta un edificio con pisos; las fachadas salen del contorno de cada piso, y un tabique en la fachada la deja como está.',
+  'timelapse.envelopeTip': 'Cuando la estructura está en pie, cierra las fachadas piso por piso con antepechos, vidrios y parantes, y pone barandas de vidrio en los balcones. Es solo para el video: no se agrega nada al modelo. Hace falta un edificio con pisos; las fachadas siguen las columnas de cada piso, y donde hay un tabique el paño va ciego.',
   'figures.shellMap': 'Resultado en placas',
   'proExport.resultsScreen': 'Los de la pantalla',
   'proExport.resultsCase': 'Caso',
