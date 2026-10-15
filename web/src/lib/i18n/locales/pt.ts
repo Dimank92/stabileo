@@ -9391,5 +9391,8 @@ const pt: Translations = {
   'loads.casesOff': 'sem casos nem combinações',
   'config.loadSize': 'Tamanho das cargas',
   'config.tip.loadSize': 'Aumenta ou diminui o desenho das cargas: setas pontuais e distribuídas, momentos e térmicas, em 2D e 3D. Os textos seguem o tamanho dos rótulos. Fica salvo neste navegador.',
+  'timelapse.envelope': 'Fechamentos e vidros no final',
+  'timelapse.envelopeShort': 'fechamentos',
+  'timelapse.envelopeTip': 'Quando a estrutura está de pé, fecha as fachadas andar por andar com peitoris, vidros e montantes. É só para o vídeo: nada é adicionado ao modelo. Precisa de um edifício com andares; as fachadas saem do contorno de cada andar, e uma parede na fachada fica como está.',
 };
 export default pt;
