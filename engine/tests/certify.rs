@@ -787,7 +787,8 @@ fn certify_fuzz_oracle() {
         }
     }
     eprintln!("fuzz: {solved} solved, {cert} certified, {unc} uncertified: {reasons:?}");
-    assert!(cert > 0);
+    // 85 (rand 0.8) / 81 (rand 0.10) certified: catch a sweep that silently shrinks.
+    assert!(cert >= 60, "only {cert} fuzz models certified");
 }
 
 // ───────────────────────── constraints and inclined supports ─────────────────────────

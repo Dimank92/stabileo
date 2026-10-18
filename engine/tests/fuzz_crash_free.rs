@@ -50,6 +50,14 @@ fn assert_finite_3d(results: &AnalysisResults3D, seed: u64) {
     }
 }
 
+/// Most random models are rejected (mechanisms, bad input); only the solved
+/// ones exercise the solver's numerics. The generated models change with the
+/// `rand` version, so guard against a sweep silently shrinking to a handful
+/// of solved models. Floors are ~75% of the counts under rand 0.8 and 0.10.
+fn assert_solved_floor(name: &str, ok: u64, floor: u64) {
+    assert!(ok >= floor, "{name}: only {ok} models solved (floor {floor}); the generator lost coverage");
+}
+
 // ==================== Main fuzz tests ====================
 
 #[test]
@@ -82,6 +90,7 @@ fn fuzz_2d_crash_free_10k() {
         "fuzz_2d_crash_free_10k: {} ok, {} err out of 10000",
         ok_count, err_count
     );
+    assert_solved_floor("fuzz_2d_crash_free_10k", ok_count, 1200);
 }
 
 #[test]
@@ -115,6 +124,7 @@ fn fuzz_3d_crash_free_2k() {
         "fuzz_3d_crash_free_2k: {} ok, {} err out of 2000",
         ok_count, err_count
     );
+    assert_solved_floor("fuzz_3d_crash_free_2k", ok_count, 320);
 }
 
 // ==================== Known tricky seeds / regression pins ====================
@@ -208,6 +218,7 @@ fn fuzz_2d_all_truss_1k() {
         "fuzz_2d_all_truss_1k: {} ok, {} err out of 1000",
         ok_count, err_count
     );
+    assert_solved_floor("fuzz_2d_all_truss_1k", ok_count, 120);
 }
 
 /// Extreme stiffness range: tests numerical conditioning.
@@ -242,6 +253,7 @@ fn fuzz_2d_extreme_stiffness_1k() {
         "fuzz_2d_extreme_stiffness_1k: {} ok, {} err out of 1000",
         ok_count, err_count
     );
+    assert_solved_floor("fuzz_2d_extreme_stiffness_1k", ok_count, 110);
 }
 
 /// Hinged-at-both-ends frames: tests the hinge release path.
@@ -277,6 +289,7 @@ fn fuzz_2d_double_hinge_500() {
         "fuzz_2d_double_hinge_500: {} ok, {} err out of 500",
         ok_count, err_count
     );
+    assert_solved_floor("fuzz_2d_double_hinge_500", ok_count, 25);
 }
 
 /// Mixed frame/truss with distributed + point loads: broad coverage of load types.
@@ -328,6 +341,7 @@ fn fuzz_2d_mixed_loads_1k() {
         "fuzz_2d_mixed_loads_1k: {} ok, {} err out of 1000",
         ok_count, err_count
     );
+    assert_solved_floor("fuzz_2d_mixed_loads_1k", ok_count, 115);
 }
 
 // ==================== Modal, Time-History, Staged Fuzz Tests ====================
@@ -355,6 +369,7 @@ fn fuzz_modal_2d_crash_free_2k() {
         }
     }
     eprintln!("fuzz_modal_2d: {} ok, {} err", ok_count, err_count);
+    assert_solved_floor("fuzz_modal_2d", ok_count, 165);
 }
 
 #[test]
