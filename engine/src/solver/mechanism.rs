@@ -1045,6 +1045,7 @@ fn analyze(m: &Model, f: Field, describe: usize) -> Option<Outcome> {
     // Incremental sparse elimination: each row is reduced by the pivots of
     // its leading columns until it is zero or leads a new pivot.
     rows.sort_by_key(|r| r.first().map_or(u32::MAX, |e| e.0));
+    let original: Vec<Row> = if describe > 0 { rows.clone() } else { Vec::new() };
     const NONE: u32 = u32::MAX;
     let mut piv: Vec<u32> = vec![NONE; ncols as usize];
     let mut prows: Vec<Row> = Vec::new();
@@ -1119,6 +1120,7 @@ fn analyze(m: &Model, f: Field, describe: usize) -> Option<Outcome> {
                 }
                 x[pc as usize] = C { m: f.neg(sm), r: -sr };
             }
+            refine_values(f, &original, &mut x);
             // nodal motions
             let mut nodal = Vec::new();
             for (n, nm) in lay.nodes.iter().enumerate() {
@@ -1144,6 +1146,94 @@ fn analyze(m: &Model, f: Field, describe: usize) -> Option<Outcome> {
         }
     }
     Some(Outcome { kernel, motions, free_rotations })
+}
+
+/// Replace the floating-point values of an exact free motion `x` by a null
+/// vector of the conditions restricted to its support, computed with
+/// complete pivoting (the values carried through the exact elimination can
+/// lose all accuracy on pivots that are exactly non-zero but tiny). For the
+/// description only; the support and the verdict stay exact.
+fn refine_values(f: Field, rows: &[Row], x: &mut [C]) {
+    const MAX_SUPPORT: usize = 240;
+    let support: Vec<u32> = (0..x.len() as u32).filter(|&c| x[c as usize].m != 0).collect();
+    let s = support.len();
+    if s == 0 || s > MAX_SUPPORT {
+        return;
+    }
+    let at: HashMap<u32, usize> = support.iter().enumerate().map(|(i, &c)| (c, i)).collect();
+    let mut a: Vec<Vec<C>> = Vec::new();
+    for r in rows {
+        if r.iter().any(|e| at.contains_key(&e.0)) {
+            let mut v = vec![C { m: 0, r: 0.0 }; s];
+            for &(c, val) in r {
+                if let Some(&i) = at.get(&c) {
+                    v[i] = val;
+                }
+            }
+            a.push(v);
+        }
+        if a.len() > 20 * MAX_SUPPORT {
+            return;
+        }
+    }
+    // exact rank of the restricted conditions
+    let mut basis: Vec<(usize, Vec<u64>)> = Vec::new();
+    for v in &a {
+        if basis.len() == s {
+            break;
+        }
+        add_to_basis(f, &mut basis, v.iter().map(|c| c.m).collect());
+    }
+    let rank = basis.len();
+    if rank >= s {
+        return;
+    }
+    // that many pivots in floating point, complete pivoting
+    let mut m: Vec<Vec<f64>> = a.iter().map(|v| v.iter().map(|c| c.r).collect()).collect();
+    let mut col_of: Vec<usize> = Vec::new();
+    let mut free: Vec<bool> = vec![true; s];
+    for k in 0..rank {
+        let mut best = (0usize, 0usize, 0.0f64);
+        for (i, row) in m.iter().enumerate().skip(k) {
+            for (j, &v) in row.iter().enumerate() {
+                if free[j] && v.abs() > best.2 {
+                    best = (i, j, v.abs());
+                }
+            }
+        }
+        if best.2 == 0.0 {
+            return;
+        }
+        m.swap(k, best.0);
+        let j = best.1;
+        free[j] = false;
+        col_of.push(j);
+        let piv = m[k].clone();
+        for (i, row) in m.iter_mut().enumerate() {
+            if i != k && row[j] != 0.0 {
+                let fct = row[j] / piv[j];
+                for q in 0..s {
+                    row[q] -= fct * piv[q];
+                }
+            }
+        }
+    }
+    let Some(first_free) = free.iter().position(|&b| b) else { return };
+    let mut y = vec![0.0; s];
+    y[first_free] = 1.0;
+    for (k, &j) in col_of.iter().enumerate() {
+        y[j] = -m[k][first_free] / m[k][j];
+    }
+    let scale = y.iter().fold(0.0f64, |acc, v| acc.max(v.abs()));
+    if !(scale > 0.0 && scale.is_finite()) {
+        return;
+    }
+    for c in x.iter_mut() {
+        c.r = 0.0;
+    }
+    for (i, &c) in support.iter().enumerate() {
+        x[c as usize].r = y[i] / scale;
+    }
 }
 
 // ---------------------------------------------------------------------------
