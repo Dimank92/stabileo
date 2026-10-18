@@ -1436,8 +1436,15 @@ pub fn solve_constrained_2d(input: &ConstrainedInput) -> Result<AnalysisResults,
 
     // A mechanism — constraints included — is refused by name (`mechanism.rs`).
     let mechanisms = super::mechanism::check_2d(&input.solver, &input.constraints);
-    mechanisms.refusal()?;
     mechanisms.refuse_unresisted_loads_2d(&input.solver.loads)?;
+    let prescribed = input.solver.supports.values().any(|s| [s.dx, s.dz, s.dry].iter().any(|d| d.is_some_and(|v| v != 0.0)));
+    mechanisms.refuse_if_loaded_2d(&input.solver, &input.solver.loads, prescribed)?;
+    let mut result = solve_constrained_2d_inner(input).map_err(|e| mechanisms.explain_failure(e))?;
+    result.structured_diagnostics.extend(mechanisms.diagnostic());
+    Ok(result)
+}
+
+fn solve_constrained_2d_inner(input: &ConstrainedInput) -> Result<AnalysisResults, String> {
 
     let dof_num = DofNumbering::build_2d(&input.solver);
     if dof_num.n_free == 0 {
@@ -2048,8 +2055,11 @@ pub fn solve_constrained_3d(input: &ConstrainedInput3D) -> Result<AnalysisResult
 
     // A mechanism — constraints included — is refused by name (`mechanism.rs`).
     let mechanisms = super::mechanism::check_3d(&input.solver, &input.constraints);
-    mechanisms.refusal()?;
     mechanisms.refuse_unresisted_loads_3d(&input.solver.loads)?;
+    let prescribed = input.solver.supports.values().any(|s| {
+        [s.dx, s.dy, s.dz, s.drx, s.dry, s.drz].iter().any(|d| d.is_some_and(|v| v != 0.0))
+    });
+    mechanisms.refuse_if_loaded_3d(&input.solver, &input.solver.loads, prescribed)?;
 
     let dof_num = DofNumbering::build_3d(&input.solver);
     if dof_num.n_free == 0 {
@@ -2344,6 +2354,7 @@ pub fn solve_constrained_3d(input: &ConstrainedInput3D) -> Result<AnalysisResult
 
     constraint_diags.extend(definiteness);
 
+    constraint_diags.extend(mechanisms.diagnostic());
     Ok(AnalysisResults3D {
         displacements,
         reactions,

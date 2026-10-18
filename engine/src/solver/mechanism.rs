@@ -50,6 +50,10 @@ const PRIMES: [u64; 2] = [(1u64 << 61) - 1, (1u64 << 62) - 57];
 /// unchecked rather than slowing every solve down.
 const WORK_BUDGET: u64 = 40_000_000;
 
+/// Largest number of free motions whose exact basis is kept for the check of
+/// the loads' work; with more, any load refuses the model.
+const BASIS_CAP: usize = 256;
+
 // ---------------------------------------------------------------------------
 // Arithmetic modulo p
 // ---------------------------------------------------------------------------
@@ -1008,6 +1012,8 @@ struct Outcome {
     /// up to a few kernel vectors, as nodal motions: per node [t (3), r (3)]
     motions: Vec<Vec<(u32, [C; 6])>>,
     free_rotations: Vec<FreeRotation>,
+    /// An exact basis of the free motions (nodal, mod p), when small enough.
+    basis: Option<Vec<Vec<(u32, [u64; 6])>>>,
 }
 
 /// Reduce `v` (dense, length k) against an echelon basis; true if it is
@@ -1039,7 +1045,7 @@ fn add_to_basis(f: Field, basis: &mut Vec<(usize, Vec<u64>)>, mut v: Vec<u64>) -
     true
 }
 
-fn analyze(m: &Model, f: Field, describe: usize) -> Option<Outcome> {
+fn analyze(m: &Model, f: Field, describe: usize, basis_cap: usize) -> Option<Outcome> {
     let lay = layout(m);
     let b = Builder { m, f, lay: &lay, posf: m.pos.iter().map(|p| p.map(|v| f.of(v))).collect() };
     let one = C { m: 1, r: 1.0 };
@@ -1299,13 +1305,21 @@ fn analyze(m: &Model, f: Field, describe: usize) -> Option<Outcome> {
     }
     let kernel = ncols as usize - prows.len();
 
-    // A few kernel vectors, for the description.
+    // A few kernel vectors for the description (values refined in floating
+    // point), and an exact basis of the free motions, for the check of the
+    // loads' work (`MechanismCheck::loads_do_work`).
     let mut motions = Vec::new();
-    if kernel > 0 && describe > 0 {
+    let nnz: usize = prows.iter().map(|r| r.len()).sum();
+    let want_basis = basis_cap > 0
+        && kernel <= basis_cap
+        && (kernel as u64) * (nnz as u64 + 6 * lay.nodes.len() as u64) <= WORK_BUDGET;
+    let mut basis: Option<Vec<Vec<(u32, [u64; 6])>>> = want_basis.then(Vec::new);
+    let count = if want_basis { kernel } else { describe.min(kernel) };
+    if kernel > 0 && count > 0 {
         let mut pivot_cols: Vec<u32> = (0..ncols).filter(|&c| piv[c as usize] != NONE).collect();
         pivot_cols.reverse();
         let free: Vec<u32> = (0..ncols).filter(|&c| piv[c as usize] == NONE).collect();
-        for &fc in free.iter().take(describe) {
+        for (idx, &fc) in free.iter().take(count).enumerate() {
             let mut x = vec![C { m: 0, r: 0.0 }; ncols as usize];
             x[fc as usize] = one;
             for &pc in &pivot_cols {
@@ -1320,7 +1334,10 @@ fn analyze(m: &Model, f: Field, describe: usize) -> Option<Outcome> {
                 }
                 x[pc as usize] = C { m: f.neg(sm), r: -sr };
             }
-            refine_values(f, &original, &mut x);
+            let described = idx < describe;
+            if described {
+                refine_values(f, &original, &mut x);
+            }
             // nodal motions
             let mut nodal = Vec::new();
             for (n, nm) in lay.nodes.iter().enumerate() {
@@ -1342,10 +1359,15 @@ fn analyze(m: &Model, f: Field, describe: usize) -> Option<Outcome> {
                     nodal.push((n as u32, vals));
                 }
             }
-            motions.push(nodal);
+            if let Some(bs) = basis.as_mut() {
+                bs.push(nodal.iter().map(|(n, v)| (*n, v.map(|c| c.m))).collect());
+            }
+            if described {
+                motions.push(nodal);
+            }
         }
     }
-    Some(Outcome { kernel, motions, free_rotations })
+    Some(Outcome { kernel, motions, free_rotations, basis })
 }
 
 /// Replace the floating-point values of an exact free motion `x` by a null
@@ -1454,6 +1476,9 @@ pub struct MechanismCheck {
     two_d: bool,
     free_rotations: Vec<FreeRotation>,
     isolated: HashSet<usize>,
+    /// Exact bases of the free motions modulo each prime (node id, slots
+    /// [u (3), θ (3)]); empty when there were too many to keep.
+    bases: Vec<(u64, Vec<Vec<(usize, [u64; 6])>>)>,
 }
 
 impl MechanismCheck {
@@ -1470,8 +1495,7 @@ impl MechanismCheck {
         let k = self.free_motions;
         let mut s = format!(
             "Structure is a mechanism: the supports, members and connections leave {k} independent \
-             free motion{} with no stiffness against {}, so the stiffness matrix is singular and any \
-             result would be meaningless. ",
+             free motion{} with no stiffness against {}, so the stiffness matrix is singular. ",
             if k == 1 { "" } else { "s" },
             if k == 1 { "it" } else { "them" },
         );
@@ -1489,17 +1513,109 @@ impl MechanismCheck {
         Some(s)
     }
 
-    /// `Err` with the message when the model is a mechanism.
+    /// Whether a load does work on some free motion: `load(node, slot)` is
+    /// the load on a node in global components, slots [Fx, Fy, Fz, Mx, My,
+    /// Mz] (2D: [Fx, Fz, —, My, —, —]). Exact: the load is orthogonal to
+    /// every free motion modulo both primes, or it does work. A load that
+    /// does no work on any free motion leaves the internal forces determined
+    /// (only the displacement along the free motions is arbitrary); one that
+    /// does has no equilibrium. Without a kept basis, any load counts.
+    pub fn loads_do_work(&self, load: impl Fn(usize, usize) -> f64) -> bool {
+        if !self.is_mechanism() {
+            return false;
+        }
+        if self.bases.is_empty() {
+            return true;
+        }
+        for (p, basis) in &self.bases {
+            let f = Field::new(*p);
+            for v in basis {
+                let mut acc = 0u64;
+                for (node, x) in v {
+                    for (slot, &xs) in x.iter().enumerate() {
+                        let l = load(*node, slot);
+                        if xs != 0 && l != 0.0 {
+                            if !l.is_finite() {
+                                return true;
+                            }
+                            acc = f.add(acc, f.mul(f.of(l), xs));
+                        }
+                    }
+                }
+                if acc != 0 {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Static solve of a mechanism: refused when the loads (or prescribed
+    /// displacements) act on a free motion; otherwise allowed, the model
+    /// carrying the `diagnostic` warning. 2D, from the assembled loads.
+    pub fn refuse_if_loaded_2d(&self, input: &SolverInput, loads: &[SolverLoad], prescribed: bool) -> Result<(), String> {
+        if !self.is_mechanism() {
+            return Ok(());
+        }
+        let dof_num = DofNumbering::build_2d(input);
+        let f = super::assembly::assemble_load_vector_2d(input, loads, &dof_num, &[]);
+        let slot_local = [Some(0usize), Some(1), None, Some(2), None, None];
+        self.refuse_if_work(prescribed, |node, slot| {
+            slot_local[slot].and_then(|l| dof_num.map.get(&(node, l))).map_or(0.0, |&i| f[i])
+        })
+    }
+
+    /// 3D twin of [`Self::refuse_if_loaded_2d`].
+    pub fn refuse_if_loaded_3d(&self, input: &SolverInput3D, loads: &[SolverLoad3D], prescribed: bool) -> Result<(), String> {
+        if !self.is_mechanism() {
+            return Ok(());
+        }
+        let dof_num = DofNumbering::build_3d(input);
+        let f = super::assembly::assemble_load_vector_3d_dense(input, loads, &dof_num, &[]);
+        self.refuse_if_work(prescribed, |node, slot| dof_num.map.get(&(node, slot)).map_or(0.0, |&i| f[i]))
+    }
+
+    fn refuse_if_work(&self, prescribed: bool, load: impl Fn(usize, usize) -> f64) -> Result<(), String> {
+        let why = if prescribed {
+            "Prescribed support displacements are applied to it, which this model cannot equilibrate."
+        } else if self.loads_do_work(load) {
+            "The loads act on it, so there is no equilibrium."
+        } else {
+            return Ok(());
+        };
+        Err(format!("{} {why}", self.message().unwrap_or_default()))
+    }
+
+    /// A solver failure on a mechanism (a factorization that broke down on
+    /// it, a blown-up solution) reported as the mechanism, by its free
+    /// motions; any other error unchanged.
+    pub fn explain_failure(&self, e: String) -> String {
+        let singular = e.contains("Singular") || e.contains("singular") || e.contains("mechanism");
+        match self.message() {
+            Some(m) if singular && !e.starts_with("Structure is a mechanism") => {
+                format!("{m} The solver could not factor its stiffness ({e}).")
+            }
+            _ => e,
+        }
+    }
+
+    /// `Err` with the message when the model is a mechanism (analyses that
+    /// cannot answer for one at all: constrained solves, modal analysis,
+    /// whose zero-frequency modes the eigensolver does not return).
     pub fn refusal(&self) -> Result<(), String> {
         match self.message() {
-            Some(m) => Err(m),
+            Some(m) => Err(format!("{m} No result is returned for a mechanism.")),
             None => Ok(()),
         }
     }
 
     /// As a pre-solve diagnostic (for analyses that report rather than refuse).
     pub fn diagnostic(&self) -> Option<StructuredDiagnostic> {
-        let msg = self.message()?;
+        let msg = format!(
+            "{} The loads do no work on it: internal forces and reactions are determined, \
+             displacements along it are not",
+            self.message()?
+        );
         Some(
             crate::solver::definiteness::not_positive_definite(&msg)
                 .with_phase("pre_solve")
@@ -1808,7 +1924,7 @@ fn run(m: Model) -> MechanismCheck {
         return out;
     }
     const DESCRIBE: usize = 3;
-    let Some(first) = analyze(&m, Field::new(PRIMES[0]), DESCRIBE) else {
+    let Some(first) = analyze(&m, Field::new(PRIMES[0]), DESCRIBE, BASIS_CAP) else {
         out.unchecked = Some("model too large for the exact mechanism check".into());
         return out;
     };
@@ -1818,7 +1934,7 @@ fn run(m: Model) -> MechanismCheck {
     }
     // Confirm with the second prime (a deficiency modulo one prime only is
     // a minor divisible by it, not a mechanism).
-    let Some(second) = analyze(&m, Field::new(PRIMES[1]), 0) else {
+    let Some(second) = analyze(&m, Field::new(PRIMES[1]), 0, BASIS_CAP) else {
         out.unchecked = Some("model too large for the exact mechanism check".into());
         return out;
     };
@@ -1826,6 +1942,12 @@ fn run(m: Model) -> MechanismCheck {
         return out;
     }
     out.free_motions = first.kernel.min(second.kernel);
+    if let (Some(b1), Some(b2)) = (&first.basis, &second.basis) {
+        let ids = |b: &Vec<Vec<(u32, [u64; 6])>>| -> Vec<Vec<(usize, [u64; 6])>> {
+            b.iter().map(|v| v.iter().map(|(n, x)| (m.ids[*n as usize], *x)).collect()).collect()
+        };
+        out.bases = vec![(PRIMES[0], ids(b1)), (PRIMES[1], ids(b2))];
+    }
     let mut parts = Uf::new(m.ids.len());
     for &(a, b) in &m.links {
         parts.union_all(&[a, b]);
@@ -1874,7 +1996,7 @@ pub fn free_motion_vectors(input2: Option<&SolverInput>, input3: Option<&SolverI
         (_, Some(i)) => model_3d(i, &i.constraints),
         _ => return Vec::new(),
     };
-    let Some(o) = analyze(&m, Field::new(PRIMES[0]), max) else { return Vec::new() };
+    let Some(o) = analyze(&m, Field::new(PRIMES[0]), max, 0) else { return Vec::new() };
     let nt = m.nt();
     o.motions
         .iter()

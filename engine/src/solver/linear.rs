@@ -705,6 +705,12 @@ pub(crate) fn prescribed_displacements_2d(input: &SolverInput, dof_num: &DofNumb
 }
 
 fn prepare_static_2d_impl(input: &SolverInput, force_dense: bool) -> Result<PreparedStatic2D<'_>, String> {
+    // A factorization that fails on a mechanism reports the free motions.
+    prepare_static_2d_inner(input, force_dense)
+        .map_err(|e| super::mechanism::check_2d(input, &[]).explain_failure(e))
+}
+
+fn prepare_static_2d_inner(input: &SolverInput, force_dense: bool) -> Result<PreparedStatic2D<'_>, String> {
     let dof_num = DofNumbering::build_2d(input);
     let mut pre_solve_diags = super::pre_solve_gates::run_pre_solve_gates_2d(input);
     validate_solver_options(&input.solver_options, &mut pre_solve_diags);
@@ -714,8 +720,10 @@ fn prepare_static_2d_impl(input: &SolverInput, force_dense: bool) -> Result<Prep
 
     // A mechanism is refused by name, before a factorization that may or
     // may not notice it (`mechanism.rs`).
+    // Loads that act on a free motion are refused per case (`solve_loads`);
+    // otherwise the results carry the warning naming it.
     let mechanisms = super::mechanism::check_2d(input, &[]);
-    mechanisms.refusal()?;
+    pre_solve_diags.extend(mechanisms.diagnostic());
 
     let n = dof_num.n_total;
     let nf = dof_num.n_free;
@@ -980,7 +988,11 @@ impl PreparedStatic2D<'_> {
         // Per-case load validation (the structure was validated in prepare)
         validate_loads_2d(&self.input, loads)?;
         self.mechanisms.refuse_unresisted_loads_2d(loads)?;
+        self.mechanisms.refuse_if_loaded_2d(&self.input, loads, self.u_r.iter().any(|v| *v != 0.0))?;
+        self.solve_loads_inner(loads).map_err(|e| self.mechanisms.explain_failure(e))
+    }
 
+    fn solve_loads_inner(&self, loads: &[SolverLoad]) -> Result<AnalysisResults, String> {
         let input = &*self.input;
         let dof_num = &self.dof_num;
         let (n, nf, nr) = (self.n, self.nf, self.nr);
@@ -2141,6 +2153,11 @@ pub(crate) fn prescribed_displacements_3d(input: &SolverInput3D, dof_num: &DofNu
 }
 
 pub fn prepare_static_3d(input: &SolverInput3D) -> Result<PreparedStatic3D, String> {
+    // A factorization that fails on a mechanism reports the free motions.
+    prepare_static_3d_inner(input).map_err(|e| super::mechanism::check_3d(input, &[]).explain_failure(e))
+}
+
+fn prepare_static_3d_inner(input: &SolverInput3D) -> Result<PreparedStatic3D, String> {
     // Expand curved beams into frame elements before solving
     let input = expand_curved_beams_3d(input);
     let n_nodes = input.nodes.len();
@@ -2165,8 +2182,10 @@ pub fn prepare_static_3d(input: &SolverInput3D) -> Result<PreparedStatic3D, Stri
 
     // A mechanism is refused by name, before a factorization that may or
     // may not notice it (`mechanism.rs`).
+    // Loads that act on a free motion are refused per case (`solve_loads`);
+    // otherwise the results carry the warning naming it.
     let mechanisms = super::mechanism::check_3d(&input, &[]);
-    mechanisms.refusal()?;
+    pre_solve_diags.extend(mechanisms.diagnostic());
 
     let n = dof_num.n_total;
     let nf = dof_num.n_free;
@@ -2513,6 +2532,7 @@ impl PreparedStatic3D {
         validate_loads_3d(&self.input, loads)?;
         self.refuse_loads_on_orphan_dofs(loads)?;
         self.mechanisms.refuse_unresisted_loads_3d(loads)?;
+        self.mechanisms.refuse_if_loaded_3d(&self.input, loads, self.u_r.iter().any(|v| *v != 0.0))?;
         match &self.path {
             PreparedPath3D::FullyRestrained(p) => self.solve_loads_fully_restrained(loads, p),
             PreparedPath3D::Dense(p) => self.solve_loads_dense(loads, p),
@@ -2520,6 +2540,7 @@ impl PreparedStatic3D {
             PreparedPath3D::Pcg(p) => self.solve_loads_pcg(loads, p),
             PreparedPath3D::SparseDenseLu(p) => self.solve_loads_sparse_dense_lu(loads, p),
         }
+        .map_err(|e| self.mechanisms.explain_failure(e))
     }
 
     fn refuse_loads_on_orphan_dofs(&self, loads: &[SolverLoad3D]) -> Result<(), String> {

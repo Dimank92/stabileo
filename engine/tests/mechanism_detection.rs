@@ -1,8 +1,9 @@
 //! Exact mechanism detection (engine/src/solver/mechanism.rs).
 //!
 //! Each mechanism the check exists for is refused by the linear solvers with
-//! a message naming the nodes that move, and the same model made stable is
-//! solved. The kinematic conditions are checked against the assembled
+//! a message naming the nodes that move when the loads act on it (and solved
+//! with a warning naming it when they do no work on it), and the same model
+//! made stable is solved. Modal analysis refuses every mechanism. The kinematic conditions are checked against the assembled
 //! stiffness: every free motion the check reports is a zero-energy mode of K
 //! (K·v ≈ 0), on random models exercising every feature. No fixture is
 //! flagged.
@@ -39,6 +40,33 @@ fn refused_3d(input: &SolverInput3D) -> String {
         Ok(_) => panic!("mechanism solved: {:?}", check_3d(input, &input.constraints)),
     }
 }
+/// A mechanism the loads do no work on: solved with the warning naming it,
+/// or — when the factorization cannot get past the free motion — refused
+/// naming it. Never solved silently.
+fn warned_3d(input: &SolverInput3D) -> String {
+    match solve_3d(input) {
+        Err(e) => {
+            assert!(e.contains("Structure is a mechanism") && e.contains("could not factor"), "{e}");
+            e
+        }
+        Ok(r) => {
+            let d = r
+                .structured_diagnostics
+                .iter()
+                .find(|d| d.code == DiagnosticCode::StiffnessNotPositiveDefinite && d.message.contains("Structure is a mechanism"))
+                .unwrap_or_else(|| panic!("mechanism not flagged: {:?}", r.structured_diagnostics));
+            assert!(d.message.contains("The loads do no work on it"), "{}", d.message);
+            d.message.clone()
+        }
+    }
+}
+fn with_load_3d(mut input: SolverInput3D, node: usize, f: [f64; 6]) -> SolverInput3D {
+    input.loads = vec![SolverLoad3D::Nodal(SolverNodalLoad3D {
+        node_id: node, fx: f[0], fy: f[1], fz: f[2], mx: f[3], my: f[4], mz: f[5], bw: None,
+    })];
+    input
+}
+
 fn assert_mechanism(msg: &str, nodes: &[usize], what: &str) {
     assert!(msg.contains("Structure is a mechanism"), "{msg}");
     for n in nodes {
@@ -182,10 +210,15 @@ fn plate_free_to_turn_in_its_plane() {
             "loads": [nodal3(5, [0.0, 0.0, -10.0, 0.0, 0.0, 0.0])]
         }))
     };
-    let msg = refused_3d(&model(false));
+    // loaded out of plane: the free rotation is flagged, the bending answered
+    let msg = warned_3d(&model(false));
     assert_mechanism(&msg, &[1], "rigid-body motion of the part containing node 1");
     assert!(msg.contains("rotation about an axis along (0, 0, 1) through (0, 0, 0)"), "{msg}");
-    solve_3d(&model(true)).expect("plate held in plane solves");
+    // loaded in plane, off the pinned corner: no equilibrium, refused
+    let msg = refused_3d(&with_load_3d(model(false), 5, [0.0, 10.0, -10.0, 0.0, 0.0, 0.0]));
+    assert_mechanism(&msg, &[1], "The loads act on it");
+    let r = solve_3d(&model(true)).expect("plate held in plane solves");
+    assert!(!r.structured_diagnostics.iter().any(|d| d.message.contains("Structure is a mechanism")));
 }
 
 /// Four columns tied at the top by a rigid diaphragm. The slave columns
@@ -330,9 +363,13 @@ fn truss_nodes_free_out_of_plane() {
             "supports": supports, "loads": [nodal3(4, [0.0, 0.0, -10.0, 0.0, 0.0, 0.0])]
         }))
     };
-    let msg = refused_3d(&model(false));
+    // loaded in its plane: flagged, solved
+    let msg = warned_3d(&model(false));
     assert_mechanism(&msg, &[2, 4, 5], "3 independent free motions");
-    solve_3d(&model(true)).expect("truss held out of plane solves");
+    // a load out of its plane: refused
+    let msg = refused_3d(&with_load_3d(model(false), 4, [0.0, 0.1, -10.0, 0.0, 0.0, 0.0]));
+    assert_mechanism(&msg, &[2, 4, 5], "uy 1");
+    solve_3d(&with_load_3d(model(true), 4, [0.0, 0.1, -10.0, 0.0, 0.0, 0.0])).expect("truss held out of plane solves");
 }
 
 /// A joint where every member is hinged is held in translation by the
@@ -429,9 +466,13 @@ fn beam_spinning_about_its_axis() {
             "loads": [nodal3(2, [0.0, 0.0, -10.0, 0.0, 0.0, 0.0])]
         }))
     };
-    let msg = refused_3d(&model(false));
+    let msg = warned_3d(&model(false));
     assert_mechanism(&msg, &[1, 2], "can rotate freely about an axis along (1, 0, 0) without any node translating");
-    solve_3d(&model(true)).expect("torsion held");
+    // a torque: refused (by the load check, or by the factorization that
+    // cannot get past the free spin — named either way)
+    let msg = refused_3d(&with_load_3d(model(false), 2, [0.0, 0.0, -10.0, 1.0, 0.0, 0.0]));
+    assert_mechanism(&msg, &[1, 2], "about an axis along (1, 0, 0)");
+    solve_3d(&with_load_3d(model(true), 2, [0.0, 0.0, -10.0, 1.0, 0.0, 0.0])).expect("torsion held");
 }
 
 // ---------------------------------------------------------------------------
