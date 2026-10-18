@@ -134,8 +134,11 @@ struct Sym {
 struct Released3D {
     i: u32,
     j: u32,
-    /// Local axes (ex, ey, ez) exactly as the element uses them.
-    axes: [[f64; 3]; 3],
+    /// The element's local y axis as it computes it; the conditions use the
+    /// exact component of it normal to the chord, and the exact cross product
+    /// for z, so the three axes are exactly orthogonal (the f64 ones are not,
+    /// and that noise could hide a mechanism from an exact rank).
+    ey: [f64; 3],
     /// Per end (i, j): whether the rotation about each local axis is coupled.
     coupled: [[bool; 3]; 2],
 }
@@ -157,8 +160,9 @@ struct Model {
     frames_2d: Vec<(u32, u32, bool, bool)>,
     frames_3d: Vec<Released3D>,
     /// Conditions with coefficients taken as given (supports, springs,
-    /// connectors, constraints).
+    /// constraints).
     rows: Vec<Vec<(Sym, f64)>>,
+    connectors: Vec<Conn>,
     /// Node pairs connected by anything, for naming the part that moves.
     links: Vec<(u32, u32)>,
     unchecked: Option<String>,
@@ -183,6 +187,7 @@ impl Model {
             frames_2d: Vec::new(),
             frames_3d: Vec::new(),
             rows: Vec::new(),
+            connectors: Vec::new(),
             links: Vec::new(),
             unchecked,
         }
@@ -263,26 +268,25 @@ fn add_constraint_rows(m: &mut Model, eqs: Vec<(usize, Vec<(usize, f64)>)>, dof_
     }
 }
 
-fn add_connector_rows<const N: usize>(m: &mut Model, i: u32, j: u32, springs: &[(f64, [f64; N])]) {
-    // N = 6 (2D: 3 per node) or 12 (3D: 6 per node)
-    let per = N / 2;
-    let nt = m.nt();
+/// A connector: its springs (stiffness, row over [node i DOFs, node j DOFs],
+/// 3 or 6 per node) as the element builds them, used as given for a
+/// zero-length one (global axes, exact); with length, the rows are rebuilt
+/// from the chord exactly (`connector_rows`).
+struct Conn {
+    i: u32,
+    j: u32,
+    springs: Vec<(f64, Vec<f64>)>,
+    zero_length: bool,
+}
+
+fn add_connector(m: &mut Model, i: u32, j: u32, springs: Vec<(f64, Vec<f64>)>, l: f64) {
     m.touch(&[i, j]);
-    for (k, b) in springs {
-        if *k == 0.0 {
-            continue;
-        }
-        let mut row = Vec::new();
-        for (a, &v) in b.iter().enumerate() {
-            let node = if a < per { i } else { j };
-            let local = a % per;
-            if local >= nt && !m.has_rot {
-                continue; // rotations the model does not number
-            }
-            row.push((Sym { node, dof: local as u8 }, v));
-        }
-        m.add_row(row);
+    if springs.iter().any(|(k, b)| !k.is_finite() || b.iter().any(|v| !v.is_finite())) {
+        m.fail("non-finite connector data".into());
+        return;
     }
+    let zero_length = !(l > crate::element::connector::ZERO_LENGTH);
+    m.connectors.push(Conn { i, j, springs, zero_length });
 }
 
 fn model_2d(input: &SolverInput, constraints: &[Constraint]) -> Model {
@@ -314,7 +318,8 @@ fn model_2d(input: &SolverInput, constraints: &[Constraint]) -> Model {
             continue;
         };
         let springs = crate::element::connector::connector_element_springs_2d(c, ni, nj);
-        add_connector_rows(&mut m, i, j, &springs);
+        let l = ((nj.x - ni.x).powi(2) + (nj.z - ni.z).powi(2)).sqrt();
+        add_connector(&mut m, i, j, springs.iter().map(|(k, b)| (*k, b.to_vec())).collect(), l);
     }
     let mut sups: Vec<&SolverSupport> = input.supports.values().collect();
     sups.sort_by_key(|s| s.id);
@@ -413,7 +418,7 @@ fn model_3d(input: &SolverInput3D, constraints: &[Constraint]) -> Model {
         m.frames_3d.push(Released3D {
             i,
             j,
-            axes: [ex, ey, ez],
+            ey,
             coupled: [released[0].map(|r| !r), released[1].map(|r| !r)],
         });
     }
@@ -454,7 +459,8 @@ fn model_3d(input: &SolverInput3D, constraints: &[Constraint]) -> Model {
             continue;
         };
         let springs = crate::element::connector::connector_element_springs_3d(c, ni, nj);
-        add_connector_rows(&mut m, i, j, &springs);
+        let l = ((nj.x - ni.x).powi(2) + (nj.y - ni.y).powi(2) + (nj.z - ni.z).powi(2)).sqrt();
+        add_connector(&mut m, i, j, springs.iter().map(|(k, b)| (*k, b.to_vec())).collect(), l);
     }
     let mut sups: Vec<&SolverSupport3D> = input.supports.values().collect();
     sups.sort_by_key(|s| s.node_id);
@@ -689,6 +695,137 @@ impl Builder<'_> {
     fn c(&self, v: f64) -> C {
         C { m: self.f.of(v), r: v }
     }
+    fn c3(&self, v: [f64; 3]) -> [C; 3] {
+        v.map(|x| self.c(x))
+    }
+}
+
+fn cmul(f: Field, a: C, b: C) -> C {
+    C { m: f.mul(a.m, b.m), r: a.r * b.r }
+}
+fn cadd(f: Field, a: C, b: C) -> C {
+    C { m: f.add(a.m, b.m), r: a.r + b.r }
+}
+fn csub(f: Field, a: C, b: C) -> C {
+    C { m: f.sub(a.m, b.m), r: a.r - b.r }
+}
+fn dot3(f: Field, a: &[C], b: &[C]) -> C {
+    cadd(f, cadd(f, cmul(f, a[0], b[0]), cmul(f, a[1], b[1])), cmul(f, a[2], b[2]))
+}
+fn cross3(f: Field, a: &[C], b: &[C]) -> [C; 3] {
+    [
+        csub(f, cmul(f, a[1], b[2]), cmul(f, a[2], b[1])),
+        csub(f, cmul(f, a[2], b[0]), cmul(f, a[0], b[2])),
+        csub(f, cmul(f, a[0], b[1]), cmul(f, a[1], b[0])),
+    ]
+}
+
+/// Exactly orthogonal (unnormalized) local axes from the exact chord `d` and
+/// an element's computed y axis: x = d, y = (d·d) ey − (ey·d) d, z = d × y.
+fn exact_axes(f: Field, d: &[C], ey: [C; 3]) -> [[C; 3]; 3] {
+    let dd = dot3(f, d, d);
+    let ed = dot3(f, &ey, d);
+    let y = [0, 1, 2].map(|k| csub(f, cmul(f, dd, ey[k]), cmul(f, ed, d[k])));
+    let z = cross3(f, d, &y);
+    [[d[0], d[1], d[2]], y, z]
+}
+
+/// The springs of a connector as conditions over nodal DOFs.
+fn connector_rows(b: &Builder, c: &Conn) -> Vec<Vec<(Sym, C)>> {
+    let f = b.f;
+    let m = b.m;
+    let per = if m.three_d { 6 } else { 3 };
+    let nt = m.nt();
+    let keep = |local: usize| local < nt || m.has_rot;
+    let mut out = Vec::new();
+    if c.zero_length {
+        for (k, row) in &c.springs {
+            if *k == 0.0 {
+                continue;
+            }
+            let mut t = Vec::new();
+            for (a, &v) in row.iter().enumerate() {
+                let (node, local) = if a < per { (c.i, a) } else { (c.j, a - per) };
+                if v != 0.0 && keep(local) {
+                    t.push((Sym { node, dof: local as u8 }, b.c(v)));
+                }
+            }
+            out.push(t);
+        }
+        return out;
+    }
+    let d: Vec<C> = (0..nt)
+        .map(|k| C {
+            m: f.sub(b.posf[c.j as usize][k], b.posf[c.i as usize][k]),
+            r: m.pos[c.j as usize][k] - m.pos[c.i as usize][k],
+        })
+        .collect();
+    let half = C { m: f.of(crate::element::connector::CONNECTOR_SHEAR_POSITION), r: crate::element::connector::CONNECTOR_SHEAR_POSITION };
+    let other = C {
+        m: f.of(1.0 - crate::element::connector::CONNECTOR_SHEAR_POSITION),
+        r: 1.0 - crate::element::connector::CONNECTOR_SHEAR_POSITION,
+    };
+    let neg = |x: C| C { m: f.neg(x.m), r: -x.r };
+    let u = |node: u32, k: usize| Sym { node, dof: k as u8 };
+    // e·(u_j − u_i) + arm·(a θ_i + (1 − a) θ_j) (arm empty for no rotation term)
+    let trans = |e: &[C], arm: Option<&[C]>| {
+        let mut t = Vec::new();
+        for k in 0..nt {
+            t.push((u(c.j, k), e[k]));
+            t.push((u(c.i, k), neg(e[k])));
+        }
+        if let (Some(arm), true) = (arm, m.has_rot) {
+            for (k, &w) in arm.iter().enumerate() {
+                t.push((u(c.i, nt + k), cmul(f, half, w)));
+                t.push((u(c.j, nt + k), cmul(f, other, w)));
+            }
+        }
+        t
+    };
+    let rot = |e: &[C]| {
+        let mut t = Vec::new();
+        if m.has_rot {
+            for (k, &w) in e.iter().enumerate() {
+                t.push((u(c.j, nt + k), w));
+                t.push((u(c.i, nt + k), neg(w)));
+            }
+        }
+        t
+    };
+    let ks: Vec<f64> = c.springs.iter().map(|s| s.0).collect();
+    if m.three_d {
+        // the element's y axis: its shear-y row is −e_y on node i
+        let ey = [0, 1, 2].map(|k| -c.springs[1].1[k]);
+        let [x, y, z] = exact_axes(f, &d, b.c3(ey));
+        let rows = [
+            trans(&x, None),
+            trans(&y, Some(&cross3(f, &y, &d))),
+            trans(&z, Some(&cross3(f, &z, &d))),
+            rot(&x),
+            rot(&y),
+            rot(&z),
+        ];
+        for (k, r) in ks.iter().zip(rows) {
+            if *k != 0.0 {
+                out.push(r);
+            }
+        }
+    } else {
+        // 2D: shear row scaled by L: (−dz, dx) on Δu, −L² on (a θ_i + (1 − a) θ_j)
+        let l2 = cadd(f, cmul(f, d[0], d[0]), cmul(f, d[1], d[1]));
+        let rows = [
+            trans(&d, None),
+            trans(&[neg(d[1]), d[0]], Some(&[neg(l2)])),
+            rot(&[C { m: 1, r: 1.0 }]),
+        ];
+        for (k, r) in ks.iter().zip(rows) {
+            if *k != 0.0 {
+                out.push(r);
+            }
+        }
+    }
+    out.retain(|r| !r.is_empty());
+    out
 }
 
 /// Sort a combination by key and merge duplicates, dropping exact zeros.
@@ -737,6 +874,7 @@ fn released_frame_rows(b: &Builder, e: &Released3D) -> Vec<Vec<(Sym, C)>> {
         }
         rows.push(r);
     }
+    let axes = exact_axes(f, &d, b.c3(e.ey));
     for (end, base) in [(0usize, 6usize), (1, 12)] {
         for a in 0..3 {
             if !e.coupled[end][a] {
@@ -744,7 +882,7 @@ fn released_frame_rows(b: &Builder, e: &Released3D) -> Vec<Vec<(Sym, C)>> {
             }
             let mut r = [zero; 15];
             for k in 0..3 {
-                let c = b.c(e.axes[a][k]);
+                let c = axes[a][k];
                 r[base + k] = c;
                 r[k] = negc(c);
             }
@@ -916,6 +1054,11 @@ fn analyze(m: &Model, f: Field, describe: usize) -> Option<Outcome> {
     }
     for e in &m.frames_3d {
         for r in released_frame_rows(&b, e) {
+            push(&mut combos, &r);
+        }
+    }
+    for c in &m.connectors {
+        for r in connector_rows(&b, c) {
             push(&mut combos, &r);
         }
     }
