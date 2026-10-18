@@ -138,6 +138,9 @@ struct Sym {
 enum YRef {
     Cross([f64; 3]),
     Project([f64; 3]),
+    /// A base axis (`Cross`/`Project`) turned about the chord by a whole
+    /// number of quarter turns (a roll angle of 90°, 180°, …), exactly.
+    Turned(&'static str, [f64; 3], u8),
 }
 
 /// A 3D frame with at least one released end axis.
@@ -397,16 +400,23 @@ fn model_2d(input: &SolverInput, constraints: &[Constraint]) -> Model {
 /// axes) or the component of the user's vector normal to d, whatever the
 /// handedness (which only flips its sign).
 fn frame_y_ref(e: &SolverElement3D, ex: [f64; 3], ey: [f64; 3]) -> YRef {
-    if e.roll_angle.is_some_and(|a| a != 0.0) {
-        return YRef::Project(ey);
-    }
-    if let (Some(x), Some(y), Some(z)) = (e.local_yx, e.local_yy, e.local_yz) {
-        if (x * x + y * y + z * z).sqrt() > 1e-10 {
-            return YRef::Project([x, y, z]);
+    let base = match (e.local_yx, e.local_yy, e.local_yz) {
+        (Some(x), Some(y), Some(z)) if (x * x + y * y + z * z).sqrt() > 1e-10 => ("project", [x, y, z]),
+        _ => ("cross", if ex[2].abs() > 0.999 { [1.0, 0.0, 0.0] } else { [0.0, 0.0, 1.0] }),
+    };
+    match e.roll_angle {
+        Some(a) if a != 0.0 => {
+            let q = (a / 90.0).round();
+            if q * 90.0 == a {
+                YRef::Turned(base.0, base.1, (q.rem_euclid(4.0)) as u8)
+            } else {
+                // a general roll: the element's own (rounded) y axis
+                YRef::Project(ey)
+            }
         }
+        _ if base.0 == "project" => YRef::Project(base.1),
+        _ => YRef::Cross(base.1),
     }
-    let up = if ex[2].abs() > 0.999 { [1.0, 0.0, 0.0] } else { [0.0, 0.0, 1.0] };
-    YRef::Cross(up)
 }
 
 fn model_3d(input: &SolverInput3D, constraints: &[Constraint]) -> Model {
@@ -750,6 +760,7 @@ fn cross3(f: Field, a: &[C], b: &[C]) -> [C; 3] {
 /// Exactly orthogonal (unnormalized) local axes from the exact chord `d`:
 /// x = d, y from `yref`, z = d × y.
 fn exact_axes(f: Field, d: &[C], yref: YRef, b: &Builder) -> [[C; 3]; 3] {
+    let neg = |v: [C; 3]| v.map(|c| C { m: f.neg(c.m), r: -c.r });
     let y = match yref {
         YRef::Cross(r) => cross3(f, &b.c3(r), d),
         YRef::Project(r) => {
@@ -757,6 +768,17 @@ fn exact_axes(f: Field, d: &[C], yref: YRef, b: &Builder) -> [[C; 3]; 3] {
             let dd = dot3(f, d, d);
             let ed = dot3(f, &ey, d);
             [0, 1, 2].map(|k| csub(f, cmul(f, dd, ey[k]), cmul(f, ed, d[k])))
+        }
+        YRef::Turned(kind, r, q) => {
+            let base = if kind == "project" { YRef::Project(r) } else { YRef::Cross(r) };
+            let [_, y0, z0] = exact_axes(f, d, base, b);
+            // y = cos·y0 + sin·z0 up to scale, for a quarter-turn angle
+            match q {
+                0 => y0,
+                1 => z0,
+                2 => neg(y0),
+                _ => neg(z0),
+            }
         }
     };
     let z = cross3(f, d, &y);
