@@ -1,14 +1,35 @@
 //! Random structural model generators shared by the fuzz tests
 //! (fuzz_crash_free.rs, certify.rs) and the assembly-path oracle
-//! (assembly_paths.rs). `random_2d_model`/`random_3d_model` are kept stable
-//! (other tests pin seeds against them); the `_rich` generators exercise
-//! every feature the assemblers branch on.
+//! (assembly_paths.rs). The `_rich` generators exercise every feature the
+//! assemblers branch on.
+//!
+//! The generated models depend on the `rand` version (`StdRng` and the
+//! `random_range` samplers are not value-stable across releases), so a test
+//! that needs one *specific* model must not pin a seed: freeze the model under
+//! tests/fixtures/fuzz-pinned/ and load it (see `pinned_npd_2d`).
 #![allow(dead_code)]
 
 use dedaliano_engine::types::*;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::collections::HashMap;
+
+// ==================== Frozen models ====================
+
+fn pinned(name: &str) -> String {
+    let p = format!("{}/tests/fixtures/fuzz-pinned/{name}", env!("CARGO_MANIFEST_DIR"));
+    std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("{p}: {e}"))
+}
+
+/// 2D fuzz model (rand 0.8, seed 86) whose stiffness is not positive definite.
+pub fn pinned_npd_2d() -> SolverInput {
+    serde_json::from_str(&pinned("npd-2d-seed86.json")).unwrap()
+}
+
+/// 3D fuzz model (rand 0.8, seed 100_031): Cholesky fails, dense LU answers.
+pub fn pinned_npd_3d() -> SolverInput3D {
+    serde_json::from_str(&pinned("npd-3d-seed100031.json")).unwrap()
+}
 
 // ==================== 2D Random Model Generator ====================
 
