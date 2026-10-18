@@ -1013,7 +1013,16 @@ struct Outcome {
     motions: Vec<Vec<(u32, [C; 6])>>,
     free_rotations: Vec<FreeRotation>,
     /// An exact basis of the free motions (nodal, mod p), when small enough.
-    basis: Option<Vec<Vec<(u32, [u64; 6])>>>,
+    basis: Option<Vec<BasisVector>>,
+}
+
+/// A free motion: per node, its exact slots modulo p and floating-point
+/// values; `refined` when the values are the free motion itself (the only
+/// one with its support), accurate enough to judge round-off.
+#[derive(Clone, Debug)]
+struct BasisVector {
+    nodal: Vec<(u32, [u64; 6], [f64; 6])>,
+    refined: bool,
 }
 
 /// Reduce `v` (dense, length k) against an echelon basis; true if it is
@@ -1313,7 +1322,7 @@ fn analyze(m: &Model, f: Field, describe: usize, basis_cap: usize) -> Option<Out
     let want_basis = basis_cap > 0
         && kernel <= basis_cap
         && (kernel as u64) * (nnz as u64 + 6 * lay.nodes.len() as u64) <= WORK_BUDGET;
-    let mut basis: Option<Vec<Vec<(u32, [u64; 6])>>> = want_basis.then(Vec::new);
+    let mut basis: Option<Vec<BasisVector>> = want_basis.then(Vec::new);
     let count = if want_basis { kernel } else { describe.min(kernel) };
     if kernel > 0 && count > 0 {
         let mut pivot_cols: Vec<u32> = (0..ncols).filter(|&c| piv[c as usize] != NONE).collect();
@@ -1335,9 +1344,9 @@ fn analyze(m: &Model, f: Field, describe: usize, basis_cap: usize) -> Option<Out
                 x[pc as usize] = C { m: f.neg(sm), r: -sr };
             }
             let described = idx < describe;
-            if described {
-                refine_values(f, &original, &mut x);
-            }
+            // values in floating point, for the description and for judging
+            // a load's work that is exactly non-zero by round-off alone
+            let refined = (described || kernel <= 32) && refine_values(f, &original, &mut x);
             // nodal motions
             let mut nodal = Vec::new();
             for (n, nm) in lay.nodes.iter().enumerate() {
@@ -1360,7 +1369,10 @@ fn analyze(m: &Model, f: Field, describe: usize, basis_cap: usize) -> Option<Out
                 }
             }
             if let Some(bs) = basis.as_mut() {
-                bs.push(nodal.iter().map(|(n, v)| (*n, v.map(|c| c.m))).collect());
+                bs.push(BasisVector {
+                    nodal: nodal.iter().map(|(n, v)| (*n, v.map(|c| c.m), v.map(|c| c.r))).collect(),
+                    refined,
+                });
             }
             if described {
                 motions.push(nodal);
@@ -1375,12 +1387,12 @@ fn analyze(m: &Model, f: Field, describe: usize, basis_cap: usize) -> Option<Out
 /// complete pivoting (the values carried through the exact elimination can
 /// lose all accuracy on pivots that are exactly non-zero but tiny). For the
 /// description only; the support and the verdict stay exact.
-fn refine_values(f: Field, rows: &[Row], x: &mut [C]) {
+fn refine_values(f: Field, rows: &[Row], x: &mut [C]) -> bool {
     const MAX_SUPPORT: usize = 240;
     let support: Vec<u32> = (0..x.len() as u32).filter(|&c| x[c as usize].m != 0).collect();
     let s = support.len();
     if s == 0 || s > MAX_SUPPORT {
-        return;
+        return false;
     }
     let at: HashMap<u32, usize> = support.iter().enumerate().map(|(i, &c)| (c, i)).collect();
     let mut a: Vec<Vec<C>> = Vec::new();
@@ -1395,7 +1407,7 @@ fn refine_values(f: Field, rows: &[Row], x: &mut [C]) {
             a.push(v);
         }
         if a.len() > 20 * MAX_SUPPORT {
-            return;
+            return false;
         }
     }
     // exact rank of the restricted conditions
@@ -1408,7 +1420,7 @@ fn refine_values(f: Field, rows: &[Row], x: &mut [C]) {
     }
     let rank = basis.len();
     if rank >= s {
-        return;
+        return false;
     }
     // that many pivots in floating point, complete pivoting
     let mut m: Vec<Vec<f64>> = a.iter().map(|v| v.iter().map(|c| c.r).collect()).collect();
@@ -1424,7 +1436,7 @@ fn refine_values(f: Field, rows: &[Row], x: &mut [C]) {
             }
         }
         if best.2 == 0.0 {
-            return;
+            return false;
         }
         m.swap(k, best.0);
         let j = best.1;
@@ -1440,7 +1452,7 @@ fn refine_values(f: Field, rows: &[Row], x: &mut [C]) {
             }
         }
     }
-    let Some(first_free) = free.iter().position(|&b| b) else { return };
+    let Some(first_free) = free.iter().position(|&b| b) else { return false };
     let mut y = vec![0.0; s];
     y[first_free] = 1.0;
     for (k, &j) in col_of.iter().enumerate() {
@@ -1448,7 +1460,7 @@ fn refine_values(f: Field, rows: &[Row], x: &mut [C]) {
     }
     let scale = y.iter().fold(0.0f64, |acc, v| acc.max(v.abs()));
     if !(scale > 0.0 && scale.is_finite()) {
-        return;
+        return false;
     }
     for c in x.iter_mut() {
         c.r = 0.0;
@@ -1456,6 +1468,7 @@ fn refine_values(f: Field, rows: &[Row], x: &mut [C]) {
     for (i, &c) in support.iter().enumerate() {
         x[c as usize].r = y[i] / scale;
     }
+    rank + 1 == s
 }
 
 // ---------------------------------------------------------------------------
@@ -1476,9 +1489,16 @@ pub struct MechanismCheck {
     two_d: bool,
     free_rotations: Vec<FreeRotation>,
     isolated: HashSet<usize>,
-    /// Exact bases of the free motions modulo each prime (node id, slots
-    /// [u (3), θ (3)]); empty when there were too many to keep.
-    bases: Vec<(u64, Vec<Vec<(usize, [u64; 6])>>)>,
+    /// An exact basis of the free motions modulo PRIMES[0] (node id, slots
+    /// [u (3), θ (3)], with floating-point values), when small enough.
+    basis: Vec<BasisVectorIds>,
+    basis_complete: bool,
+}
+
+#[derive(Clone, Debug)]
+struct BasisVectorIds {
+    nodal: Vec<(usize, [u64; 6], [f64; 6])>,
+    refined: bool,
 }
 
 impl MechanismCheck {
@@ -1516,35 +1536,44 @@ impl MechanismCheck {
     /// Whether a load does work on some free motion: `load(node, slot)` is
     /// the load on a node in global components, slots [Fx, Fy, Fz, Mx, My,
     /// Mz] (2D: [Fx, Fz, —, My, —, —]). Exact: the load is orthogonal to
-    /// every free motion modulo both primes, or it does work. A load that
+    /// every free motion (its virtual work vanishes modulo a 61-bit prime), or it does work. A load that
     /// does no work on any free motion leaves the internal forces determined
     /// (only the displacement along the free motions is arbitrary); one that
-    /// does has no equilibrium. Without a kept basis, any load counts.
+    /// does has no equilibrium. Without a kept basis, any load counts. The
+    /// exact test is relaxed to round-off (relative 1e-9) only against a
+    /// free motion whose floating-point values are known accurately.
     pub fn loads_do_work(&self, load: impl Fn(usize, usize) -> f64) -> bool {
         if !self.is_mechanism() {
             return false;
         }
-        if self.bases.is_empty() {
+        if !self.basis_complete {
             return true;
         }
-        for (p, basis) in &self.bases {
-            let f = Field::new(*p);
-            for v in basis {
-                let mut acc = 0u64;
-                for (node, x) in v {
-                    for (slot, &xs) in x.iter().enumerate() {
-                        let l = load(*node, slot);
-                        if xs != 0 && l != 0.0 {
-                            if !l.is_finite() {
-                                return true;
-                            }
-                            acc = f.add(acc, f.mul(f.of(l), xs));
-                        }
+        let f = Field::new(PRIMES[0]);
+        for v in &self.basis {
+            let (mut acc, mut dot, mut scale) = (0u64, 0.0f64, 0.0f64);
+            for (node, x, r) in &v.nodal {
+                for slot in 0..6 {
+                    let l = load(*node, slot);
+                    if l == 0.0 {
+                        continue;
                     }
+                    if !l.is_finite() {
+                        return true;
+                    }
+                    if x[slot] != 0 {
+                        acc = f.add(acc, f.mul(f.of(l), x[slot]));
+                    }
+                    dot += l * r[slot];
+                    scale += (l * r[slot]).abs();
                 }
-                if acc != 0 {
-                    return true;
-                }
+            }
+            // Exactly orthogonal, or — when the load comes out of rounded
+            // arithmetic (element loads, coordinates) — orthogonal to the
+            // free motion's accurate values up to round-off.
+            let no_work = acc == 0 || (v.refined && dot.abs() <= 1e-9 * scale);
+            if !no_work {
+                return true;
             }
         }
         false
@@ -1942,11 +1971,15 @@ fn run(m: Model) -> MechanismCheck {
         return out;
     }
     out.free_motions = first.kernel.min(second.kernel);
-    if let (Some(b1), Some(b2)) = (&first.basis, &second.basis) {
-        let ids = |b: &Vec<Vec<(u32, [u64; 6])>>| -> Vec<Vec<(usize, [u64; 6])>> {
-            b.iter().map(|v| v.iter().map(|(n, x)| (m.ids[*n as usize], *x)).collect()).collect()
-        };
-        out.bases = vec![(PRIMES[0], ids(b1)), (PRIMES[1], ids(b2))];
+    if let (Some(b1), Some(_)) = (&first.basis, &second.basis) {
+        out.basis = b1
+            .iter()
+            .map(|v| BasisVectorIds {
+                nodal: v.nodal.iter().map(|(n, x, r)| (m.ids[*n as usize], *x, *r)).collect(),
+                refined: v.refined,
+            })
+            .collect();
+        out.basis_complete = true;
     }
     let mut parts = Uf::new(m.ids.len());
     for &(a, b) in &m.links {
