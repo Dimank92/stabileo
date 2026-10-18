@@ -323,7 +323,7 @@ fn validation_truss_missing_diagonal_load_path() {
         (5, 0.0, h),   (6, panel_w, h),   (7, 2.0*panel_w, h),   (8, 3.0*panel_w, h),
     ];
 
-    let make_truss_ef = |include_diag_panel2: bool| -> Vec<f64> {
+    let make_truss_ef = |include_diag_panel2: bool| -> Result<Vec<f64>, String> {
         let mut elems = vec![
             (1,  "truss", 1, 2, 1, 1, false, false), // bottom chord
             (2,  "truss", 2, 3, 1, 1, false, false),
