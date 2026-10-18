@@ -130,6 +130,16 @@ struct Sym {
     dof: u8,
 }
 
+/// How a local y axis is obtained exactly from the chord d: as `r × d` for a
+/// reference r (the default axes: r = global up, or X for near-vertical
+/// members; a connector's frame), or as the component of r normal to d (a
+/// user's local-y vector; with a roll angle, the element's computed y).
+#[derive(Clone, Copy)]
+enum YRef {
+    Cross([f64; 3]),
+    Project([f64; 3]),
+}
+
 /// A 3D frame with at least one released end axis.
 struct Released3D {
     i: u32,
@@ -138,7 +148,7 @@ struct Released3D {
     /// exact component of it normal to the chord, and the exact cross product
     /// for z, so the three axes are exactly orthogonal (the f64 ones are not,
     /// and that noise could hide a mechanism from an exact rank).
-    ey: [f64; 3],
+    ey: YRef,
     /// Per end (i, j): whether the rotation about each local axis is coupled.
     coupled: [[bool; 3]; 2],
 }
@@ -382,6 +392,23 @@ fn model_2d(input: &SolverInput, constraints: &[Constraint]) -> Model {
     m
 }
 
+/// The exact counterpart of `compute_local_axes_3d`'s y axis (see `YRef`):
+/// without a roll angle the element's y is the normalized r × d (default
+/// axes) or the component of the user's vector normal to d, whatever the
+/// handedness (which only flips its sign).
+fn frame_y_ref(e: &SolverElement3D, ex: [f64; 3], ey: [f64; 3]) -> YRef {
+    if e.roll_angle.is_some_and(|a| a != 0.0) {
+        return YRef::Project(ey);
+    }
+    if let (Some(x), Some(y), Some(z)) = (e.local_yx, e.local_yy, e.local_yz) {
+        if (x * x + y * y + z * z).sqrt() > 1e-10 {
+            return YRef::Project([x, y, z]);
+        }
+    }
+    let up = if ex[2].abs() > 0.999 { [1.0, 0.0, 0.0] } else { [0.0, 0.0, 1.0] };
+    YRef::Cross(up)
+}
+
 fn model_3d(input: &SolverInput3D, constraints: &[Constraint]) -> Model {
     let dof_num = DofNumbering::build_3d(input);
     let has_rot = dof_num.dofs_per_node >= 6;
@@ -418,7 +445,7 @@ fn model_3d(input: &SolverInput3D, constraints: &[Constraint]) -> Model {
         m.frames_3d.push(Released3D {
             i,
             j,
-            ey,
+            ey: frame_y_ref(e, ex, ey),
             coupled: [released[0].map(|r| !r), released[1].map(|r| !r)],
         });
     }
@@ -720,12 +747,18 @@ fn cross3(f: Field, a: &[C], b: &[C]) -> [C; 3] {
     ]
 }
 
-/// Exactly orthogonal (unnormalized) local axes from the exact chord `d` and
-/// an element's computed y axis: x = d, y = (d·d) ey − (ey·d) d, z = d × y.
-fn exact_axes(f: Field, d: &[C], ey: [C; 3]) -> [[C; 3]; 3] {
-    let dd = dot3(f, d, d);
-    let ed = dot3(f, &ey, d);
-    let y = [0, 1, 2].map(|k| csub(f, cmul(f, dd, ey[k]), cmul(f, ed, d[k])));
+/// Exactly orthogonal (unnormalized) local axes from the exact chord `d`:
+/// x = d, y from `yref`, z = d × y.
+fn exact_axes(f: Field, d: &[C], yref: YRef, b: &Builder) -> [[C; 3]; 3] {
+    let y = match yref {
+        YRef::Cross(r) => cross3(f, &b.c3(r), d),
+        YRef::Project(r) => {
+            let ey = b.c3(r);
+            let dd = dot3(f, d, d);
+            let ed = dot3(f, &ey, d);
+            [0, 1, 2].map(|k| csub(f, cmul(f, dd, ey[k]), cmul(f, ed, d[k])))
+        }
+    };
     let z = cross3(f, d, &y);
     [[d[0], d[1], d[2]], y, z]
 }
@@ -795,8 +828,10 @@ fn connector_rows(b: &Builder, c: &Conn) -> Vec<Vec<(Sym, C)>> {
     let ks: Vec<f64> = c.springs.iter().map(|s| s.0).collect();
     if m.three_d {
         // the element's y axis: its shear-y row is −e_y on node i
-        let ey = [0, 1, 2].map(|k| -c.springs[1].1[k]);
-        let [x, y, z] = exact_axes(f, &d, b.c3(ey));
+        // the element's frame: y = normalized (X or Y) × chord
+        let dir = c.springs[0].1[6..9].to_vec();
+        let r = if dir[0].abs() < 0.9 { [1.0, 0.0, 0.0] } else { [0.0, 1.0, 0.0] };
+        let [x, y, z] = exact_axes(f, &d, YRef::Cross(r), b);
         let rows = [
             trans(&x, None),
             trans(&y, Some(&cross3(f, &y, &d))),
@@ -874,7 +909,7 @@ fn released_frame_rows(b: &Builder, e: &Released3D) -> Vec<Vec<(Sym, C)>> {
         }
         rows.push(r);
     }
-    let axes = exact_axes(f, &d, b.c3(e.ey));
+    let axes = exact_axes(f, &d, e.ey, b);
     for (end, base) in [(0usize, 6usize), (1, 12)] {
         for a in 0..3 {
             if !e.coupled[end][a] {
@@ -1448,6 +1483,22 @@ impl MechanismCheck {
                 .with_phase("pre_solve")
                 .with_nodes(self.nodes.clone()),
         )
+    }
+
+    /// Rotation directions of single nodes that nothing couples to and that
+    /// are not along a global axis (the solver's artificial stiffness holds
+    /// only global-axis ones, so these leave the assembled K singular even
+    /// though no part of the structure moves). For tests comparing with the
+    /// null space of K.
+    #[doc(hidden)]
+    pub fn unheld_rotation_dims(&self) -> usize {
+        self.free_rotations
+            .iter()
+            .map(|r| {
+                let zero_cols = (0..r.nr).filter(|&k| r.basis.iter().all(|b| b[k] == 0)).count();
+                r.nr - r.basis.len() - zero_cols
+            })
+            .sum()
     }
 
     fn unresisted_moment(&self, node: usize, m: &[f64]) -> bool {

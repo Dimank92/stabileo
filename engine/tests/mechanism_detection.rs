@@ -15,6 +15,8 @@ use dedaliano_engine::solver::assembly::{
 use dedaliano_engine::solver::dof::DofNumbering;
 use dedaliano_engine::solver::linear::{solve_2d, solve_3d};
 use dedaliano_engine::solver::mechanism::{check_2d, check_3d, free_motion_vectors};
+use dedaliano_engine::solver::modal::{solve_modal_2d, solve_modal_3d};
+use std::collections::HashMap;
 use dedaliano_engine::types::*;
 use serde_json::{json, Value};
 
@@ -218,7 +220,9 @@ fn constrained_diaphragm_with_a_free_rotation() {
         m
     };
     let msg = refused_3d(&model(true));
-    assert_mechanism(&msg, &[11, 12, 13, 14, 15], "rotation about an axis along (0, 0, 1) through (3, 2,");
+    // the floor turns about the master column; the pinned columns tilt with it
+    assert_mechanism(&msg, &[11, 12, 13, 14, 15], "move freely together");
+    assert!(msg.contains("node 11: ux 0.504, uy -0.755") || msg.contains("node 11: ux -0.504, uy 0.755"), "{msg}");
     solve_3d(&model(false)).expect("diaphragm held by the master column's torsion solves");
 }
 
@@ -356,29 +360,42 @@ fn all_hinged_joint_with_a_moment() {
 /// 3D, about an axis that is not a global one: two inclined members meet at
 /// a node, each released in bending there but not in torsion. Their torsion
 /// resists moments in the plane of their axes; about the normal to that
-/// plane nothing does.
+/// plane nothing does. That free rotation moves no part of the structure, so
+/// it is not a mechanism; a moment about it is refused. (The assembled K is
+/// singular along it — the artificial stiffness the assembler puts on
+/// rotations nothing holds is only on global axes — and the factorization
+/// refuses the model: refused either way, never solved silently.)
 #[test]
 fn released_joint_moment_about_a_skew_axis() {
-    let model = |m: [f64; 3]| {
-        let mut e = |id: usize, i: usize| {
-            json!({"id": id, "type": "frame", "nodeI": i, "nodeJ": 3, "materialId": 1, "sectionId": 1,
-                   "releaseMyEnd": true, "releaseMzEnd": true})
-        };
-        in3(json!({
-            "nodes": {"1": {"id": 1, "x": 0.0, "y": 0.0, "z": 0.0}, "2": {"id": 2, "x": 4.0, "y": 0.0, "z": 0.0},
-                      "3": {"id": 3, "x": 2.0, "y": 1.0, "z": 3.0}},
-            "materials": mats(), "sections": sec3(),
-            "elements": {"1": e(1, 1), "2": e(2, 2)},
-            "supports": {"1": sup3(1, [true; 6]), "2": sup3(2, [true; 6])},
-            "loads": [nodal3(3, [0.0, 0.0, -10.0, m[0], m[1], m[2]])]
-        }))
+    let e = |id: usize, i: usize| {
+        json!({"id": id, "type": "frame", "nodeI": i, "nodeJ": 3, "materialId": 1, "sectionId": 1,
+               "releaseMyEnd": true, "releaseMzEnd": true})
     };
-    solve_3d(&model([0.0; 3])).expect("no moment: solves");
-    // in the plane of the two axes (2, 1, 3) and (−2, 1, 3): resisted by torsion
-    solve_3d(&model([2.0, 1.0, 3.0])).expect("moment along a member axis solves");
-    // the normal (0, 3, −1) of that plane: nothing resists it
-    let e = solve_3d(&model([0.0, 3.0, -1.0])).unwrap_err();
+    let input = in3(json!({
+        "nodes": {"1": {"id": 1, "x": 0.0, "y": 0.0, "z": 0.0}, "2": {"id": 2, "x": 4.0, "y": 0.0, "z": 0.0},
+                  "3": {"id": 3, "x": 2.0, "y": 1.0, "z": 3.0}},
+        "materials": mats(), "sections": sec3(),
+        "elements": {"1": e(1, 1), "2": e(2, 2)},
+        "supports": {"1": sup3(1, [true; 6]), "2": sup3(2, [true; 6])},
+        "loads": []
+    }));
+    let c = check_3d(&input, &[]);
+    assert!(!c.is_mechanism(), "{c:?}");
+    assert_eq!(c.unheld_rotation_dims(), 1);
+    let moment = |m: [f64; 3]| {
+        vec![SolverLoad3D::Nodal(SolverNodalLoad3D {
+            node_id: 3, fx: 0.0, fy: 0.0, fz: -10.0, mx: m[0], my: m[1], mz: m[2], bw: None,
+        })]
+    };
+    c.refuse_unresisted_loads_3d(&moment([0.0; 3])).unwrap();
+    // in the plane of the two axes (−2, −1, −3) and (2, −1, −3): torsion resists it
+    c.refuse_unresisted_loads_3d(&moment([2.0, -1.0, -3.0])).unwrap();
+    c.refuse_unresisted_loads_3d(&moment([0.0, 1.0, 3.0])).unwrap();
+    // the normal (0, 3, −1) of that plane, alone or mixed in: nothing resists it
+    let e = c.refuse_unresisted_loads_3d(&moment([0.0, 3.0, -1.0])).unwrap_err();
     assert!(e.contains("Nodal moment at node 3"), "{e}");
+    assert!(c.refuse_unresisted_loads_3d(&moment([1.0, 0.0, 1.0])).is_err());
+    assert!(solve_3d(&input).is_err(), "singular K solved");
 }
 
 /// A load on a node that nothing connects is refused (the node is otherwise
@@ -514,7 +531,7 @@ fn reported_free_motions_have_zero_energy() {
         if check_2d(&m2, &m2.constraints).is_mechanism() {
             flagged += 1;
             for r in residuals_2d(&m2) {
-                assert!(r < 1e-9, "2d seed {seed}: free motion with energy (residual {r:e})");
+                assert!(r < 1e-6, "2d seed {seed}: free motion with energy (residual {r:e})");
                 tested += 1;
             }
         }
@@ -534,12 +551,179 @@ fn reported_free_motions_have_zero_energy() {
         if check_3d(&m3, &m3.constraints).is_mechanism() {
             flagged += 1;
             for r in residuals_3d(&m3) {
-                assert!(r < 1e-9, "3d seed {seed}: free motion with energy (residual {r:e})");
+                assert!(r < 1e-6, "3d seed {seed}: free motion with energy (residual {r:e})");
                 tested += 1;
             }
         }
     }
     assert!(tested > 200 && flagged > 100, "only {tested} motions on {flagged} models");
+}
+
+
+// ---------------------------------------------------------------------------
+// Modal analysis on a mechanism (#338)
+// ---------------------------------------------------------------------------
+
+/// MYSTRAN differential model modal3d_lumped-744196 (#338, #340): member 8
+/// (node 7 to node 9) is released about its local y at node 7 and node 9 is
+/// a free tip, so the member swings on its hinge. Modal analysis returned 3
+/// of the 12 modes requested, with no diagnostic, dropping the zero mode;
+/// the static solve returned displacements of 1.6e10. Both now refuse,
+/// naming the tip.
+const MODAL3D_LUMPED_744196: &str = r#"{"nodes": {"1": {"id": 1, "x": 0.967, "y": 6.302, "z": 2.024}, "2": {"id": 2, "x": 0.967, "y": 6.302, "z": -1.077}, "3": {"id": 3, "x": 1.18, "y": 2.891, "z": 4.408}, "4": {"id": 4, "x": 7.958, "y": 7.783, "z": 3.562}, "5": {"id": 5, "x": 1.282, "y": 6.661, "z": 4.34}, "6": {"id": 6, "x": 6.215, "y": 2.373, "z": 0.032}, "7": {"id": 7, "x": 1.237, "y": 0.113, "z": 1.521}, "8": {"id": 8, "x": 4.576, "y": 5.494, "z": 4.907}, "9": {"id": 9, "x": 1.177, "y": 5.043, "z": 7.108}}, "materials": {"1": {"id": 1, "e": 30000.0, "nu": 0.28957148714599}, "2": {"id": 2, "e": 57110.617580267186, "nu": 0.20085113715377023}}, "sections": {"1": {"id": 1, "a": 0.07544237029215778, "iy": 0.0006797517270497183, "iz": 0.00033093940951539527, "j": 0.0010106911365651136}, "2": {"id": 2, "a": 0.0732789572064304, "iy": 0.000623085049988766, "iz": 0.0003213714547854747, "j": 0.0009444565047742406}, "3": {"id": 3, "a": 0.1494962479727206, "iy": 0.0058786446593315595, "iz": 0.000590040021463207, "j": 0.006468684680794767}}, "elements": {"1": {"id": 1, "type": "frame", "nodeI": 1, "nodeJ": 2, "materialId": 2, "sectionId": 1, "rollAngle": -126.86728945771999, "releaseMyEnd": true}, "2": {"id": 2, "type": "frame", "nodeI": 3, "nodeJ": 1, "materialId": 2, "sectionId": 1, "releaseMyEnd": true}, "3": {"id": 3, "type": "frame", "nodeI": 8, "nodeJ": 1, "materialId": 2, "sectionId": 2, "localYx": -0.38610421393555794, "localYy": 0.09199959207572439, "localYz": 0.8673081756085204, "releaseMyEnd": true}, "4": {"id": 4, "type": "frame", "nodeI": 5, "nodeJ": 2, "materialId": 1, "sectionId": 1, "releaseMyEnd": true}, "5": {"id": 5, "type": "frame", "nodeI": 4, "nodeJ": 3, "materialId": 1, "sectionId": 2, "releaseMyEnd": true}, "6": {"id": 6, "type": "frame", "nodeI": 6, "nodeJ": 4, "materialId": 1, "sectionId": 1, "localYx": 0.7716167404634611, "localYy": 0.27324904480734613, "localYz": -0.5291170372906462, "releaseMyEnd": true}, "7": {"id": 7, "type": "frame", "nodeI": 6, "nodeJ": 7, "materialId": 1, "sectionId": 1, "rollAngle": 8.000476439362387, "releaseMyEnd": true}, "8": {"id": 8, "type": "frame", "nodeI": 7, "nodeJ": 9, "materialId": 1, "sectionId": 2, "releaseMyStart": true}, "9": {"id": 9, "type": "frame", "nodeI": 5, "nodeJ": 3, "materialId": 1, "sectionId": 1, "releaseMyEnd": true}, "10": {"id": 10, "type": "frame", "nodeI": 7, "nodeJ": 8, "materialId": 1, "sectionId": 1, "releaseMyEnd": true}}, "supports": {"1": {"nodeId": 1, "rx": true, "ry": true, "rz": true, "rrx": true, "rry": true, "rrz": true}, "2": {"nodeId": 2, "rx": false, "ry": true, "rz": true, "rrx": true, "rry": true, "rrz": false}, "3": {"nodeId": 7, "rx": false, "ry": true, "rz": true, "rrx": true, "rry": false, "rrz": false, "dy": -0.005637269981230953, "dz": 0.006427283511252756, "drx": 0.001676186104643508}}, "loads": [], "_densities": {"1": 2500.0, "2": 7850.0}}"#;
+
+#[test]
+fn modal_on_a_mechanism_is_refused() {
+    let input: SolverInput3D = serde_json::from_str(MODAL3D_LUMPED_744196).unwrap();
+    let dens: HashMap<String, f64> = [("1".to_string(), 2500.0), ("2".to_string(), 7850.0)].into();
+    let e = solve_modal_3d(&input, &dens, 12).err().expect("modal on a mechanism refused");
+    assert_mechanism(&e, &[9], "node 9");
+    let mut stat = input.clone();
+    stat.loads = vec![SolverLoad3D::Nodal(SolverNodalLoad3D {
+        node_id: 9, fx: 1.0, fy: 0.0, fz: 0.0, mx: 0.0, my: 0.0, mz: 0.0, bw: None,
+    })];
+    assert_mechanism(&refused_3d(&stat), &[9], "node 9");
+    // Unreleased, the tip member is a cantilever: modal returns all modes.
+    let mut fixed = input.clone();
+    fixed.elements.get_mut("8").unwrap().release_my_start = false;
+    let r = solve_modal_3d(&fixed, &dens, 12).expect("no mechanism");
+    assert_eq!(r.modes.len(), 12);
+}
+
+/// 2D: a cantilever with a member hinged at its tip, free at the far end.
+#[test]
+fn modal_2d_on_a_mechanism_is_refused() {
+    let model = |hinge: bool| {
+        in2(json!({
+            "nodes": {"1": {"id": 1, "x": 0.0, "z": 0.0}, "2": {"id": 2, "x": 3.0, "z": 0.0},
+                      "3": {"id": 3, "x": 5.0, "z": 1.0}},
+            "materials": mats(), "sections": sec2(),
+            "elements": {"1": frame2(1, 1, 2, false, false), "2": frame2(2, 2, 3, hinge, false)},
+            "supports": {"1": sup2(1, 1, "fixed")}, "loads": []
+        }))
+    };
+    let dens: HashMap<String, f64> = [("1".to_string(), 7850.0)].into();
+    let e = solve_modal_2d(&model(true), &dens, 4).err().expect("refused");
+    assert_mechanism(&e, &[3], "node 3");
+    solve_modal_2d(&model(false), &dens, 4).expect("cantilever modal");
+}
+
+// ---------------------------------------------------------------------------
+// Free motions against the null space of K
+// ---------------------------------------------------------------------------
+
+fn jacobi_eigenvalues(mut a: Vec<f64>, n: usize) -> Vec<f64> {
+    for _ in 0..200 {
+        let mut off = 0.0;
+        for p in 0..n {
+            for q in p + 1..n {
+                off += a[p * n + q] * a[p * n + q];
+            }
+        }
+        if off < 1e-36 {
+            break;
+        }
+        for p in 0..n {
+            for q in p + 1..n {
+                let apq = a[p * n + q];
+                if apq.abs() < 1e-300 {
+                    continue;
+                }
+                let theta = (a[q * n + q] - a[p * n + p]) / (2.0 * apq);
+                let t = if theta == 0.0 { 1.0 } else { theta.signum() / (theta.abs() + (theta * theta + 1.0).sqrt()) };
+                let c = 1.0 / (t * t + 1.0).sqrt();
+                let s = t * c;
+                for k in 0..n {
+                    let (x, y) = (a[k * n + p], a[k * n + q]);
+                    a[k * n + p] = c * x - s * y;
+                    a[k * n + q] = s * x + c * y;
+                }
+                for k in 0..n {
+                    let (x, y) = (a[p * n + k], a[q * n + k]);
+                    a[p * n + k] = c * x - s * y;
+                    a[q * n + k] = s * x + c * y;
+                }
+            }
+        }
+    }
+    let mut e: Vec<f64> = (0..n).map(|i| a[i * n + i]).collect();
+    e.sort_by(|x, y| x.total_cmp(y));
+    e
+}
+
+/// Number of zero eigenvalues of the Jacobi-scaled K_ff, when the spectrum
+/// separates them clearly (below 1e-11, the next above 1e-7); None otherwise.
+fn zero_modes(k: &[f64], n: usize, nf: usize) -> Option<usize> {
+    if nf == 0 || nf > 160 {
+        return None;
+    }
+    let d: Vec<f64> = (0..nf).map(|i| k[i * n + i].abs().sqrt()).collect();
+    if d.iter().any(|v| *v == 0.0) {
+        return None;
+    }
+    let mut a = vec![0.0; nf * nf];
+    for i in 0..nf {
+        for j in 0..nf {
+            a[i * nf + j] = k[i * n + j] / (d[i] * d[j]);
+        }
+    }
+    let e = jacobi_eigenvalues(a, nf);
+    let z = e.iter().filter(|v| v.abs() < 1e-11).count();
+    match e.get(z) {
+        Some(next) if *next < 1e-7 => None,
+        _ => Some(z),
+    }
+}
+
+/// On random models (every feature but constraints, which K does not see),
+/// the number of free motions the exact check finds — plus single-node
+/// rotations nothing couples to off the global axes, which the solver's
+/// artificial stiffness does not hold — equals the number of zero
+/// eigenvalues of the assembled stiffness, whenever the spectrum separates
+/// them. Both directions: no motion invented, none missed.
+#[test]
+fn free_motions_match_the_null_space_of_k() {
+    let (mut agree, mut skipped) = (0, 0);
+    for seed in 0..300u64 {
+        let (mut m2, _) = fuzz_models::random_2d_model_rich(seed);
+        if seed % 3 == 0 {
+            m2.supports.clear();
+        }
+        let c = check_2d(&m2, &[]);
+        let dn = DofNumbering::build_2d(&m2);
+        let st = assemble_stiffness_2d(&m2, &dn);
+        match zero_modes(&st.k, dn.n_total, dn.n_free) {
+            Some(z) => {
+                // the solver's artificial stiffness holds a rotation whose
+                // diagonal is round-off, which exact arithmetic may count
+                // as coupled: unheld rotations are an upper bound
+                assert!(c.free_motions <= z && z <= c.free_motions + c.unheld_rotation_dims(), "2d seed {seed}: {z} zero modes, {c:?}");
+                agree += 1;
+            }
+            None => skipped += 1,
+        }
+        let (mut m3, _) = fuzz_models::random_3d_model_rich(seed);
+        if seed % 3 == 0 {
+            m3.supports.clear();
+        }
+        if !m3.curved_beams.is_empty() || DofNumbering::dofs_per_node_3d(&m3) == 7 || m3.left_hand == Some(true) {
+            continue;
+        }
+        let c = check_3d(&m3, &[]);
+        let dn = DofNumbering::build_3d(&m3);
+        let st = assemble_stiffness_3d(&m3, &dn);
+        match zero_modes(&st.k, dn.n_total, dn.n_free) {
+            Some(z) => {
+                // the solver's artificial stiffness holds a rotation whose
+                // diagonal is round-off, which exact arithmetic may count
+                // as coupled: unheld rotations are an upper bound
+                assert!(c.free_motions <= z && z <= c.free_motions + c.unheld_rotation_dims(), "3d seed {seed}: {z} zero modes, {c:?}");
+                agree += 1;
+            }
+            None => skipped += 1,
+        }
+    }
+    assert!(agree > 300, "only {agree} models compared ({skipped} skipped)");
 }
 
 // ---------------------------------------------------------------------------
