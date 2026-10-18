@@ -289,6 +289,7 @@ export function deserializeProject(text: string): boolean {
   forgetSessionDemandRevisions(data.snapshot);
   historyStore.pushState();
   modelStore.restore(data.snapshot);
+  modelStore.announceNewProject();
   // Adopted separately from `restore()`, which is also the undo path — see project-provenance.ts.
   // A file written before these fields existed hydrates to "we do not know", not to "none".
   hydrateProjectProvenance(data.snapshot);

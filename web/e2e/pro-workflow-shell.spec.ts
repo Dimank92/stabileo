@@ -15,7 +15,7 @@
  * on a timer, and no timeout is widened to make a slow thing pass.
  */
 
-import { test, expect, designAll, loadModel, openDocumentsStage } from './fixtures';
+import { test, expect, designAll, loadModel, openDocumentsStage, openClassicDesign } from './fixtures';
 
 type Page = import('@playwright/test').Page;
 
@@ -296,7 +296,7 @@ test.describe('@smoke PRO shell — Ver modelo 3D on the Design row', () => {
      * first: the ribbon renders only the active stage's groups, so the command does not exist in
      * the DOM until then — which is why this asserts nothing about its absence beforehand.
      */
-    await page.getByTestId('pr-stage-design').click();
+    await openClassicDesign(page);
     await expect(page.getByTestId('pr-cmd-rebar3d')).toBeEnabled();
 
     /*
