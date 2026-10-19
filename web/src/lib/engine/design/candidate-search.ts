@@ -581,9 +581,19 @@ export function runDesign(
     }
   }
 
-  settleCrossingSeats(adapter, list, outcomes, cages, colBars, corners, absent, {
-    budget: opts.budget, clock, expired: () => !!opts.signal?.aborted || clock() - t0 > maxRunMs,
-  });
+  /*
+   * The settle runs to its end whatever the clock says. It is what makes a verified beam's
+   * certificate true against the seats the run designed, and its work is bounded by counts (each
+   * member's search budget, no more sweeps than members). Cut by the run's clock, it left beams
+   * VERIFIED against a guess with `aborted` false: on the 408-member flagship a run that crossed
+   * the 20 s mark during the settle verified 357 beams and columns where a complete one verifies
+   * 356, and the repair ladder downstream moved other bars. The clock stops the loop above, where
+   * what it leaves out is counted in `notReached`; a cancellation still stops the settle, and the
+   * run says it was aborted.
+   */
+  if (!settleCrossingSeats(adapter, list, outcomes, cages, colBars, corners, absent, {
+    budget: opts.budget, clock, cancelled: () => !!opts.signal?.aborted,
+  })) aborted = true;
 
   const prov = adapter.provenance();
   return tallyRunSummary(
@@ -617,8 +627,8 @@ function settleCrossingSeats(
   adapter: DesignCodeAdapter, list: MemberContext[], outcomes: MemberDesignOutcome[],
   cages: Map<number, number>, colBars: Map<number, { count: number; diameterMm: number }>,
   corners: Map<number, BeamCornerRecord>, absent: Set<number>,
-  o: { budget?: SearchBudget; clock: Clock; expired: () => boolean },
-): void {
+  o: { budget?: SearchBudget; clock: Clock; cancelled: () => boolean },
+): boolean {
   const refusedOnAnchorage = (x: MemberDesignOutcome) => x.elementType === 'beam' && x.outcome !== 'VERIFIED' && x.limiting.includes('anchorage');
   const pieces = (c: MemberContext) => c.span?.elements ?? [c.elementId];
   const record = (i: number) => {
@@ -644,7 +654,7 @@ function settleCrossingSeats(
     for (const id of pieces(c)) lightest.set(id, { cornerDiasMm: [Math.min(...admissible)], stirrupDiaMm: c.material.stirrupDia });
   }
   for (const i of refused) {
-    if (o.expired()) return;
+    if (o.cancelled()) return false;
     const again = designMember(adapter, withSeats(list[i]!, { seats: lightest, present: new Set(lightest.keys()) }), { budget: o.budget, clock: o.clock });
     if (again.outcome !== 'VERIFIED') {
       // Tried again with the crossing beams at their lightest seat, and refused again: said so.
@@ -670,7 +680,7 @@ function settleCrossingSeats(
       if (x.elementType !== 'beam' || x.outcome !== 'VERIFIED') continue;
       const rebar = detailableReinforcement(x)?.rebar;
       if (!rebar || adapter.verify(withSeats(list[i]!), rebar).overallStatus !== 'fail') continue;
-      if (o.expired()) return;
+      if (o.cancelled()) return false;
       const again = designMember(adapter, withSeats(list[i]!), { budget: o.budget, clock: o.clock });
       outcomes[i] = again;
       record(i);
@@ -683,8 +693,9 @@ function settleCrossingSeats(
       const before = detailableReinforcement(x)?.rebar, after = detailableReinforcement(again)?.rebar;
       if (again.outcome !== x.outcome || !before || !after || rebarHash(before) !== rebarHash(after)) changed = true;
     }
-    if (!changed) return;
+    if (!changed) return true;
   }
+  return true;
 }
 
 /** The certificate a passing arrangement gets: the one shape the search and an edit share. */
