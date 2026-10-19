@@ -15,6 +15,7 @@ import { lineLaps, linePieces, type LineBarPiece, type LineLap, type LineStirrup
 import { mirrorReinforcement, type BeamLine } from '../engine/design/repeated-frames';
 import { lineKey, type BeamLineReinforcement } from '../design-contract/beam-line';
 import { designLength, withSpanPieces } from './design-spans-store';
+import { lineAxis } from './line-axis';
 import type { ProvidedReinforcement } from '../design-contract/reinforcement';
 import type { ProvidedRebarResult } from '../engine/station-design-forces';
 
@@ -224,4 +225,23 @@ export function savedLinePieces(): {
     }
   }
   return { pieces, laps };
+}
+
+/** The cross-sections placed on saved lines, each at its point in the model (`DocumentModel.sectionCuts`). */
+export function savedSectionCuts(): NonNullable<import('../engine/detailing/document-model').DocumentModel['sectionCuts']> {
+  const out: NonNullable<import('../engine/detailing/document-model').DocumentModel['sectionCuts']> = [];
+  if (!Object.keys(storedDecisions().lines ?? {}).length) return out;
+  for (const l of modelBeamLines()) {
+    const saved = storedLine(l);
+    if (!saved?.cuts?.length) continue;
+    const axis = lineAxis(l);
+    if (!axis) continue;
+    const X = memberOffsets(saved);
+    for (const c of saved.cuts) {
+      const k = Math.max(0, X.findIndex((x, i) => c.x >= x - 1e-9 && c.x <= x + saved.lengths[i]! + 1e-9));
+      const at = { x: axis.start.x + axis.dir.x * c.x, y: axis.start.y + axis.dir.y * c.x, z: axis.start.z + axis.dir.z * c.x };
+      out.push({ elementIds: [saved.members[k]!], label: c.label, at });
+    }
+  }
+  return out;
 }

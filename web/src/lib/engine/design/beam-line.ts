@@ -442,3 +442,21 @@ export function uniteSpans(line: BeamLineReinforcement, i0: number, i1: number):
 export function splitSpans(line: BeamLineReinforcement, index: number): BeamLineReinforcement {
   return { ...line, spans: (line.spans ?? []).filter((s) => !s.includes(index)) };
 }
+
+/** Place a cross-section at x along the line, lettered with the first letter no cut holds. */
+export function addCut(line: BeamLineReinforcement, x: number): BeamLineReinforcement {
+  const total = line.lengths.reduce((a, l) => a + l, 0);
+  const at = Math.max(0, Math.min(total, Math.round(x * 100) / 100));
+  const used = new Set((line.cuts ?? []).map((c) => c.label));
+  let label = '';
+  for (let i = 0; !label || used.has(label); i++) label = i < 26 ? String.fromCharCode(65 + i) : `${String.fromCharCode(65 + (i % 26))}${Math.floor(i / 26)}`;
+  const id = `c${Date.now().toString(36)}${(line.cuts ?? []).length}`;
+  return { ...line, cuts: [...(line.cuts ?? []), { id, x: at, label }].sort((p, q) => p.x - q.x) };
+}
+
+/** Take a cross-section off the line. */
+export function removeCut(line: BeamLineReinforcement, id: string): BeamLineReinforcement {
+  const cuts = (line.cuts ?? []).filter((c) => c.id !== id);
+  const { cuts: _old, ...rest } = line;
+  return cuts.length ? { ...rest, cuts } : rest;
+}

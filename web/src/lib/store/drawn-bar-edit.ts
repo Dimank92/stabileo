@@ -11,12 +11,12 @@
  * beam's line is first saved exactly as its members hold it (`takeAsDrawn`), which changes no bar,
  * and from then on its bars are drawn bars with identities that survive regenerations.
  */
-import { modelStore } from './model.svelte';
 import { detailingStore } from './detailing.svelte';
 import { lineBarsFromDetailing } from '../engine/detailing/line-bars';
 import { verificationStore } from './verification.svelte';
 import { framesOf } from './frame-equalize';
 import { openLine, saveLine, staleLines } from './beam-line-store';
+import { lineAxis } from './line-axis';
 import { setHook, updateBar } from '../engine/design/beam-line';
 import { lineKey, type BeamLineBar, type BeamLineReinforcement } from '../design-contract/beam-line';
 import type { BeamLine } from '../engine/design/repeated-frames';
@@ -79,15 +79,6 @@ function relay(line: BeamLine, next: BeamLineReinforcement): ScheduleChange[] {
   return dias.map((d) => ({ diameterMm: d, deltaKg: (after.get(d) ?? 0) - (before.get(d) ?? 0) })).filter((c) => Math.abs(c.deltaKg) > 0.005);
 }
 
-/** A line member's two end nodes in the line's sense: its span's ends when it stands for one. */
-function endsOf(id: number, forward: boolean): [number, number] | null {
-  const span = verificationStore.contextFor(id)?.span;
-  const e = modelStore.elements.get(id);
-  const [a, b] = span ? [span.start, span.end] : e ? [e.nodeI, e.nodeJ] : [NaN, NaN];
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
-  return forward ? [a, b] : [b, a];
-}
-
 /**
  * Save a beam's line as the detailing laid it, so its bars become drawn bars: each bar the
  * detailing laid along the line is a line bar with the same ends, row, diameter and hooks
@@ -97,16 +88,13 @@ function endsOf(id: number, forward: boolean): [number, number] | null {
 export function takeAsDrawn(memberId: number): boolean {
   const open = openLine(memberId);
   if (!open || open.saved) return false;
-  const first = endsOf(open.line.members[0]!, open.line.forward[0] !== false);
-  const last = endsOf(open.line.members[open.line.members.length - 1]!, open.line.forward[open.line.members.length - 1] !== false);
-  const p0 = first && modelStore.nodes.get(first[0]), p1 = last && modelStore.nodes.get(last[1]);
+  const axis = lineAxis(open.line);
   const ids = new Set(open.line.members);
   const laid = detailingStore.assemblies.flatMap((a) => a.bars).filter((b) => b.ownerElementIds.some((id) => ids.has(id)));
   let model = open.model;
-  if (p0 && p1 && laid.length) {
-    const d = { x: p1.x - p0.x, y: p1.y - p0.y, z: (p1.z ?? 0) - (p0.z ?? 0) }, L = Math.hypot(d.x, d.y, d.z) || 1;
+  if (axis && laid.length) {
     const length = open.model.lengths.reduce((s, l) => s + l, 0);
-    const bars = lineBarsFromDetailing(laid, { x: p0.x, y: p0.y, z: p0.z ?? 0 }, { x: d.x / L, y: d.y / L, z: d.z / L }, length);
+    const bars = lineBarsFromDetailing(laid, axis.start, axis.dir, length);
     if (bars.length) model = { ...open.model, bars };
   }
   relay(open.line, model);
