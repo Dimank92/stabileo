@@ -713,9 +713,12 @@ export function checkShear(params: ConcreteDesignParams, Vu: number, Nu: number 
   // Av/s (m²/m) = Vs(kN) / (fy(MPa) * d(m)) × (1/1000)
   const AvOverS = VsReq > 0 ? (VsReq / (fy * d)) * 10 : 0; // cm²/m
 
-  // Minimum stirrups: Av,min/s = max((1/16)·√f'c, 0.33)·bw/fyt (CIRSOC 201), with the bars' fyt:
-  // §22.5.3.3 limits the fyt of Vs only.
-  const AvOverSMin = Math.max((1 / 16) * Math.sqrt(fc), 0.33) * (b * 100) / params.fy; // cm²/cm → cm²/m ×100
+  // Minimum stirrups, with the bars' fyt (§22.5.3.3 limits the fyt of Vs only):
+  //   2025 §9.6.3.4: Av,min/s = max(0,062·√f'c, 0,35)·bw/fyt;
+  //   2005 §11.5.6.3: Av,min/s = max((1/16)·√f'c, 0,33)·bw/fyt.
+  // The design run is 2025 and read the 2005 coefficients: 0,33 for 0,35 put the stirrups up to
+  // 6 % under the 2025 minimum wherever the minimum governs.
+  const AvOverSMin = (lim ? Math.max(0.062 * Math.sqrt(fc), 0.35) : Math.max((1 / 16) * Math.sqrt(fc), 0.33)) * (b * 100) / params.fy; // cm²/cm → cm²/m ×100
   const AvOverSMinCm2m = AvOverSMin * 100;
 
   const AvOverSDesign = Math.max(AvOverS, AvOverSMinCm2m);

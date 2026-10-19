@@ -10,15 +10,23 @@
  *   rc-design-qa-8 (a one-bay wind frame, 40×40 columns, 30×55 beams): 8 of 8 designed outside
  *   the system; 6 of 8 not declared, the two 6 m beams (5 and 6) refused on their anchorage at the
  *   corner columns, where no bottom bar that carries their moment hooks to ℓdh behind the cage.
- *   rc-design-frame (408 members): 379 designed outside the system; 356 not declared. The 23
- *   beams it loses refuse on their anchorage (11), congestion (11) and anchorage and congestion
- *   (1); none it designs is designed by the other reading alone.
+ *   rc-design-frame (408 members): 383 designed outside the system; 360 not declared. The 23
+ *   beams it loses refuse on their anchorage (7), congestion (13), anchorage and congestion (2)
+ *   and anchorage, congestion and shear (1); none it designs is designed by the other reading
+ *   alone.
  *
  * 379 and 356 (373 and 331 before) since the verifier checks the ductility of a flexural member
  * (CIRSOC 201-2025 §9.3.3.1): over-reinforced candidates are rejected for maxSteel before the
  * joint and anchorage stages, and the search reaches arrangements that pass every check, the
  * column cages and the anchorage included. Measured by switching off only that check: 373/22 and
  * 331/64 with the 42 lost by the same causes come back. A check added, not one relaxed.
+ *
+ * 383 and 360 (379/16 and 356/39 before) since the verifier checks the minimum shear
+ * reinforcement of CIRSOC 201-2025 §9.6.3.1 on beams deeper than 250 mm and the generator stops
+ * offering stirrups under Av,min: with those options out of the first ones per region the search
+ * reaches arrangements that thread the cages for 165–168 outside the system and for four more
+ * not declared. The 23 lost now refuse on congestion (13), anchorage (7), anchorage and
+ * congestion (2), and anchorage, congestion and shear (1).
  */
 import { describe, it, expect } from 'vitest';
 import qa8 from '../../../templates/fixtures/rc-design-qa-8.json';
@@ -68,12 +76,12 @@ describe('rc-design-qa-8', () => {
 describe('rc-design-frame, 408 members', () => {
   const gravity = run(frame, { beams: 'gravity' }), undeclared = run(frame, null);
 
-  it('outside the system 379 designed; not declared 356, the 23 it loses refusing on their anchorage or congestion', () => {
-    expect(counts(gravity.s)).toEqual({ verified: 379, searchExhausted: 16, provisionalBiaxial: 13, sectionInadequate: 0 });
-    expect(counts(undeclared.s)).toEqual({ verified: 356, searchExhausted: 39, provisionalBiaxial: 13, sectionInadequate: 0 });
+  it('outside the system 383 designed; not declared 360, the 23 it loses refusing on their anchorage or congestion', () => {
+    expect(counts(gravity.s)).toEqual({ verified: 383, searchExhausted: 12, provisionalBiaxial: 13, sectionInadequate: 0 });
+    expect(counts(undeclared.s)).toEqual({ verified: 360, searchExhausted: 35, provisionalBiaxial: 13, sectionInadequate: 0 });
     const l = lost(gravity.s, undeclared.s);
     expect(l.ids).toHaveLength(23);
-    expect(l.by).toEqual({ 'SEARCH_EXHAUSTED anchorage': 11, 'SEARCH_EXHAUSTED anchorage,congestion': 1, 'SEARCH_EXHAUSTED congestion': 11 });
+    expect(l.by).toEqual({ 'SEARCH_EXHAUSTED anchorage': 7, 'SEARCH_EXHAUSTED anchorage,congestion': 2, 'SEARCH_EXHAUSTED anchorage,congestion,shear': 1, 'SEARCH_EXHAUSTED congestion': 13 });
     expect(lost(undeclared.s, gravity.s).ids).toEqual([]);
   });
 });

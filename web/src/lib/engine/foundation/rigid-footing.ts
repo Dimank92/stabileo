@@ -9,7 +9,8 @@
  *               factored net field and the column loads on one side: positive bends the bottom,
  *               negative (between the columns of a combined footing) the top; As = Mu/(φ·0,9·d·fy)
  *               on the footing's width, never under 0,0018·b·h at the bottom.
- *   Shear       one-way at d from each column face, against φ·0,17·√f'c·b·d (§13.2.7, §22.5).
+ *   Shear       one-way at d from each column face, against φ·0,17·√f'c·b·d: §13.2.6.2(a) allows it
+ *               for a shallow member continuously on the soil designed as rigid, which this is.
  *   Punching    around each column that does not span the footing, by the shared check
  *               (`checkPunchingShear`), its moments included (§8.4.4.2).
  *

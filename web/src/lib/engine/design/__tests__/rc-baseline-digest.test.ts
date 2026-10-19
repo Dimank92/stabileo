@@ -101,9 +101,10 @@ describe('RC design baseline — the flagship frame, member by member', () => {
      * 379 and 16 since the verifier checks the ductility of a flexural member (§9.3.3.1): six of
      * the 22 reach a passing arrangement that threads the cages (see the fingerprint).
      */
-    expect(summary.verified).toBe(379);
-    // The 16 congested beams are an exhausted search, not a proven section (`section-bounds.ts`).
-    expect(summary.searchExhausted).toBe(16);
+    // 383 and 12 since the minimum shear reinforcement of §9.6.3.1 (see the fingerprint).
+    expect(summary.verified).toBe(383);
+    // The 12 congested beams are an exhausted search, not a proven section (`section-bounds.ts`).
+    expect(summary.searchExhausted).toBe(12);
     expect(summary.provisionalBiaxial).toBe(13);
     expect(summary.sectionInadequate).toBe(0);
     expect(summary.demandUnavailable).toBe(0);
@@ -184,6 +185,19 @@ describe('RC design baseline — the flagship frame, member by member', () => {
      *
      * A check added: over-reinforced candidates are rejected for maxSteel before the joint stage,
      * and the search reaches, for the six, bars that pass every check and thread the cages.
+     *
+     * And again, for the minimum shear reinforcement of §9.6.3.1 on beams deeper than 250 mm
+     * (Av,min where Vu > φ·0,085·√f'c·bw·d). Checked across all 408 against the run without it:
+     *
+     *   outcome changed               4  (165–168 SEARCH_EXHAUSTED → VERIFIED)
+     *   limiting constraint changed   6  (those four; 182 and 188 add «anchorage», still congestion)
+     *   stirrups changed            169  (closer spacing where Av,min governs)
+     *   utilisation changed         135  (125 down to −0,363; 10 up to +0,251, all ≤ 0,974)
+     *   worst utilisation after   0,998 — the gate above still holds
+     *
+     * The generator no longer offers stirrups under Av,min, so its first 30 options per region
+     * reach arrangements it used to cut off: the four that now verify, and lighter Ø6 sets in
+     * place of Ø8 c/30 on the ten that move up.
      */
     expect(actual).toBe(RECORDED_FINGERPRINT);
   });
@@ -197,8 +211,9 @@ describe('RC design baseline — the flagship frame, member by member', () => {
     // 13 since self-weight bends the beams: nine of the 22 left the biaxial band (see above).
     // 22 more since the design reads the column cages: congestion, never a certificate.
     // 16 of them since the ductility check (see the fingerprint): 169–172, 197 and 198 verify.
+    // 12 since the minimum shear reinforcement (§9.6.3.1, see the fingerprint): 165–168 verify.
     const congested = [...summary.outcomes.values()].filter((o) => o.outcome === 'SEARCH_EXHAUSTED');
-    expect(congested.map((o) => o.elementId).sort((a, b) => a - b)).toEqual([161, 164, 165, 166, 167, 168, 180, 181, 182, 183, 184, 186, 187, 188, 196, 199]);
+    expect(congested.map((o) => o.elementId).sort((a, b) => a - b)).toEqual([161, 164, 180, 181, 182, 183, 184, 186, 187, 188, 196, 199]);
     for (const o of congested) {
       expect(o.limiting).toContain('congestion');
       expect(o.insufficiency).toBeUndefined();
@@ -349,4 +364,13 @@ describe('RC design baseline — the flagship frame, member by member', () => {
 // SEARCH_EXHAUSTED → VERIFIED, 164 and 165 trade «anchorage», utilization moves on 7 (162, 163
 // up to 0,851; five down by at most 0,003); the worst stays 0,998, and the counts are 379
 // verified, 16 exhausted, 13 provisional.
-const RECORDED_FINGERPRINT = 'ebe350998ab46447';
+// And (was `ebe350998ab46447`) when the provided-reinforcement verifier checks the minimum shear
+// reinforcement of CIRSOC 201-2025 §9.6.3.1 on beams deeper than 250 mm: Av,min (§9.6.3.4,
+// max(0,062·√f'c, 0,35)·bw·s/fyt) wherever Vu > φ·0,085·√f'c·bw·d, and the generator stops
+// offering stirrups under it. Compared line by line against the run without it: 165, 166, 167
+// and 168 SEARCH_EXHAUSTED → VERIFIED (0,743, 0,733, 0,733, 0,743); 182 and 188 add «anchorage» to «congestion», still
+// exhausted; stirrups change on 169 members (Ø6 c/25–c/30 → c/17,5 where Av,min governs, and
+// several Ø8 c/30 → Ø6 c/17,5, lighter and meeting it); utilization moves on 135, 125 down (to
+// −0,363: more Vs) and 10 up (to +0,251, the Ø8 → Ø6 ones, all ≤ 0,974); the worst stays 0,998.
+// The counts are 383 verified, 12 exhausted, 13 provisional.
+const RECORDED_FINGERPRINT = '43cfaf49844937cb';

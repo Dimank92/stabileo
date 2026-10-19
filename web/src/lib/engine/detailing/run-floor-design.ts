@@ -36,7 +36,7 @@
  * Pure: no store, no runes, no i18n.
  */
 
-import { checkPanel, proposePanel, type PanelElement, type PanelInput } from './slab-panel';
+import { checkPanel, proposePanel, panelMaxSpacing, type PanelElement, type PanelInput } from './slab-panel';
 import type { SlabBarLayer } from './slab-design';
 import type { ClauseRef, RegulationEdition } from '../../codes/regulation';
 import type { Maturity } from '../../codes/maturity';
@@ -518,7 +518,8 @@ export function runFloorDesign(input: RunFloorDesignInput): RunFloorDesignResult
     const y0 = Math.min(...parts.map((p) => p.box.y0)), y1 = Math.max(...parts.map((p) => p.box.y1));
     const thickness = Math.min(...parts.map((p) => p.shell.thickness));
     const pInput: PanelInput = { panelId: pk, x0, x1, y0, y1, thickness, cover: input.cover, fy: input.fy, elements: parts.map((p) => p.el) };
-    const sMax = Math.min(2 * thickness, 0.45);
+    // CIRSOC 201-2025 §8.7.2.2: min(2h, 300 mm) at the critical sections (`panelMaxSpacing`).
+    const sMax = panelMaxSpacing(thickness);
     const saved = input.slabReinforcement?.(pk);
     const reinforcement = saved ?? proposePanel(pInput, { sMax, ...(input.slabBase ? { base: input.slabBase } : {}) });
     const check = checkPanel(pInput, reinforcement);
@@ -535,7 +536,7 @@ export function runFloorDesign(input: RunFloorDesignInput): RunFloorDesignResult
       aspect: Math.max(x1 - x0, y1 - y0) / Math.max(Math.min(x1 - x0, y1 - y0), 1e-9),
       layers: baseLayers,
       memo: [`Paño ${pk}: ${parts.length} elemento(s), ${(x1 - x0).toFixed(2)} × ${(y1 - y0).toFixed(2)} m, armado por fajas: base y ${reinforcement.bands.length} banda(s); utilización máxima por faja ${check.worst.toFixed(2)}.`, ...gov.design.memo],
-      unsupported: [...new Set(parts.flatMap((p) => p.design.unsupported)), ...failing.map((c) => `Faja ${c.kind} ${c.dir} ${c.face}: necesita ${(c.need * 1e4).toFixed(2)} cm²/m y tiene ${(c.given * 1e4).toFixed(2)} cm²/m.`), ...(check.minimumOk ? [] : ['La armadura base inferior no alcanza la mínima de 24.4.3.2.'])],
+      unsupported: [...new Set(parts.flatMap((p) => p.design.unsupported)), ...failing.map((c) => `Faja ${c.kind} ${c.dir} ${c.face}: necesita ${(c.need * 1e4).toFixed(2)} cm²/m y tiene ${(c.given * 1e4).toFixed(2)} cm²/m.`), ...(check.minimumOk ? [] : ['La armadura base inferior no alcanza la mínima de 24.4.3.2.']), ...check.spacing.filter((c) => !c.ok).map((c) => `${c.source === 'base' ? 'Malla base' : `Banda ${c.id}`} ${c.face} ${c.dir}: separación ${(c.spacing * 100).toFixed(1)} cm, mayor que s,máx = ${(c.limit * 100).toFixed(1)} cm (8.7.2.2).`)],
       panel: { reinforcement, check, input: pInput, saved: !!saved },
     };
     const geometry: SlabPanelGeometry = { panelId: pk, origin: { x: x0, y: y0, z: level }, lx: x1 - x0, ly: y1 - y0, thickness, cover: input.cover, elementIds: [...ids].sort((a, b) => a - b) };
