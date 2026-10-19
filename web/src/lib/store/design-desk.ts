@@ -19,6 +19,8 @@ import type { DesignRunReport, DesignFamilySelection } from '../engine/design/de
 import { levelCentres, type LevelCentres } from '../engine/building/level-centres';
 import { resolveMassFactors } from '../engine/dynamics/mass-source';
 import { physicalGroups } from './physical';
+import { materialFamilyOf } from '../engine/steel/material-family';
+import { catalogueGradeFamily } from '../engine/steel/grade-family';
 
 export interface DeskRunOptions {
   families?: DesignFamilySelection;
@@ -49,6 +51,15 @@ const STATUSES: DisplayStatus[] = ['ok', 'warn', 'fail', 'provisional', 'unavail
 export function deskMembers(): DeskMember[] {
   const ids = new Set<number>([...verificationStore.contexts.keys()]);
   const steel = new Set(verificationStore.steelMap.keys());
+  // Designed against an analysis a change has cleared: still listed, out of date (`outOfDate`).
+  for (const id of verificationStore.outOfDate) {
+    if (ids.has(id) || steel.has(id)) continue;
+    ids.add(id);
+    const e = modelStore.elements.get(id);
+    if (e && materialFamilyOf(modelStore.materials.get(e.materialId) as never, catalogueGradeFamily).family === 'steel') steel.add(id);
+  }
+  // Listed without a design when the analysis was cleared: still listed, «not checked».
+  for (const id of verificationStore.stillListed) ids.add(id);
   // Steel members whose section the check cannot read: shown, unchecked, saying why.
   const incomplete = new Set(steelInputCompleteness({ elements: modelStore.elements, nodes: modelStore.nodes, sections: modelStore.sections, materials: modelStore.materials, supports: modelStore.supports } as never).map((g) => g.elementId));
   if (verificationStore.steelMap.size > 0 || incomplete.size > 0) for (const id of incomplete) { steel.add(id); }
@@ -107,6 +118,26 @@ export function finalReport(members = deskMembers()): LevelReport[] {
     by.set(l.name, r);
   }
   return [...by.values()].sort((a, b) => a.z - b.z);
+}
+
+/**
+ * The members «Size…» reads as not designed yet: the concrete members design has a context for
+ * and no bars on. The steel members are checked, not designed, so they are never among them.
+ */
+export function undesignedMembers(): number[] {
+  return [...verificationStore.contexts.keys()].filter((id) => !modelStore.elements.get(id)?.reinforcement);
+}
+
+/**
+ * Design the members given (a selection, the undesigned ones), with the same rule for the edited
+ * ones as the whole run, then the steel check when asked, and report as the whole run does.
+ */
+export function designMembers(ids: readonly number[], o: Omit<DeskRunOptions, 'families'>): DeskReport {
+  designRunStore.autoDesign([...ids], { edited: o.edited });
+  const skipped = { ...designRunStore.lastSkipped };
+  const s = o.steel ? runSteelCheck() : null;
+  if (o.steel) runMaterialChecks();
+  return { concrete: null, steel: s && 'checked' in s ? s.checked : null, skipped, levels: finalReport() };
 }
 
 /** Design everything the project designs, and report. */

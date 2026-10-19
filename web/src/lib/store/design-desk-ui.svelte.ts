@@ -23,27 +23,59 @@ import { sortedLevels } from '../model/grid';
 import { designDrafts } from './design-drafts.svelte';
 import { tp } from '../i18n';
 
-export type DeskTab = 'prepare' | 'plan' | 'frame' | 'column' | 'wall' | 'slab' | 'joist' | 'footing' | 'seismic' | 'joint' | 'levels' | 'report' | 'geometry' | 'materials' | 'special' | 'stairs' | 'pt' | 'elements' | 'fire' | 'codes' | 'budget' | 'collab' | 'arch' | 'site' | 'documents';
+export type DeskTab = 'prepare' | 'designData' | 'plan' | 'frame' | 'column' | 'wall' | 'slab' | 'joist' | 'footing' | 'seismic' | 'joint' | 'levels' | 'list' | 'steel' | 'connections' | 'report' | 'geometry' | 'materials' | 'special' | 'stairs' | 'pt' | 'elements' | 'fire' | 'codes' | 'detailing' | 'budget' | 'collab' | 'arch' | 'site' | 'documents';
 
 /**
- * How the desk's views are grouped. Preparing the model comes first. Then three ways of working:
- * by floor (the plan and the levels), by the piece selected (its editor) and by what is pending
- * (the report and the geometry). The output of the work (documents) follows. Specialties that act
- * on the whole building and the project's own surfaces (budget, coordination, architecture,
- * works) are menus: they do not depend on what is selected.
+ * How the desk's views are grouped. Preparing the model comes first: what it still lacks and the
+ * project's design data. Then the ways of working on the design: by floor (the plan and the
+ * levels), by the piece selected (its editor), as the member list with its filters and inline
+ * editors, by steel (the profiles and the connections) and by what is pending (the report and the
+ * geometry). Coordinating the bars (detailing) and the output of the work (documents) follow.
+ * Specialties that act on the whole building and the project's own surfaces (budget,
+ * coordination, architecture, works) are menus: they do not depend on what is selected.
  */
 export const DESK_GROUPS = {
-  prepare: ['prepare'],
+  prepare: ['prepare', 'designData'],
   floor: ['plan', 'levels'],
   piece: ['frame', 'column', 'wall', 'slab', 'joist', 'special', 'pt', 'stairs', 'footing', 'joint', 'elements'],
+  list: ['list'],
+  steel: ['steel', 'connections'],
+  codes: ['codes'],
   pending: ['report', 'geometry'],
+  detailing: ['detailing'],
   documents: ['documents'],
-  specialties: ['seismic', 'fire', 'materials', 'codes'],
+  specialties: ['seismic', 'fire', 'materials'],
   project: ['budget', 'collab', 'arch', 'site'],
 } as const satisfies Record<string, readonly DeskTab[]>;
 export type DeskGroup = keyof typeof DESK_GROUPS;
 export const groupOf = (t: DeskTab): DeskGroup => (Object.keys(DESK_GROUPS) as DeskGroup[]).find((g) => (DESK_GROUPS[g] as readonly DeskTab[]).includes(t)) ?? 'floor';
+
+/**
+ * The four steps of design, as the top of the Design stage names them: prepare the model, size
+ * (design, check and edit the members), detail (coordinate the bars) and document. Every place of
+ * the desk belongs to one, except the project's own surfaces, which belong to none.
+ */
+export type DeskStep = 'prepare' | 'size' | 'detail' | 'document';
+export const DESK_STEPS: readonly DeskStep[] = ['prepare', 'size', 'detail', 'document'];
+export function stepOf(t: DeskTab): DeskStep | null {
+  const g = groupOf(t);
+  if (g === 'prepare') return 'prepare';
+  if (g === 'detailing') return 'detail';
+  if (g === 'documents') return 'document';
+  if (g === 'project') return null;
+  return 'size';
+}
 export type DeskFilter = 'all' | 'fail' | 'warn' | 'ok' | 'unavailable' | 'locked' | 'edited' | 'steel';
+/**
+ * «Other code», in one of its two modes: an independent check of the members under another code,
+ * which stores nothing, or the equivalences and the design under another code for the report,
+ * which are kept with the project.
+ */
+export type CodesMode = 'verify' | 'memoria';
+/** What «Size…» runs over: every member, the members selected, or those with no bars yet. */
+export type RunScope = 'all' | 'selection' | 'undesigned';
+/** «Size…» asked for: its scope, and `fromList` when the member list asked, which then shows the result itself. */
+export interface DeskAsk { scope: RunScope; fromList?: boolean }
 
 /** What a project tab keeps of design when another tab takes the screen. */
 export interface DeskViewState {
@@ -54,6 +86,7 @@ export interface DeskViewState {
   filter: DeskFilter;
   /** The modelling level design last took over, to tell a new one from the same one. */
   modelLevelSeen: number;
+  codesMode: CodesMode;
 }
 
 const SAME_Z = 1e-3;
@@ -65,6 +98,9 @@ function createDesk() {
   let tab = $state<DeskTab>('plan');
   let filter = $state<DeskFilter>('all');
   let report = $state<DeskReport | null>(null);
+  let codesMode = $state<CodesMode>('verify');
+  /** «Size…» asked for, with the scope it was asked with and from where; null while no one is asking. */
+  let ask = $state<DeskAsk | null>(null);
   /*
    * Not reactive: read and written only on entering and leaving. The default is the default
    * modelling level, so a model nobody moved off the ground opens design on «all levels».
@@ -120,21 +156,30 @@ function createDesk() {
     get tab() { return tab; }, set tab(v: DeskTab) { tab = v; },
     get filter() { return filter; }, set filter(v: DeskFilter) { filter = v; },
     get report() { return report; }, set report(v: DeskReport | null) { report = v; },
+    get codesMode() { return codesMode; }, set codesMode(v: CodesMode) { codesMode = v; },
+    get ask() { return ask; }, set ask(v: DeskAsk | null) { ask = v; },
 
     capture(): DeskViewState {
-      return { open, levelZ, focus, tab, filter, modelLevelSeen };
+      return { open, levelZ, focus, tab, filter, modelLevelSeen, codesMode };
     },
     /** Take a tab's design state back. `reopen` false keeps design closed (a session restored at boot). */
     restore(s: DeskViewState | undefined, reopen = true) {
       if (!s) { this.reset(); return; }
       levelZ = s.levelZ; focus = s.focus; tab = s.tab; filter = s.filter;
       modelLevelSeen = s.modelLevelSeen;
-      report = null;
+      codesMode = s.codesMode ?? 'verify';
+      report = null; ask = null;
       open = reopen && s.open;
     },
-    /** A new project: the defaults. Design stays open or closed as it is. */
-    reset() {
-      levelZ = null; focus = null; tab = 'plan'; filter = 'all'; report = null;
+    /**
+     * A new project: the defaults. Design stays open or closed as it is. `keepPlace`: another
+     * project opened in this tab (a file, an example), which keeps design on the place it was
+     * (the member list, the steel profiles) unless that is a piece editor, whose piece belonged
+     * to the project it was picked in. A new tab starts from the plan.
+     */
+    reset(keepPlace = false) {
+      levelZ = null; focus = null; filter = 'all'; report = null; ask = null;
+      if (!keepPlace || (DESK_GROUPS.piece as readonly DeskTab[]).includes(tab)) tab = 'plan';
       modelLevelSeen = uiStore.nodeCreateZ;
     },
   };
@@ -166,4 +211,3 @@ function createDeskLayout() {
   };
 }
 export const deskLayout = createDeskLayout();
-export const openDesk = (): void => { deskUi.open = true; };

@@ -11,6 +11,7 @@ import { tourStore } from './tour.svelte';
 import { verificationStore } from './verification.svelte';
 import { storedRefusal } from './design-refusals';
 import { detailingStore } from './detailing.svelte';
+import { designRunStore } from './design-run.svelte';
 import { deflectionChecks } from './serviceability';
 import { seismicState } from './seismic-design.svelte';
 import { seismicMemberCheckRows } from '../engine/design/check-rows-families';
@@ -23,6 +24,7 @@ import { connectionPrompt } from './connection-prompt.svelte';
 import { scheduleDefinedLoadsSync, flushDefinedLoadsSync } from './defined-loads';
 import { viewVisibility } from './view-state.svelte';
 import { deskUi } from './design-desk-ui.svelte';
+import { otherCodesRun } from './other-codes-run.svelte';
 import { designDrafts } from './design-drafts.svelte';
 import { rebarWorkspace } from './rebar-workspace.svelte';
 import { pruneDeletedMembers } from './selection-prune';
@@ -49,7 +51,14 @@ modelStore._setOnNewProject(() => {
   uiStore.selfWeightCaseId = null;
   // The last floor and footing runs were the previous project's; its own are in its file.
   detailingStore.forgetRuns();
-  forgetDesignView();
+  /*
+   * Which members a person edited by hand was the previous project's too: kept, it marked the new
+   * project's members with the same ids as edited, and «Size…» keeps edited members unless told
+   * otherwise. A file or a tab then adopts its own (`hydrateProjectProvenance`, after this).
+   */
+  designRunStore.resetMarks();
+  // Another project in this tab: design stays on the place it was (a new tab starts from the plan).
+  forgetDesignView(true);
 });
 
 /*
@@ -57,13 +66,14 @@ modelStore._setOnNewProject(() => {
  * view's selection belong to that project. A new project or another tab starts from nothing;
  * a tab switch then restores the tab's own (`tabs.svelte.ts`).
  */
-function forgetDesignView(): void {
-  deskUi.reset();
+function forgetDesignView(keepPlace = false): void {
+  deskUi.reset(keepPlace);
+  otherCodesRun.reset();
   designDrafts.clear();
   rebarWorkspace.reset();
   rebarWorkspace.close();
 }
-uiStore.onSessionReset(forgetDesignView);
+uiStore.onSessionReset(() => forgetDesignView());
 
 // An analysis reads the definitions' loads current, even inside the moment a rewrite waits for.
 modelStore._setBeforeAnalysisInput(flushDefinedLoadsSync);
@@ -92,7 +102,7 @@ modelStore._setOnMutation(() => {
  * current document is retired, as on a structural edit.
  */
 modelStore._setOnDesignChange(() => {
-  verificationStore.invalidateAnalysis();
+  verificationStore.invalidateAnalysis('design');
   detailingStore.supersedeDocuments();
 });
 
