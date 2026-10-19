@@ -345,7 +345,7 @@ export const wallBarDiameterMm = (): number => designData().wallBarDiaMm;
 /** A member a person locked against a redesign: the detailing repair loop leaves its bars. */
 export const isLockedMember = (id: number): boolean => !!modelStore.designDecisions?.locked?.includes(id);
 export { writeRepaired } from './design-decisions';
-export { savedMemberCuts } from './beam-line-store';
+export { savedMemberCuts, savedLinePieces } from './beam-line-store';
 export { wallInputs } from './wall-inputs'; export { slabInputs } from './slab-inputs';
 
 // The footing bottom-mat diameter used to live here, as

@@ -10,7 +10,8 @@ import { verificationStore } from './verification.svelte';
 import { storedDecisions } from './design-decisions';
 import { framesOf, modelBeamLines, copyFrame } from './frame-equalize';
 import { rebarHash } from '../engine/design/rebar-hash';
-import { lineFromMembers, lineMembersOf, memberCuts, membersFromLine, type LineMember, type MemberCuts } from '../engine/design/beam-line';
+import { lineFromMembers, lineMembersOf, memberCuts, membersFromLine, memberOffsets, type LineMember, type MemberCuts } from '../engine/design/beam-line';
+import { lineLaps, linePieces, type LineBarPiece, type LineLap, type LineStirrupPiece } from '../engine/detailing/line-bars';
 import { mirrorReinforcement, type BeamLine } from '../engine/design/repeated-frames';
 import { lineKey, type BeamLineReinforcement } from '../design-contract/beam-line';
 import { designLength, withSpanPieces } from './design-spans-store';
@@ -197,4 +198,30 @@ export function savedMemberCuts(): Map<number, MemberCuts> {
     }
   }
   return out;
+}
+
+/**
+ * Every saved line that still stands for its members, as the detailing lays it: each member's
+ * bars and stirrups exactly as drawn (`line-bars.ts`), and each drawn lap with the member that
+ * holds its middle. A stale line gives nothing: its members are detailed from their own bars.
+ */
+export function savedLinePieces(): {
+  pieces: Map<number, { bars: LineBarPiece[]; stirrups: LineStirrupPiece[] }>;
+  laps: Array<{ owner: number; lap: LineLap }>;
+} {
+  const pieces = new Map<number, { bars: LineBarPiece[]; stirrups: LineStirrupPiece[] }>();
+  const laps: Array<{ owner: number; lap: LineLap }> = [];
+  if (!Object.keys(storedDecisions().lines ?? {}).length) return { pieces, laps };
+  for (const l of modelBeamLines()) {
+    const saved = storedLine(l);
+    if (!saved) continue;
+    for (const [id, p] of linePieces(saved, l.forward)) pieces.set(id, p);
+    const X = memberOffsets(saved);
+    for (const lap of lineLaps(saved)) {
+      const mid = (lap.from + lap.to) / 2;
+      const k = Math.max(0, X.findIndex((x, i) => mid >= x - 1e-9 && mid <= x + saved.lengths[i]! + 1e-9));
+      laps.push({ owner: saved.members[k]!, lap });
+    }
+  }
+  return { pieces, laps };
 }

@@ -31,6 +31,7 @@ import { foundationPlan, type PlanFooting } from '../sheets/plans/foundation-pla
 import { punchingPlan, type PunchingJoint } from '../sheets/plans/punching-plan';
 import { anchorPlan, jointSheet, steelFrameElevation, steelLevelPlan, type SteelBase, type SteelMember } from '../sheets/plans/steel-plans';
 import { barBreakdown, stirrupZones, type StirrupSpan } from '../sheets/plans/beam-plans';
+import { savedLinePieces } from './beam-line-store';
 import { bendingSchedule } from '../sheets/plans/bending-schedule';
 import { constructionDetails, type Tr } from '../sheets/plans/details';
 import { generalNotes } from '../sheets/plans/general-notes';
@@ -182,12 +183,21 @@ function beamLines(axes: PlanAxis[]): Array<{ id: string; spans: Frame[] }> {
 
 function beams(c: PlanContext, doc: DocumentModel | null, axes: PlanAxis[]): DrawingInput[] {
   const m = modelStore.model, out: DrawingInput[] = [];
+  // The zones a saved line draws, as drawn (`line-bars.ts`), each in its member's own sense.
+  const drawn = savedLinePieces().pieces;
   for (const line of beamLines(axes)) {
     const spans: StirrupSpan[] = line.spans.map((f, i) => {
       const reg = m.elements.get(f.id)?.reinforcement?.regions;
       const len = Math.hypot(f.b.x - f.a.x, f.b.y - f.a.y);
+      const own = drawn.get(f.id)?.stirrups;
+      // The sheet lays each span from its low end (x, or y on a line along y); a member whose i
+      // node is at the high end reads its zones mirrored.
+      const el = m.elements.get(f.id), ni = el && m.nodes.get(el.nodeI), nj = el && m.nodes.get(el.nodeJ);
+      const alongX = Math.abs(f.b.x - f.a.x) >= Math.abs(f.b.y - f.a.y);
+      const flip = !!ni && !!nj && (alongX ? ni.x > nj.x : ni.y > nj.y);
       return {
         name: f.name && f.name.length <= 6 ? f.name : `${i + 1}`, length: len,
+        ...(own?.length ? { drawn: own.map((z) => (flip ? { from: len - z.to, to: len - z.from, diameter: z.diameter, spacing: z.spacing } : { from: z.from, to: z.to, diameter: z.diameter, spacing: z.spacing })) } : {}),
         ...(reg?.stirrupsSupport ? { support: { diameter: reg.stirrupsSupport.diameter, spacing: reg.stirrupsSupport.spacing, length: reg.regionT ?? len / 4 } } : {}),
         ...(reg?.stirrupsSpan ? { span: { diameter: reg.stirrupsSpan.diameter, spacing: reg.stirrupsSpan.spacing } } : {}),
       };

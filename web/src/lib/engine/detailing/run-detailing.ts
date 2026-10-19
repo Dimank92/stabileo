@@ -82,6 +82,7 @@ import { DEFAULT_DESIGN_FAMILIES, type DesignFamily } from '../design/design-fam
 import { noFloorFamilies } from './family-record';
 import { envelopeIsComplete } from './coordination-search';
 import { materialiseLaps, lapIndex, lapBetween, type PlannedTransition, type LapInterval } from './lap-materialize';
+import type { LineBarPiece, LineLap, LineStirrupPiece } from './line-bars';
 import type { EngineMessage } from '../../codes/message';
 import {
   allocateLayers, depthAfterRaise,
@@ -205,6 +206,13 @@ export interface RunDetailingInput {
   bentUp?: BentUpPolicy;
   /** Cut points a person set in the frame editor, per beam, in its own sense (`generate-beam` `cuts`). */
   memberCuts?: ReadonlyMap<number, { bottomFrom?: number; bottomTo?: number; bottomShort?: number; topI?: number; topJ?: number }>;
+  /**
+   * A saved beam line's bars and stirrups per member, exactly as drawn (`line-bars.ts`). Given
+   * for a member, they are laid as drawn and its cut points are not read.
+   */
+  linePieces?: ReadonlyMap<number, { bars: readonly LineBarPiece[]; stirrups: readonly LineStirrupPiece[] }>;
+  /** The laps saved lines draw, each with the member that holds its middle (`lineLaps`). */
+  lineLaps?: ReadonlyArray<{ owner: number; lap: LineLap }>;
   /** Members whose bars belong to the lateral-force-resisting system. */
   lateralSystem?: ReadonlySet<number>;
   /**
@@ -689,6 +697,8 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
     });
     stacks.set(key, list);
   }
+  /** Laps a saved line draws inside a member, as each member's generator laid them. */
+  const drawnLaps: Array<{ elementId: number; fromBarId: string; toBarId: string; from: Point3; to: Point3; offset: number }> = [];
 
   const memberBarsById = new Map<number, MemberBars>();
   /** A column's horizontal local axes, which carry its section's x and y into plan. */
@@ -1013,10 +1023,13 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
     // Nested tails stand side by side: §25.2.1's clear (`end-support-anchorage` `verdictsIn`).
     const nestClear = (d: number) => minClearSpacingInLayer(input.edition, { barDiameterMm: d, maxAggregateSizeMm: input.maxAggregateSizeMm }).minClear;
     const topRowsAt = (side: 'I' | 'J') => topRowsOf(rows[side]);
-    const plan = (side: 'I' | 'J', bar: { position: 'top' | 'bottom'; diameterMm: number; need: 'develop' | 'embed' | 'none'; hook: 'allowed' | 'requested'; inboard: number; rowStep?: number }) => {
+    const plan = (side: 'I' | 'J', bar: { position: 'top' | 'bottom'; diameterMm: number; need: 'develop' | 'embed' | 'none'; hook: 'allowed' | 'requested'; inboard: number; rowStep?: number; endsHere?: boolean }) => {
       const dev = faceDevelopment(rebar, section, bar.position === 'bottom' ? 'bottom' : side === 'I' ? 'topStart' : 'topEnd', bar.diameterMm, input.edition);
       const outerAcross = seatedLongitudinalHalfExtents(section.b, section.h, section.cover, seat.stirrupDiaMm, bar.diameterMm).corner.halfAcross;
-      return planSupportEnd(cages[side], { ...bar, outerAcross, ld: dev.ld, ldh: dev.ldh, ldc: dev.ldc, stress: 'tension' });
+      // A bar drawn to end at this support ends here, anchored in the column, whether or not the
+      // line continues past it: no lap of the line takes it (`lineBars`).
+      const cage = bar.endsHere ? { ...cages[side], continues: false } : cages[side];
+      return planSupportEnd(cage, { ...bar, outerAcross, ld: dev.ld, ldh: dev.ldh, ldc: dev.ldc, stress: 'tension' });
     };
 
     /**
@@ -2465,7 +2478,9 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
       layerDrop: layerDropOf.get(id) ?? 0,
       bentUp: input.bentUp ?? { seismicDesign: 'unstated', optOut: false },
       ...(accepted?.regions?.skin ? { skin: accepted.regions.skin } : {}),
-      ...(input.memberCuts?.get(id) ? { cuts: input.memberCuts.get(id) } : {}),
+      ...(input.linePieces?.get(id)?.bars.length
+        ? { lineBars: input.linePieces.get(id)!.bars, lineStirrups: input.linePieces.get(id)!.stirrups }
+        : input.memberCuts?.get(id) ? { cuts: input.memberCuts.get(id) } : {}),
       ...(accepted?.regions?.bottomGroups?.some((g) => g.anchorageStart === 'hook' || g.anchorageEnd === 'hook') ? { bottomHooks: {
         start: accepted.regions.bottomGroups.some((g) => g.anchorageStart === 'hook'),
         end: accepted.regions.bottomGroups.some((g) => g.anchorageEnd === 'hook'),
@@ -2473,6 +2488,18 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
     } as never);
 
     for (const [barId, layer] of Object.entries(gen.barLayers)) barLayers.set(barId, layer);
+    for (const l of gen.drawnLaps) drawnLaps.push({ ...l, elementId: id });
+    // The laps the saved line draws with their middle in this member, against the splice length the
+    // larger bar needs (§25.5.2), measured on the whole line where the whole overlap is.
+    for (const { lap } of (input.lineLaps ?? []).filter((x) => x.owner === id)) {
+      const need = anchor.lapSplice(lap.diameterMm);
+      const where = `${lap.count}Ø${lap.diameterMm} ${lap.face === 'top' ? 'superiores' : 'inferiores'}, x = ${lap.from.toFixed(2)}–${lap.to.toFixed(2)} m de la línea`;
+      if (lap.length < need - 1e-3) {
+        gen.unsupported.push(`Solape dibujado de ${where}: ${lap.length.toFixed(2)} m, menor que la longitud de empalme ℓst = ${need.toFixed(2)} m (25.5.2).`);
+      } else {
+        gen.trace.push(`Solape dibujado de ${where}: ${lap.length.toFixed(2)} m, cubre ℓst = ${need.toFixed(2)} m (25.5.2).`);
+      }
+    }
 
     // ── The transverse cage joins the assembly ──
     //
@@ -2564,6 +2591,24 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
         ? { ...r, solution: r.available >= r.required - 1e-9 ? 'straight' as const : 'unresolved' as const } : r;
       const start = settle(a.start), end = settle(a.end);
       return { ...bar, anchorage: { ...(start ? { start } : {}), ...(end ? { end } : {}) } };
+    });
+  }
+  // The laps a saved line draws, declared as laps: the pair is intended, and the collision check
+  // reads it as one (`isLapPair`). A pair farther apart than §25.5.1.3 allows is said so.
+  for (const d of drawnLaps) {
+    const bar = memberBarsById.get(d.elementId)?.bars.find((b) => b.id === d.fromBarId);
+    const db = (bar?.diameterMm ?? 0) / 1000;
+    const len = Math.hypot(d.to.x - d.from.x, d.to.y - d.from.y, d.to.z - d.from.z);
+    const maxOffset = Math.min(len / 5, 0.15);
+    const contact = d.offset <= db + 0.002;
+    if (!contact && d.offset > maxOffset + 1e-6) {
+      memberBarsById.get(d.elementId)?.unsupported.push(`Solape dibujado de ${d.fromBarId} y ${d.toBarId}: barras a ${(d.offset * 1000).toFixed(0)} mm entre ejes, más que ${(maxOffset * 1000).toFixed(0)} mm (25.5.1.3).`);
+    }
+    materialised.laps.push({
+      jointId: `drawn:e${d.elementId}`, fromElementId: d.elementId, toElementId: d.elementId,
+      fromBarId: d.fromBarId, toBarId: d.toBarId, from: d.from, to: d.to, lapLength: len,
+      kind: contact ? 'contactLap' : 'nonContactLap', spliceClass: 'B', offset: d.offset,
+      maxOffset: contact ? Infinity : maxOffset, refs: [clause('cirsoc-201', input.edition, '25.5.1.3', 'empalmes por yuxtaposición sin contacto')],
     });
   }
   const laps = lapIndex(materialised.laps);
