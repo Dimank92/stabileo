@@ -17,6 +17,7 @@ import { modelStore } from '../model.svelte';
 import { uiStore } from '../ui.svelte';
 import '../index';
 import { designRunStore } from '../design-run.svelte';
+import { verificationStore } from '../verification.svelte';
 import { initSolver } from '../../engine/wasm-solver';
 import { resultsStore } from '../results.svelte';
 import { solveCombinations3D, validateAndSolve3D } from '../../engine/solver-service';
@@ -33,7 +34,12 @@ describe('the flagship frame: every interior support spliced, every end built as
     const combo: any = solveCombinations3D(modelStore.model as never, modelStore.model.loadCases, modelStore.model.combinations, true, false);
     resultsStore.setResults3D(validateAndSolve3D(modelStore.model as never, true, false) as never);
     resultsStore.setCombinationResults3D(combo.perCase, combo.perCombo, combo.envelope);
-    designRunStore.designAll();
+    // The whole frame, whatever the machine: the user's 20 s cap (`DEFAULT_RUN_MS`) stops the run
+    // on a slower runner with members not designed, and the assertions below are about all of them.
+    // The engine's tests on this frame give `runDesign` the same 180 s.
+    designRunStore.designAll({ maxRunMs: 180_000 });
+    const summary = verificationStore.runSummary;
+    if (!summary || summary.aborted || summary.notReached > 0) throw new Error(`design all left the frame incomplete: aborted ${summary?.aborted}, not reached ${summary?.notReached}`);
     bars = (modelStore.model.detailing?.assemblies ?? []).flatMap((a) => a.bars);
   }, 600_000);
 
