@@ -192,21 +192,28 @@ test.describe('@slow what these fixtures now reach, and what they cannot', () =>
    * fixture did produce one it would fail and the unreinforced filter and the `.unreinforced`
    * block would be exercised instead. That day came. Since the design reads the bars' anchorage
    * in the columns (3980d8402) and designs a beam that declares no role in the lateral system as
-   * part of it, fy developed at the column face (292b87f68), `rc-qa-diagnostic` refuses seven
+   * part of it, fy developed at the column face (292b87f68), `rc-qa-diagnostic` refused seven
    * beams — e13 to e18 and e20, SEARCH_EXHAUSTED on the anchorage of their top and bottom bars —
-   * and e19 is refused at the biaxial gate with nothing to propose (UNSUPPORTED). Before: 0
-   * refused; after: those eight, none with steel.
+   * and e19 at the biaxial gate with nothing to propose (UNSUPPORTED). Before: 0 refused; after:
+   * those eight, none with steel.
+   *
+   * Since the search stopped offering stirrups below Av,min (CIRSOC 201 §9.6.3.1, c16090225),
+   * the options it retains per region reach 6 Ø12 top, 5 Ø12 bottom, Ø6 c/20–22,5 on e14 and
+   * e18, which pass every check, anchorage included (worst 0,992). Their refusal listed
+   * `optionsBeyondRetained` as not explored: a search that ran out (48 tried), never a proof.
+   * The verifier only gained a row in that change. Now five SEARCH_EXHAUSTED (e13, e15–e17,
+   * e20) and the same UNSUPPORTED e19.
    */
   test('rc-qa-diagnostic now refuses members, and the rail, the block and the filter say so',
     async ({ pro: page }) => {
       await generate(page, 'rc-qa-diagnostic');
       const counts = await page.evaluate(() => window.__stabileo.runCounts());
-      expect([counts?.searchExhausted, counts?.unsupported], 'the refusals the engine reached').toEqual([7, 1]);
+      expect([counts?.searchExhausted, counts?.unsupported], 'the refusals the engine reached').toEqual([5, 1]);
       await openViewer(page);
       expect(await page.locator('.st-refused').count(), 'the rail reports them').toBeGreaterThan(0);
       const block = page.getByTestId('rebar-unreinforced');
       await expect(block, 'and the block names them').toBeVisible();
-      for (const id of [13, 14, 15, 16, 17, 18, 19, 20]) await expect(block).toContainText(String(id));
+      for (const id of [13, 15, 16, 17, 19, 20]) await expect(block).toContainText(String(id));
 
       // The filter is no longer unused: it takes their bare concrete out of the scene.
       type Census = { solids: Record<string, number> };
