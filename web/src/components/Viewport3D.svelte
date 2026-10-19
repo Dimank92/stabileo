@@ -386,7 +386,7 @@
      * the scene graph. Both branches of this rebase hid the markers in sections mode
      * and each did it its own way; this is the one that says why.
      */
-    const drawn = uiStore.renderMode3D !== 'sections';
+    const drawn = uiStore.renderMode3D !== 'sections' && uiStore.renderMode3D !== 'physical';
     nodesInstanced.setDrawn(drawn);
     publishMarkerState(drawn, drawn ? undefined : null);
     if (!drawn) return;
@@ -4200,6 +4200,21 @@
             <span class="cam-glyph">{uiStore.renderMode3D === 'sections' ? '◫' : '⬡'}</span>
             <span>{uiStore.renderMode3D === 'sections'
               ? t('config.wireframe') : t('config.sections')}</span>
+          </button>
+          <button
+            class="cam-item" class:on={uiStore.renderMode3D === 'physical'} data-testid="cam-physical"
+            onclick={() => {
+              if (uiStore.renderMode3D === 'physical') {
+                uiStore.renderMode3D = renderModeBeforeSections;
+              } else {
+                renderModeBeforeSections = uiStore.renderMode3D === 'solid' ? 'solid' : 'wireframe';
+                uiStore.renderMode3D = 'physical';
+              }
+            }}
+          >
+            <span class="cam-glyph">▣</span>
+            <span>{uiStore.renderMode3D === 'physical'
+              ? t('config.wireframe') : t('config.physical')}</span>
           </button>
           <div class="cam-sep"></div>
           <button

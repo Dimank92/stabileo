@@ -17,6 +17,7 @@ import { currentRevision } from '../model/project-info';
 import type { DocumentModel } from '../engine/detailing/document-model';
 import type { SheetFormat } from '../sheets/formats';
 import { membersFromModel } from '../engine/detailing/member-geometry';
+import { projectPhysicalFrame } from './physical-frame';
 import { cachedSceneModel } from '../engine/detailing/scene-cache';
 import { PLAN_KINDS, planContext, workDrawings, type PlanKind } from './work-drawings';
 
@@ -33,7 +34,7 @@ function sceneOf(doc: DocumentModel) {
     elementIds: [...m.elements.keys()].sort((a, b) => a - b),
     nodes: [...m.nodes.values()], elements: [...m.elements.values()], sections: [...m.sections.values()],
   });
-  return cachedSceneModel(doc, members);
+  return cachedSceneModel(doc, members, { physical: projectPhysicalFrame() });
 }
 
 export function setSheetRevision(number: string, r: SheetRevision | null): void {

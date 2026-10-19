@@ -85,6 +85,13 @@ export interface ProjectDesignData {
   architecture?: { constructions: import('../engine/architecture/architecture').Construction[]; walls: import('../engine/architecture/architecture').ArchWall[]; rooms: import('../engine/architecture/architecture').Room[] };
   /** Service condition and temperature of the timber members (CIRSOC 601 CM and Ct). */
   timber?: import('../engine/design/materials/timber').TimberSettings;
+  /**
+   * How the project goes to other programs. `ifcColumnTop`: where a column's body ends in the IFC
+   * against the slab it meets: the slab's top (the whole joint in the column, the default), the
+   * slab's soffit, or the node's axis; what is above goes to the slab, or to the deepest beam where
+   * there is no slab.
+   */
+  exchange?: { ifcColumnTop?: 'slabTop' | 'slabSoffit' | 'axis' };
   sheets?: { format: import('../sheets/formats').SheetFormat; prefix: string; start: number; language?: string; kinds?: string[]; revisions?: Record<string, { code: string; date?: string; note?: string }> };
   /** How a seismic project designs its concrete (`seismic-design.ts`). Absent: the defaults. */
   seismic?: import('./seismic-design').SeismicDesignSettings;

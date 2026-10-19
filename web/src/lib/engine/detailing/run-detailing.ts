@@ -43,8 +43,9 @@ import {
   standardHook, type BarPath, type Point3,
 } from '../../codes/cirsoc201/bar-geometry';
 import {
-  bottomHookInboard, columnFacesAlong, faceDevelopment, planSupportEnd, supportRowInto, supportRows, topLayout, topRowInboard, topRowsOf, type SupportCage, type SupportRow,
+  bottomHookInboard, faceDevelopment, planSupportEnd, supportRowInto, supportRows, topLayout, topRowInboard, topRowsOf, type SupportCage, type SupportRow,
 } from './support-anchorage';
+import { jointBandOf, supportFacesAt as supportFacesOf, type BandBeam, type FaceColumn } from '../physical/support-faces';
 import { beamCornerRecord, columnCageDia, crossingSeatsOf, endSupportPlan, isSimpleSupport, supportCageFrom } from '../design/end-support-anchorage';
 import { developsAtFace } from '../../model/lateral-system';
 import type { MemberContext } from '../design/member-context';
@@ -881,21 +882,19 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
    * column centred on the node gives `face` = half its smaller side and no `far`, as always.
    */
   function supportFacesAt(nodeId: number, id: number): { face: number; far?: number } {
-    let half = 0, widest: number | undefined;
+    const at: FaceColumn[] = [];
     for (const cid of columns) {
       const cEl = input.elements.get(cid);
       if (!cEl || (cEl.nodeI !== nodeId && cEl.nodeJ !== nodeId)) continue;
       const cCtx = input.contexts.get(cid);
       if (!cCtx) continue;
-      const h = Math.min(cCtx.section.b, cCtx.section.h) / 2;
-      if (h > half) { half = h; widest = cid; }
+      at.push({ b: cCtx.section.b, h: cCtx.section.h, offset: axisOffsetAt(cid, nodeId) });
     }
     const el = input.elements.get(id), line = memberLine(id);
-    if (widest === undefined || !el || !line) return { face: half };
+    if (!el || !line) return { face: at.reduce((m, c) => Math.max(m, Math.min(c.b, c.h) / 2), 0) };
     const u = unit(line.i, line.j);
     const w = nodeId === el.nodeI ? u : { x: -u.x, y: -u.y, z: -u.z };
-    const c = axisOffsetAt(widest, nodeId), o = axisOffsetAt(id, nodeId);
-    return columnFacesAlong(half, { x: c.x - o.x, y: c.y - o.y, z: 0 }, w);
+    return supportFacesOf(at, axisOffsetAt(id, nodeId), w);
   }
   /** Node to the near face of the widest column at a node, along beam `id`, m. */
   function supportFaceAt(nodeId: number, id: number): number {
@@ -1331,7 +1330,7 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
     // The band is handed over only where an insertion moves it, so a model that declares none
     // gets the joint it always had, to the bit.
     const jointAt = (z: number, at: { x: number; y: number }) => {
-      let depth = 0, lo = Infinity, hi = -Infinity, moved = false;
+      const framing: BandBeam[] = [];
       for (const bId of beams) {
         const bEl = input.elements.get(bId);
         const bCtx = input.contexts.get(bId);
@@ -1341,15 +1340,12 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
           if (!n) continue;
           if (Math.abs(Z(n) - z) < 0.05
             && Math.hypot(n.x - at.x, n.y - at.y) < 0.6) {
-            depth = Math.max(depth, bCtx.section.h);
-            const dz = axisOffsetAt(bId, nid).z;
-            if (Math.abs(dz) > 1e-9) moved = true;
-            lo = Math.min(lo, Z(n) + dz - bCtx.section.h / 2);
-            hi = Math.max(hi, Z(n) + dz + bCtx.section.h / 2);
+            framing.push({ nodeZ: Z(n), dz: axisOffsetAt(bId, nid).z, h: bCtx.section.h });
           }
         }
       }
-      return { depth, band: moved && depth > 0 ? { lo, hi } : undefined };
+      const band = jointBandOf(framing);
+      return { depth: band?.depth ?? 0, band: band?.moved ? { lo: band.lo, hi: band.hi } : undefined };
     };
     const beamDepthAtTop = new Map<number, number>();
     const jointAtTop = new Map<number, { lo: number; hi: number }>();
