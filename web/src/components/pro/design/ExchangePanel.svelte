@@ -59,7 +59,7 @@
   .actions { display: flex; flex-wrap: wrap; gap: 0.3rem; }
   .opt { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; font-size: 0.68rem; color: var(--st-text-2); }
   .opt select { font-size: 0.68rem; background: var(--st-surface-3); color: var(--st-text); border: 1px solid var(--st-hair-strong); border-radius: 4px; }
-  .hint { margin: 0; font-size: 0.64rem; color: var(--st-text-3, var(--st-text-2)); }
+  .hint { margin: 0; font-size: 0.68rem; color: var(--st-text-2); line-height: 1.35; }
   .actions button {
     font-size: 0.7rem; padding: 0.2rem 0.5rem; background: var(--st-surface-3); color: var(--st-text);
     border: 1px solid var(--st-hair-strong); border-radius: 4px; cursor: pointer;

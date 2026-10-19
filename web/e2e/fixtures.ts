@@ -26,11 +26,11 @@ export async function alSection(page: import('@playwright/test').Page, id: 'regu
  *
  * Restated here rather than imported: `e2e/` is compiled by Playwright, not by the app's Vite
  * pipeline, and reaching into `src/lib/three` from a spec would drag Three.js into the test
- * process to read six strings. `rebar-toggles.spec.ts` asserts that this list matches the
+ * process to read seven strings. `rebar-toggles.spec.ts` asserts that this list matches the
  * renderer's own, so a family added on one side cannot go unnoticed on the other.
  */
 export const SOLID_FAMILIES = [
-  'column', 'beam', 'slab', 'wall', 'footing', 'pedestal',
+  'column', 'beam', 'joint', 'slab', 'wall', 'footing', 'pedestal',
 ] as const;
 
 export type SolidFamily = typeof SOLID_FAMILIES[number];
