@@ -106,12 +106,18 @@ function loop(): DesignFeedbackLoopResult {
  * amounts and repair to different utilizations:
  *   5, 6 — no joint-layer movement, only Table 26.6.2.1(a)'s 15 mm → d = 497, d/2 = 248,5
  *   7, 8 — 12 mm bottom raise + 10 mm top drop + 15 mm            → d = 485, d/2 = 242,5
+ *
+ * The raise is now 11,7 mm, not 12,0: the layer allocation separates the crossing bottom mats
+ * from where each beam's bars sit in its own stirrup's bends (`seatsOf`, the corner seats), not
+ * from its face, and the two seats differ by 0,29 mm. Less depth lost, so 7 and 8 fail at their
+ * final geometry by a hair less (before: hash b12.0/t10.0/d15.0, utilization 1,031; after:
+ * b11.7/t10.0/d15.0, 1,030), and still on the same check.
  */
 const REPAIRED = [5, 6, 7, 8];
 /** The two pairs, and the geometry each actually lost. */
 const PAIRS = {
-  noLayerMovement: { ids: [5, 6], hash: 'b0.0/t0.0/d15.0', sMaxCm: 24.8, util: 1.008 },
-  layerMoved: { ids: [7, 8], hash: 'b12.0/t10.0/d15.0', sMaxCm: 24.3, util: 1.031 },
+  noLayerMovement: { ids: [5, 6], hash: 'b0.0/t0.0/d15.0', sMaxCm: 24.8, util: 1.008, raise: 0 },
+  layerMoved: { ids: [7, 8], hash: 'b11.7/t10.0/d15.0', sMaxCm: 24.3, util: 1.030, raise: 0.0117071 },
 } as const;
 const pairOf = (id: number) =>
   PAIRS.noLayerMovement.ids.includes(id as never) ? PAIRS.noLayerMovement : PAIRS.layerMoved;
@@ -146,7 +152,7 @@ describe('the four beams: the failure, the repair and the arithmetic behind both
     // raise on them would be asserting a coordination that did not happen.
     for (const fb of loop().iterations[0].feedback) {
       const moved = PAIRS.layerMoved.ids.includes(fb.elementId as never);
-      expect(fb.finalGeometry.bottomRaise).toBeCloseTo(moved ? 0.012 : 0, 6);
+      expect(fb.finalGeometry.bottomRaise).toBeCloseTo(moved ? PAIRS.layerMoved.raise : 0, 6);
       expect(fb.finalGeometry.topLower).toBeCloseTo(moved ? 0.010 : 0, 6);
       // The tolerance applies whether or not anything moved.
       expect(fb.finalGeometry.depthTolerance).toBeCloseTo(0.015, 6);
@@ -160,7 +166,7 @@ describe('the four beams: the failure, the repair and the arithmetic behind both
   it('the arithmetic behind each failure, from the table', () => {
     // d/2 is row 1 of Table 9.7.6.2.2, whose 400 mm cap does not govern at this depth.
     // 5, 6: 512 − 15      = 497 → 248,5 mm; 250/248,5 = 1,006 → reported 1,008
-    // 7, 8: 512 − 12 − 15 = 485 → 242,5 mm; 250/242,5 = 1,031
+    // 7, 8: 512 − 12 − 15 = 485 → 242,5 mm; 250/242,5 = 1,031 (the run raises 11,7 mm: 1,030)
     expect(250 / 248.5).toBeCloseTo(1.006, 3);
     expect(250 / 242.5).toBeCloseTo(1.031, 3);
     // The old rule permitted 300 mm in all four span regions. Both real limits are below it.
@@ -389,7 +395,7 @@ describe('certificates describe the geometry that exists', () => {
       expect(r.certificate!.rebarHash).toBe(rebarHash(r.accepted!));
       seen.add(r.certificate!.finalGeometryHash);
     }
-    expect([...seen].sort()).toEqual(['b0.0/t0.0/d15.0', 'b12.0/t10.0/d15.0']);
+    expect([...seen].sort()).toEqual(['b0.0/t0.0/d15.0', PAIRS.layerMoved.hash]);
   });
 
   it('the published outcome carries the final-geometry certificate alongside the nominal one', () => {
@@ -454,7 +460,7 @@ describe('locked reinforcement is a hard constraint', () => {
     expect(l.unrepaired.map((u) => u.elementId)).toEqual([7, 8]);
     for (const u of l.unrepaired) {
       expect(u.kind).toBe('LOCKED_REINFORCEMENT_PREVENTS_REPAIR');
-      expect(u.finalUtilization).toBeCloseTo(1.031, 3);
+      expect(u.finalUtilization).toBeCloseTo(PAIRS.layerMoved.util, 3);
     }
     // The pinned steel is untouched and the honest verdict is preserved.
     for (const id of [7, 8]) {

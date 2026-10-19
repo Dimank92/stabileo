@@ -181,9 +181,14 @@ describe('§25.4.1.2 — no hook anchors a compression bar', () => {
     // The clause is a prohibition, not a preference: "no se deben emplear para anclar
     // barras en compresión". A hook here is not conservative, it is non-compliant — and it
     // was also putting a 12db extension through the beam's top mat.
+    // The COLUMNS' bars. The beams' top bars hook down into the edge columns now, and rightly:
+    // they are tension steel that needs ld = 0,475 m past the face of a 40 cm column, which has
+    // 0,37 m to offer straight (§25.4.3, `generate-beam` `endPlan`).
+    const columns = new Set([...solveFixture(frame as never).contexts.values()]
+      .filter((c) => c.elementType === 'column').map((c) => c.elementId));
     const hooked = run().assemblies
       .flatMap((a) => a.bars)
-      .filter((b) => b.role === 'longitudinal'
+      .filter((b) => b.role === 'longitudinal' && b.ownerElementIds.every((id) => columns.has(id))
         && (b.startTreatment.kind === 'hook' || b.endTreatment.kind === 'hook'));
     expect(hooked.map((b) => b.id)).toEqual([]);
   });
