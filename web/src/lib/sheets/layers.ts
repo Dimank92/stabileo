@@ -1,5 +1,5 @@
 /**
- * The layers of every sheet, declared once: name, colour (AutoCAD index), lineweight (mm) and line
+ * The layers of every sheet, declared once: name, colour (ACI, the DXF colour index), lineweight (mm) and line
  * type. The drawings already draw on the RC-* layers (`drawings.ts`, `structure-drawings.ts`);
  * the paper adds its frame and title block. The DXF writes this table, and the SVG and the PDF take
  * colour and weight from it, so the three agree.
@@ -46,7 +46,7 @@ export const LAYERS: readonly LayerDef[] = [
 const BY = new Map(LAYERS.map((l) => [l.name, l]));
 export const layerDef = (name: string): LayerDef => BY.get(name) ?? { name, color: 7, weight: 0.25 };
 
-/** AutoCAD colour index to RGB, for the indices the table uses. */
+/** DXF colour index (ACI) to RGB, for the indices the table uses. */
 export function aciRgb(i: number): [number, number, number] {
   switch (i) {
     case 1: return [204, 0, 0]; case 2: return [170, 150, 0]; case 3: return [0, 140, 0]; case 4: return [0, 150, 150];
