@@ -724,6 +724,7 @@ fn prepare_static_2d_inner(input: &SolverInput, force_dense: bool) -> Result<Pre
     // otherwise the results carry the warning naming it.
     let mechanisms = super::mechanism::check_2d(input, &[]);
     pre_solve_diags.extend(mechanisms.diagnostic());
+    mechanisms.refuse_unheld_rotations()?;
 
     let n = dof_num.n_total;
     let nf = dof_num.n_free;
@@ -2186,6 +2187,7 @@ fn prepare_static_3d_inner(input: &SolverInput3D) -> Result<PreparedStatic3D, St
     // otherwise the results carry the warning naming it.
     let mechanisms = super::mechanism::check_3d(&input, &[]);
     pre_solve_diags.extend(mechanisms.diagnostic());
+    mechanisms.refuse_unheld_rotations()?;
 
     let n = dof_num.n_total;
     let nf = dof_num.n_free;

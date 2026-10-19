@@ -427,6 +427,16 @@ fn model_3d(input: &SolverInput3D, constraints: &[Constraint]) -> Model {
     let dof_num = DofNumbering::build_3d(input);
     let has_rot = dof_num.dofs_per_node >= 6;
     let mut m = Model::new(true, has_rot, input.nodes.values().map(|n| (n.id, [n.x, n.y, n.z])).collect());
+    // With `leftHand` the frame elements transform rotations like
+    // translations (det R = −1), so their kernels are the mirrored rigid
+    // motions u_j = u_i − θ × d. On frames, trusses and supports alone that is
+    // the same check with every rotation negated; mixed with constraints,
+    // connectors or shells (which use +θ × r) the engine's kinematics are not
+    // the model's, and the model is left unchecked (#403 findings).
+    let shells = !(input.plates.is_empty() && input.quads.is_empty() && input.quad9s.is_empty() && input.curved_shells.is_empty());
+    if input.left_hand == Some(true) && (!constraints.is_empty() || !input.connectors.is_empty() || shells) {
+        m.fail("left-handed member axes with constraints, connectors or shells".into());
+    }
     let left_hand = input.left_hand.unwrap_or(false);
     let mut elems: Vec<&SolverElement3D> = input.elements.values().collect();
     elems.sort_by_key(|e| e.id);
@@ -1543,6 +1553,14 @@ impl MechanismCheck {
     /// exact test is relaxed to round-off (relative 1e-9) only against a
     /// free motion whose floating-point values are known accurately.
     pub fn loads_do_work(&self, load: impl Fn(usize, usize) -> f64) -> bool {
+        self.loads_do_work_scaled(load, 0.0)
+    }
+
+    /// As [`Self::loads_do_work`], round-off judged against `load_scale`
+    /// (the largest load component in the model) as well as the loads on the
+    /// moving nodes: element loads summed in another order leave a node
+    /// with a round-off residue that is not a load.
+    fn loads_do_work_scaled(&self, load: impl Fn(usize, usize) -> f64, load_scale: f64) -> bool {
         if !self.is_mechanism() {
             return false;
         }
@@ -1571,7 +1589,8 @@ impl MechanismCheck {
             // Exactly orthogonal, or — when the load comes out of rounded
             // arithmetic (element loads, coordinates) — orthogonal to the
             // free motion's accurate values up to round-off.
-            let no_work = acc == 0 || (v.refined && dot.abs() <= 1e-9 * scale);
+            let vnorm: f64 = v.nodal.iter().flat_map(|(_, _, r)| r.iter()).map(|x| x.abs()).sum();
+            let no_work = acc == 0 || (v.refined && dot.abs() <= 1e-9 * scale.max(load_scale * vnorm));
             if !no_work {
                 return true;
             }
@@ -1589,7 +1608,8 @@ impl MechanismCheck {
         let dof_num = DofNumbering::build_2d(input);
         let f = super::assembly::assemble_load_vector_2d(input, loads, &dof_num, &[]);
         let slot_local = [Some(0usize), Some(1), None, Some(2), None, None];
-        self.refuse_if_work(prescribed, |node, slot| {
+        let scale = f.iter().fold(0.0f64, |a, v| a.max(v.abs()));
+        self.refuse_if_work(prescribed, scale, |node, slot| {
             slot_local[slot].and_then(|l| dof_num.map.get(&(node, l))).map_or(0.0, |&i| f[i])
         })
     }
@@ -1601,13 +1621,14 @@ impl MechanismCheck {
         }
         let dof_num = DofNumbering::build_3d(input);
         let f = super::assembly::assemble_load_vector_3d_dense(input, loads, &dof_num, &[]);
-        self.refuse_if_work(prescribed, |node, slot| dof_num.map.get(&(node, slot)).map_or(0.0, |&i| f[i]))
+        let scale = f.iter().fold(0.0f64, |a, v| a.max(v.abs()));
+        self.refuse_if_work(prescribed, scale, |node, slot| dof_num.map.get(&(node, slot)).map_or(0.0, |&i| f[i]))
     }
 
-    fn refuse_if_work(&self, prescribed: bool, load: impl Fn(usize, usize) -> f64) -> Result<(), String> {
+    fn refuse_if_work(&self, prescribed: bool, scale: f64, load: impl Fn(usize, usize) -> f64) -> Result<(), String> {
         let why = if prescribed {
             "Prescribed support displacements are applied to it, which this model cannot equilibrate."
-        } else if self.loads_do_work(load) {
+        } else if self.loads_do_work_scaled(load, scale) {
             "The loads act on it, so there is no equilibrium."
         } else {
             return Ok(());
@@ -1650,6 +1671,43 @@ impl MechanismCheck {
                 .with_phase("pre_solve")
                 .with_nodes(self.nodes.clone()),
         )
+    }
+
+    /// Refuse a node rotation that nothing stiffens about an axis that is not
+    /// a global one (a member released about one bending axis, alone at a
+    /// node): the stiffness matrix is singular in exact arithmetic but
+    /// regular after rounding, and the assembler's artificial stiffness holds
+    /// only global axes, so the solve would return an arbitrary rotation
+    /// there and a certificate would certify it (#458).
+    pub fn refuse_unheld_rotations(&self) -> Result<(), String> {
+        let nodes: Vec<usize> = self
+            .free_rotations
+            .iter()
+            .filter(|r| {
+                let zero_cols = (0..r.nr).filter(|&k| r.basis.iter().all(|b| b[k] == 0)).count();
+                r.nr > r.basis.len() + zero_cols
+            })
+            .map(|r| r.node)
+            .collect();
+        if nodes.is_empty() {
+            return Ok(());
+        }
+        Err(format!(
+            "Rotation not stiffened at node{} {}: nothing in the model resists the rotation of {} about an \
+             axis that is not a global one (a member released about one bending axis, and nothing else \
+             at the node), so the stiffness matrix is singular. Release the member about both bending \
+             axes there, or connect or restrain the node's rotation",
+            if nodes.len() == 1 { "" } else { "s" },
+            list_nodes(&nodes),
+            if nodes.len() == 1 { "that node" } else { "those nodes" },
+        ))
+    }
+
+    /// Why a linear certificate must not certify this model: a mechanism (its
+    /// regularized answer is not the model's), or a rotation nothing
+    /// stiffens off the global axes. `None` when certifiable.
+    pub fn uncertifiable(&self) -> Option<String> {
+        self.message().or_else(|| self.refuse_unheld_rotations().err())
     }
 
     /// Rotation directions of single nodes that nothing couples to and that

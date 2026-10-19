@@ -17,6 +17,7 @@ use dedaliano_engine::solver::dof::DofNumbering;
 use dedaliano_engine::solver::linear::{solve_2d, solve_3d};
 use dedaliano_engine::solver::mechanism::{check_2d, check_3d, free_motion_vectors};
 use dedaliano_engine::solver::modal::{solve_modal_2d, solve_modal_3d};
+use dedaliano_engine::certify::{certify_linear_2d_full, certify_results_2d, certify_results_3d};
 use std::collections::HashMap;
 use dedaliano_engine::types::*;
 use serde_json::{json, Value};
@@ -649,6 +650,109 @@ fn modal_2d_on_a_mechanism_is_refused() {
     solve_modal_2d(&model(false), &dens, 4).expect("cantilever modal");
 }
 
+
+// ---------------------------------------------------------------------------
+// Models the assembled-level certificate certified although singular (#458,
+// found by the end-to-end certificates of #403)
+// ---------------------------------------------------------------------------
+
+/// 2D: a nodal moment on a node where every member is hinged. Nothing
+/// resists it; the artificial rotational spring absorbed it (rotation 21 rad,
+/// under the 100 rad heuristic) and the certificate certified the
+/// regularised answer. Refused; without the moment the model is fine (the
+/// hinged rotation is harmless).
+#[test]
+fn moment_on_fully_hinged_node_2d() {
+    let model = |my: f64| {
+        in2(json!({
+            "nodes": {"1": {"id":1,"x":0.0,"z":0.0}, "2": {"id":2,"x":1.0,"z":0.0}, "3": {"id":3,"x":2.0,"z":0.0}},
+            "materials": {"1": {"id":1,"e":200000.0,"nu":0.3}},
+            "sections": {"1": {"id":1,"a":1.0,"iz":1.0}},
+            "elements": {"1": frame2(1, 1, 2, false, true), "2": frame2(2, 2, 3, true, false)},
+            "supports": {"1": sup2(1, 1, "fixed"), "2": sup2(2, 3, "fixed")},
+            "loads": [nodal2(2, 0.0, -10.0, my)]
+        }))
+    };
+    let e = solve_2d(&model(5.0)).unwrap_err();
+    assert!(e.contains("Nodal moment at node 2"), "{e}");
+    assert!(certify_linear_2d_full(&model(5.0)).is_err());
+    let out = certify_linear_2d_full(&model(0.0)).expect("no moment: solves");
+    assert!(out.certificate.is_certified(), "{:?}", out.certificate);
+}
+
+/// 2D: a rigid link from a node where its only member is hinged. The linked
+/// pair turns freely about the hinge (the truss between them does not resist
+/// a rigid rotation); the all-hinged spring held it and a load on the slave
+/// drove it to a meaningless value certified with a relative bound of 2e-15.
+/// Refused, naming the free motion; and never certified.
+#[test]
+fn rigid_link_hides_a_mechanism_2d() {
+    let input = in2(json!({
+        "nodes": {"1": {"id":1,"x":0.0,"z":0.0}, "2": {"id":2,"x":0.0,"z":3.0}, "3": {"id":3,"x":2.0,"z":3.0}},
+        "materials": {"1": {"id":1,"e":200000.0,"nu":0.3}},
+        "sections": {"1": {"id":1,"a":0.01,"iz":0.0001}},
+        "elements": {"1": frame2(1, 1, 2, false, true),
+                     "2": {"id":2,"type":"truss","nodeI":2,"nodeJ":3,"materialId":1,"sectionId":1}},
+        "supports": {"1": sup2(1, 1, "fixed")},
+        "loads": [nodal2(3, 0.0, -10.0, 0.0)],
+        "constraints": [{"type":"rigidLink","masterNode":2,"slaveNode":3,"dofs":[]}]
+    }));
+    let e = solve_2d(&input).unwrap_err();
+    assert_mechanism(&e, &[2, 3], "The loads act on it");
+    assert!(certify_linear_2d_full(&input).is_err());
+}
+
+/// 3D models from the differential generator (rich3d seeds 121 and 143):
+/// a node reached by one member released about its local y has a rotation
+/// about a skew axis that nothing stiffens. Singular in exact arithmetic,
+/// regular after rounding (the orphan guard looks at diagonal entries only),
+/// so the solve returned an arbitrary rotation there and the certificate
+/// certified it. Refused, naming the node; never certified.
+const RICH3D_121: &str = r#"{"nodes": {"1": {"id": 1, "x": 1.745, "y": 6.987, "z": 5.006}, "2": {"id": 2, "x": 1.745, "y": 6.987, "z": 7.863}, "3": {"id": 3, "x": 3.377, "y": 5.408, "z": 7.749}}, "materials": {"1": {"id": 1, "e": 243959.72071397945, "nu": 0.23638039947385409}, "2": {"id": 2, "e": 30000.0, "nu": 0.23572099204586067}}, "sections": {"1": {"id": 1, "a": 0.1793323820126768, "iy": 0.00611073797410362, "iz": 0.0011753811313195914, "j": 0.0018028910583047996}, "2": {"id": 2, "a": 0.10213213799559304, "iy": 0.001200866391291703, "iz": 0.0006292055010928566, "j": 0.0007358232660339858}, "3": {"id": 3, "a": 0.2726084574185359, "iy": 0.013086490695788216, "iz": 0.0029307016464066907, "j": 0.0073126523061655645}}, "elements": {"1": {"id": 1, "type": "frame", "nodeI": 1, "nodeJ": 2, "materialId": 2, "sectionId": 2, "releaseMyEnd": true}, "2": {"id": 2, "type": "frame", "nodeI": 1, "nodeJ": 3, "materialId": 2, "sectionId": 1, "rollAngle": -162.96598917454062}}, "supports": {"1": {"nodeId": 1, "rx": true, "ry": true, "rz": true, "rrx": true, "rry": true, "rrz": true}, "2": {"nodeId": 3, "rx": true, "ry": false, "rz": false, "rrx": true, "rry": true, "rrz": true}}, "loads": [{"type": "pointOnElement", "data": {"elementId": 2, "a": 1.4261474112074768, "py": -12.449540384086312, "pz": -49.38067865820969}}]}"#;
+const RICH3D_143: &str = r#"{"nodes": {"1": {"id": 1, "x": 6.811, "y": 0.367, "z": 1.809}, "2": {"id": 2, "x": 6.811, "y": 0.367, "z": 4.225}, "3": {"id": 3, "x": 6.811, "y": 0.367, "z": 6.333}, "4": {"id": 4, "x": 6.811, "y": 0.367, "z": 11.209}}, "materials": {"1": {"id": 1, "e": 200000.0, "nu": 0.2754904163849028}, "2": {"id": 2, "e": 30000.0, "nu": 0.222703232560822}}, "sections": {"1": {"id": 1, "a": 0.06903085536532749, "iy": 0.0006951137395761415, "iz": 0.00022685829003832902, "j": 0.0008934362410407531}, "2": {"id": 2, "a": 0.19153143426220748, "iy": 0.005832515285612155, "iz": 0.0016022927426968066, "j": 0.0037610880015888637}, "3": {"id": 3, "a": 0.10770678224010694, "iy": 0.0007452306703916212, "iz": 0.0012540619573944585, "j": 0.0019338187324166964, "asY": 0.04649663166180314, "asZ": 0.06649362877601928}}, "elements": {"1": {"id": 1, "type": "frame", "nodeI": 2, "nodeJ": 1, "materialId": 1, "sectionId": 1, "rollAngle": -172.52129811134515}, "2": {"id": 2, "type": "frame", "nodeI": 3, "nodeJ": 2, "materialId": 2, "sectionId": 1, "releaseMyStart": true, "releaseMyEnd": true}, "3": {"id": 3, "type": "frame", "nodeI": 4, "nodeJ": 2, "materialId": 1, "sectionId": 3, "localYx": -0.9410253048586574, "localYy": -0.7135371130715171, "localYz": 0.5668694606600337}}, "supports": {"1": {"nodeId": 1, "rx": true, "ry": true, "rz": true, "rrx": true, "rry": true, "rrz": true}, "2": {"nodeId": 3, "rx": true, "ry": true, "rz": true, "rrx": true, "rry": false, "rrz": true, "ky": 704256.9331335936, "kz": 981135.4917627038, "krz": 722921.0917681075}}, "loads": [{"type": "distributed", "data": {"elementId": 3, "qYI": 9.359839369828897, "qYJ": -8.168632536035796, "qZI": 11.671373558975922, "qZJ": 18.03038572127911}}, {"type": "distributed", "data": {"elementId": 2, "qYI": -12.856427636278127, "qYJ": -14.208062164794937, "qZI": 4.029468147580001, "qZJ": -8.852007891000483, "qXI": -2.112379173634558, "qXJ": -7.99829953151683}}, {"type": "nodal", "data": {"nodeId": 1, "fx": 39.86045105294775, "fy": 44.19376110061971, "fz": 1.5786309268326448, "mx": -18.34446359344619, "my": 19.678196221658972, "mz": 8.806467493587093}}]}"#;
+
+#[test]
+fn rotation_unstiffened_about_a_skew_axis() {
+    for json in [RICH3D_121, RICH3D_143] {
+        let input: SolverInput3D = serde_json::from_str(json).unwrap();
+        let c = check_3d(&input, &input.constraints);
+        assert!(c.unheld_rotation_dims() > 0, "{c:?}");
+        let e = solve_3d(&input).unwrap_err();
+        assert!(e.contains("Rotation not stiffened at node"), "{e}");
+        assert!(c.uncertifiable().is_some());
+    }
+}
+
+/// The certificate's own gate: given results for a mechanism, or for a model
+/// with a skew rotation nothing stiffens, it does not certify them (whatever
+/// produced them).
+#[test]
+fn certificate_never_certifies_a_mechanism() {
+    // a beam on two rollers in 2D, loaded vertically: it slides
+    let input = in2(json!({
+        "nodes": {"1": {"id":1,"x":0.0,"z":0.0}, "2": {"id":2,"x":4.0,"z":0.0}},
+        "materials": mats(), "sections": sec2(),
+        "elements": {"1": frame2(1, 1, 2, false, false)},
+        "supports": {"1": sup2(1, 1, "rollerX"), "2": sup2(2, 2, "rollerX")},
+        "loads": [nodal2(2, 0.0, -10.0, 0.0)]
+    }));
+    let fixed = {
+        let mut m = input.clone();
+        m.supports.get_mut("1").unwrap().support_type = "pinned".into();
+        m
+    };
+    let results = solve_2d(&fixed).unwrap();
+    let cert = certify_results_2d(&input, &results);
+    assert!(!cert.is_certified(), "{cert:?}");
+    assert!(certify_results_2d(&fixed, &results).is_certified());
+    let input: SolverInput3D = serde_json::from_str(RICH3D_121).unwrap();
+    let results = solve_3d(&in3(json!({
+        "nodes": {"1": {"id":1,"x":0.0,"y":0.0,"z":0.0}}, "materials": mats(), "sections": sec3(),
+        "elements": {}, "supports": {"1": sup3(1, [true; 6])}, "loads": []
+    }))).unwrap();
+    assert!(!certify_results_3d(&input, &results).is_certified());
+}
+
 // ---------------------------------------------------------------------------
 // Free motions against the null space of K
 // ---------------------------------------------------------------------------
@@ -796,6 +900,7 @@ fn no_fixture_is_flagged() {
         };
         assert!(!c.is_mechanism(), "{name}: {}", c.message().unwrap());
         assert!(c.unchecked.is_none(), "{name}: unchecked ({:?})", c.unchecked);
+        assert!(c.refuse_unheld_rotations().is_ok(), "{name}: {:?}", c.refuse_unheld_rotations());
         checked += 1;
     }
     assert!(checked > 100, "only {checked} fixtures");

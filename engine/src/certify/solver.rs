@@ -178,6 +178,9 @@ fn size_check(dof_num: &DofNumbering) -> Result<(), Certificate> {
 /// Models with constraints or inclined supports take the per-case general path;
 /// the rest certify K once through `certify_load_cases_2d`.
 pub fn certify_results_2d(input: &SolverInput, results: &AnalysisResults) -> Certificate {
+    if let Some(why) = crate::solver::mechanism::check_2d(input, &input.constraints).uncertifiable() {
+        return Certificate::uncertified(why);
+    }
     if needs_general_2d(input) {
         return certify_general_2d(input, results);
     }
@@ -327,6 +330,10 @@ fn rotated_candidate_2d(
 /// once; each case then costs one interval residual.
 pub fn certify_load_cases_2d(input: &SolverInput, cases: &[(&[SolverLoad], &AnalysisResults)]) -> Vec<Certificate> {
     let all = |c: Certificate| vec![c; cases.len()];
+    // A mechanism's (regularized) answer is not the model's: never certified.
+    if let Some(why) = crate::solver::mechanism::check_2d(input, &input.constraints).uncertifiable() {
+        return all(Certificate::uncertified(why));
+    }
     if needs_general_2d(input) {
         // Constraints / inclined supports: per case through the general path.
         return cases
@@ -391,6 +398,9 @@ pub(super) fn gather_u_2d(dof_num: &DofNumbering, displacements: &[Displacement]
 
 /// Certify given results of `solve_3d(input)` (the input the results came from).
 pub fn certify_results_3d(input: &SolverInput3D, results: &AnalysisResults3D) -> Certificate {
+    if let Some(why) = crate::solver::mechanism::check_3d(input, &input.constraints).uncertifiable() {
+        return Certificate::uncertified(why);
+    }
     let expanded = expand_curved_beams_3d(input);
     if needs_general_3d(&expanded) {
         return certify_general_3d(input, results);
@@ -510,6 +520,10 @@ pub fn certify_load_cases_3d(
     cases: &[(&[SolverLoad3D], &AnalysisResults3D)],
 ) -> Vec<Certificate> {
     let all = |c: Certificate| vec![c; cases.len()];
+    // A mechanism's (regularized) answer is not the model's: never certified.
+    if let Some(why) = crate::solver::mechanism::check_3d(input, &input.constraints).uncertifiable() {
+        return all(Certificate::uncertified(why));
+    }
     if needs_general_3d(&expand_curved_beams_3d(input)) {
         return cases
             .iter()
