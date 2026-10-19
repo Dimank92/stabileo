@@ -36,7 +36,7 @@
               onclick={onOpenRegulations}>{t('design.code.openRegulations')}</button>
     </span>
   {:else if changeable}
-    <button type="button" class="code-gate-link" data-testid="desk-list-code"
+    <button type="button" class="code-change" data-testid="desk-list-code"
             onclick={onOpenRegulations}>{t('design.code.openRegulations')}</button>
   {/if}
 </div>
@@ -53,5 +53,9 @@
     color: var(--st-interactive); text-decoration: underline; cursor: pointer;
     font-size: 0.68rem;
   }
-  .code-gate-link:focus-visible { outline: 2px solid var(--st-value); outline-offset: 1px; }
+  .code-change {
+    font-size: 0.68rem; padding: 2px 8px; border-radius: 4px; cursor: pointer;
+    border: 1px solid var(--st-hair-strong); background: var(--st-surface); color: var(--st-text);
+  }
+  .code-gate-link:focus-visible, .code-change:focus-visible { outline: 2px solid var(--st-value); outline-offset: 1px; }
 </style>
