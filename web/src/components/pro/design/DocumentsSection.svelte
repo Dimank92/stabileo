@@ -45,6 +45,7 @@
   import RcDocumentScope from './RcDocumentScope.svelte';
   import RcDocumentPreview from './RcDocumentPreview.svelte';
   import SheetsPanel from './SheetsPanel.svelte';
+  import ListingsPanel from './ListingsPanel.svelte';
   import MemoriaButton from './MemoriaButton.svelte';
   import ExchangePanel from './ExchangePanel.svelte';
   import ProQuantitiesCard from './ProQuantitiesCard.svelte';
@@ -362,6 +363,7 @@
 
     <!-- The same drawings composed onto numbered sheets with the title block and the index. -->
     <SheetsPanel resolve={() => currentDoc(true)} projectName={projectName()} />
+    <ListingsPanel resolve={() => currentDoc(true)} />
     <ExchangePanel projectName={projectName()} />
 
     <!--

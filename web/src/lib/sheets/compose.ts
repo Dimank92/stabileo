@@ -28,6 +28,8 @@ export interface PlacedDrawing {
 export interface ComposedSheet { format: SheetFormat; group?: string; drawings: PlacedDrawing[]; primitives: Primitive[] }
 
 const GAP = 12, CAPTION = 8;
+/** The band under each drawing that holds its title and scale, paper mm. */
+export const CAPTION_MM = CAPTION;
 
 export function composeSheets(drawings: readonly DrawingInput[], format: SheetFormat, geometryOf: (f: SheetFormat) => FormatGeometry = formatGeometry): ComposedSheet[] {
   const sheets: ComposedSheet[] = [];

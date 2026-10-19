@@ -96,6 +96,8 @@ export interface ProjectDesignData {
   frameToleranceMm?: number;
   /** Cover a person set for one member, m, by element id: it replaces its kind's (`covers`). */
   coverByElement?: Record<string, number>;
+  /** The listings' columns and filters, and the waste added to the quantities (`store/listings.ts`). */
+  listings?: { configs?: Record<string, { columns?: string[]; text?: string; failingOnly?: boolean }>; wastePct?: number };
   sheets?: {
     format: import('../sheets/formats').SheetFormat; prefix: string; start: number; language?: string; kinds?: string[]; revisions?: Record<string, { code: string; date?: string; note?: string }>;
     /** The set as an ordered list of entries (`sheets/sheet-entries.ts`); absent, one per kind. */
@@ -207,6 +209,7 @@ export function migrateDesignData(raw: unknown): ProjectDesignData {
     ...(e.budget && typeof e.budget === 'object' && Array.isArray((e.budget as { bases?: unknown }).bases) ? { budget: e.budget as ProjectDesignData['budget'] } : {}),
     ...((x) => (x && typeof x === 'object' && ['slabTop', 'slabSoffit', 'axis'].includes(String((x as { ifcColumnTop?: unknown }).ifcColumnTop))
       ? { exchange: { ifcColumnTop: (x as { ifcColumnTop: 'slabTop' | 'slabSoffit' | 'axis' }).ifcColumnTop } } : {}))(e.exchange),
+    ...(e.listings && typeof e.listings === 'object' && !Array.isArray(e.listings) ? { listings: e.listings as ProjectDesignData['listings'] } : {}),
     ...(typeof e.frameToleranceMm === 'number' && Number.isFinite(e.frameToleranceMm) && e.frameToleranceMm > 0 ? { frameToleranceMm: Math.min(e.frameToleranceMm, 500) } : {}),
     ...((c) => (Object.keys(c).length ? { coverByElement: c } : {}))(
       e.coverByElement && typeof e.coverByElement === 'object' && !Array.isArray(e.coverByElement)

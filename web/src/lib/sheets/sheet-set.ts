@@ -5,7 +5,7 @@
  * page per sheet) are made from.
  */
 import { zipSync, strToU8 } from 'fflate';
-import { composeSheets, type DrawingInput } from './compose';
+import { CAPTION_MM, composeSheets, type DrawingInput } from './compose';
 import { blankGeometry, formatGeometry, type SheetFormat } from './formats';
 import { displayPrimitives, displayStyle, type SheetDisplay } from './display';
 import { fillLine, type TitleBlockTemplate } from './sheet-entries';
@@ -15,6 +15,7 @@ import { frameAndTitleBlock, type TitleBlockData } from './title-block';
 import { sheetToDxf } from './to-dxf';
 import { sheetToSvg } from './to-svg';
 import { sheetsToPdf } from './to-pdf';
+import { dxf2004Bytes, sheetToDxf2004 } from './to-dxf2004';
 import type { Primitive } from './primitives';
 
 export interface SheetSetSettings { format: SheetFormat; prefix: string; start: number }
@@ -29,6 +30,12 @@ export interface SetSheet {
   blockCount?: number;
   /** On the index: the layout adjustments that did not hold after this generation. */
   layoutConflicts?: LayoutConflict[];
+  /**
+   * The drawings at a scale, as the DXF 2004 puts them: in model space at full size and seen
+   * through a viewport on the sheet. `body` is where each one's primitives are in `primitives`;
+   * `at` and `from` invert the placing (paper = at + (model − from) / scale).
+   */
+  views?: Array<{ key: string; scale: number; body: [number, number]; at: { x: number; y: number }; from: { x: number; y: number }; box: { x: number; y: number; w: number; h: number } }>;
 }
 
 export interface SheetSetInput {
@@ -94,7 +101,11 @@ export function buildSheetSet(i: SheetSetInput): SetSheet[] {
     const revision = i.revisions?.[number] ?? i.projectRevision;
     const tl = lines({ number, scale: scales, ...(c.group ? { group: c.group } : {}) });
     const tb = block(g, { ...i.project, sheetNumber: number, sheetTitle: title, scale: scales, format: c.format, ...(revision ? { revision } : {}), ...(tl ? { lines: tl } : {}) });
-    return { number, title, format: c.format, width: g.width, height: g.height, primitives: [...tb, ...c.primitives], drawings: c.drawings.map((d) => d.key), placed: c.drawings, blockCount: tb.length, ...(revision ? { revision } : {}) };
+    const views = c.drawings.filter((p) => !p.paper).map((p) => ({
+      key: p.key, scale: p.scale, body: [tb.length + p.from, tb.length + p.to - 1] as [number, number],
+      at: { x: p.x, y: p.y + CAPTION_MM }, from: byKey.get(p.key)?.origin ?? { x: 0, y: 0 }, box: { x: p.x, y: p.y + CAPTION_MM, w: p.w, h: p.h - CAPTION_MM },
+    }));
+    return { number, title, format: c.format, width: g.width, height: g.height, primitives: [...tb, ...c.primitives], drawings: c.drawings.map((d) => d.key), placed: c.drawings, blockCount: tb.length, ...(views.length ? { views } : {}), ...(revision ? { revision } : {}) };
   });
   // The index, first.
   const g = geometryOf(i.settings.format), number = num(0);
@@ -122,9 +133,16 @@ export function buildSheetSet(i: SheetSetInput): SetSheet[] {
 export const sheetSvg = (s: SetSheet, display?: SheetDisplay, target: 'screen' | 'plan' = 'screen') => sheetToSvg(s.width, s.height, displayPrimitives(s.primitives, display, target), displayStyle(display));
 export const sheetDxf = (s: SetSheet, display?: SheetDisplay) => sheetToDxf(displayPrimitives(s.primitives, display, 'plan'), displayStyle(display));
 
-/** Every sheet's DXF in one zip, named by number. */
-export function sheetSetDxfZip(sheets: readonly SetSheet[], display?: SheetDisplay): Uint8Array {
-  return zipSync(Object.fromEntries(sheets.map((s) => [`${s.number}.dxf`, strToU8(sheetDxf(s, display))])));
+/** Every sheet's DXF in one zip, named by number: version 2004 (model space and layouts) by default, R12 when asked. */
+export function sheetSetDxfZip(sheets: readonly SetSheet[], display?: SheetDisplay, version: '2004' | 'r12' = '2004'): Uint8Array {
+  return zipSync(Object.fromEntries(sheets.map((s) => [`${s.number}.dxf`, version === 'r12'
+    ? strToU8(sheetDxf(s, display))
+    : dxf2004Bytes(sheetToDxf2004(s, displayStyle(display), (ps) => displayPrimitives(ps, display, 'plan')))])));
+}
+
+/** Every sheet's SVG in one zip, as the plan shows it. */
+export function sheetSetSvgZip(sheets: readonly SetSheet[], display?: SheetDisplay): Uint8Array {
+  return zipSync(Object.fromEntries(sheets.map((s) => [`${s.number}.svg`, strToU8(sheetSvg(s, display, 'plan'))])));
 }
 
 export function sheetSetPdf(sheets: readonly SetSheet[], title: string, display?: SheetDisplay): Uint8Array {

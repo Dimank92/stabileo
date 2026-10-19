@@ -9,7 +9,7 @@
   import { SHEET_FORMATS, type SheetFormat } from '../../../lib/sheets/formats';
   import { sheetSvg, type SetSheet } from '../../../lib/sheets/sheet-set';
   import {
-    exportSheetsDxf, exportSheetsPdf, patchSheetSettings, projectSheetSet, projectSheetSetAsync, setSheetEntries, setSheetRevision, sheetEntries, sheetKinds, sheetSettings,
+    exportSheetsDxf, exportSheetsPdf, exportSheetsSvg, patchSheetSettings, projectSheetSet, projectSheetSetAsync, setSheetEntries, setSheetRevision, sheetEntries, sheetKinds, sheetSettings,
   } from '../../../lib/store/sheet-set';
   import SheetEntriesEditor from './SheetEntriesEditor.svelte';
   import SheetDisplayEditor from './SheetDisplayEditor.svelte';
@@ -66,6 +66,7 @@
     shown = Math.min(shown, Math.max(0, sheets.length - 1));
   }
   function cancel() { abort?.abort(); progress = null; }
+  let dxfVersion = $state<'2004' | 'r12'>('2004');
   /** The sheets chosen for a partial export; none chosen, all of them. */
   let chosen = $state<Set<string>>(new Set());
   const toExport = $derived(chosen.size ? sheets.filter((s) => chosen.has(s.number)) : sheets);
@@ -140,7 +141,9 @@
     {#if sheets.length > 0}
       <!-- Sheets laid out before the last change are not downloaded: lay them out again first. -->
       <button data-testid="sheets-pdf" disabled={outdated} onclick={() => exportSheetsPdf(doc, toExport, at(), projectName)}>{t('sheet.ui.pdf')}</button>
-      <button data-testid="sheets-dxf" disabled={outdated} onclick={() => exportSheetsDxf(doc, toExport, at())}>{t('sheet.ui.dxf')}</button>
+      <button data-testid="sheets-dxf" disabled={outdated} onclick={() => exportSheetsDxf(doc, toExport, at(), dxfVersion)}>{t('sheet.ui.dxf')}</button>
+      <select data-testid="sheets-dxf-version" bind:value={dxfVersion} aria-label={t('sheet.ui.dxfVersion')}><option value="2004">DXF 2004</option><option value="r12">DXF R12</option></select>
+      <button data-testid="sheets-svg" disabled={outdated} onclick={() => exportSheetsSvg(doc, toExport, at())}>{t('sheet.ui.svg')}</button>
     {/if}
   </div>
 

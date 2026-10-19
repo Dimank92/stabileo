@@ -12,7 +12,7 @@ import { readinessBanner, renderDrawings } from '../engine/detailing/document-re
 import { retouchedIn, withExportLog } from './export-log';
 import { coverForMember, sheetMembers } from './detailing-sheet-inputs';
 import { drawingPrimitives } from '../sheets/adapter';
-import { buildSheetSet, DEFAULT_SHEET_SETTINGS, sheetSetDxfZip, sheetSetPdf, type SetSheet, type SheetRevision } from '../sheets/sheet-set';
+import { buildSheetSet, DEFAULT_SHEET_SETTINGS, sheetSetDxfZip, sheetSetPdf, sheetSetSvgZip, type SetSheet, type SheetRevision } from '../sheets/sheet-set';
 import { currentRevision } from '../model/project-info';
 import type { DocumentModel } from '../engine/detailing/document-model';
 import type { SheetFormat } from '../sheets/formats';
@@ -174,11 +174,19 @@ function save(name: string, type: string, bytes: Uint8Array) {
 }
 
 /** The set as one zip with a DXF per sheet, recorded in the export log like the other files. */
-export function exportSheetsDxf(doc: DocumentModel | null, sheets: readonly SetSheet[], at: string) {
-  const filename = doc ? `sheets-rev${doc.revision.number}-dxf.zip` : 'sheets-dxf.zip';
-  const write = () => save(filename, 'application/zip', sheetSetDxfZip(sheets, sheetSettings().display));
+export function exportSheetsDxf(doc: DocumentModel | null, sheets: readonly SetSheet[], at: string, version: '2004' | 'r12' = '2004') {
+  const tag = version === 'r12' ? 'dxf-r12' : 'dxf';
+  const filename = doc ? `sheets-rev${doc.revision.number}-${tag}.zip` : `sheets-${tag}.zip`;
+  const write = () => save(filename, 'application/zip', sheetSetDxfZip(sheets, sheetSettings().display, version));
   // The export log records emissions of a document revision; a set without one has none to cite.
   if (doc) withExportLog({ kind: 'sheetsDxf', doc, filename, at }, write); else write();
+}
+
+/** Every sheet as an SVG, zipped. */
+export function exportSheetsSvg(doc: DocumentModel | null, sheets: readonly SetSheet[], at: string) {
+  const filename = doc ? `sheets-rev${doc.revision.number}-svg.zip` : 'sheets-svg.zip';
+  const write = () => save(filename, 'application/zip', sheetSetSvgZip(sheets, sheetSettings().display));
+  if (doc) withExportLog({ kind: 'sheetsSvg', doc, filename, at }, write); else write();
 }
 
 /** The set as one PDF, a page per sheet at its paper size. */
