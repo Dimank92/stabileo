@@ -36,7 +36,7 @@
     "@playwright/test": "1.64.1",
     "@stryker-mutator/core": "^10.0.0",
     "@stryker-mutator/vitest-runner": "^10.0.0",
-    "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@types/lz-string": "^1.5.0",
     "@types/node": "^26.6.5",
     "@types/three": "^0.186.0",
@@ -45,8 +45,8 @@
     "svelte": "^5.19.0",
     "svelte-check": "^4.7.6",
     "typescript": "^5.7.3",
-    "vite": "^6.1.0",
-    "vitest": "^3.2.4"
+    "vite": "^8.3.4",
+    "vitest": "^4.1.12"
   },
   "dependencies": {
     "dxf-parser": "^1.1.2",
