@@ -154,15 +154,16 @@ test.describe('@smoke design desk', () => {
     await sheet.getByTestId('steel-sheet-row-0').locator('button').click();
     await expect(sheet.getByTestId('steel-sheet-derivation')).toContainText('φ');
     await expect(page.getByTestId('desk-status')).toContainText(/\d\.\d\d/);
-    // Rows without a ratio are both the held members and the ones never checked: the incomplete
-    // section (D122) is among them.
-    const dashes = rows.filter({ hasText: '—' });
-    let d122 = false;
-    for (let i = 0, n = await dashes.count(); i < n && !d122; i++) {
-      await dashes.nth(i).click();
-      d122 = ((await page.getByTestId('desk-inspector').textContent()) ?? '').includes('D122');
-    }
-    expect(d122, 'an incomplete steel section names its notice').toBe(true);
+    /*
+     * Rows without a ratio are both the held members and the ones never checked. In this example
+     * the sections the check cannot read (D122) are the facade columns' RHS 160×160×6 and the tie
+     * rods; the held ones (angles in flexure, braces) come first in the list. Clicking through
+     * every row without a ratio until one named D122 took 374 clicks: about 30 s here and past the
+     * 60 s test timeout on CI's runner (it stopped at the 305th). The member is taken by its
+     * section, as the purlin above is.
+     */
+    await rows.filter({ hasText: 'RHS 160×160×6' }).filter({ hasText: '—' }).first().click();
+    await expect(page.getByTestId('desk-inspector'), 'an incomplete steel section names its notice').toContainText('D122');
   });
 
   test('a steel I member: rolled or welded is declared on its section, never read off the catalogue', async ({ pro: page }) => {
