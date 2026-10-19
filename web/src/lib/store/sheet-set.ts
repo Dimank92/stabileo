@@ -16,16 +16,27 @@ import { buildSheetSet, DEFAULT_SHEET_SETTINGS, sheetSetDxfZip, sheetSetPdf, typ
 import { currentRevision } from '../model/project-info';
 import type { DocumentModel } from '../engine/detailing/document-model';
 import type { SheetFormat } from '../sheets/formats';
+import type { DrawingInput } from '../sheets/compose';
 import { membersFromModel } from '../engine/detailing/member-geometry';
 import { projectPhysicalFrame } from './physical-frame';
 import { cachedSceneModel } from '../engine/detailing/scene-cache';
 import { PLAN_KINDS, planContext, workDrawings, type PlanKind } from './work-drawings';
+import { defaultEntries, parseSetTemplate, type SheetEntry, type SheetSetTemplate } from '../sheets/sheet-entries';
 
 export const sheetSettings = () => ({ ...DEFAULT_SHEET_SETTINGS, ...designData().sheets });
 export const patchSheetSettings = (p: Partial<ReturnType<typeof sheetSettings>>) => patchDesignData({ sheets: { ...sheetSettings(), ...p } });
 export const sheetLanguage = () => sheetSettings().language ?? i18n.locale;
 /** The kinds of plan the set carries; absent, all of them. */
 export const sheetKinds = (): Set<PlanKind> => new Set((sheetSettings().kinds as PlanKind[] | undefined) ?? PLAN_KINDS);
+
+/** The set's entries in order: the person's list, or one per kind of the chosen kinds. */
+export function sheetEntries(): SheetEntry[] {
+  const st = sheetSettings();
+  if (st.entries?.length) return st.entries;
+  const kinds = sheetKinds();
+  return defaultEntries(PLAN_KINDS.filter((k) => kinds.has(k)));
+}
+export const setSheetEntries = (entries: SheetEntry[]) => patchSheetSettings({ entries });
 
 /** The scene the structure-wide sheets are drawn from: the same one the 3-D view renders. */
 function sceneOf(doc: DocumentModel) {
@@ -43,16 +54,54 @@ export function setSheetRevision(number: string, r: SheetRevision | null): void 
   patchSheetSettings({ revisions });
 }
 
+/** One entry's drawings, each in its group and with its scale and format (`SheetEntry`). */
+function entryDrawings(doc: DocumentModel | null, projectName: string, e: SheetEntry, named: Map<string, number>): DrawingInput[] {
+  const locale = sheetLanguage(), st = sheetSettings();
+  const kind = e.kind as PlanKind;
+  const ctx = planContext(locale, (e.format ?? st.format) as SheetFormat, e);
+  let ds: DrawingInput[];
+  if (kind === 'detailing') {
+    ds = doc
+      ? renderDrawings(doc, { locale, projectName, retouched: retouchedIn(doc), members: sheetMembers(), coverOf: coverForMember, scene: sceneOf(doc) }).sheets
+        // The caption names the drawing; the project and the readiness go to the title block.
+        .map((s) => ({ key: s.name, title: s.caption ?? s.name, ...drawingPrimitives(s.sheet, locale) }))
+      : [];
+  } else ds = workDrawings(doc, new Set([kind]), ctx).get(kind) ?? [];
+  // Two entries of one kind make two groups of sheets, each under its own name.
+  const label = e.label || ctx.tr(`sheet.kind.${kind}`);
+  const n = (named.get(label) ?? 0) + 1; named.set(label, n);
+  const group = n > 1 ? `${label} (${n})` : label;
+  return ds
+    .filter((d) => e.tables !== false || !d.table)
+    // A name the person gave the entry heads each of its drawings, so a sheet of one drawing reads it too.
+    .map((d) => ({ ...d, ...(e.label ? { title: `${e.label} — ${d.title}` } : {}), group, ...(e.scale && !d.paper ? { scale: e.scale } : {}), ...(e.format ? { format: e.format } : {}), key: `${e.id}:${d.key}` }));
+}
+
 export function projectSheetSet(doc: DocumentModel | null, projectName: string): SetSheet[] {
-  const locale = sheetLanguage(), st = sheetSettings(), kinds = sheetKinds();
-  const ctx = planContext(locale, st.format as SheetFormat);
-  const work = workDrawings(doc, kinds, ctx);
-  const detailing = doc && kinds.has('detailing')
-    ? renderDrawings(doc, { locale, projectName, retouched: retouchedIn(doc), members: sheetMembers(), coverOf: coverForMember, scene: sceneOf(doc) }).sheets
-      // The caption names the drawing; the project and the readiness go to the title block.
-      .map((s) => ({ key: s.name, title: s.caption ?? s.name, ...drawingPrimitives(s.sheet, locale) }))
-    : [];
-  const drawings = PLAN_KINDS.flatMap((k) => (k === 'detailing' ? detailing : (work.get(k) ?? []).map((d) => ({ ...d, group: ctx.tr(`sheet.kind.${k}`) }))));
+  const named = new Map<string, number>();
+  return assemble(doc, projectName, sheetEntries().flatMap((e) => entryDrawings(doc, projectName, e, named)));
+}
+
+/**
+ * The set built entry by entry with a pause between them, so the page stays alive on a large
+ * project: `onProgress` hears each entry as it starts, and an aborted signal stops the build and
+ * returns null (nothing half-built is shown).
+ */
+export async function projectSheetSetAsync(doc: DocumentModel | null, projectName: string, opts: { onProgress?: (done: number, total: number, entry: SheetEntry) => void; signal?: AbortSignal } = {}): Promise<SetSheet[] | null> {
+  const entries = sheetEntries(), named = new Map<string, number>(), drawings: DrawingInput[] = [];
+  for (const [i, e] of entries.entries()) {
+    if (opts.signal?.aborted) return null;
+    opts.onProgress?.(i, entries.length, e);
+    await new Promise((r) => setTimeout(r, 0));
+    if (opts.signal?.aborted) return null;
+    drawings.push(...entryDrawings(doc, projectName, e, named));
+  }
+  if (opts.signal?.aborted) return null;
+  return assemble(doc, projectName, drawings);
+}
+
+function assemble(doc: DocumentModel | null, projectName: string, drawings: DrawingInput[]): SetSheet[] {
+  const locale = sheetLanguage(), st = sheetSettings();
   const info = modelStore.model.projectInfo, tb = modelStore.model.detailing?.titleBlock ?? {};
   const rev = currentRevision(info);
   return buildSheetSet({
@@ -67,6 +116,51 @@ export function projectSheetSet(doc: DocumentModel | null, projectName: string):
     ...(st.revisions ? { revisions: st.revisions } : {}),
     ...(rev ? { projectRevision: { code: rev.code, ...(rev.date ? { date: rev.date } : {}), ...(rev.note ? { note: rev.note } : {}) } } : {}),
     label: (k) => tAt(k, locale),
+    // The template's variables the project already states fill themselves; the template's own win.
+    ...(st.titleBlock ? { titleBlock: { ...st.titleBlock, values: {
+      ...(info?.job || tb.project || projectName ? { obra: info?.job || tb.project || projectName } : {}),
+      ...(info?.jobNumber ? { expediente: info.jobNumber } : {}), ...(info?.site ? { ubicacion: info.site } : {}),
+      ...(info?.client ? { propietario: info.client } : {}), ...(info?.designer ? { profesional: info.designer.name } : {}),
+      ...(rev?.date ? { fecha: rev.date } : {}),
+      ...st.titleBlock.values,
+    } } } : {}),
+  });
+}
+
+// ─── The set kept as a template of the office ───
+
+const TEMPLATES = 'stabileo-sheet-set-templates';
+
+export function listSetTemplates(): SheetSetTemplate[] {
+  try { const l = JSON.parse(localStorage.getItem(TEMPLATES) ?? '[]'); return Array.isArray(l) ? l.filter((t) => t?.kind === 'stabileo-sheet-set') : []; } catch { return []; }
+}
+
+/** The project's set as a template: its entries, display, title block, format and numbering. */
+export function setTemplateFromProject(name: string): SheetSetTemplate {
+  const st = sheetSettings();
+  return {
+    kind: 'stabileo-sheet-set', version: 1, name, format: st.format as SheetFormat, prefix: st.prefix, start: st.start,
+    ...(st.language ? { language: st.language } : {}), entries: JSON.parse(JSON.stringify(sheetEntries())),
+    ...(st.display ? { display: JSON.parse(JSON.stringify(st.display)) } : {}),
+    ...(st.titleBlock ? { titleBlock: JSON.parse(JSON.stringify(st.titleBlock)) } : {}),
+  };
+}
+
+export function saveSetTemplate(t: SheetSetTemplate): boolean {
+  try { localStorage.setItem(TEMPLATES, JSON.stringify([...listSetTemplates().filter((x) => x.name !== t.name), t])); return true; } catch { return false; }
+}
+export function removeSetTemplate(name: string): void {
+  try { localStorage.setItem(TEMPLATES, JSON.stringify(listSetTemplates().filter((x) => x.name !== name))); } catch { /* kept as is */ }
+}
+export const importSetTemplate = (text: string): SheetSetTemplate => { const t = parseSetTemplate(text); saveSetTemplate(t); return t; };
+
+/** Apply a template to the open project: its entries, display, title block, format and numbering; one undo step. Revisions stay the project's. */
+export function applySetTemplate(t: SheetSetTemplate): void {
+  patchSheetSettings({
+    format: t.format, prefix: t.prefix, start: t.start, ...(t.language ? { language: t.language } : {}),
+    entries: JSON.parse(JSON.stringify(t.entries)),
+    ...(t.display ? { display: JSON.parse(JSON.stringify(t.display)) } : { display: undefined }),
+    ...(t.titleBlock ? { titleBlock: JSON.parse(JSON.stringify(t.titleBlock)) } : { titleBlock: undefined }),
   });
 }
 
@@ -79,7 +173,7 @@ function save(name: string, type: string, bytes: Uint8Array) {
 /** The set as one zip with a DXF per sheet, recorded in the export log like the other files. */
 export function exportSheetsDxf(doc: DocumentModel | null, sheets: readonly SetSheet[], at: string) {
   const filename = doc ? `sheets-rev${doc.revision.number}-dxf.zip` : 'sheets-dxf.zip';
-  const write = () => save(filename, 'application/zip', sheetSetDxfZip(sheets));
+  const write = () => save(filename, 'application/zip', sheetSetDxfZip(sheets, sheetSettings().display));
   // The export log records emissions of a document revision; a set without one has none to cite.
   if (doc) withExportLog({ kind: 'sheetsDxf', doc, filename, at }, write); else write();
 }
@@ -87,6 +181,6 @@ export function exportSheetsDxf(doc: DocumentModel | null, sheets: readonly SetS
 /** The set as one PDF, a page per sheet at its paper size. */
 export function exportSheetsPdf(doc: DocumentModel | null, sheets: readonly SetSheet[], at: string, title: string) {
   const filename = doc ? `sheets-rev${doc.revision.number}.pdf` : 'sheets.pdf';
-  const write = () => save(filename, 'application/pdf', sheetSetPdf(sheets, title));
+  const write = () => save(filename, 'application/pdf', sheetSetPdf(sheets, title, sheetSettings().display));
   if (doc) withExportLog({ kind: 'sheetsPdf', doc, filename, at }, write); else write();
 }

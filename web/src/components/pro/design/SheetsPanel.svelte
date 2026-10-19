@@ -9,8 +9,12 @@
   import { SHEET_FORMATS, type SheetFormat } from '../../../lib/sheets/formats';
   import { sheetSvg, type SetSheet } from '../../../lib/sheets/sheet-set';
   import {
-    exportSheetsDxf, exportSheetsPdf, patchSheetSettings, projectSheetSet, setSheetRevision, sheetKinds, sheetSettings,
+    exportSheetsDxf, exportSheetsPdf, patchSheetSettings, projectSheetSet, projectSheetSetAsync, setSheetEntries, setSheetRevision, sheetEntries, sheetKinds, sheetSettings,
   } from '../../../lib/store/sheet-set';
+  import SheetEntriesEditor from './SheetEntriesEditor.svelte';
+  import SheetDisplayEditor from './SheetDisplayEditor.svelte';
+  import TitleBlockEditor from './TitleBlockEditor.svelte';
+  import SheetTemplates from './SheetTemplates.svelte';
   import { PLAN_KINDS, type PlanKind } from '../../../lib/store/work-drawings';
   import type { DocumentModel } from '../../../lib/engine/detailing/document-model';
   import { designFingerprint } from '../../../lib/store/design-fingerprint';
@@ -28,19 +32,39 @@
   const st = $derived(sheetSettings());
   const kinds = $derived(sheetKinds());
 
+  const entries = $derived(sheetEntries());
+  /** A kind on or off: in the arranged list when there is one (all its entries go, or one comes back), else in the kinds. */
   function toggleKind(k: PlanKind) {
+    if (st.entries?.length) {
+      const has = st.entries.some((e) => e.kind === k);
+      const next = has ? st.entries.filter((e) => e.kind !== k) : [...st.entries, { id: st.entries.some((e) => e.id === k) ? `${k}-${Date.now().toString(36)}` : k, kind: k }];
+      setEntries(next);
+      return;
+    }
     const next = new Set(kinds);
     if (next.has(k)) next.delete(k); else next.add(k);
     patch({ kinds: PLAN_KINDS.filter((x) => next.has(x)) });
   }
+  function setEntries(next: typeof entries) { setSheetEntries(next); if (built) sheets = projectSheetSet(doc, projectName); }
 
-  function build() {
+  // The set built entry by entry, with its progress and a way to stop it.
+  let progress = $state<{ done: number; total: number; label: string } | null>(null);
+  let abort: AbortController | null = null;
+  async function build() {
     doc = resolve();
-    built = true;
-    builtFrom = designFingerprint();
-    sheets = projectSheetSet(doc, projectName);
+    abort?.abort();
+    const ctl = new AbortController(); abort = ctl;
+    const from = designFingerprint();
+    const next = await projectSheetSetAsync(doc, projectName, {
+      signal: ctl.signal,
+      onProgress: (done, total, e) => { progress = { done, total, label: e.label || t(`sheet.kind.${e.kind}`) }; },
+    });
+    progress = null;
+    if (!next || ctl.signal.aborted) return;
+    built = true; builtFrom = from; sheets = next;
     shown = Math.min(shown, Math.max(0, sheets.length - 1));
   }
+  function cancel() { abort?.abort(); progress = null; }
 
   /** A setting changed: rebuild what is on screen so it never shows the previous one. */
   function patch(p: Parameters<typeof patchSheetSettings>[0]) {
@@ -94,10 +118,19 @@
     </div>
   </details>
 
+  <SheetEntriesEditor {entries} onChange={setEntries} />
+  <SheetDisplayEditor display={st.display} onChange={(d) => patch({ display: d })} />
+  <TitleBlockEditor template={st.titleBlock} onChange={(tb) => patch({ titleBlock: tb })} />
+  <SheetTemplates onApplied={() => { if (built) sheets = projectSheetSet(doc, projectName); }} />
+
   <OutdatedNotice what="detailing" testid="sheets-detailing-outdated" />
   <OutdatedNotice what="sheets" stale={outdated} testid="sheets-outdated" />
   <div class="actions">
-    <button data-testid="sheets-build" onclick={build}>{t('sheet.ui.build')}</button>
+    <button data-testid="sheets-build" disabled={!!progress} onclick={build}>{t('sheet.ui.build')}</button>
+    {#if progress}
+      <span class="muted" role="status" data-testid="sheets-progress">{tp('sheet.ui.progress', { done: progress.done + 1, total: progress.total, label: progress.label })}</span>
+      <button data-testid="sheets-cancel" onclick={cancel}>{t('sheet.ui.cancel')}</button>
+    {/if}
     {#if sheets.length > 0}
       <!-- Sheets laid out before the last change are not downloaded: lay them out again first. -->
       <button data-testid="sheets-pdf" disabled={outdated} onclick={() => exportSheetsPdf(doc, sheets, at(), projectName)}>{t('sheet.ui.pdf')}</button>
@@ -125,7 +158,7 @@
     </ul>
     {#if sheets[shown]}
       <!-- The sheet's own SVG writer escapes every text it draws. -->
-      <div class="preview" data-testid="sheets-preview">{@html sheetSvg(sheets[shown]!)}</div>
+      <div class="preview" data-testid="sheets-preview">{@html sheetSvg(sheets[shown]!, st.display, 'screen')}</div>
     {/if}
   {/if}
 </section>

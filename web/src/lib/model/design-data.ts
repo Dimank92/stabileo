@@ -96,7 +96,13 @@ export interface ProjectDesignData {
   frameToleranceMm?: number;
   /** Cover a person set for one member, m, by element id: it replaces its kind's (`covers`). */
   coverByElement?: Record<string, number>;
-  sheets?: { format: import('../sheets/formats').SheetFormat; prefix: string; start: number; language?: string; kinds?: string[]; revisions?: Record<string, { code: string; date?: string; note?: string }> };
+  sheets?: {
+    format: import('../sheets/formats').SheetFormat; prefix: string; start: number; language?: string; kinds?: string[]; revisions?: Record<string, { code: string; date?: string; note?: string }>;
+    /** The set as an ordered list of entries (`sheets/sheet-entries.ts`); absent, one per kind. */
+    entries?: import('../sheets/sheet-entries').SheetEntry[];
+    display?: import('../sheets/display').SheetDisplay;
+    titleBlock?: import('../sheets/sheet-entries').TitleBlockTemplate;
+  };
   /** How a seismic project designs its concrete (`seismic-design.ts`). Absent: the defaults. */
   seismic?: import('./seismic-design').SeismicDesignSettings;
   /**

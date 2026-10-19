@@ -31,6 +31,13 @@ import { foundationPlan, type PlanFooting } from '../sheets/plans/foundation-pla
 import { punchingPlan, type PunchingJoint } from '../sheets/plans/punching-plan';
 import { anchorPlan, jointSheet, steelFrameElevation, steelLevelPlan, type SteelBase, type SteelMember } from '../sheets/plans/steel-plans';
 import { barBreakdown, stirrupZones, type StirrupSpan } from '../sheets/plans/beam-plans';
+import { appliedLoadsPlan, columnElevation, corbelDrawing, foundationLoadsTable, setoutPlan, wallElevation, type FloorLoads, type FoundationLoad, type SetoutColumn } from '../sheets/plans/extra-plans';
+import { resultsStore } from './results.svelte';
+import { verificationStore } from './verification.svelte';
+import { columnLapOf } from './column-stack-store';
+import { corbelChecks } from './special-elements';
+import { anchorageFunctions } from '../codes/cirsoc201/anchorage';
+import { CIRSOC201_DESIGN_EDITION } from '../engine/codes/argentina/cirsoc201-basis';
 import { SLAB_LAYERS, slabBreakdown, slabLayerPlan, slabMarks, type PlanSlabPanel } from '../sheets/plans/slab-plan';
 import { storedDecisions } from './design-decisions';
 import { savedLinePieces } from './beam-line-store';
@@ -44,19 +51,25 @@ import { builtBy, phaseEnd } from '../engine/site/phases';
 import { phasePlan, phaseSchedule, type PhaseGeometry } from '../sheets/plans/phase-plans';
 
 /** What a set can contain, in the order it is issued. `detailing` is the assemblies' own drawings. */
-export const PLAN_KINDS = ['notes', 'formwork', 'columns', 'beams', 'slabs', 'detailing', 'foundations', 'punching', 'stairs', 'tendons', 'steel', 'anchors', 'joints', 'bbs', 'details', 'phases'] as const;
+export const PLAN_KINDS = ['notes', 'loads', 'formwork', 'setout', 'columns', 'colElev', 'beams', 'slabs', 'walls', 'detailing', 'foundations', 'fdnLoads', 'punching', 'stairs', 'tendons', 'steel', 'anchors', 'joints', 'bbs', 'details', 'corbels', 'phases'] as const;
 export type PlanKind = (typeof PLAN_KINDS)[number];
 
 type V2 = { x: number; y: number };
 type V3 = V2 & { z: number };
 const TOL = 0.05;
 
-export interface PlanContext { locale: string; format: SheetFormat; tr: Tr; fmt: (v: number, d: number) => string }
+export interface PlanContext {
+  locale: string; format: SheetFormat; tr: Tr; fmt: (v: number, d: number) => string;
+  /** The levels the entry covers, m; absent, all. */
+  levels?: number[];
+  /** The entry's kind-specific choices. */
+  options?: Record<string, string | number | boolean>;
+}
 
-export function planContext(locale: string, format: SheetFormat): PlanContext {
+export function planContext(locale: string, format: SheetFormat, entry?: { levels?: number[]; options?: Record<string, string | number | boolean> }): PlanContext {
   const tr: Tr = (key, params) => teAt({ key, ...(params ? { params } : {}) }, locale);
   const fmt = (v: number, d: number) => new Intl.NumberFormat(locale, { minimumFractionDigits: d, maximumFractionDigits: d }).format(v);
-  return { locale, format, tr, fmt };
+  return { locale, format, tr, fmt, ...(entry?.levels?.length ? { levels: entry.levels } : {}), ...(entry?.options ? { options: entry.options } : {}) };
 }
 
 // ─── What the model holds, read once per set ───
@@ -242,7 +255,7 @@ export function levelSlabPanels(): Array<PlanSlabPanel & { z: number }> {
 
 function slabPlans(c: PlanContext, axes: PlanAxis[], levels: Array<{ name: string; z: number }>): DrawingInput[] {
   const panels = levelSlabPanels(), out: DrawingInput[] = [];
-  const zs = [...new Set(panels.map((p) => Math.round(p.z * 100) / 100))].sort((a, b) => a - b);
+  const zs = [...new Set(panels.map((p) => Math.round(p.z * 100) / 100))].sort((a, b) => a - b).filter((z) => !c.levels || c.levels.some((w) => Math.abs(w - z) < TOL));
   for (const z of zs) {
     const here = panels.filter((p) => Math.abs(p.z - z) < TOL);
     const name = levels.find((l) => Math.abs(l.z - z) < TOL)?.name ?? `+${c.fmt(z, 2)}`;
@@ -251,9 +264,131 @@ function slabPlans(c: PlanContext, axes: PlanAxis[], levels: Array<{ name: strin
     const scale = planScale({ x0: box.x0 - 1500, y0: box.y0 - 1500, x1: box.x1 + 1500, y1: box.y1 + 1500 }, c.format);
     for (const layer of SLAB_LAYERS) { const d = slabLayerPlan(name, layer, here, marks, axes, scale, c.tr, c.fmt); if (d) out.push(d); }
     const b = slabBreakdown(name, marks, c.tr, c.fmt);
-    if (b) out.push(b);
+    if (b) out.push({ ...b, table: true });
   }
   return out;
+}
+
+// ─── The sheets the set lacked (`sheets/plans/extra-plans.ts`) ───
+
+/** The columns standing on the lowest level, by their schedule names. */
+function baseColumns(): SetoutColumn[] {
+  const m = modelStore.model, cols = frames().filter(isVertical);
+  if (!cols.length) return [];
+  const names = columnNames(cols), z0 = Math.min(...cols.map((f) => Math.min(f.a.z, f.b.z)));
+  return cols.filter((f) => Math.abs(Math.min(f.a.z, f.b.z) - z0) < TOL).map((f) => {
+    const sec = sectionOf(f.sectionId), e = m.elements.get(f.id);
+    const b = sec.kind === 'rect' || sec.kind === 'other' ? sec.b : sec.kind === 'circle' ? sec.D : 0.3, h = sec.kind === 'rect' || sec.kind === 'other' ? sec.h : sec.kind === 'circle' ? sec.D : 0.3;
+    return { name: names.get(posKey(f.a)) ?? `#${f.id}`, x: f.a.x, y: f.a.y, b, h, ...(e?.rollAngle ? { rotDeg: e.rollAngle } : {}) };
+  });
+}
+
+function setout(c: PlanContext, axes: PlanAxis[]): DrawingInput[] {
+  const cols = baseColumns();
+  if (!cols.length) return [];
+  const box = boxOf(cols.map((p) => ({ x: p.x * 1000, y: p.y * 1000 })));
+  const o = c.options ?? {};
+  const ref = o.ref === 'fixed' ? { kind: 'fixed' as const, x: Number(o.fx ?? 0), y: Number(o.fy ?? 0) } : { kind: 'centre' as const };
+  return setoutPlan(c.tr('plan.setout.base'), cols, axes, planScale({ x0: box.x0 - 1500, y0: box.y0 - 1500, x1: box.x1 + 1500, y1: box.y1 + 1500 }, c.format), ref, c.tr, c.fmt, o.table !== false);
+}
+
+/** The reactions under each column base, per load case: what goes to the foundation. */
+export function foundationLoads(): FoundationLoad[] {
+  const m = modelStore.model, cols = frames().filter(isVertical), names = columnNames(cols), out: FoundationLoad[] = [];
+  const caseName = (id: number) => m.loadCases.find((lc) => lc.id === id)?.name ?? `#${id}`;
+  for (const [cid, r] of resultsStore.perCase3D) {
+    for (const re of r.reactions ?? []) {
+      const n = m.nodes.get(re.nodeId);
+      if (!n) continue;
+      const name = names.get(posKey(n)) ?? `N${re.nodeId}`;
+      out.push({ name, case: caseName(cid), n: re.fz, vx: re.fx, vy: re.fy, mx: re.mx, my: re.my });
+    }
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }) || a.case.localeCompare(b.case));
+}
+
+/** A floor's loads as applied, by case: on its beams, at its nodes, over its slabs. */
+function appliedLoads(c: PlanContext, axes: PlanAxis[], levels: Array<{ name: string; z: number }>): DrawingInput[] {
+  const m = modelStore.model, out: DrawingInput[] = [];
+  const caseName = (id?: number) => m.loadCases.find((lc) => lc.id === (id ?? 1))?.name ?? '';
+  const at = (id: number) => m.nodes.get(id);
+  for (const lv of levels) {
+    const on = (z?: number) => Math.abs((z ?? 0) - lv.z) < TOL;
+    const loads: FloorLoads = { lines: [], points: [], areas: [] };
+    for (const l of m.loads) {
+      if (l.type === 'distributed3d') {
+        const e = m.elements.get(l.data.elementId), a = e && at(e.nodeI), b = e && at(e.nodeJ);
+        if (!a || !b || !on(a.z) || !on(b.z)) continue;
+        const q = Math.max(Math.abs(l.data.qZI), Math.abs(l.data.qZJ), Math.abs(l.data.qYI), Math.abs(l.data.qYJ));
+        loads.lines.push({ a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y }, text: `${c.fmt(q, 1)} kN/m · ${caseName(l.data.caseId)}` });
+      } else if (l.type === 'nodal3d') {
+        const n = at(l.data.nodeId);
+        if (!n || !on(n.z)) continue;
+        loads.points.push({ at: { x: n.x, y: n.y }, text: `${c.fmt(Math.hypot(l.data.fx, l.data.fy, l.data.fz), 1)} kN · ${caseName(l.data.caseId)}` });
+      } else if (l.type === 'surface3d') {
+        const q = m.quads.get(l.data.quadId) ?? m.plates.get(l.data.quadId);
+        const pts = (q as { nodes?: number[] } | undefined)?.nodes?.map(at).filter((p): p is NonNullable<typeof p> => !!p) ?? [];
+        if (pts.length < 3 || !pts.every((p) => on(p.z))) continue;
+        loads.areas.push({ outline: pts.map((p) => ({ x: p.x, y: p.y })), text: `${c.fmt(l.data.q, 2)} kPa` });
+      }
+    }
+    // Shells of one slab carry the same load: one text per value, not one per shell.
+    const seen = new Set<string>();
+    loads.areas = loads.areas.map((a) => { const t = seen.has(a.text) ? '' : a.text; seen.add(a.text); return { ...a, text: t }; });
+    const pts = [...loads.lines.flatMap((l) => [l.a, l.b]), ...loads.points.map((p) => p.at), ...loads.areas.flatMap((a) => a.outline)];
+    if (!pts.length) continue;
+    const box = boxOf(pts.map((p) => ({ x: p.x * 1000, y: p.y * 1000 })));
+    const d = appliedLoadsPlan(lv.name, loads, axes, planScale({ x0: box.x0 - 1500, y0: box.y0 - 1500, x1: box.x1 + 1500, y1: box.y1 + 1500 }, c.format), c.tr);
+    if (d) out.push(d);
+  }
+  return out;
+}
+
+/** Each column stack at full height with its laps and its breakdown. */
+function columnElevations(c: PlanContext, levels: Array<{ name: string; z: number }>): DrawingInput[] {
+  const m = modelStore.model, cols = frames().filter(isVertical), names = columnNames(cols);
+  const stacks = columnStacks({ nodes: m.nodes, elements: m.elements as never, columns: cols.map((f) => f.id) });
+  const levelName = (z: number) => levels.find((l) => Math.abs(l.z - z) < TOL)?.name ?? `+${c.fmt(z, 2)}`;
+  const dd = designData(), out: DrawingInput[] = [];
+  for (const st of stacks) {
+    const name = names.get(posKey(st)) ?? st.key;
+    const lifts = st.lifts.map((l) => {
+      const e = m.elements.get(l.id), r = e?.reinforcement, sec = sectionOf(l.sectionId);
+      const n = r?.column ? 4 + r.column.nBottom + r.column.nTop + r.column.nLeft + r.column.nRight : r?.shaped?.count ?? r?.longitudinal?.count;
+      const dia = r?.column?.cornerDia ?? r?.shaped?.diameter ?? r?.longitudinal?.diameter;
+      const fc = verificationStore.contextFor(l.id)?.material.fc ?? 25;
+      const lap = columnLapOf(l.id) ?? (dia ? anchorageFunctions({ fy: dd.rebarFy, fc, favourableSpacing: true, psiT: 1, edition: CIRSOC201_DESIGN_EDITION } as never).lapSplice(dia) : 0);
+      // The joint above: the deepest beam framing in at the lift's top.
+      const top = [...m.elements.values()].filter((x) => x.id !== l.id && (x.nodeI === (e?.nodeJ ?? -1) || x.nodeJ === (e?.nodeJ ?? -1) || x.nodeI === (e?.nodeI ?? -1) || x.nodeJ === (e?.nodeI ?? -1)))
+        .filter((x) => { const a = m.nodes.get(x.nodeI), b = m.nodes.get(x.nodeJ); return !!a && !!b && Math.abs((a.z ?? 0) - (b.z ?? 0)) < 1e-6 && Math.abs((a.z ?? 0) - l.zHi) < TOL; })
+        .map((x) => m.sections.get(x.sectionId)?.h ?? 0);
+      const b = sec.kind === 'rect' || sec.kind === 'other' ? sec.b : sec.kind === 'circle' ? sec.D : 0.3;
+      return {
+        level: levelName(l.zHi), zLo: l.zLo, zHi: l.zHi, b,
+        bars: n && dia ? `${n}Ø${dia}` : '—', ...(dia ? { barDia: dia } : {}), ...(n ? { barCount: n } : {}),
+        ties: r?.stirrups ? `eØ${r.stirrups.diameter} c/${Math.round(r.stirrups.spacing * 100)}` : '—',
+        lap, joint: top.length ? Math.max(...top) : 0,
+      };
+    });
+    out.push(...columnElevation(name, lifts, c.tr, c.fmt, c.options?.table !== false));
+  }
+  return out;
+}
+
+function wallElevations(c: PlanContext): DrawingInput[] {
+  const saved = storedDecisions().walls ?? {};
+  return (detailingStore.lastFloorRun?.walls ?? []).map((w) => {
+    const r = saved[w.wallId] ?? w.reinforcement;
+    return wallElevation({ id: w.wallId, length: w.input.length, height: w.input.height, vertical: r.vertical, horizontal: r.horizontal, curtains: r.curtains, ...(r.boundary ? { boundary: r.boundary } : {}), ...(r.openings ? { openings: r.openings } : {}) }, c.tr, c.fmt);
+  });
+}
+
+function corbels(c: PlanContext): DrawingInput[] {
+  return corbelChecks().flatMap((k) => (k.design ? [corbelDrawing({
+    name: k.entry.name, bw: k.entry.bw, h: k.entry.h, ...(k.entry.hEdge ? { hEdge: k.entry.hEdge } : {}), d: k.entry.d, av: k.entry.av,
+    asPrimary: k.design.asPrimary, ah: k.design.ah, ...(k.entry.ascProvided !== undefined ? { ascProvided: k.entry.ascProvided } : {}), ...(k.entry.ahProvided !== undefined ? { ahProvided: k.entry.ahProvided } : {}),
+    status: c.tr(`plan.corbel.status.${k.status}`),
+  }, c.tr, c.fmt)] : []));
 }
 
 function foundations(c: PlanContext, axes: PlanAxis[]): DrawingInput[] {
@@ -468,7 +603,9 @@ function phases(c: PlanContext, axes: PlanAxis[]): DrawingInput[] {
  * model alone still come out; the breakdown and the bending schedule need the document's marks.
  */
 export function workDrawings(doc: DocumentModel | null, kinds: ReadonlySet<PlanKind>, c: PlanContext): Map<PlanKind, DrawingInput[]> {
-  const { axes, levels } = gridOf();
+  const { axes, levels: all } = gridOf();
+  // An entry that covers some levels only draws those (`SheetEntry.levels`).
+  const levels = c.levels ? all.filter((l) => c.levels!.some((z) => Math.abs(z - l.z) < TOL)) : all;
   const hasSteel = frames().some(isSteelFrame);
   const out = new Map<PlanKind, DrawingInput[]>();
   const add = (k: PlanKind, f: () => DrawingInput[]) => { if (kinds.has(k)) out.set(k, f()); };
@@ -477,6 +614,12 @@ export function workDrawings(doc: DocumentModel | null, kinds: ReadonlySet<PlanK
   add('columns', () => columnScheduleOf(c, levels));
   add('beams', () => beams(c, doc, axes));
   add('slabs', () => slabPlans(c, axes, levels));
+  add('setout', () => setout(c, axes));
+  add('fdnLoads', () => foundationLoadsTable(foundationLoads(), c.tr, c.fmt));
+  add('loads', () => appliedLoads(c, axes, levels));
+  add('colElev', () => columnElevations(c, levels));
+  add('walls', () => wallElevations(c));
+  add('corbels', () => corbels(c));
   add('foundations', () => foundations(c, axes));
   add('punching', () => punching(c, axes));
   add('stairs', () => stairs(c));

@@ -4,33 +4,37 @@
  * top to bottom, a new sheet when the current one is full. A drawing too large for the format at
  * any scale goes on a sheet of its own at the scale that fits the larger format it is moved to.
  */
-import { fittingScale, formatGeometry, SHEET_FORMATS, type SheetFormat } from './formats';
+import { fittingScale, formatGeometry, SHEET_FORMATS, type FormatGeometry, type SheetFormat } from './formats';
 import { place, type Primitive } from './primitives';
 
 /** `paper`: drawn in paper millimetres already (a table, a block of notes), placed at 1:1 with no
  *  scale in its caption. */
 export interface DrawingInput { key: string; title: string; primitives: Primitive[]; width: number; height: number; origin: { x: number; y: number }; scale?: number; paper?: boolean;
   /** The kind of plan it belongs to: a new kind starts a new sheet, named after it. */
-  group?: string }
+  group?: string;
+  /** Its own paper format; absent, the set's. */
+  format?: SheetFormat;
+  /** A table that goes with a plan (coordinates, breakdown): left out when its entry says so. */
+  table?: boolean }
 
 export interface ComposedSheet { format: SheetFormat; group?: string; drawings: Array<{ key: string; title: string; scale: number; paper?: boolean }>; primitives: Primitive[] }
 
 const GAP = 12, CAPTION = 8;
 
-export function composeSheets(drawings: readonly DrawingInput[], format: SheetFormat): ComposedSheet[] {
+export function composeSheets(drawings: readonly DrawingInput[], format: SheetFormat, geometryOf: (f: SheetFormat) => FormatGeometry = formatGeometry): ComposedSheet[] {
   const sheets: ComposedSheet[] = [];
   let cur: ComposedSheet | null = null, x = 0, top = 0, rowH = 0;
   let group: string | undefined;
-  const open = (f: SheetFormat) => { cur = { format: f, ...(group ? { group } : {}), drawings: [], primitives: [] }; sheets.push(cur); const g = formatGeometry(f); x = g.drawable.x0; top = g.drawable.y1; rowH = 0; };
+  const open = (f: SheetFormat) => { cur = { format: f, ...(group ? { group } : {}), drawings: [], primitives: [] }; sheets.push(cur); const g = geometryOf(f); x = g.drawable.x0; top = g.drawable.y1; rowH = 0; };
   for (const d of drawings) {
     if (d.group !== group) { group = d.group; cur = null; }
-    let f = format, g = formatGeometry(f);
+    let f = d.format ?? format, g = geometryOf(f);
     const W = g.drawable.x1 - g.drawable.x0, H = g.drawable.y1 - g.drawable.y0 - CAPTION;
     let s = d.paper ? 1 : d.scale ?? fittingScale(d.width, d.height, W, H);
     if (s === null) {
       // Up the formats until one holds it.
-      const bigger = SHEET_FORMATS.slice(0, SHEET_FORMATS.indexOf(format)).reverse();
-      for (const b of bigger) { const gb = formatGeometry(b); const sb = fittingScale(d.width, d.height, gb.drawable.x1 - gb.drawable.x0, gb.drawable.y1 - gb.drawable.y0 - CAPTION); if (sb !== null) { f = b; g = gb; s = sb; break; } }
+      const bigger = SHEET_FORMATS.slice(0, SHEET_FORMATS.indexOf(f)).reverse();
+      for (const b of bigger) { const gb = geometryOf(b); const sb = fittingScale(d.width, d.height, gb.drawable.x1 - gb.drawable.x0, gb.drawable.y1 - gb.drawable.y0 - CAPTION); if (sb !== null) { f = b; g = gb; s = sb; break; } }
       if (s === null) s = 500;
       open(f);
     }
