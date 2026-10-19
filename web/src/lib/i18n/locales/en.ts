@@ -7485,6 +7485,7 @@ const en: Record<string, string> = {
   'check.steel.F.7–F.12': 'Flexure of a section shape not implemented',
   'check.slab.flexure': 'Flexure by layer',
   'check.slab.shear': 'One-way shear',
+  'check.slab.spacing': 'Bar spacing',
   'check.slab.strip': 'Design strip',
   'check.wall.shear': 'In-plane shear',
   'check.wall.axialFlexure': 'Axial load and flexure',

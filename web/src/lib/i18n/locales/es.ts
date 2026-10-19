@@ -7478,6 +7478,7 @@ const es: Record<string, string> = {
   'check.steel.F.7–F.12': 'Flexión de una forma de sección no implementada',
   'check.slab.flexure': 'Flexión por capa',
   'check.slab.shear': 'Corte en una dirección',
+  'check.slab.spacing': 'Separación de barras',
   'check.slab.strip': 'Franja de diseño',
   'check.wall.shear': 'Corte en el plano',
   'check.wall.axialFlexure': 'Flexocompresión',

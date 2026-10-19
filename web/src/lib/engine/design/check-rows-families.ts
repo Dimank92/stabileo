@@ -65,6 +65,15 @@ export function slabCheckRows(s: SlabDesignResult, edition = '2025'): CheckRow[]
       ratio: st.utilization, status: statusOfRatio(st.utilization), location: `${st.dir} ${st.lo.toFixed(2)}–${st.hi.toFixed(2)} m`,
     }));
   }
+  // §8.7.2.2: the spacing of each base mat and band, against min(2h, 300 mm) (`panelMaxSpacing`).
+  for (const c of s.panel?.check.spacing ?? []) {
+    out.push(row({
+      key: 'check.slab.spacing', title: `Bar spacing, ${c.source === 'base' ? 'base' : `band ${c.id}`}, ${c.face} ${c.dir}`, clause: '8.7.2.2', edition, formula: 's ≤ s,máx = mín(2h; 300 mm)',
+      inputs: [inp('s', c.spacing * 100, 'cm'), inp('s,máx', c.limit * 100, 'cm')],
+      demand: c.spacing * 100, capacity: c.limit * 100, unit: 'cm', ratio: c.ratio, status: c.ok ? 'ok' : 'fail',
+      location: `${c.face} ${c.dir}`,
+    }));
+  }
   return out;
 }
 

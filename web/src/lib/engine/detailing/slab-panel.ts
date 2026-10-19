@@ -10,7 +10,8 @@
  * minimum §24.4.3.2 asks for, at the bottom, unless the project gives another) and bands of extra
  * bars over each strip where its need passes the base, from the first row that needs them to the
  * last and a development length (40·db) past each, clamped to the panel. The check reads every
- * strip and row against the base plus the bands that cover its elements.
+ * strip and row against the base plus the bands that cover its elements, and the spacing of every
+ * base mat and band against §8.7.2.2 (`panelMaxSpacing`).
  */
 import type { SlabBand, SlabPanelReinforcement } from '../../design-contract/reinforcement';
 import { woodArmer, SHRINKAGE_RATIO } from './slab-design';
@@ -96,10 +97,32 @@ export function barsFor(as: number, sMax: number): { diameter: number; spacing: 
   return { diameter: 25, spacing: 0.075 };
 }
 
+/**
+ * CIRSOC 201-2025 §8.7.2.2, solid non-prestressed slabs: the spacing of the deformed longitudinal
+ * bars is at most the lesser of 2h and 300 mm at the critical sections, and of 3h and 300 mm
+ * elsewhere. The base mat runs through the critical sections and the bands sit where the moment
+ * peaks, so both are held to the critical-section limit, min(2h, 300 mm). (The shrinkage and
+ * temperature steel's min(5h, 450 mm), §24.4.3.3, is a different rule.)
+ */
+export const SLAB_SPACING_CAP = 0.3;
+export const panelMaxSpacing = (thickness: number): number => Math.min(2 * thickness, SLAB_SPACING_CAP);
+
+/** One base mat or band against §8.7.2.2. */
+export interface PanelSpacingCheck {
+  source: 'base' | 'band';
+  /** The band's id, for a band. */
+  id?: string;
+  face: 'top' | 'bottom'; dir: 'x' | 'y';
+  spacing: number; limit: number;
+  /** spacing / limit. */
+  ratio: number;
+  ok: boolean;
+}
+
 export interface PanelStripCheck { dir: 'x' | 'y'; face: 'top' | 'bottom'; kind: 'edge' | 'middle'; lo: number; hi: number; need: number; given: number; utilization: number; at: number }
 
 /** Every strip, face and row against what is given there. */
-export function checkPanel(p: PanelInput, r: SlabPanelReinforcement): { strips: PanelStripCheck[]; worst: number; minimumOk: boolean } {
+export function checkPanel(p: PanelInput, r: SlabPanelReinforcement): { strips: PanelStripCheck[]; worst: number; minimumOk: boolean; spacing: PanelSpacingCheck[]; spacingOk: boolean } {
   const els = new Map(p.elements.map((e) => [e.id, e]));
   const need = new Map(p.elements.map((e) => [e.id, elementNeeds(e, p.cover, p.fy)]));
   const out: PanelStripCheck[] = [];
@@ -119,7 +142,16 @@ export function checkPanel(p: PanelInput, r: SlabPanelReinforcement): { strips: 
     const b = r.base[k];
     return !!b && area(b.diameter) / b.spacing >= asMin - 1e-12;
   });
-  return { strips: out, worst: Math.max(0, ...out.map((c) => c.utilization)), minimumOk };
+  // §8.7.2.2: every base mat; every band on a face and direction with no base mat there (over a
+  // base the band only adds bars between the base's, so the base's spacing is the one that holds).
+  const limit = panelMaxSpacing(p.thickness);
+  const sp = (source: 'base' | 'band', face: 'top' | 'bottom', dir: 'x' | 'y', spacing: number, id?: string): PanelSpacingCheck =>
+    ({ source, ...(id ? { id } : {}), face, dir, spacing, limit, ratio: spacing / limit, ok: spacing <= limit + 1e-9 });
+  const spacing: PanelSpacingCheck[] = [
+    ...KEYS.flatMap((k) => (r.base[k] ? [sp('base', faceOf(k), dirOf(k), r.base[k]!.spacing)] : [])),
+    ...r.bands.filter((b) => !r.base[`${b.face}${b.dir.toUpperCase()}` as Key]).map((b) => sp('band', b.face, b.dir, b.spacing, b.id)),
+  ];
+  return { strips: out, worst: Math.max(0, ...out.map((c) => c.utilization)), minimumOk, spacing, spacingOk: spacing.every((c) => c.ok) };
 }
 
 /**

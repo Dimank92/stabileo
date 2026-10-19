@@ -7922,6 +7922,7 @@ const pt: Translations = {
   'check.steel.F.7–F.12': 'Flexão de uma forma de seção não implementada',
   'check.slab.flexure': 'Flexão por camada',
   'check.slab.shear': 'Cisalhamento em uma direção',
+  'check.slab.spacing': 'Espaçamento das barras',
   'check.slab.strip': 'Faixa de cálculo',
   'check.wall.shear': 'Cisalhamento no plano',
   'check.wall.axialFlexure': 'Flexo-compressão',
