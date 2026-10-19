@@ -87,9 +87,12 @@ export type DisplayStatus =
  *                section, a clash or a lap it could not resolve or check (`detailing.*`);
  *   deflection — its deflection exceeds the limit (Tabla 24.2.2);
  *   refused    — the design refused it (SEARCH_EXHAUSTED, SECTION_INADEQUATE, UNSUPPORTED, …);
- *   seismic    — its chapter-18 checks run only as a substitute, which does not verify them.
+ *   seismic    — its chapter-18 checks run only as a substitute, which does not verify them;
+ *   enginePending — a provision the engine's checker does not apply yet, which the member needs:
+ *                a shallow beam (h ≤ 250 mm) with Vu > φVc and Av < Av,min, which CIRSOC 201-2025
+ *                §9.6.3.1 does not exempt and the engine does (`ProvidedRebarResult.shallowMinShear`).
  */
-export type MemberHoldKind = 'analysis' | 'detailing' | 'deflection' | 'refused' | 'seismic';
+export type MemberHoldKind = 'analysis' | 'detailing' | 'deflection' | 'refused' | 'seismic' | 'enginePending';
 export interface MemberHold { kind: MemberHoldKind; key: string; params?: Record<string, string | number> }
 
 /**
@@ -619,6 +622,16 @@ function createVerificationStore() {
       const o = this.outcomeFor(elementId)?.outcome;
       if (o && o !== 'VERIFIED' && o !== 'PROVISIONAL_BIAXIAL') holds.push({ kind: 'refused', key: 'verdict.hold.refused', params: { outcome: o } });
       if (seismicSubstituteProvider?.(elementId)) holds.push({ kind: 'seismic', key: 'verdict.hold.seismic' });
+      // §9.6.3.1 on a shallow beam: the engine exempts it, the clause does not. Held, never approved
+      // and never failed on a rule the engine has not applied; the worst region names the numbers.
+      const shallow = this.providedFor(elementId)?.shallowMinShear;
+      if (shallow?.length) {
+        const w = shallow.reduce((a, b) => (b.Vu / Math.max(b.phiVc, 1e-9) > a.Vu / Math.max(a.phiVc, 1e-9) ? b : a));
+        holds.push({ kind: 'enginePending', key: 'verdict.hold.shallowMinShear', params: {
+          h: Math.round(w.h * 1000), vu: w.Vu.toFixed(1), phiVc: w.phiVc.toFixed(1),
+          av: w.Av.toFixed(2), avMin: w.AvMin.toFixed(2), s: (w.spacing * 100).toFixed(1),
+        } });
+      }
       return holds;
     },
 

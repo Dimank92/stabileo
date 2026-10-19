@@ -89,7 +89,7 @@ export function projectVerdict(): ProjectVerdict {
 /** The project's verdict as sentences: the state, then each reason with its count. */
 export function projectVerdictLines(p: ProjectVerdict, tr: Tr): { state: string; reasons: string[] } {
   const reasons: string[] = [];
-  const HOLDS: MemberHoldKind[] = ['analysis', 'detailing', 'deflection', 'refused', 'seismic'];
+  const HOLDS: MemberHoldKind[] = ['analysis', 'detailing', 'deflection', 'refused', 'seismic', 'enginePending'];
   for (const k of HOLDS) if (p.held[k]) reasons.push(tr(`verdict.project.held.${k}`, { n: p.held[k]! }));
   if (p.failing) reasons.push(tr('verdict.project.failing', { n: p.failing }));
   if (p.provisional) reasons.push(tr('verdict.project.provisional', { n: p.provisional }));
