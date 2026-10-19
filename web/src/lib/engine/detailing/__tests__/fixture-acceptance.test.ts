@@ -130,7 +130,7 @@ describe('rc-design-qa-8 reaches CONSTRUCTIBLE through the production path', () 
     }
   });
 
-  it('reaches CONSTRUCTIBLE, and the last two conditions were closed by design feedback', () => {
+  it('reaches CONSTRUCTIBLE, with no member left for design feedback to repair', () => {
     // The two that used to fail — `allMembersReverified` and `certificatesMatchGeometry` —
     // were the SAME failure: the beams came out of the authoritative re-verification above
     // ratio 1,00 once the joint-layer movement and Table 26.6.2.1(a)'s tolerance were charged
@@ -151,10 +151,18 @@ describe('rc-design-qa-8 reaches CONSTRUCTIBLE through the production path', () 
     // checking against an invented 300 mm limit. A required V_s of zero is row 1 of Table
     // 9.7.6.2.2 and its limit is d/2 = 248 mm, so the previous baseline had certified a
     // 250 mm span spacing the regulation forbids. Correcting the rule surfaced it.
+    //
+    // CHANGED EXPECTATION: [5, 6, 7, 8] → []. Since the verifier checks CIRSOC 201-2025
+    // §9.6.3.1 (Av,min wherever Vu > φ·0,085·√f'c·bw·d), the eØ6 2 ramas c/25 those four spans
+    // were designed with is refused at the nominal geometry: Av = 0,57 cm² < Av,min =
+    // 0,35·300·250/420 = 0,63 cm² (§9.6.3.4). The search places c/22,5 from the start, which is
+    // also under the final geometry's d/2, so the authoritative re-verification passes and the
+    // loop has nothing to repair. The loop's own mechanics keep their scenario in
+    // `design-feedback-loop.test.ts`, where the beams get Ø8 stirrups (Av,min met at 250 mm).
     const l = loop();
     expect(l.outcome).toBe('FINAL_GEOMETRY_VERIFIED');
     expect(l.unrepaired).toEqual([]);
-    expect(l.iterations.flatMap((i) => i.changed)).toEqual([5, 6, 7, 8]);
+    expect(l.iterations.flatMap((i) => i.changed)).toEqual([]);
     // Reinforcement is downstream of analysis: repairing it can never require a solve.
     expect(l.stats.structuralSolves).toBe(0);
     for (const a of run().assemblies) {

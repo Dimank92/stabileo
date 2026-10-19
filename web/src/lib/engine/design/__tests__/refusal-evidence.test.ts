@@ -105,10 +105,12 @@ describe('the flagship frame: the beams refused for congestion and anchorage are
   const refused = [...s.outcomes.values()].filter((o) => o.outcome === 'SECTION_INADEQUATE' || o.outcome === 'SEARCH_EXHAUSTED');
   // The 22 that read SECTION_INADEQUATE before (limiting congestion, 13 with anchorage).
   // Six of them (169–172, 197, 198) verify since the ductility check of §9.3.3.1 steers the
-  // search (autodesign-regression.test.ts, header); the 16 left are the ones that still refuse.
-  const BEFORE = [161, 164, 165, 166, 167, 168, 180, 181, 182, 183, 184, 186, 187, 188, 196, 199];
+  // search (autodesign-regression.test.ts, header). Four more (165–168) verify since the minimum
+  // shear reinforcement of §9.6.3.1 prunes the stirrup options under Av,min (same header); the
+  // 12 left are the ones that still refuse.
+  const BEFORE = [161, 164, 180, 181, 182, 183, 184, 186, 187, 188, 196, 199];
 
-  it('none reads SECTION_INADEQUATE: no bound proves any of them; the 16 left read SEARCH_EXHAUSTED', () => {
+  it('none reads SECTION_INADEQUATE: no bound proves any of them; the 12 left read SEARCH_EXHAUSTED', () => {
     expect(s.sectionInadequate).toBe(0);
     for (const id of BEFORE) expect([id, s.outcomes.get(id)!.outcome], `e${id}`).toEqual([id, 'SEARCH_EXHAUSTED']);
     expect(s.searchExhausted).toBe(refused.length);

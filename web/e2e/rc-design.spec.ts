@@ -465,10 +465,16 @@ test.describe('@slow RC design at scale', () => {
      * and the search reaches arrangements that pass every check, cages and anchorage included
      * (`lateral-fixtures.test.ts` measures it against the run without that check: 331/64).
      */
+    /*
+     * 360 and 35 since the verifier checks the minimum shear reinforcement of CIRSOC 201-2025
+     * §9.6.3.1 on beams deeper than 250 mm and the generator stops offering stirrups under
+     * Av,min (§9.6.3.4): four more beams reach an arrangement that threads and anchors
+     * (`lateral-fixtures.test.ts` measures it: 356/39 without it).
+     */
     const counts = (await page.evaluate(() => window.__stabileo.runCounts()))!;
-    expect(counts.verified).toBe(356);
+    expect(counts.verified).toBe(360);
     expect(counts.sectionInadequate, 'nothing is called inadequate without a proof').toBe(0);
-    expect(counts.searchExhausted, 'the beams no implemented layout threads and anchors').toBe(39);
+    expect(counts.searchExhausted, 'the beams no implemented layout threads and anchors').toBe(35);
     expect(counts.unsupported, 'and nothing is refused outright any more').toBe(0);
     expect(counts.provisionalBiaxial, 'the 13 are proposals').toBe(13);
     expect(counts.aborted).toBe(0);
@@ -575,15 +581,19 @@ test.describe('@slow RC design at scale', () => {
      *
      * Since the ductility check (see the run counts above): 333 of the 356 verified read fail,
      * held by the detailing as described, and the 39 refused read unavailable.
+     *
+     * Since the minimum shear reinforcement of §9.6.3.1 (run counts above): 339 of the 360
+     * verified read fail, held by the detailing as described, and the 35 refused read
+     * unavailable.
      */
     const display = await page.evaluate(() => window.__stabileo.counts());
-    expect(display.ok + display.warn + display.fail, 'the fully checked members').toBe(356);
+    expect(display.ok + display.warn + display.fail, 'the fully checked members').toBe(360);
     expect(display.provisional, 'the proposals, named as proposals').toBe(13);
-    expect(display.fail, 'and only what the detailing could not build is called a failure').toBe(333);
-    expect(display.unavailable, 'only the refused beams are left without steel').toBe(39);
+    expect(display.fail, 'and only what the detailing could not build is called a failure').toBe(339);
+    expect(display.unavailable, 'only the refused beams are left without steel').toBe(35);
     // A proposal is never folded into the passes. This is the assertion that would catch the
     // exception being widened into a way of making red things green.
-    expect(display.ok + display.warn, 'proposals are not counted as verified').toBe(23);
+    expect(display.ok + display.warn, 'proposals are not counted as verified').toBe(21);
     // Every member lands in exactly one display bucket. A member missing from all of them
     // would be a row the summary bar does not describe.
     expect(display.ok + display.warn + display.fail + display.provisional
@@ -606,7 +616,7 @@ test.describe('@slow RC design at scale', () => {
      * And the bar itself says so.
      *
      * The run-outcome chips hide at zero, so `unsupported` is gone because nothing landed in it;
-     * `exhausted` holds the 39 (absent while the refused read SECTION_INADEQUATE). The
+     * `exhausted` holds the 35 (absent while the refused read SECTION_INADEQUATE). The
      * provisional chip lives with the DISPLAY counts, which are always rendered — it reports what
      * the members ARE rather than what the last run decided, and those two can diverge the
      * moment a user edits a member's steel.

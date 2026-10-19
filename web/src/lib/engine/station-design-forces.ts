@@ -2631,9 +2631,18 @@ export function verifyProvidedReinforcement(
      * so a region where Vu > φVc with Av < Av,min is not approved here: it is held (below).
      */
     const shallowBeam = elementType === 'beam' && section.h <= SHALLOW_BEAM_MAX_H + 1e-9;
+    /*
+     * §9.6.3.1 on every other beam: Av,min «en todas las secciones donde Vu > φ·0,085·λ·√f'c·bw·d»
+     * (2025; 2005 §11.5.6.1: Vu > φVc/2), Av,min of §9.6.3.4 (2025: max(0,062·√f'c, 0,35)·bw·s/fyt,
+     * as the engine computes it with the project's fyt). An evaluated check: failing, with its row.
+     */
+    const minShearThreshold = (phiVc: number) => (spacingRule.edition === '2005'
+      ? 0.5 * phiVc
+      : 0.75 * 0.085 * shearSqrtFc(section.fc) * section.b * d * 1000);
     for (const ss of shearSpecs) {
       let worst: { ratio: number; Vu: number; phiVn: number; comboName: string; stationX: number } | null = null;
       let held: ShallowMinShearHold | null = null;
+      let minShort: { Vu: number; threshold: number; AvMin: number; comboName: string; stationX: number } | null = null;
       let count = 0;
       let peakVu = 0; let peakCombo = ''; let peakX = 0;
       for (const t of ss.tuples) {
@@ -2658,8 +2667,29 @@ export function verifyProvidedReinforcement(
             AvMin: +(cap.AvMin ?? 0).toFixed(3), spacing: ss.stir.spacing, h: section.h, comboName: t.comboName,
           };
         }
+        if (elementType === 'beam' && !shallowBeam && cap.evaluated && cap.avBelowMin) {
+          const threshold = minShearThreshold(cap.phiVc);
+          if (Vu > threshold + 1e-9 && (!minShort || Vu - threshold > minShort.Vu - minShort.threshold)) {
+            minShort = { Vu, threshold, AvMin: cap.AvMin ?? 0, comboName: t.comboName, stationX: t.stationX };
+          }
+        }
       }
       if (held) shallowMinShear.push(held);
+      if (minShort && ss.stir) {
+        const av = ss.stir.legs * (REBAR_DB.find((r) => r.diameter === ss.stir!.diameter)?.area ?? (Math.PI / 4) * (ss.stir.diameter / 10) ** 2);
+        const clause = spacingRule.edition === '2005' ? '§11.5.6.1' : '§9.6.3.1';
+        const rule = spacingRule.edition === '2005' ? 'φVc/2' : 'φ·0,085·√f\'c·bw·d';
+        pushStrength({
+          category: `${ss.label} Av,min ${clause}`, demandCategory: null,
+          demand: +minShort.AvMin.toFixed(3), capacity: +av.toFixed(3),
+          utilization: av > 0 ? minShort.AvMin / av : Number.POSITIVE_INFINITY,
+          unit: 'cm²', method: 'area', tuplesChecked: count, regionRange: ss.range,
+          description: `Vu = ${minShort.Vu.toFixed(1)} kN > ${rule} = ${minShort.threshold.toFixed(1)} kN: Av,min required (${clause}); `
+            + `eØ${ss.stir.diameter} ${ss.stir.legs}L c/${(ss.stir.spacing * 100).toFixed(0)} gives Av = ${av.toFixed(2)} cm² < Av,min = ${minShort.AvMin.toFixed(2)} cm² (${spacingRule.edition === '2005' ? '§11.5.6.3' : '§9.6.3.4'}, fyt = ${section.fy} MPa)`,
+          comboName: minShort.comboName, stationX: minShort.stationX,
+          limiting: 'shear',
+        });
+      }
       if (count === 0) continue;
       checkedAxes.add(axes.shear);
       if (!ss.stir) {

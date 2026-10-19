@@ -671,8 +671,17 @@ function settleCrossingSeats(
       const rebar = detailableReinforcement(x)?.rebar;
       if (!rebar || adapter.verify(withSeats(list[i]!), rebar).overallStatus !== 'fail') continue;
       if (o.expired()) return;
-      outcomes[i] = designMember(adapter, withSeats(list[i]!), { budget: o.budget, clock: o.clock });
-      record(i); changed = true;
+      const again = designMember(adapter, withSeats(list[i]!), { budget: o.budget, clock: o.clock });
+      outcomes[i] = again;
+      record(i);
+      /*
+       * A change is a different verdict or different bars. A beam whose bars read `fail` here
+       * only for a hook the search completes (`anchorHook`, `completeAnchorage`) is designed
+       * again to the same bars, VERIFIED: counting that as a change re-ran the sweep up to once
+       * per member (103 835 verifier calls on the 408-member frame, for two such beams).
+       */
+      const before = detailableReinforcement(x)?.rebar, after = detailableReinforcement(again)?.rebar;
+      if (again.outcome !== x.outcome || !before || !after || rebarHash(before) !== rebarHash(after)) changed = true;
     }
     if (!changed) return;
   }
