@@ -68,6 +68,8 @@
 
 <style>
   .dn { display: flex; flex-direction: column; gap: 6px; min-height: 0; padding: 8px; border-right: 1px solid var(--st-hair); width: 17rem; }
+  @media (max-width: 1100px) { .dn { width: 14rem; } }
+  @media (max-width: 960px) { .dn { width: 12rem; } }
   .dn-level { display: flex; flex-direction: column; gap: 2px; font-size: 0.68rem; color: var(--st-text-2); }
   .dn-filters { display: flex; flex-wrap: wrap; gap: 3px; }
   .dn-filters button, .dn-step button { font-size: 0.64rem; padding: 1px 6px; border: 1px solid var(--st-hair-strong); background: var(--st-surface); color: var(--st-text-2); border-radius: 10px; cursor: pointer; }
@@ -82,4 +84,9 @@
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--st-text-3); flex: none; }
   .dot.st-ok { background: var(--st-ok); } .dot.st-warn { background: var(--st-warn); }
   .dot.st-fail, .dot.st-provisional { background: var(--st-danger); }
+  /* A phone: as wide as the screen, and the list short enough to leave the canvas in view. */
+  @media (max-width: 767px) {
+    .dn { width: auto; padding: 6px 8px; }
+    .dn-list { max-height: 18vh; }
+  }
 </style>

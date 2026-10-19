@@ -1,4 +1,8 @@
-import { openDesk } from '../store/design-desk-ui.svelte';
+import { deskUi, type DeskTab } from '../store/design-desk-ui.svelte';
+import { openDeskAt } from './design-navigation';
+
+/** Whether the desk is on screen on `place`: what lights a Design command. */
+const deskOn = (place: DeskTab): boolean => deskUi.open && deskUi.tab === place;
 import { TWO_D_INTERNAL_FORCE_LABELS as F2D } from '../geometry/coordinate-system';
 import { resultsStore } from '../store/results.svelte';
 
@@ -341,51 +345,60 @@ export function buildProStages(ctx: ProStageContext): ProStage[] {
     {
       id: 'design',
       labelKey: 'proRibbon.stageDesign',
-      home: 'design',
+      // The desk, where it was left (`design-navigation.ts`).
+      home: 'desk',
+      /*
+       * ── Design is one workspace, and these are its places ─────────────
+       *
+       * The stage had seven commands in four groups (design data, the desk, the concrete
+       * workflow, the 3-D detailing, the steel profiles, the steel connections and a check under
+       * other codes), each opening a screen of its own, so a reader entering Design had to choose
+       * between «Desk», «Rebar design» and a «Classic view» to find where the work was. Now the
+       * stage IS the desk, docked around the viewer, and every screen the commands opened is a
+       * place inside it. On a desktop the desk's own bar, with the four steps and their state,
+       * takes this row (`ProRibbon` draws no groups for Design while the desk is docked). These
+       * commands are what the phone grid and the command palette list, and what the ribbon shows
+       * the moment the desk is not on screen; each one opens the desk on its place
+       * (`openDeskAt`), the same place the rail opens.
+       */
       groups: [
-        /*
-         * Two materials, two sub-sections — not one group with three buttons.
-         *
-         * The first arrangement put Design, Metallic structures and Connections side by side
-         * under the Concrete heading, which said that the metallic surface was part of the
-         * concrete workflow. It is not: it is a different material, a different code, and a
-         * different maturity. Reading the row left to right you could not tell which button
-         * designed concrete and which one did not.
-         *
-         * Same stage, because an engineer on a mixed structure moves between them without
-         * changing where they are. Separate groups, because that is the sentence the ribbon
-         * is for: what this does, and to what.
-         */
         {
-          // For every material: the project's design data and the desk that designs them all.
-          id: 'general',
-          labelKey: 'proRibbon.groupDesignGeneral',
+          id: 'designPrepare',
+          labelKey: 'desk.step.prepare',
           cmds: [
-            { id: 'designData', labelKey: 'designData.title', icon: 'settings', tab: 'designData' },
-            { id: 'desk', labelKey: 'desk.title', descKey: 'desk.desc', icon: 'view3d', action: openDesk },
+            { id: 'designPrepare', labelKey: 'desk.rail.model', icon: 'building', action: () => openDeskAt('prepare'), activeWhen: () => deskOn('prepare') },
+            { id: 'designData', labelKey: 'designData.title', icon: 'settings', action: () => openDeskAt('designData'), activeWhen: () => deskOn('designData') },
           ],
         },
         {
-          id: 'rc',
-          labelKey: 'proRibbon.groupDesign',
+          id: 'designSize',
+          labelKey: 'desk.step.size',
           cmds: [
-            {
-              // "Design" alone answered nothing once a second material appeared beside it.
-              id: 'design',
-              labelKey: 'proRibbon.cmdRebarDesign',
-              descKey: 'proRibbon.cmdRebarDesignDesc',
-              icon: 'settings',
-              tab: 'design',
-            },
+            { id: 'design', labelKey: 'desk.tab.plan', descKey: 'desk.cmd.planDesc', icon: 'grid', action: () => openDeskAt('plan'), activeWhen: () => deskOn('plan') },
+            { id: 'designList', labelKey: 'desk.rail.list', descKey: 'desk.cmd.listDesc', icon: 'data', action: () => openDeskAt('list'), activeWhen: () => deskOn('list') },
+            /*
+             * Profiles and connections are the steel route inside sizing: the same panels, with
+             * the optimiser, the assumptions, the connection typologies, the bolts, the welds and
+             * the tension connection editor, in the desk.
+             */
+            { id: 'steel', labelKey: 'proRibbon.cmdSteelProfiles', descKey: 'proRibbon.cmdSteelProfilesDesc', icon: 'section', action: () => openDeskAt('steel'), activeWhen: () => deskOn('steel') },
+            { id: 'connections', labelKey: 'proRibbon.cmdSteelJoints', descKey: 'proRibbon.cmdSteelJointsDesc', icon: 'element', action: () => openDeskAt('connections'), activeWhen: () => deskOn('connections') },
+            // One «Other code», with its two modes inside (`DeskOtherCodes.svelte`).
+            { id: 'otherCodes', labelKey: 'desk.rail.otherCodes', descKey: 'desk.codes.desc', icon: 'data', action: () => openDeskAt('codes'), activeWhen: () => deskOn('codes') },
+          ],
+        },
+        {
+          id: 'designDetail',
+          labelKey: 'desk.step.detail',
+          cmds: [
+            { id: 'detailing', labelKey: 'desk.rail.detailing', icon: 'view3d', action: () => openDeskAt('detailing'), activeWhen: () => deskOn('detailing') },
             {
               /*
-               * The SAME operation as the button on the Design overview and the one inside
-               * the detailing section. All of them call `openRebar3D`, so the cage on screen
-               * is a projection of one document instance — three ways in, one thing that
-               * happens. A fourth viewer is exactly what this must not be.
+               * A view of the design work, on the member design is on: `openRebar3DView`, the one
+               * path every entry to the 3-D reinforcement takes.
                */
               id: 'rebar3d',
-              labelKey: 'proRibbon.cmdRebar3D',
+              labelKey: 'desk.rebar3d',
               descKey: 'proRibbon.cmdRebar3DDesc',
               icon: 'view3d',
               action: onRebar3D,
@@ -395,66 +408,10 @@ export function buildProStages(ctx: ProStageContext): ProStage[] {
           ],
         },
         {
-          id: 'steel',
-          labelKey: 'proRibbon.groupSteel',
+          id: 'designDocument',
+          labelKey: 'desk.step.document',
           cmds: [
-            {
-              /*
-               * The entry point the future profile workflow lands on — the same tab that
-               * today shows the metallic inventory. Deliberately NOT a second button beside
-               * the old "Metallic structures" one: that button became this one.
-               *
-               * Its label says `design`, and the panel it opens states its maturity in its own
-               * banner: the inventory verifies nothing, while the profile optimiser below it does
-               * check each candidate. See `steel.panel.experimentalBanner`.
-               */
-              id: 'steel',
-              labelKey: 'proRibbon.cmdSteelProfiles',
-              descKey: 'proRibbon.cmdSteelProfilesDesc',
-              icon: 'section',
-              tab: 'steel',
-            },
-            {
-              /*
-               * Renamed from "Connections" after auditing what it does, not before.
-               *
-               * `ProConnectionsTab` computes exactly two things — `checkBoltGroup` and
-               * `checkFilletWeld` — over bolt grades 4.6 to 10.9 and fillet welds with a
-               * plate thickness and an Fexx. Both are steel connection checks; there is no
-               * concrete, timber or masonry path in `connection-design.ts`, which mentions
-               * no material at all. So the narrower name hides nothing.
-               *
-               * What it does NOT narrow: mixed joints. `ProConnectionsTab` hands
-               * `detectJoints` the metallic inventory's verdict, so a joint with no
-               * metallic member at all is not listed — and the panel says how many it
-               * hid. A steel beam framing into a concrete column still is listed, with
-               * its members split by material, because that is a real detail an
-               * engineer checks.
-               */
-              id: 'connections',
-              labelKey: 'proRibbon.cmdSteelJoints',
-              descKey: 'proRibbon.cmdSteelJointsDesc',
-              icon: 'element',
-              tab: 'connections',
-            },
-          ],
-        },
-        {
-          /*
-           * Codes other than CIRSOC: AISC 360, EN 1993-1-1, AISI S100, ACI 318, EN 1992-1-1.
-           * A group of its own because it spans both materials above, and because what it does
-           * is check the members under another code, not design them.
-           */
-          id: 'otherCodes',
-          labelKey: 'proRibbon.groupOtherCodes',
-          cmds: [
-            {
-              id: 'otherCodes',
-              labelKey: 'proRibbon.cmdOtherCodes',
-              descKey: 'proRibbon.cmdOtherCodesDesc',
-              icon: 'data',
-              tab: 'otherCodes',
-            },
+            { id: 'documents', labelKey: 'desk.tab.documents', icon: 'project', action: () => openDeskAt('documents'), activeWhen: () => deskOn('documents') },
           ],
         },
       ],
@@ -497,7 +454,11 @@ export const PRO_TAB_STAGE: Record<string, string> = {
     /* Conditions is a GROUP inside Model now, not a stage of its own. */
     supports: 'model', specifications: 'model', loads: 'model',
     advanced: 'analyse', results: 'analyse', diagnostics: 'analyse',
-    design: 'design', designData: 'design', steel: 'design', connections: 'design', otherCodes: 'design',
+    /*
+     * Design's views name the desk's places (`DESK_PLACE_OF_TAB` in `design-navigation.ts`, the
+     * same list): `desk` the stage itself, the others the places that were panels of their own.
+     */
+    desk: 'design', design: 'design', designData: 'design', steel: 'design', connections: 'design', otherCodes: 'design',
   };
 
 /** Every command in every stage, flattened — for callers that want a lookup. */

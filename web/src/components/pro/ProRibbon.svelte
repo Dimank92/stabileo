@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { deskUi, openDesk } from '../../lib/store/design-desk-ui.svelte';
-  import { designHome } from '../../lib/pro/design-home';
+  import { deskUi } from '../../lib/store/design-desk-ui.svelte';
+  import { openDeskAt } from '../../lib/pro/design-navigation';
+  import { rememberStageTab, stageEntryTab } from '../../lib/pro/stage-memory.svelte';
   import ProCommandPalette from './ProCommandPalette.svelte';
   import { t } from '../../lib/i18n';
   /*
@@ -13,9 +14,7 @@
    */
   import { uiStore, modelStore, resultsStore, historyStore, verificationStore } from '../../lib/store';
   import { saveProject } from '../../lib/store/file';
-  import { detailingStore } from '../../lib/store/detailing.svelte';
-  import { detailingAuthor } from '../../lib/store/detailing-author.svelte';
-  import { canOpenRebar3D, openRebar3D } from '../../lib/store/rebar-open';
+  import { canOpenRebar3D, openRebar3DView, rebar3DMissingSteps } from '../../lib/store/rebar-open';
   import Icon from '../ribbon/Icon.svelte';
   import { buildProStages, PRO_TAB_STAGE, type ProStage, type ProCmd } from '../../lib/pro/stages';
   import { TWO_D_INTERNAL_FORCE_LABELS as F2D } from '../../lib/geometry/coordinate-system';
@@ -98,22 +97,8 @@
     resultsStore.diagramType === 'axialColor' ? 'axial' : resultsStore.diagramType,
   );
 
-  function rebar3DMissingSteps(): string[] {
-    const steps: string[] = [];
-    if (resultsStore.results3D == null && resultsStore.results == null) {
-      steps.push('proRibbon.need.solve');
-    }
-    if (verificationStore.providedSummary.total === 0) steps.push('proRibbon.need.design');
-    if (detailingStore.assemblies.length === 0) steps.push('proRibbon.need.detailing');
-    return steps;
-  }
 
-  function openRebar3DFromRibbon(): void {
-    openRebar3D({
-      author: detailingAuthor.resolve(t('detailing.doc.unnamedAuthor')),
-      at: new Date().toISOString(),
-    });
-  }
+  function openRebar3DFromRibbon(): void { openRebar3DView(); }
 
   /*
    * The command tree lives in `lib/pro/stages.ts`, not here.
@@ -156,19 +141,17 @@
   const activeStage = $derived(mappedStage || lastStage);
   const stage = $derived(STAGES.find(s => s.id === activeStage) ?? STAGES[0]);
 
+  $effect(() => { rememberStageTab(uiStore.proActiveTab); });
+
   function openStage(s: ProStage) {
     moreOpen = null;
-    // Landing on a stage lands on its first destination, so the panel always
-    // agrees with the tab.
-    if (TAB_STAGE[uiStore.proActiveTab] !== s.id) {
-      uiStore.proActiveTab = s.id === 'design' ? designHome(modelStore.elements.values(), modelStore.materials) : s.home;
-    }
+    // Design is one workspace: the desk, docked around the viewer, on the place it was left.
+    if (s.id === 'design') { openDeskAt(); return; }
+    // Landing on a stage lands on the command last used in it (its home the first time), so
+    // the panel always agrees with the tab. Another stage leaves design (its state stays).
+    if (TAB_STAGE[uiStore.proActiveTab] !== s.id) uiStore.proActiveTab = stageEntryTab(s.id, s.home);
     uiStore.proPanelVisible = true;
-    // Design has one door: the desk. The concrete and steel workflow screens stay under it, as the
-    // classic view, until everything they hold has moved into the desk. Docked beside the viewer,
-    // the desk leaves the bar in reach, and another stage leaves design (its state stays).
-    if (s.id === 'design') openDesk();
-    else deskUi.open = false;
+    deskUi.open = false;
   }
 
   function run(c: ProCmd) {
@@ -443,7 +426,13 @@
       >{ribbonOpen ? '⌃' : '⌄'}</button>
     </div>
 
-    {#if ribbonOpen}
+    <!--
+      Design draws no groups while the desk is on screen: the desk's own bar, right under this
+      row, carries the four steps of design with their state and the actions of the step in hand
+      (`DeskProcessBar.svelte`), and the rail holds every place. The commands of the stage open
+      those same places; they are listed here only when the desk is not showing.
+    -->
+    {#if ribbonOpen && !(stage.id === 'design' && deskUi.open)}
     <div class="pr-groups">
       {#each stage.groups as g (g.id)}
         <section class="pr-group" class:pr-group-menu={g.menu} data-group={g.id}>

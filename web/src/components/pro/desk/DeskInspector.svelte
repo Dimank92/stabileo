@@ -13,8 +13,8 @@
   import { decisionState, equalizeFrom, recoverCopy, removeCopy, revertToProposal, saveCopy, setLocked, storedDecisions } from '../../../lib/store/design-decisions';
   import { sortedLevels } from '../../../lib/model/grid';
   import { deskUi } from '../../../lib/store/design-desk-ui.svelte';
-  import { rcOpenRebar3D } from '../../../lib/flow/rc-commands';
-  import { detailingAuthor } from '../../../lib/store/detailing-author.svelte';
+  import { designTableUi } from '../design/design-table-ui.svelte';
+  import { openRebar3DView } from '../../../lib/store/rebar-open';
   import VerificationDetail from '../design/VerificationDetail.svelte';
   import { copyFrame, equalizeFrames, framesOf } from '../../../lib/store/frame-equalize';
   import { jointChecks } from '../../../lib/store/joint-checks';
@@ -30,6 +30,11 @@
 
   let { rows }: { rows: DeskRow[] } = $props();
   const row = $derived(rows.find((r) => r.id === deskUi.selected));
+  /*
+   * The member's checks are drawn once: while the member list (a place of the canvas) has this
+   * member's row open, the row carries them with its editors, and the sheet says so instead.
+   */
+  const openInList = $derived(deskUi.tab === 'list' && !!row && designTableUi.expandedId === row.id);
   const ctx = $derived(row ? verificationStore.contextFor(row.id) : undefined);
   /*
    * The headline is the member's verdict (`member-verdict.ts`), with what holds it; the ratio
@@ -129,7 +134,7 @@
         <button disabled={decision !== 'edited'} onclick={() => revertToProposal([row.id])} data-testid="desk-revert">{t('desk.revert')}</button>
         <button disabled={decision === 'locked'} onclick={redesign} data-testid="desk-redesign">{t('desk.redesign')}</button>
         <button disabled={decision === 'none' || sameSection.length === 0} onclick={() => { note = tp('desk.equalized', { n: equalizeFrom(row.id, sameSection).length }); }} data-testid="desk-equalize">{tp('desk.equalize', { n: sameSection.length })}</button>
-        <button onclick={() => { uiStore.selectElement(row.id, false); const r = rcOpenRebar3D(detailingAuthor.resolve(t('detailing.doc.unnamedAuthor')), new Date().toISOString()); if (!r.ok) note = t('detailing.doc.noCoordinated'); }} data-testid="desk-open-3d">{t('desk.open3d')}</button>
+        <button onclick={() => { uiStore.selectElement(row.id, false); const r = openRebar3DView(); if (!r.ok) note = t('detailing.doc.noCoordinated'); }} data-testid="desk-open-3d">{t('desk.rebar3d')}</button>
       {/if}
     </div>
     {#if row.material === 'concrete'}
@@ -175,7 +180,10 @@
       </section>
     {/if}
 
-    {#if row.material === 'concrete' && ctx}
+    {#if row.material === 'concrete' && ctx && openInList}
+      <!-- The member list has this member's row open, with these same checks and its editors. -->
+      <p class="di-hint" data-testid="desk-inspector-in-list">{t('desk.inspectorInList')}</p>
+    {:else if row.material === 'concrete' && ctx}
       <VerificationDetail elementId={row.id} {ctx} provided={verificationStore.providedFor(row.id) ?? null} outcome={verificationStore.outcomeFor(row.id)} onApplyAdvice={() => {}} />
     {:else if row.material !== 'concrete' && row.material !== 'steel'}
       {@const res = materialCheckState.results.get(row.id)}
@@ -222,6 +230,11 @@
 
 <style>
   .di { width: 24rem; padding: 8px; border-left: 1px solid var(--st-hair); overflow: auto; display: flex; flex-direction: column; gap: 6px; }
+  /* Narrower windows: the sheet gives the canvas between it and the rail the width it needs. */
+  @media (max-width: 1280px) { .di { width: 20rem; } }
+  @media (max-width: 1100px) { .di { width: 16rem; } }
+  @media (max-width: 960px) { .di { width: 14rem; } }
+  @media (max-width: 767px) { .di { width: auto; border-left: none; } }
   .di-hint { color: var(--st-text-3); font-size: 0.72rem; }
   .di-fab { display: flex; gap: 6px; align-items: baseline; font-size: 0.7rem; color: var(--st-text-2); }
   .di-fab select { font-size: 0.7rem; }

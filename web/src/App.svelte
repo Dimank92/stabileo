@@ -319,8 +319,22 @@
   import RebarWorkspace from './components/pro/design/RebarWorkspace.svelte';
   import DesignDesk from './components/pro/desk/DesignDesk.svelte';
   import { deskUi, deskLayout } from './lib/store/design-desk-ui.svelte';
+  import { syncDeskWithTab, syncTabWithDesk } from './lib/pro/design-navigation';
+  import { rebarWorkspace } from './lib/store/rebar-workspace.svelte';
   /** Design docks beside the viewer on a desktop PRO screen; elsewhere it is a full-screen sheet. */
   const deskDocked = $derived(uiStore.appMode === 'pro' && !uiStore.isMobile);
+  /*
+   * The Design stage IS the desk: a design view opens it, any other view closes it, and opening or
+   * closing it directly moves the view (`design-navigation.ts`). Outside PRO there is no desk.
+   */
+  $effect(() => {
+    const tab = uiStore.proActiveTab, pro = uiStore.appMode === 'pro';
+    untrack(() => { if (pro) syncDeskWithTab(tab); else if (deskUi.open) deskUi.open = false; });
+  });
+  $effect(() => {
+    const open = deskUi.open;
+    untrack(() => { if (uiStore.appMode === 'pro') syncTabWithDesk(open); });
+  });
   import ProProjectFileActions from './components/pro/ProProjectFileActions.svelte';
   import ProRibbon from './components/pro/ProRibbon.svelte';
   import ProDrawBar from './components/pro/ProDrawBar.svelte';
@@ -562,7 +576,7 @@
     const VALID = ['project', 'nodes', 'elements', 'shells', 'materials', 'sections', 'supports',
       'specifications', 'constraints', 'loads', 'advanced', 'results', 'design', 'connections', 'diagnostics',
       'settings', 'selection', 'steel', 'grid', 'generators', 'transform', 'edit', 'groups', 'code', 'view',
-      'otherCodes'];
+      'otherCodes', 'designData', 'desk'];
     if (!VALID.includes(tab)) return;
     uiStore.proActiveTab = tab;
   }
@@ -1280,30 +1294,52 @@
   });
 
   /*
-   * Design docked: the toasts anchor to the viewer's bottom-right corner, measured, rather than
-   * the window's. Anchored to the window they landed on design's canvas, over the plan and the
-   * editors, and took the clicks meant for them.
+   * In PRO the toasts stand at the viewer's foot, measured, above its legends. Design docked: at
+   * the viewer's bottom-right corner rather than the window's. Anchored to the window they landed
+   * on design's canvas, over the plan and the editors, and took the clicks meant for them.
    */
   let mainAreaEl = $state<HTMLDivElement | null>(null);
+  /** The viewers' legends, which the toasts keep clear of. */
+  const LEGEND_SELECTOR = '.diagram-legend, .shell-legend, .cs-legend';
   $effect(() => {
     const root = document.documentElement;
     const el = mainAreaEl;
-    if (!(deskDocked && deskUi.open) || !el) {
+    const docked = deskDocked && deskUi.open;
+    // The 3-D reinforcement view covers the viewer: the toasts go back to the window's corner.
+    if (uiStore.appMode !== 'pro' || !el || rebarWorkspace.open) {
       root.style.removeProperty('--st-toast-right');
       root.style.removeProperty('--st-toast-bottom');
       return;
     }
+    /*
+     * Above the viewer's legends, not over them: the status legend runs along the viewer's foot
+     * and the contour and colour-scale legends stand at its right, and a toast anchored to the
+     * corner covered whichever was there (the solve's toast over the verification legend).
+     */
     const place = () => {
       const r = el.getBoundingClientRect();
-      root.style.setProperty('--st-toast-right', `${Math.round(window.innerWidth - r.right + 16)}px`);
-      root.style.setProperty('--st-toast-bottom', `${Math.round(window.innerHeight - r.bottom + 12)}px`);
+      let lift = 12;
+      for (const lg of el.querySelectorAll<HTMLElement>(LEGEND_SELECTOR)) {
+        const b = lg.getBoundingClientRect();
+        if (b.width === 0 || b.height === 0) continue;
+        // Only a legend under the toast column (the viewer's right 26 rem, all of it on a phone) is in its way.
+        if (!uiStore.isMobile && b.right < r.right - 26 * 16) continue;
+        lift = Math.max(lift, Math.round(r.bottom - b.top + 8));
+      }
+      if (docked) root.style.setProperty('--st-toast-right', `${Math.round(window.innerWidth - r.right + 16)}px`);
+      else root.style.removeProperty('--st-toast-right');
+      root.style.setProperty('--st-toast-bottom', `${Math.round(window.innerHeight - r.bottom + lift)}px`);
     };
     place();
     const ro = new ResizeObserver(place);
     ro.observe(el);
+    // A legend appears or goes with the diagram drawn: placed again when the viewer's content changes.
+    const mo = new MutationObserver(() => requestAnimationFrame(place));
+    mo.observe(el, { childList: true, subtree: true });
     window.addEventListener('resize', place);
     return () => {
       ro.disconnect();
+      mo.disconnect();
       window.removeEventListener('resize', place);
       root.style.removeProperty('--st-toast-right');
       root.style.removeProperty('--st-toast-bottom');
@@ -3025,11 +3061,20 @@
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     /* The viewer keeps at least a strip on a short window; the canvas takes its height up to what it was dragged to. */
-    grid-template-rows: auto minmax(80px, 1fr) minmax(0, var(--dd-canvas-h, 40vh));
+    grid-template-rows: auto minmax(80px, 1fr) minmax(0, min(var(--dd-canvas-h, 40vh), 60vh));
     grid-template-areas: 'head head head' 'rail view sheet' 'rail canvas sheet';
     min-height: 0;
   }
   .desk-docked > .main-area { grid-area: view; min-width: 0; min-height: 0; }
+  /*
+   * A short window (≤ 600 px): the canvas takes at most half of what is left, so the viewer keeps
+   * room for the model and its legend whatever height the canvas was dragged to on a taller one.
+   */
+  @media (max-height: 600px) {
+    .app-body-inner.pro-body-row.desk-docked {
+      grid-template-rows: auto minmax(140px, 1fr) minmax(0, min(var(--dd-canvas-h, 40vh), 45vh));
+    }
+  }
   .desk-docked > :global(.pro-sidebar), .desk-docked > :global(.pro-panel-reopen) { display: none !important; }
 
   .sidebar {
@@ -3955,7 +4000,8 @@
          model; the sheet's top edge is the one place that is neither.
       */
       top: auto;
-      bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+      /* Measured in PRO, above the viewer's legends (see `LEGEND_SELECTOR`). */
+      bottom: var(--st-toast-bottom, calc(12px + env(safe-area-inset-bottom, 0px)));
     }
 
     .toast-container.toast-over-sheet {

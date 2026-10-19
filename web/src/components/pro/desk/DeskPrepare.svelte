@@ -19,8 +19,8 @@
   import { physicalGroups } from '../../../lib/store/physical';
   import { materialFamilyOf } from '../../../lib/engine/steel/material-family';
   import { catalogueGradeFamily } from '../../../lib/engine/steel/grade-family';
-  import { deskUi } from '../../../lib/store/design-desk-ui.svelte';
-  import { openClassic, openModelTool } from '../../../lib/pro/design-navigation';
+  import { openDeskAt, openModelTool } from '../../../lib/pro/design-navigation';
+  import DesignOverview from '../design/DesignOverview.svelte';
 
   let { empty }: { empty: boolean } = $props();
 
@@ -91,6 +91,10 @@
       {:else}<p class="pp-hint">{tp('desk.prep.nothingMissing', { n: members })}</p>{/if}
     </section>
   {/if}
+  {#if members > 0}
+    <!-- The state of the project: the code in force, the member counts, the way to the 3-D view. -->
+    <section class="pp-overview" data-testid="desk-overview"><h4>{t('design.overview.title')}</h4><DesignOverview onOpenRegulations={() => openDeskAt('designData')} /></section>
+  {/if}
 
   <!-- The model's tools for design, on demand: they are out of the model ribbon's way until asked for. -->
   <section class="pp-tools" data-testid="desk-prepare-tools">
@@ -101,9 +105,9 @@
       <button onclick={() => openModelTool('building')} data-testid="desk-prep-building">{t('building.title')} ↗</button>
       <button onclick={() => openModelTool('foundations')} data-testid="desk-prep-foundations">{t('fdn.title')} ↗</button>
       <button onclick={() => openModelTool('generators')} data-testid="desk-prep-generators">{t('proRibbon.cmdGenerators')} ↗</button>
-      <button onclick={() => (deskUi.tab = 'stairs')} data-testid="desk-prep-stairs">{t('desk.tab.stairs')}</button>
-      <button onclick={() => (deskUi.tab = 'geometry')} data-testid="desk-prep-geometry">{t('desk.tab.geometry')}</button>
-      <button onclick={() => openClassic('designData')} data-testid="desk-prep-design-data">{t('designData.title')} ↗</button>
+      <button onclick={() => openDeskAt('stairs')} data-testid="desk-prep-stairs">{t('desk.tab.stairs')}</button>
+      <button onclick={() => openDeskAt('geometry')} data-testid="desk-prep-geometry">{t('desk.tab.geometry')}</button>
+      <button onclick={() => openDeskAt('designData')} data-testid="desk-prep-design-data">{t('designData.title')}</button>
     </div>
     <p class="pp-hint">{t('desk.prep.toolsHint')}</p>
   </section>
@@ -122,5 +126,7 @@
   .pp-actions button { font-size: 0.72rem; padding: 3px 10px; border-radius: 4px; border: 1px solid var(--st-hair-strong); background: var(--st-surface); color: var(--st-text); cursor: pointer; }
   .pp-actions button:disabled { opacity: 0.45; cursor: default; }
   .pp-actions .pp-primary { border-color: var(--st-accent); }
+  .pp-overview { border: 1px solid var(--st-hair); border-radius: 6px; padding-top: 6px; }
+  .pp-overview h4 { margin: 0 10px; font-size: 0.82rem; }
   .pp-tools { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--st-hair); padding-top: 8px; }
 </style>
