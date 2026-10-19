@@ -12,7 +12,7 @@
  * and where it breaks. With `AUDIT_OUT` the record is written as JSON; with `AUDIT_SHOTS` each step
  * leaves a screenshot. It is an audit instrument: its assertions are the record.
  */
-import { test, expect, solveModel, setAppLanguage, openDeskStage, ribbonCmd } from './fixtures';
+import { test, expect, solveModel, setAppLanguage, openDeskStage, ribbonCmd, leaveDesign, designPlace, generateDetailing } from './fixtures';
 import { writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import type { Page } from '@playwright/test';
 
@@ -41,8 +41,7 @@ async function step(page: Page, journey: string, name: string, fn: () => Promise
 
 /** The design desk, on its documents. */
 async function deskDocs(page: Page): Promise<void> {
-  await openDeskStage(page);
-  await page.getByTestId('desk-tab-documents').click();
+  await designPlace(page, 'documents');
 }
 
 const census = (page: Page) => page.evaluate(() => window.__stabileo.modelCensus());
@@ -138,7 +137,7 @@ async function designAndDocument(page: Page, j: string): Promise<void> {
     return { report: await page.getByTestId('desk-report').innerText(), counts };
   });
   await step(page, j, 'desk views reachable', async () => {
-    const views = await page.locator('.dd-modes [data-testid^="desk-"], .dd-flow [data-testid^="desk-"]').evaluateAll((els) => els.map((e) => {
+    const views = await page.locator('[data-testid="desk-rail"] [data-testid^="desk-"], [data-testid="desk-process"] [data-testid^="desk-"]').evaluateAll((els) => els.map((e) => {
       const r = (e as HTMLElement).getBoundingClientRect();
       return { id: e.getAttribute('data-testid'), visible: r.right <= window.innerWidth && r.bottom <= window.innerHeight && r.width > 0 };
     }));
@@ -146,7 +145,9 @@ async function designAndDocument(page: Page, j: string): Promise<void> {
     return { total: views.length };
   });
   await step(page, j, 'detailing', async () => {
-    await page.getByTestId('desk-detail').click();
+    // Detail what was designed, then read it in the documents (the old «Detail» did both).
+    await generateDetailing(page);
+    await designPlace(page, 'documents');
     await expect.poll(() => detailingTotals(page).then((x) => x.assemblies), { timeout: 60_000 }).toBeGreaterThan(0);
     const coverage = await page.evaluate(() => {
       const a = (window.__stabileo as unknown as { detailingAssemblies(): Array<{ elementIds: number[] }> }).detailingAssemblies();
@@ -159,7 +160,7 @@ async function designAndDocument(page: Page, j: string): Promise<void> {
     return { ...(await detailingTotals(page)), ...coverage };
   });
   await step(page, j, 'sheets with bending schedule', async () => {
-    await expect(page.getByTestId('desk-tab-documents')).toHaveClass(/on/);
+    await expect(page.getByTestId('desk-step-document')).toHaveAttribute('data-open', 'true');
     const desk = page.getByTestId('design-desk');
     await desk.getByTestId('sheets-build').click();
     const list = desk.getByTestId('sheets-list');
@@ -183,7 +184,7 @@ async function designAndDocument(page: Page, j: string): Promise<void> {
     const [xlsx] = await Promise.all([page.waitForEvent('download'), panel.getByTestId('exchange-xlsx').click()]);
     return { ifcColumns: (text.match(/IFCCOLUMN\(/g) ?? []).length, ifcBeams: (text.match(/IFCBEAM\(/g) ?? []).length, ifcSlabs: (text.match(/IFCSLAB\(/g) ?? []).length, outdatedBars: (text.match(/OUTDATED/g) ?? []).length, xlsx: xlsx.suggestedFilename() };
   });
-  await step(page, j, 'leave desk', async () => { await page.getByTestId('desk-close').click(); });
+  await step(page, j, 'leave desk', async () => { await leaveDesign(page); });
 }
 
 test.describe('@slow acceptance of the two journeys', () => {
@@ -210,17 +211,18 @@ test.describe('@slow acceptance of the two journeys', () => {
       return { detailingBefore: before, detailingAfter: await detailingTotals(page), deskSaysSolve: /solve|calcul/i.test(await desk.innerText()) };
     });
     await step(page, j, 'after the change: solve, design and detail again', async () => {
-      await page.getByTestId('desk-close').click();
+      await leaveDesign(page);
       await solveModel(page);
       await openDeskStage(page);
       await page.getByTestId('desk-design').click();
       await page.getByTestId('desk-run').click();
       await expect(page.getByTestId('desk-report')).toBeVisible({ timeout: 180_000 });
       const report = await page.getByTestId('desk-report').innerText();
-      await page.getByTestId('desk-detail').click();
+      await generateDetailing(page);
+      await designPlace(page, 'documents');
       await expect(page.getByTestId('design-desk').getByTestId('documents-outdated')).toHaveCount(0);
       const counts = await page.evaluate(() => window.__stabileo.runCounts());
-      await page.getByTestId('desk-close').click();
+      await leaveDesign(page);
       return { report: report.slice(0, 500), counts, detailing: await detailingTotals(page) };
     });
     await step(page, j, 'reopen', async () => {
@@ -247,7 +249,7 @@ test.describe('@slow acceptance of the two journeys', () => {
       return { beforeSolve, afterSolve, detailing: await detailingTotals(page) };
     });
     await step(page, j, 'other language', async () => {
-      await page.getByTestId('desk-close').click();
+      await leaveDesign(page);
       await setAppLanguage(page, 'pt');
       await deskDocs(page);
       const desk = page.getByTestId('design-desk');
@@ -255,12 +257,12 @@ test.describe('@slow acceptance of the two journeys', () => {
       expect(text).toMatch(/Mesa de projeto/);
       await desk.getByTestId('sheets-build').click();
       const sheetsPt = await desk.getByTestId('sheets-list').innerText();
-      await page.getByTestId('desk-close').click();
+      await leaveDesign(page);
       await setAppLanguage(page, 'es');
       await deskDocs(page);
       await page.getByTestId('design-desk').getByTestId('sheets-build').click();
       const sheetsEs = await page.getByTestId('design-desk').getByTestId('sheets-list').innerText();
-      await page.getByTestId('desk-close').click();
+      await leaveDesign(page);
       return { desk: text.slice(0, 300), sheetsPt: sheetsPt.slice(0, 300), sheetsEs: sheetsEs.slice(0, 300) };
     });
     if (process.env.AUDIT_OUT) writeFileSync(`${process.env.AUDIT_OUT}-J1.json`, JSON.stringify(record.filter((r) => r.journey === j), null, 2));
@@ -288,7 +290,7 @@ test.describe('@slow acceptance of the two journeys', () => {
       await openDeskStage(page);
       const text = await page.getByTestId('design-desk').innerText();
       const levels = await page.locator('[data-testid="design-desk"] select').first().evaluate((e) => [...(e as HTMLSelectElement).options].map((o) => o.textContent)).catch(() => null);
-      await page.getByTestId('desk-close').click();
+      await leaveDesign(page);
       return { levels, sample: text.slice(0, 400) };
     });
     await step(page, j, 'axes from the model', async () => {

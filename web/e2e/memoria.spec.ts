@@ -5,7 +5,7 @@
  * limit and never as satisfying a code. The document itself is pinned in
  * `lib/report/memoria/__tests__/memoria.test.ts`.
  */
-import { test, expect, designAll, loadModel, openDocumentsStage, solveModel, openDeskStage } from './fixtures';
+import { test, expect, designAll, loadModel, openDocumentsStage, solveModel, openDeskStage, designPlace, leaveDesign } from './fixtures';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 test.use({ viewport: { width: 1400, height: 900 } });
@@ -14,7 +14,7 @@ test.describe('@slow memoria', () => {
   test('the concrete frame: every chapter, one left out, another language, the file', async ({ pro: page }) => {
     await loadModel(page, 'rc-design-qa-8');
     await designAll(page);
-    await page.getByTestId('detailing-disclosure').locator('> summary').click();
+    await designPlace(page, 'detailing');
     await page.getByTestId('cmd-generate-detailing').click();
     await expect.poll(async () => page.evaluate(() =>
       (window.__stabileo as unknown as { detailingAssemblies(): unknown[] }).detailingAssemblies().length), { timeout: 30_000 }).toBeGreaterThan(0);
@@ -54,8 +54,8 @@ test.describe('@slow memoria', () => {
     await page.getByTestId('desk-design').click();
     await page.getByTestId('desk-run').click();
     await expect(page.getByTestId('desk-report')).toBeVisible({ timeout: 120_000 });
-    await page.getByTestId('desk-close').click();
-    await page.getByTestId('pr-cmd-steel').click();
+    await leaveDesign(page);
+    await designPlace(page, 'steel');
     const stage = page.getByTestId('steel-stage-documents');
     if (await stage.getAttribute('open') === null) await stage.locator('> summary').click();
     await stage.getByTestId('memoria-open').click();

@@ -27,8 +27,7 @@
  * members for the navigator to scroll).
  */
 import {
-  test, expect, loadModel, solveModel, designAll, openDeskStage, openClassicDesign, deskTab,
-} from './fixtures';
+  test, expect, loadModel, solveModel, designAll, openDeskStage, deskTab, designPlace } from './fixtures';
 import type { Page, Locator } from '@playwright/test';
 
 test.use({ viewport: { width: 1440, height: 900 } });
@@ -36,6 +35,8 @@ test.use({ viewport: { width: 1440, height: 900 } });
 /**
  * Mark the running test as a contract the application does not meet yet, for the reason given.
  * `CONTRACTS_RAW=1` runs every contract as a plain test, to see what each one observes today.
+ * Every contract below is met today (C8, C8b, C9, C12, C12b and C13 were the last to be); a new
+ * one the application does not meet yet is written with this.
  */
 function knownDefect(reason: string): void {
   test.fail(process.env.CONTRACTS_RAW !== '1', reason);
@@ -51,9 +52,12 @@ async function enterDesign(page: Page): Promise<void> {
   await openDeskStage(page);
 }
 
-/** Leave design by its close control. */
+/**
+ * Leave design by its way out. Design is a stage of its own, docked around the viewer, so on a
+ * desktop its way out is the stage bar: the Model stage.
+ */
 async function leaveDesignByClose(page: Page): Promise<void> {
-  await page.getByTestId('desk-close').click();
+  await page.getByTestId('pr-stage-model').click();
   await expect(designSurface(page)).toBeHidden();
 }
 
@@ -103,9 +107,10 @@ function view3D(page: Page): Locator {
   return page.getByTestId('rebar-workspace');
 }
 
-/** Open the 3-D reinforcement view from the detailing screen (outside design). */
+/** Open the 3-D reinforcement view from the coordinated detailing (the Detail step's rail). */
 async function open3DFromDetailing(page: Page): Promise<void> {
-  await page.getByTestId('cmd-open-3d').click();
+  await designPlace(page, 'detailing');
+  await page.getByTestId('desk-rail-3d').click();
   await expect(view3D(page)).toBeVisible();
 }
 
@@ -218,12 +223,9 @@ async function designedFrame(page: Page): Promise<void> {
   await designAll(page);
 }
 
-/** The classic detailing section, opened. */
+/** The coordinated detailing: design's Detail step. */
 async function openDetailing(page: Page): Promise<void> {
-  await openClassicDesign(page);
-  await page.getByTestId('pr-cmd-design').click();
-  const section = page.getByTestId('detailing-disclosure');
-  if (await section.getAttribute('open') === null) await section.locator('> summary').click();
+  await designPlace(page, 'detailing');
 }
 
 /** qa-8 designed and detailed. */
@@ -261,10 +263,10 @@ async function changeSectionOf(page: Page, id: number): Promise<void> {
   }, id);
 }
 
-/** Visit another stage and come back to design's classic screens. */
+/** Visit another stage and come back to design, where it was left. */
 async function roundTripFromClassicDesign(page: Page): Promise<void> {
   await page.getByTestId('pr-stage-model').click();
-  await openClassicDesign(page);
+  await openDeskStage(page);
 }
 
 // ─── The contracts ──────────────────────────────────────────────────────────────────────────────
@@ -370,9 +372,10 @@ test.describe('@smoke interaction contracts', () => {
   test('C7b — returning to design brings the current member\'s row back into view', async ({ pro: page }) => {
     await designedFrame(page);
     // A window short enough that qa-8's eight members overflow the list. Design docked under the
-    // ribbon (design/43) shares the window's height with the app's bars and the rail's own entries,
-    // so the list overflows at 560 px; at 300 px there is no room left for a list at all.
-    await page.setViewportSize({ width: 1440, height: 560 });
+    // ribbon shares the window's height with the app's bars and the rail's own entries; on a short
+    // window the rail lays its places in two columns to leave the list its height (interface A),
+    // so the list overflows at 480 px; at 300 px there is no room left for a list at all.
+    await page.setViewportSize({ width: 1440, height: 480 });
     await enterDesign(page);
     expect((await memberListScroll(page)).overflows, 'the member list scrolls').toBe(true);
     const last = page.locator('[data-testid^="desk-row-"]').last();
@@ -387,7 +390,6 @@ test.describe('@smoke interaction contracts', () => {
   });
 
   test('C8 — returning to a stage restores the command last used in it (model)', async ({ pro: page }) => {
-    knownDefect('openStage lands on the stage home (Nodes) instead of the last tab used in the stage');
     await loadModel(page, 'rc-design-qa-8');
     await page.getByTestId('pr-stage-model').click();
     await page.getByTestId('pr-cmd-sections').click();
@@ -398,7 +400,6 @@ test.describe('@smoke interaction contracts', () => {
   });
 
   test('C8b — returning to a stage restores the command last used in it (analysis)', async ({ pro: page }) => {
-    knownDefect('openStage lands on the stage home (Results) instead of the last tab used in the stage');
     await loadModel(page, 'rc-design-qa-8');
     await solveModel(page);
     await page.getByTestId('pr-stage-analyse').click();
@@ -409,19 +410,17 @@ test.describe('@smoke interaction contracts', () => {
     await expect(page.getByTestId('pr-cmd-advanced')).toHaveClass(/active/);
   });
 
-  test('C9 — the classic design table keeps its filter, search and open row across a tab switch', async ({ pro: page }) => {
-    knownDefect('filter, search and expanded row are component state of ProDesignTab, which unmounts with its tab');
+  test('C9 — the member list keeps its filter, search and open row across a change of place', async ({ pro: page }) => {
     await designedFrame(page);
-    await openClassicDesign(page);
-    await page.getByTestId('pr-cmd-design').click();
+    await designPlace(page, 'list');
     await page.getByTestId('filter-ok').click();
     const first = page.locator('[data-testid^="design-row-"]').first();
     const id = Number((await first.getAttribute('data-testid'))!.replace('design-row-', ''));
     await page.getByTestId('design-search').fill(String(id));
     await page.getByTestId(`row-expand-${id}`).click();
     await expect(page.getByTestId(`design-detail-${id}`)).toBeVisible();
-    await page.getByTestId('pr-cmd-designData').click();
-    await page.getByTestId('pr-cmd-design').click();
+    await designPlace(page, 'designData');
+    await designPlace(page, 'list');
     await expect(page.getByTestId('filter-ok')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByTestId('design-search')).toHaveValue(String(id));
     await expect(page.getByTestId(`design-detail-${id}`)).toBeVisible();
@@ -461,7 +460,7 @@ test.describe('@smoke interaction contracts', () => {
     await count.press('Enter');
     await expect(page.getByTestId('frame-state')).toHaveText(/Unsaved|Sin guardar/);
 
-    await page.getByTestId('desk-close').click();
+    await leaveDesignByClose(page);
     // Not applied behind the user's back.
     expect(await page.evaluate((e) => JSON.stringify(window.__stabileo.reinforcement(e)), id)).toBe(stored);
     // And not dropped without a word: either design is still open asking, or the draft is there on return.
@@ -473,7 +472,6 @@ test.describe('@smoke interaction contracts', () => {
   });
 
   test('C12 — a model change marks the designed members out of date', async ({ pro: page }) => {
-    knownDefect('a model change clears the analysis: designed members read «unavailable» (Not checked), not «stale», and the desk list empties');
     await designedFrame(page);
     const id = (await page.evaluate(() => window.__stabileo.elementIds()))[0]!;
     expect(await page.evaluate((e) => window.__stabileo.displayStatus(e), id)).toBe('ok');
@@ -493,7 +491,6 @@ test.describe('@smoke interaction contracts', () => {
   });
 
   test('C12b — design states that its results are out of date because the model changed', async ({ pro: page }) => {
-    knownDefect('after a model change the desk only says «Solve the model to design.»; nothing says the design it holds no longer matches the model');
     await designedFrame(page);
     const id = (await page.evaluate(() => window.__stabileo.elementIds()))[0]!;
     await changeSectionOf(page, id);
@@ -502,28 +499,25 @@ test.describe('@smoke interaction contracts', () => {
   });
 
   test('C13 — an other-codes run survives leaving and returning, or says it must be run again', async ({ pro: page }) => {
-    knownDefect('the other-codes run is component state of ProOtherCodesPanel: on return the results are gone and nothing says so');
     await steelPortal(page);
-    await openClassicDesign(page);
-    await page.getByTestId('pr-cmd-otherCodes').click();
+    await designPlace(page, 'otherCodes');
     await page.getByTestId('other-codes-run').click();
     await expect(page.getByTestId('other-codes-results')).toBeVisible();
     await roundTripFromClassicDesign(page);
-    await page.getByTestId('pr-cmd-otherCodes').click();
+    await designPlace(page, 'otherCodes');
     await expect(page.getByTestId('other-codes-results').or(page.getByTestId('other-codes-stale'))).toBeVisible();
   });
 
   test('C14 — a chosen joint survives a stage round trip', async ({ pro: page }) => {
     await steelPortal(page);
-    await openClassicDesign(page);
-    await page.getByTestId('pr-cmd-connections').click();
+    await designPlace(page, 'connections');
     const rows = page.locator('.conn-joint-row');
     await expect(rows.first()).toBeVisible();
     const pick = rows.nth(Math.min(1, (await rows.count()) - 1));
     await pick.click();
     const chosen = await page.locator('.conn-joint-row.active').innerText();
     await roundTripFromClassicDesign(page);
-    await page.getByTestId('pr-cmd-connections').click();
+    await designPlace(page, 'connections');
     await expect(page.locator('.conn-joint-row.active')).toHaveText(chosen);
   });
 
@@ -574,6 +568,7 @@ test.describe('@smoke interaction contracts', () => {
     await rows.last().click();
     expect(await rebarSelection(page)).toEqual([victim]);
     await close3D(page);
+    await leaveDesignForModel(page);
     await selectInModel(page, [victim]);
     await page.locator('body').press('Delete');
     await expect.poll(() => page.evaluate(() => window.__stabileo.elementIds())).not.toContain(victim);
@@ -711,6 +706,8 @@ test.describe('@smoke interaction contracts', () => {
     await designedFrame(page);
     const ids = await page.evaluate(() => window.__stabileo.elementIds());
     const victim = ids[ids.length - 1]!;
+    // A member is deleted in the model: design, open from the start, is left for the model stage.
+    await leaveDesignForModel(page);
     await selectInModel(page, [victim]);
     await page.locator('body').press('Delete');
     await expect.poll(() => page.evaluate(() => window.__stabileo.elementIds())).not.toContain(victim);
@@ -724,6 +721,9 @@ test.describe('@smoke interaction contracts', () => {
 
   test('C24 — with nothing to design, design offers its two ways in, each saying what is missing', async ({ pro: page }) => {
     await enterDesign(page);
+    // Preparing is where an empty project stands, and its step says so; pressing it shows the ways in.
+    await expect(page.getByTestId('desk-step-prepare')).toHaveAttribute('aria-current', 'step');
+    await page.getByTestId('desk-step-prepare').click();
     const existing = page.getByTestId('desk-route-existing');
     const scratch = page.getByTestId('desk-route-scratch');
     await expect(existing).toBeVisible();

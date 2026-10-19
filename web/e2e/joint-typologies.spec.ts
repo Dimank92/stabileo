@@ -3,7 +3,7 @@
  * the list with each one's state, a joint opened with its checks and its drawing, the same parts
  * in the 3D view, plates made equal across joints alike, and no claim of approval anywhere.
  */
-import { test, expect, PRO_URL, loadModel, solveModel, openDeskStage, openClassicDesign, deskTab } from './fixtures';
+import { test, expect, PRO_URL, loadModel, solveModel, openDeskStage, deskTab, designPlace } from './fixtures';
 
 test.describe('@slow joint typologies', () => {
   test('proposed everywhere, opened, drawn and equalized', async ({ page }) => {
@@ -12,8 +12,7 @@ test.describe('@slow joint typologies', () => {
     await page.goto(PRO_URL);
     await loadModel(page, '3d-nave-industrial');
     await solveModel(page);
-    await openClassicDesign(page);
-    await page.getByTestId('pr-cmd-connections').click();
+    await designPlace(page, 'connections');
     const overview = page.getByTestId('joints-overview');
     await expect(overview).toBeVisible();
     await overview.getByTestId('joints-propose-all').click();

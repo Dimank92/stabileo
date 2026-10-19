@@ -3,7 +3,7 @@
  * member opened in the inspector and locked, a redesign that keeps it, the centres by level and
  * the geometry check. The decisions are pinned in `store/__tests__/design-decisions.test.ts`.
  */
-import { test, expect, loadModel, solveModel, openDeskStage, deskTab } from './fixtures';
+import { test, expect, loadModel, solveModel, openDeskStage, deskTab, leaveDesign } from './fixtures';
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -39,7 +39,7 @@ test.describe('@smoke design desk', () => {
     await expect(page.getByTestId('desk-levels')).toBeVisible();
     await deskTab(page, 'geometry');
     await page.getByTestId('desk-check-geometry').click();
-    await page.getByTestId('desk-close').click();
+    await leaveDesign(page);
     await expect(page.getByTestId('design-desk')).toHaveCount(0);
   });
 

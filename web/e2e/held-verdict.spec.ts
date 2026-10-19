@@ -9,7 +9,7 @@
  * held while its section's local checks pass. qa-8 with its beams' role not declared: two beams
  * refused, held by the refusal, the others verified.
  */
-import { test, expect, loadModel, designAll, openDeskStage, deskTab, openClassicDesign } from './fixtures';
+import { test, expect, loadModel, designAll, openDeskStage, deskTab, openClassicDesign, designPlace } from './fixtures';
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -71,7 +71,7 @@ test.describe('held verdicts in the browser', () => {
 
     // The overview: the verified count is the verdicts', the held local passes said apart, and
     // the project's verdict held with its reasons.
-    await openClassicDesign(page);
+    await designPlace(page, 'prepare');
     const counts = await page.evaluate(() => window.__stabileo.counts());
     await expect(page.getByTestId('summary-count-verified')).toContainText(String(counts.ok));
     await expect(page.getByTestId('summary-count-held')).toContainText(String((counts as unknown as { held: number }).held));
@@ -100,7 +100,7 @@ test.describe('held verdicts in the browser', () => {
     await expect(page.getByTestId('desk-status-holds')).toHaveCount(0);
     await expect(page.getByTestId(`member-verdict-${free[0]}`)).toHaveAttribute('data-status', 'ok');
 
-    await openClassicDesign(page);
+    await designPlace(page, 'prepare');
     await expect(page.getByTestId('summary-count-verified')).toContainText('6');
     await expect(page.getByTestId('project-verdict')).toHaveAttribute('data-state', 'held');
   });
