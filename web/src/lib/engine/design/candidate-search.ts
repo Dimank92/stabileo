@@ -161,10 +161,10 @@ export function designMember(
      * Briefly: a beam's reinforcement model has no side-face bars, in the schema, the
      * generator, the geometry, the drawings or the schedule — so a weak-axis check that
      * FAILED would leave the search no knob to turn. Bresler is formulated in 1/Pn and is
-     * unusable at N≈0. Two-way shear on a beam is not implemented. And in this very
-     * population the median torsion (1,33 kN·m) exceeds the median secondary moment
-     * (1,00 kN·m) while torsion is not verified at all, so certifying these members would
-     * move the false pass rather than remove it.
+     * unusable at N≈0. Two-way shear on a beam is not implemented. (When this was audited
+     * torsion was not verified at all, and in this population the median torsion, 1,33 kN·m,
+     * exceeds the median secondary moment, 1,00 kN·m. Torsion is checked now, §22.7 in
+     * `verifyProvidedReinforcement`; the reasons above still stand.)
      */
     if (unsupported.length === 1 && unsupported[0] === 'biaxial' && ctx.elementType !== 'column') {
       const proposal = proposeOnPrimaryAxis(adapter, ctx, opts, base, clock, t0);

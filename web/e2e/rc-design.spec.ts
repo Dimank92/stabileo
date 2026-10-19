@@ -606,7 +606,7 @@ test.describe('@slow RC design at scale', () => {
      * And the bar itself says so.
      *
      * The run-outcome chips hide at zero, so `unsupported` is gone because nothing landed in it;
-     * `exhausted` holds the 64 (absent while the refused read SECTION_INADEQUATE). The
+     * `exhausted` holds the 39 (absent while the refused read SECTION_INADEQUATE). The
      * provisional chip lives with the DISPLAY counts, which are always rendered — it reports what
      * the members ARE rather than what the last run decided, and those two can diverge the
      * moment a user edits a member's steel.
