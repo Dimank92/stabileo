@@ -399,18 +399,18 @@ export interface PunchingCheck {
   openingLoss?: number;
 }
 
-/** §8.4.4.2 — the eccentric-shear moment transfer this module does not implement. */
+/** §8.4.4.2 — the eccentric-shear moment transfer, evaluated by `eccentricShear` when the moment is significant. */
 const R_MOMENT_TRANSFER = clause('cirsoc-201', '2025', '8.4.4.2',
   'transferencia de momento por corte excéntrico');
 
 /**
- * Direct two-way shear check, without moment transfer.
+ * Two-way shear check: direct shear, and the moment transfer where the unbalanced moment matters.
  *
- * Moment transfer (γ_v M_sc eccentric shear, §8.4.4.2) is NOT implemented: it needs the
- * section modulus of the critical perimeter and the γ_f / γ_v split, and getting it
- * approximately right would produce a check that passes connections that fail. When an
- * unbalanced moment is present the result is downgraded to UNSUPPORTED rather than
- * reported as a direct-shear pass.
+ * Moment transfer (γ_v M_sc eccentric shear, §8.4.4.2) is evaluated when the unbalanced moment
+ * exceeds `momentTolerance`·V_u·d, or when an opening cuts the perimeter: `eccentricShear` takes
+ * the critical perimeter's Jc and the γ_f / γ_v split and the check reads the stress at the
+ * farthest corner. Below the threshold direct shear governs and the memo says so. A caller that
+ * cannot form the moment (`momentTransferNotFormed`) gets UNSUPPORTED, never a direct-shear pass.
  *
  * ── The refusal that was never reached ─────────────────────────
  *
@@ -497,7 +497,7 @@ export function checkPunchingShear(opts: {
 
   const utilization = phiVc > 0 ? vu / phiVc : Infinity;
 
-  // Moment transfer: refuse rather than approximate.
+  // Moment transfer: significant above `tol`·Vu·d, then evaluated by §8.4.4.2 below.
   const tol = opts.momentTolerance ?? 0.02;
   const threshold = tol * Math.max(demand.Vu * opts.d, 1e-9);
   const momentSignificant = demand.Msc > threshold;

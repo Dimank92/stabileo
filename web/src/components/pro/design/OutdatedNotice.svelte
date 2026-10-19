@@ -5,12 +5,13 @@
   drawings, the bending schedule, the 3-D cage and the IFC bars describe that model.
   `built`: what this panel built (sheets, a report) was made before the last change; the panel
   passes whether its own fingerprint still matches.
+  `workbook`: the project workbook's design sheets, which carry the same stamp in the file.
 -->
 <script lang="ts">
   import { t } from '../../../lib/i18n';
   import { detailingStore } from '../../../lib/store/detailing.svelte';
 
-  let { what, stale = undefined, testid = 'outdated-notice' }: { what: 'detailing' | 'sheets' | 'memoria' | 'exchange'; stale?: boolean; testid?: string } = $props();
+  let { what, stale = undefined, testid = 'outdated-notice' }: { what: 'detailing' | 'sheets' | 'memoria' | 'exchange' | 'workbook'; stale?: boolean; testid?: string } = $props();
   const shown = $derived(stale ?? detailingStore.modelStale);
 </script>
 

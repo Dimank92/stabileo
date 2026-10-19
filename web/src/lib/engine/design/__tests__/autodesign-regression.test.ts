@@ -47,6 +47,13 @@
  * Measured by switching off only that check: 373/22 come back, member by member the earlier
  * digest except utilization moves on 162, 163, 173, 192, 195, 254 and 257. No member lost a
  * certificate. A check added, not one relaxed: the six were an exhausted search, not a proof.
+ *
+ * AFTER the verifier checks the minimum shear reinforcement on beams deeper than 250 mm
+ * (CIRSOC 201-2025 §9.6.3.1: Av,min of §9.6.3.4 wherever Vu > φ·0,085·√f'c·bw·d) and the
+ * generator stops offering stirrups under it: 383/408 VERIFIED, 13 PROVISIONAL_BIAXIAL,
+ * 12 SEARCH_EXHAUSTED. Beams 165–168 reach an arrangement that threads the cages once the options
+ * under Av,min no longer fill the first ones per region (`rc-baseline-digest.test.ts` lists the
+ * member-by-member comparison). A check added: no member lost a certificate.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -78,11 +85,11 @@ describe('flagship 408-member RC frame designs completely', () => {
     // threshold; this verifier only checks the primary axis for beams, so it
     // refuses rather than falsely certify them (PR78 review fix). 22 until
     // self-weight bent the beams (see the header).
-    expect(s.verified).toBe(379);
+    expect(s.verified).toBe(383);   // 379 until §9.6.3.1 (header)
     // 16 refused on congestion: an exhausted search, not a proven section (`section-bounds.ts`).
     // 22 until the ductility check (header).
     expect(s.sectionInadequate).toBe(0);
-    expect(s.searchExhausted).toBe(16);
+    expect(s.searchExhausted).toBe(12);   // 16 until §9.6.3.1 (header)
     expect(s.demandUnavailable).toBe(0);
     /**
      * The 13 biaxial beams: PROVISIONAL_BIAXIAL, not UNSUPPORTED and not SEARCH_EXHAUSTED.
@@ -102,8 +109,9 @@ describe('flagship 408-member RC frame designs completely', () => {
      * short. A biaxial proposal is a member whose primary axis PASSED. Merging the two
      * counters would let a failing member inherit a proposal's treatment.
      */
-    // 13 + 16 since the ductility check (header); 13 + 22 = 35 before.
-    expect(s.provisionalRetained).toBe(29);
+    // 13 + 12 since the minimum shear reinforcement of §9.6.3.1 (header); 13 + 16 = 29 since the
+    // ductility check, 13 + 22 = 35 before.
+    expect(s.provisionalRetained).toBe(25);
     expect(s.aborted).toBe(false);
     expect(s.notReached).toBe(0);
 
@@ -148,7 +156,7 @@ describe('flagship 408-member RC frame designs completely', () => {
       worst = Math.max(worst, o.certificate!.worstUtilization);
     }
     expect(refused).toBe(13);
-    expect(congested).toBe(16);
+    expect(congested).toBe(12);
     expect(worst).toBeLessThanOrEqual(UTIL_FAIL_THRESHOLD);
   }, 180_000);
 

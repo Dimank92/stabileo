@@ -20,6 +20,7 @@
   import type { StationSpec } from '../../../lib/engine/station-forces';
   import { ensureProResults, hasShells } from '../../../lib/pro/export-results';
   import CheckGroup from './CheckGroup.svelte';
+  import OutdatedNotice from '../design/OutdatedNotice.svelte';
 
   let { open = $bindable(false), format = $bindable('xlsx') }: { open: boolean; format: 'xlsx' | 'csv' } = $props();
 
@@ -157,6 +158,8 @@
       </div>
     </div>
     {#if wantsResults && !resultsStore.results3D}<p class="xs-note">{t('proExport.dataSolves')}</p>{/if}
+    <!-- The design sheets describe the model the design and its detailing were generated from. -->
+    {#if open && DESIGN_SHEETS.some(on)}<OutdatedNotice what="workbook" testid="pro-data-export-outdated" />{/if}
   </ExportSection>
 
   {#if wantsResults && (cases.length > 1 || combos.length > 0)}

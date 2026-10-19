@@ -161,10 +161,10 @@ export function designMember(
      * Briefly: a beam's reinforcement model has no side-face bars, in the schema, the
      * generator, the geometry, the drawings or the schedule — so a weak-axis check that
      * FAILED would leave the search no knob to turn. Bresler is formulated in 1/Pn and is
-     * unusable at N≈0. Two-way shear on a beam is not implemented. And in this very
-     * population the median torsion (1,33 kN·m) exceeds the median secondary moment
-     * (1,00 kN·m) while torsion is not verified at all, so certifying these members would
-     * move the false pass rather than remove it.
+     * unusable at N≈0. Two-way shear on a beam is not implemented. (When this was audited
+     * torsion was not verified at all, and in this population the median torsion, 1,33 kN·m,
+     * exceeds the median secondary moment, 1,00 kN·m. Torsion is checked now, §22.7 in
+     * `verifyProvidedReinforcement`; the reasons above still stand.)
      */
     if (unsupported.length === 1 && unsupported[0] === 'biaxial' && ctx.elementType !== 'column') {
       const proposal = proposeOnPrimaryAxis(adapter, ctx, opts, base, clock, t0);
@@ -581,9 +581,19 @@ export function runDesign(
     }
   }
 
-  settleCrossingSeats(adapter, list, outcomes, cages, colBars, corners, absent, {
-    budget: opts.budget, clock, expired: () => !!opts.signal?.aborted || clock() - t0 > maxRunMs,
-  });
+  /*
+   * The settle runs to its end whatever the clock says. It is what makes a verified beam's
+   * certificate true against the seats the run designed, and its work is bounded by counts (each
+   * member's search budget, no more sweeps than members). Cut by the run's clock, it left beams
+   * VERIFIED against a guess with `aborted` false: on the 408-member flagship a run that crossed
+   * the 20 s mark during the settle verified 357 beams and columns where a complete one verifies
+   * 356, and the repair ladder downstream moved other bars. The clock stops the loop above, where
+   * what it leaves out is counted in `notReached`; a cancellation still stops the settle, and the
+   * run says it was aborted.
+   */
+  if (!settleCrossingSeats(adapter, list, outcomes, cages, colBars, corners, absent, {
+    budget: opts.budget, clock, cancelled: () => !!opts.signal?.aborted,
+  })) aborted = true;
 
   const prov = adapter.provenance();
   return tallyRunSummary(
@@ -617,8 +627,8 @@ function settleCrossingSeats(
   adapter: DesignCodeAdapter, list: MemberContext[], outcomes: MemberDesignOutcome[],
   cages: Map<number, number>, colBars: Map<number, { count: number; diameterMm: number }>,
   corners: Map<number, BeamCornerRecord>, absent: Set<number>,
-  o: { budget?: SearchBudget; clock: Clock; expired: () => boolean },
-): void {
+  o: { budget?: SearchBudget; clock: Clock; cancelled: () => boolean },
+): boolean {
   const refusedOnAnchorage = (x: MemberDesignOutcome) => x.elementType === 'beam' && x.outcome !== 'VERIFIED' && x.limiting.includes('anchorage');
   const pieces = (c: MemberContext) => c.span?.elements ?? [c.elementId];
   const record = (i: number) => {
@@ -644,7 +654,7 @@ function settleCrossingSeats(
     for (const id of pieces(c)) lightest.set(id, { cornerDiasMm: [Math.min(...admissible)], stirrupDiaMm: c.material.stirrupDia });
   }
   for (const i of refused) {
-    if (o.expired()) return;
+    if (o.cancelled()) return false;
     const again = designMember(adapter, withSeats(list[i]!, { seats: lightest, present: new Set(lightest.keys()) }), { budget: o.budget, clock: o.clock });
     if (again.outcome !== 'VERIFIED') {
       // Tried again with the crossing beams at their lightest seat, and refused again: said so.
@@ -670,12 +680,22 @@ function settleCrossingSeats(
       if (x.elementType !== 'beam' || x.outcome !== 'VERIFIED') continue;
       const rebar = detailableReinforcement(x)?.rebar;
       if (!rebar || adapter.verify(withSeats(list[i]!), rebar).overallStatus !== 'fail') continue;
-      if (o.expired()) return;
-      outcomes[i] = designMember(adapter, withSeats(list[i]!), { budget: o.budget, clock: o.clock });
-      record(i); changed = true;
+      if (o.cancelled()) return false;
+      const again = designMember(adapter, withSeats(list[i]!), { budget: o.budget, clock: o.clock });
+      outcomes[i] = again;
+      record(i);
+      /*
+       * A change is a different verdict or different bars. A beam whose bars read `fail` here
+       * only for a hook the search completes (`anchorHook`, `completeAnchorage`) is designed
+       * again to the same bars, VERIFIED: counting that as a change re-ran the sweep up to once
+       * per member (103 835 verifier calls on the 408-member frame, for two such beams).
+       */
+      const before = detailableReinforcement(x)?.rebar, after = detailableReinforcement(again)?.rebar;
+      if (again.outcome !== x.outcome || !before || !after || rebarHash(before) !== rebarHash(after)) changed = true;
     }
-    if (!changed) return;
+    if (!changed) return true;
   }
+  return true;
 }
 
 /** The certificate a passing arrangement gets: the one shape the search and an edit share. */

@@ -457,8 +457,14 @@ function createDesignRunStore() {
     }
   }
 
-  /** Design all: the convenience chain. Progress + cancellation + partial honesty. */
-  function designAll(): CommandResult {
+  /**
+   * Design all: the convenience chain. Progress + cancellation + partial honesty.
+   *
+   * `maxRunMs`: the run's wall-clock cap, the user's 20 s by default (`DEFAULT_RUN_MS`). A caller
+   * that needs the whole model designed whatever the machine, a test on the 408-member flagship,
+   * passes its own, as the engine's tests pass theirs to `runDesign`.
+   */
+  function designAll(opts: { maxRunMs?: number } = {}): CommandResult {
     const d = computeDemands();
     if (!d.ok) return d;
     const c = runCodeCheck();
@@ -486,7 +492,7 @@ function createDesignRunStore() {
       && !verificationStore.outcomeFor(id) && !manualOverrides.has(id));
     if (answerLost) {
       const again = all.filter((id) => !manualOverrides.has(id));
-      return autoDesign(again.length > 0 ? again : all);
+      return autoDesign(again.length > 0 ? again : all, { maxRunMs: opts.maxRunMs });
     }
     const undesigned: number[] = [];
     for (const id of all) {
@@ -495,7 +501,7 @@ function createDesignRunStore() {
       undesigned.push(id);
     }
     const target = undesigned.length > 0 ? undesigned : all;
-    return autoDesign(target);
+    return autoDesign(target, { maxRunMs: opts.maxRunMs });
   }
 
   /**

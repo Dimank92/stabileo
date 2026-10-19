@@ -66,19 +66,28 @@ test.describe('@smoke the permanent load comes from CIRSOC 101 Tabla 3.1', () =>
   test('§3.1.4 says when the partition allowance is missing', async ({ pro: page }) => {
     await openDialog(page);
     const check = page.getByTestId('dead-partition-check');
-    // The default build-up carries one, on a 2 kN/m² dwelling, at the §4.3.2 minimum of 0,75.
-    await expect(check).toContainText(/incluida|included|inclu/i);
+    // On a 2 kN/m² dwelling the §4.3.2 minimum of 0,75 is provided for, as the live load it is
+    // (CIRSOC 101-2025 §4.3.2, "sobrecarga de repartición"); it used to be a dead row.
+    await expect(check).toContainText(/4\.3\.2/);
+    await expect(check).not.toHaveClass(/warn/);
 
-    // Take it off and the article speaks up: what is missing shows as nothing at all.
-    await page.getByTestId('dead-is-partition').last().uncheck();
+    // Take it off in the live pane and the article speaks up: what is missing shows as nothing at all.
+    await page.getByTestId('al-nav-live').click();
+    await expect(page.getByTestId('al-partition-live-note')).toContainText(/4\.3\.2/);
+    await expect(page.getByTestId('live-total')).toContainText('2.75');
+    await page.getByTestId('al-partition-live-on').uncheck();
+    await expect(page.getByTestId('live-total')).toContainText('2.00');
+    await page.getByTestId('al-nav-dead').click();
     await expect(check).toContainText(/3\.1\.4/);
     await expect(check).toHaveClass(/warn/);
   });
 
   test('the total is the sum of the rows, to two decimals', async ({ pro: page }) => {
     await openDialog(page);
-    // 1,440 + 0,280 + 0,05 + 0,75 (the §4.3.2 partition minimum) = 2,52 kN/m².
-    await expect(page.getByTestId('dead-total')).toContainText('2.52');
+    // 1,440 + 0,280 + 0,05 = 1,77 kN/m². Changed from 2,52: the §4.3.2 partition minimum (0,75)
+    // is a live load and is no longer one of the dead rows.
+    await expect(page.getByTestId('dead-row')).toHaveCount(3);
+    await expect(page.getByTestId('dead-total')).toContainText('1.77');
   });
 });
 

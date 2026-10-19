@@ -21,6 +21,21 @@ type Page = import('@playwright/test').Page;
 
 const SMALL = 'rc-qa-diagnostic';
 
+/**
+ * What the open 3-D workspace draws, once it draws something.
+ *
+ * The workspace shows before its scene exists: the viewport paints first and builds the cage two
+ * animation frames later (the deferred first build in `RebarViewport3D.svelte`), and only then
+ * publishes the scene the census is read off. Read the moment the workspace was visible, the
+ * census was null whenever those frames came late, as on a machine busy with a full e2e run.
+ * The wait is for that publication, the same one `rebar-toggles.spec.ts` waits for.
+ */
+async function openWorkspaceCensus(page: Page) {
+  await expect.poll(() => page.evaluate(() => window.__stabileo.rebarSceneCensus() !== null),
+    { message: 'the open workspace published its scene' }).toBe(true);
+  return page.evaluate(() => window.__stabileo.rebarSceneCensus());
+}
+
 test.describe('@smoke PRO shell — settings', () => {
   /*
    * ── These changed shape, and the change is the point ───────────────
@@ -370,7 +385,7 @@ test.describe('@smoke PRO shell — Ver modelo 3D on the Design row', () => {
     await designPlace(page, 'list');
     await page.getByTestId('cmd-open-3d').click();
     await expect(page.getByTestId('rebar-workspace')).toBeVisible();
-    const viaToolbar = await page.evaluate(() => window.__stabileo.rebarSceneCensus());
+    const viaToolbar = await openWorkspaceCensus(page);
     await page.getByTestId('rebar-workspace-close').click();
     await expect(page.getByTestId('rebar-workspace')).toHaveCount(0);
 
@@ -379,7 +394,7 @@ test.describe('@smoke PRO shell — Ver modelo 3D on the Design row', () => {
     const docs = page.getByTestId('desk-canvas');
     await page.getByTestId('doc-3d').click();
     await expect(page.getByTestId('rebar-workspace')).toBeVisible();
-    const viaPanel = await page.evaluate(() => window.__stabileo.rebarSceneCensus());
+    const viaPanel = await openWorkspaceCensus(page);
     await page.getByTestId('rebar-workspace-close').click();
     await expect(page.getByTestId('rebar-workspace')).toHaveCount(0);
 
@@ -394,7 +409,7 @@ test.describe('@smoke PRO shell — Ver modelo 3D on the Design row', () => {
     await designPlace(page, 'prepare');
     await page.getByTestId('overview-open-3d').click();
     await expect(page.getByTestId('rebar-workspace')).toBeVisible();
-    const viaOverview = await page.evaluate(() => window.__stabileo.rebarSceneCensus());
+    const viaOverview = await openWorkspaceCensus(page);
 
     expect(viaPanel, 'the same scene, from either button').toEqual(viaToolbar);
     expect(viaOverview, 'and from the one at the top of the panel').toEqual(viaToolbar);
