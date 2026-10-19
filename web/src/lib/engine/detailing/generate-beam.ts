@@ -210,6 +210,11 @@ export interface BeamGenerationInput {
   lineBars?: readonly LineBarPiece[];
   /** The member's stirrup zones as the saved line draws them, between the support faces. */
   lineStirrups?: readonly LineStirrupPiece[];
+  /**
+   * Openings through the web (`OpeningEntry`), along the member from its i node, m: no stirrup
+   * crosses one, and what the opening's own design asks there is said, not drawn.
+   */
+  webOpenings?: ReadonlyArray<{ from: number; to: number }>;
   /** Rows of top bars planned at each support, and the largest top bar: where bottom hooks nest. */
   topRowsAt?: { I: number; J: number };
   /** A simple support at either end (§9.7.3.8.1): no column and no continuation. */
@@ -1678,6 +1683,7 @@ export function generateBeamBars(input: BeamGenerationInput): GeneratedBeam {
     const zoneId = `e${input.elementId}:${z.reason}:${zi}`;
     for (let si = 0; si < stations.length; si++) {
       const station = stations[si];
+      if (input.webOpenings?.some((o) => station > o.from - 0.01 && station < o.to + 0.01)) continue;
       // Only the bars that EXIST at this station. A bend cannot grip a curtailed bar past its
       // cut-off, and the tolerance is the same fabrication tolerance the containment check
       // uses — a bar ending exactly at the station is still there to be gripped.
@@ -1711,6 +1717,10 @@ export function generateBeamBars(input: BeamGenerationInput): GeneratedBeam {
     // by Table 9.7.6.2.2 across the width (already enforced, and it is what sets `z.legs`) and
     // by §25.7.1.2 at the bends. `unbracedBarReport` stays available for the column generator,
     // which is where that clause belongs.
+  }
+  for (const o of input.webOpenings ?? []) {
+    unsupported.push(`Hueco en el alma en x = ${o.from.toFixed(2)}–${o.to.toFixed(2)} m: ningún estribo lo cruza. ` +
+      'Los estribos de los cordones y los laterales que pide el cálculo del hueco (22.5) no se dibujan; se leen en Elementos especiales.');
   }
   // §25.7.1.2 — "cada doblez en un estribo cerrado debe contener una barra longitudinal".
   //

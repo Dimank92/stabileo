@@ -13,6 +13,7 @@
   import type { BeamLineReinforcement } from '../../../../lib/design-contract/beam-line';
   import { areaAt, memberOffsets } from '../../../../lib/engine/design/beam-line';
   import { transverseAt, type DemandPoint, type TransversePoint } from '../../../../lib/engine/design/beam-line-demand';
+  import type { LineOpening } from '../../../../lib/store/line-openings';
   import { t } from '../../../../lib/i18n';
 
   interface Props {
@@ -34,9 +35,11 @@
     transverse?: TransversePoint[];
     tMode?: 'shear' | 'torsion' | 'both';
     tMin?: boolean;
+    /** Web openings placed on the line's members. */
+    holes?: LineOpening[];
   }
   let { line, faces, demand, selectedBar, secondBar, selectedZone, pointX, failing, onBar, onZone, onPoint,
-    shifted = null, lawOn = 'below', transverse = [], tMode = 'both', tMin = true }: Props = $props();
+    shifted = null, lawOn = 'below', transverse = [], tMode = 'both', tMin = true, holes = [] }: Props = $props();
 
   const W = 960, M = 40, TOP = 40, H = 110;
   const total = $derived(line.lengths.reduce((s, l) => s + l, 0));
@@ -167,6 +170,13 @@
   <path d={giveTop} class="fe-give" /><path d={giveBottom} class="fe-give" />
   <path d={needTop} class="fe-need" /><path d={needBottom} class="fe-need" />
 
+  <!-- Web openings -->
+  {#each holes as o (o.entry.id)}
+    {@const hh = Math.max(4, o.hShare * H)}
+    <rect x={X(o.from)} y={TOP + H / 2 - o.offShare * H - hh / 2} width={Math.max(2, (o.to - o.from) * sx)} height={hh}
+      class="fe-hole" class:fe-fail={o.status === 'fail'} data-testid="frame-hole-{o.entry.id}" />
+  {/each}
+
   <!-- Cross-sections placed on the line -->
   {#each line.cuts ?? [] as c (c.id)}
     <g class="fe-cut" data-testid="frame-cut-{c.label}">
@@ -220,6 +230,8 @@
   .fe-axis { stroke: var(--st-hair-strong); stroke-width: 0.7; }
   .fe-need { fill: none; stroke: var(--st-danger); stroke-width: 1.2; stroke-dasharray: 3 2; }
   .fe-give { fill: none; stroke: var(--st-ok); stroke-width: 1.4; }
+  .fe-hole { fill: var(--st-surface); stroke: var(--st-text-2); stroke-width: 1; }
+  .fe-hole.fe-fail { stroke: var(--st-danger); stroke-width: 1.6; }
   .fe-cut line { stroke: var(--st-text); stroke-width: 1.2; stroke-dasharray: 8 3 2 3; }
   .fe-cut text { font-size: 10px; font-weight: 600; fill: var(--st-text); }
   .fe-law { fill: none; stroke: var(--st-value); stroke-width: 1.3; }

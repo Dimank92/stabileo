@@ -12,6 +12,7 @@
   import { modelStore } from '../../../lib/store';
   import { designData } from '../../../lib/store/design-data';
   import { verificationStore } from '../../../lib/store/verification.svelte';
+  import { checkLabel } from '../../../lib/engine/design/check-clauses';
   import { canTakeAsDrawn, drawnBar, editDrawnBar, takeAsDrawn, type ScheduleChange } from '../../../lib/store/drawn-bar-edit';
 
   let { barId, elementIds }: { barId: string; elementIds: readonly number[] } = $props();
@@ -34,8 +35,10 @@
   const verdict = $derived.by(() => {
     void modelStore.designDecisions;
     if (member === undefined) return null;
-    const v = verificationStore.providedFor(member) as { overallStatus?: string; worstUtilization?: number } | null | undefined;
-    return v?.overallStatus ? v : null;
+    const v = verificationStore.providedFor(member);
+    if (!v?.overallStatus) return null;
+    const failing = v.checks.filter((c) => c.status === 'fail').map((c) => checkLabel(c, 'beam'));
+    return { overallStatus: v.overallStatus, worstUtilization: v.worstUtilization, failing };
   });
   const fmt = (v: number) => v.toFixed(2);
   function apply() {
@@ -63,7 +66,7 @@
     <button onclick={apply} data-testid="bar-edit-apply">{t('barEdit.apply')}</button>
     {#if verdict}
       <p class="state" class:bad={verdict.overallStatus === 'fail'} data-testid="bar-edit-verdict">
-        {verdict.overallStatus === 'fail' ? t('barEdit.fails') : tp('barEdit.verifies', { u: (verdict.worstUtilization ?? 0).toFixed(2) })}
+        {verdict.overallStatus === 'fail' ? tp('barEdit.fails', { checks: verdict.failing.join(', ') }) : tp('barEdit.verifies', { u: (verdict.worstUtilization ?? 0).toFixed(2) })}
       </p>
     {/if}
     {#if changes}

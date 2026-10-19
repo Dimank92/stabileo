@@ -213,6 +213,10 @@ export interface RunDetailingInput {
   linePieces?: ReadonlyMap<number, { bars: readonly LineBarPiece[]; stirrups: readonly LineStirrupPiece[] }>;
   /** The laps saved lines draw, each with the member that holds its middle (`lineLaps`). */
   lineLaps?: ReadonlyArray<{ owner: number; lap: LineLap }>;
+  /** Lap length of column bars a person set, m, by column element id (`StoredDecisions.columnLaps`). */
+  columnLaps?: ReadonlyMap<number, number>;
+  /** Web openings by member, along it from its i node, m (`generate-beam` `webOpenings`). */
+  webOpenings?: ReadonlyMap<number, ReadonlyArray<{ from: number; to: number }>>;
   /** Members whose bars belong to the lateral-force-resisting system. */
   lateralSystem?: ReadonlySet<number>;
   /**
@@ -1400,7 +1404,8 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
       fc: first.material.fc, fy: first.material.fy,
       maxAggregateSizeMm: input.maxAggregateSizeMm,
       edition: input.edition,
-      lapSplice: anchor.lapSplice,
+      // A lap a person set for the stack replaces the code's; the splice check below measures it.
+      lapSplice: ((set) => (set !== undefined ? () => set : anchor.lapSplice))(lifts.map((l) => input.columnLaps?.get(l.elementId)).find((v) => v !== undefined)),
       // The cage from `column-candidates`, which distributes the non-corner bars around
       // ALL FOUR faces and validates §25.2.3 before returning.
       //
@@ -2478,6 +2483,7 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
       layerDrop: layerDropOf.get(id) ?? 0,
       bentUp: input.bentUp ?? { seismicDesign: 'unstated', optOut: false },
       ...(accepted?.regions?.skin ? { skin: accepted.regions.skin } : {}),
+      ...(input.webOpenings?.get(id)?.length ? { webOpenings: input.webOpenings.get(id)! } : {}),
       ...(input.linePieces?.get(id)?.bars.length
         ? { lineBars: input.linePieces.get(id)!.bars, lineStirrups: input.linePieces.get(id)!.stirrups }
         : input.memberCuts?.get(id) ? { cuts: input.memberCuts.get(id) } : {}),

@@ -18,6 +18,8 @@ import { openLine, saveLine } from '../beam-line-store';
 import { addCut, cutBar, updateBar } from '../../engine/design/beam-line';
 import { renderDrawings } from '../../engine/detailing/document-render';
 import { sheetMembers } from '../detailing-sheet-inputs';
+import { saveEntry } from '../special-elements';
+import { setColumnLap, columnLapOf, modelColumnStacks } from '../column-stack-store';
 import { buildSchedule } from '../../engine/detailing/drawings';
 import { buildSceneModel } from '../../engine/detailing/scene-model';
 import type { DocumentModel } from '../../engine/detailing/document-model';
@@ -127,5 +129,43 @@ describe('an edit in the frame editor reaches every output', () => {
     expect(names.some((n) => /-section$/.test(n))).toBe(true);
     const a = set.sheets.find((s) => /-section-A$/.test(s.name))!;
     expect(a.caption).toMatch(/corte A/);
+  });
+
+  it('a web opening placed on a beam: no stirrup crosses it, and what its design asks is said', () => {
+    designedFrame();
+    const line = modelBeamLines()[0]!;
+    const id = line.members[0]!;
+    // A 0,40 m long opening centred 2,0 m from the member's i node.
+    saveEntry('openings', { id: 'o1', elementId: id, x: 2.0, lo: 0.4, ho: 0.15 });
+    const run = detailingStore.generate()!;
+    const a = run.assemblies.find((x) => x.bars.some((b) => b.ownerElementIds.includes(id)))!;
+    const e = modelStore.elements.get(id)!, ni = modelStore.nodes.get(e.nodeI)!;
+    // The frame runs along x; the member's own position of a stirrup is its distance from the i node.
+    const stirrupX = a.bars.filter((b) => b.role === 'transverse' && b.ownerElementIds.includes(id)).map((b) => Math.abs(b.segments[0]!.start.x - ni.x));
+    expect(stirrupX.length).toBeGreaterThan(0);
+    expect(stirrupX.filter((x) => x > 1.8 && x < 2.2)).toEqual([]);
+    expect(JSON.stringify(a.unsupported)).toMatch(/Hueco en el alma en x = 1\.80–2\.20 m/);
+  });
+
+  it('a column lap set for a stack group is laid by the detailing, and one under the code\'s is reported', () => {
+    designedFrame();
+    const stack = modelColumnStacks().find((s) => s.lifts.length > 1)!;
+    const lower = stack.lifts[0]!.id;
+    const lapsOf = () => detailingStore.generate()!.assemblies.flatMap((a) => a.bars)
+      .filter((b) => b.role === 'longitudinal' && b.ownerElementIds.includes(lower) && b.ownerElementIds.length === 1)
+      .map((b) => { const zs = b.segments.flatMap((sg) => [sg.start.z, sg.end.z]); return Math.max(...zs); });
+    const before = lapsOf();
+    setColumnLap(lower, 1.5);
+    expect(stack.lifts.every((l) => columnLapOf(l.id) === 1.5)).toBe(true);
+    const longer = lapsOf();
+    // The lower lift's bars now run 1,5 m past the joint: the splice starts above the 0,50 m
+    // beam centred on the floor at 3 m, at 3,25 m.
+    expect(Math.max(...longer)).toBeGreaterThan(Math.max(...before));
+    expect(Math.max(...longer)).toBeCloseTo(3.25 + 1.5, 2);
+    setColumnLap(lower, 0.2);
+    const run = detailingStore.generate()!;
+    expect(JSON.stringify(run.assemblies.map((a) => a.unsupported))).toMatch(/25\.5/);
+    historyStore.undo();
+    expect(columnLapOf(lower)).toBe(1.5);
   });
 });

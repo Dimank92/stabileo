@@ -108,6 +108,12 @@ function columnNames(cols: readonly Frame[]): Map<string, string> {
 }
 const posKey = (p: V2) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`;
 
+/** The name the column schedule gives the column at a plan point («C8»), so the editor reads the same. */
+export function planColumnName(): (x: number, y: number) => string | undefined {
+  const names = columnNames(frames().filter(isVertical));
+  return (x, y) => names.get(posKey({ x, y }));
+}
+
 // ─── The drawings ───
 
 function formwork(c: PlanContext, axes: PlanAxis[], levels: Array<{ name: string; z: number }>): DrawingInput[] {

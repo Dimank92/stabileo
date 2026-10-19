@@ -23,6 +23,12 @@
   import FrameElevation from './FrameElevation.svelte';
   import FramePanel from './FramePanel.svelte';
   import StaleLinesNotice from './StaleLinesNotice.svelte';
+  import FrameOpenings from './FrameOpenings.svelte';
+  import { checkLabel } from '../../../../lib/engine/design/check-clauses';
+  import FrameHangers from './FrameHangers.svelte';
+  import { lineHangers } from '../../../../lib/store/line-hangers';
+  import { lineOpenings, memberAtLine } from '../../../../lib/store/line-openings';
+  import { openingChecks } from '../../../../lib/store/special-elements';
   import type { StaleLine } from '../../../../lib/store/beam-line-store';
   import { designDrafts } from '../../../../lib/store/design-drafts.svelte';
 
@@ -84,6 +90,12 @@
   const demand = $derived(lineDemand(spans, comboId));
   const shifted = $derived(showShift ? shiftedDemand(demand) : null);
   const transverse = $derived(lineTransverseDemand(spans, comboId));
+  const spanOf = (id: number) => verificationStore.contextFor(id)?.span;
+  const hangers = $derived(line && draft ? lineHangers(line, draft.lengths) : []);
+  const holes = $derived.by(() => {
+    void modelStore.designDecisions;
+    return line && draft ? lineOpenings(openingChecks(), draft, line.forward, (id) => verificationStore.contextFor(id)?.axes.hFlex, spanOf) : [];
+  });
   const repeats = $derived.by(() => { void modelStore.designDecisions; return line ? (framesOf(line.members[0]!)?.group?.lines ?? []) : []; });
   const key = $derived(line ? lineKey(line.members) : '');
   const grouped = $derived.by(() => { void modelStore.designDecisions; return key ? frameGroupOf(key) : null; });
@@ -187,7 +199,7 @@
       </label>
       <label><input type="checkbox" bind:checked={tMin} data-testid="frame-view-min" /> {t('frameEd.view.min')}</label>
     </div>
-    <FrameElevation line={draft} {faces} {demand} {shifted} {lawOn} {transverse} {tMode} {tMin} selectedBar={selBar} secondBar={selBar2} selectedZone={selZone} {pointX} {failing}
+    <FrameElevation line={draft} {faces} {demand} {shifted} {lawOn} {transverse} {tMode} {tMin} {holes} selectedBar={selBar} secondBar={selBar2} selectedZone={selZone} {pointX} {failing}
       onBar={onBar} onZone={(id) => { selZone = id; selBar = selBar2 = null; }} {onPoint} />
     <div class="fx-view" data-testid="frame-cuts">
       <button class:on={placing} onclick={() => (placing = !placing)} data-testid="frame-cut-place">{placing ? t('frameEd.cuts.clickHint') : t('frameEd.cuts.place')}</button>
@@ -212,13 +224,15 @@
     <div class="fx-cols">
       <FramePanel line={draft} selectedBar={selBar} secondBar={selBar2} selectedZone={selZone} {lapOf} {apply} clearSelection={() => { selBar = selBar2 = selZone = null; }} />
       <section class="fx-members" data-testid="frame-members">
+        <FrameOpenings openings={holes} locate={(x) => (line && draft ? memberAtLine(draft, line.forward, x, spanOf) : null)} total={draft.lengths.reduce((a, l) => a + l, 0)} />
+        <FrameHangers supports={hangers} line={draft} {apply} />
         <h5>{t('frameEd.members')}</h5>
         {#each line.members as id, i (id)}
           {@const v = verdicts.get(id)}
           <div class="fx-m" class:bad={failing.has(id)}>
             <span>{i + 1} · #{id}</span>
             <span>{v ? v.worstUtilization.toFixed(2) : '—'}</span>
-            {#if v}{#each v.checks.filter((c: { status: string }) => c.status === 'fail').slice(0, 3) as c}<span class="fx-c">{c.category}</span>{/each}{/if}
+            {#if v}{#each v.checks.filter((c: { status: string }) => c.status === 'fail').slice(0, 3) as c}<span class="fx-c">{checkLabel(c, 'beam')}</span>{/each}{/if}
           </div>
         {/each}
       </section>
