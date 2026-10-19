@@ -34,8 +34,8 @@
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
-    "@stryker-mutator/core": "^8.7.1",
-    "@stryker-mutator/vitest-runner": "^8.7.1",
+    "@stryker-mutator/core": "^10.0.0",
+    "@stryker-mutator/vitest-runner": "^10.0.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
     "@types/lz-string": "^1.5.0",
     "@types/node": "^26.6.5",
