@@ -45,22 +45,89 @@ function projected(line: BeamLine, model: BeamLineReinforcement): Map<number, Pr
 
 const hashes = (ids: readonly number[]) => Object.fromEntries(ids.map((id) => [String(id), rebarHash(modelStore.elements.get(id)?.reinforcement)]));
 
-/** The saved line of these members, when none of them changed since it was saved. */
-function storedLine(line: BeamLine): BeamLineReinforcement | null {
-  const l = storedDecisions().lines?.[lineKey(line.members)];
-  if (!l || !l.memberHashes) return null;
-  const now = hashes(line.members);
-  return line.members.every((id) => l.memberHashes![String(id)] === now[String(id)]) ? l : null;
+/**
+ * Why a saved line no longer stands for its members:
+ * - `redesigned`: a member's bars changed since the line was saved (a design run, an edit
+ *   elsewhere); the line's geometry still fits, so it can be taken up again as a draft;
+ * - `geometry`: a member's length changed (a node moved, a span was split or joined); positions
+ *   along the line no longer mean the same, and no length is rescaled to make them fit.
+ */
+export type LineStaleness = 'redesigned' | 'geometry';
+
+export interface StaleLine {
+  key: string;
+  label: string;
+  members: number[];
+  reason: LineStaleness;
+  /** The members that changed: redesigned, or whose length moved. */
+  changed: Array<{ id: number; was?: number; now?: number }>;
+  record: BeamLineReinforcement;
 }
 
-export interface OpenLine { line: BeamLine; model: BeamLineReinforcement; saved: boolean }
+const LENGTH_TOL = 1e-3;
+
+/** Whether a saved line still stands for its members, and if not, why. */
+function stalenessOf(line: BeamLine, rec: BeamLineReinforcement): Pick<StaleLine, 'reason' | 'changed'> | null {
+  const ms = lineMembers(line);
+  const moved = ms.map((m, i) => ({ id: m.id, was: rec.lengths[i], now: m.L })).filter((x) => x.was === undefined || Math.abs(x.was - x.now) > LENGTH_TOL);
+  if (rec.lengths.length !== ms.length || moved.length) return { reason: 'geometry', changed: moved };
+  const now = hashes(line.members);
+  const redesigned = line.members.filter((id) => rec.memberHashes?.[String(id)] !== now[String(id)]).map((id) => ({ id }));
+  return redesigned.length ? { reason: 'redesigned', changed: redesigned } : null;
+}
+
+/** The saved line of these members, when none of them changed since it was saved: bars nor lengths. */
+function storedLine(line: BeamLine): BeamLineReinforcement | null {
+  const l = storedDecisions().lines?.[lineKey(line.members)];
+  return l && !stalenessOf(line, l) ? l : null;
+}
+
+/**
+ * The saved lines that no longer stand for their members, with why: they are not applied (the
+ * frame editor and the detailing read the members instead) and are shown, so a person decides
+ * whether to take one up again or let it go. A saved line whose members no longer form a line
+ * (a member deleted or renumbered) is not listed: it cannot be opened, and it is dropped with
+ * the next save of that line's members.
+ */
+export function staleLines(): StaleLine[] {
+  const lines = storedDecisions().lines ?? {};
+  if (!Object.keys(lines).length) return [];
+  const out: StaleLine[] = [];
+  for (const l of modelBeamLines()) {
+    const key = lineKey(l.members), rec = lines[key];
+    if (!rec) continue;
+    const st = stalenessOf(l, rec);
+    if (st) out.push({ key, label: l.label, members: [...l.members], record: rec, ...st });
+  }
+  return out;
+}
+
+/** Let a saved line go: the members keep their bars, the line is read from them. One undo step. */
+export function discardLine(key: string): void {
+  const d = storedDecisions();
+  if (!d.lines?.[key]) return;
+  const { [key]: _gone, ...rest } = d.lines;
+  modelStore.reinforcementTransaction((api) => api.setDecisions({ ...d, lines: rest }));
+}
+
+export interface OpenLine {
+  line: BeamLine;
+  model: BeamLineReinforcement;
+  saved: boolean;
+  /** A saved line that no longer stands for the members: not applied, offered. */
+  stale?: StaleLine;
+}
 
 /** The line a member is on, with its reinforcement as a line. */
 export function openLine(memberId: number): OpenLine | null {
   const f = framesOf(memberId);
   if (!f) return null;
   const saved = storedLine(f.line);
-  return { line: f.line, model: saved ? clone(saved) : lineFromMembers(lineMembers(f.line)), saved: !!saved };
+  const stale = saved ? undefined : staleLines().find((x) => x.key === lineKey(f.line.members));
+  return {
+    line: f.line, model: saved ? clone(saved) : lineFromMembers(lineMembers(f.line)), saved: !!saved,
+    ...(stale ? { stale } : {}),
+  };
 }
 
 /** Check a draft line without writing it: each member's verdict on its projected regions. */

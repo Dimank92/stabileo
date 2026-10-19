@@ -14,6 +14,7 @@
    */
   import RecheckNotice from '../design/RecheckNotice.svelte';
   import RcRegenerationWarning from '../design/RcRegenerationWarning.svelte';
+  import StaleLinesNotice from './frame/StaleLinesNotice.svelte';
   import { t, tp } from '../../../lib/i18n';
   import { modelStore, resultsStore } from '../../../lib/store';
   import { materialFamilyOf } from '../../../lib/engine/steel/material-family';
@@ -127,6 +128,8 @@
       >{detailingStore.generating ? t('detailing.cmd.generating') : hasDetailing ? t('detailing.cmd.regenerate') : t('detailing.cmd.generate')}</button>
       <!-- What regenerating is about to replace, before it runs, beside the command. -->
       <RcRegenerationWarning />
+      <!-- Saved lines the detailing will not apply, because the members no longer match them. -->
+      <StaleLinesNotice />
     {/if}
   </div>
 

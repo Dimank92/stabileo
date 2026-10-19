@@ -22,6 +22,8 @@
   import { computeFlexureCapacity, requiredLd } from '../../../../lib/engine/station-design-forces';
   import FrameElevation from './FrameElevation.svelte';
   import FramePanel from './FramePanel.svelte';
+  import StaleLinesNotice from './StaleLinesNotice.svelte';
+  import type { StaleLine } from '../../../../lib/store/beam-line-store';
   import { designDrafts } from '../../../../lib/store/design-drafts.svelte';
 
   let { memberId }: { memberId: number } = $props();
@@ -34,11 +36,13 @@
   let selBar = $state<string | null>(null), selBar2 = $state<string | null>(null), selZone = $state<string | null>(null);
   let pointX = $state<number | null>(null);
   let note = $state<string | null>(null);
+  /** A saved line the members no longer match: not applied, offered (`StaleLinesNotice`). */
+  let stale = $state<StaleLine | null>(null);
 
   /** Open the member's line: its kept draft when there is one, else what the members hold. */
   function load() {
     const o = openLine(memberId);
-    line = o?.line ?? null; draft = o?.model ?? null; saved = o?.saved ?? false;
+    line = o?.line ?? null; draft = o?.model ?? null; saved = o?.saved ?? false; stale = o?.stale ?? null;
     dirty = false; undo = []; selBar = selBar2 = selZone = null; pointX = null; note = null;
     const kept = line ? designDrafts.frame(lineKey(line.members)) : undefined;
     if (kept) { draft = kept.draft; undo = kept.undo; dirty = true; note = t('frameEd.draftRestored'); }
@@ -74,6 +78,12 @@
     undo = [...undo, draft].slice(-50);
     draft = next; dirty = true; note = null;
     keep();
+  }
+  /** Take a redesigned line's saved bars up again as a draft: checked here, written only by «Save». */
+  function takeUp(s: StaleLine) {
+    const { memberHashes: _old, ...rec } = JSON.parse(JSON.stringify(s.record)) as BeamLineReinforcement;
+    apply(rec as BeamLineReinforcement);
+    stale = null; note = t('frameEd.stale.takenUp');
   }
   function back() { const prev = undo[undo.length - 1]; if (prev) { draft = prev; undo = undo.slice(0, -1); dirty = true; keep(); } }
   function save() {
@@ -144,6 +154,7 @@
         {/if}
       {/if}
     </header>
+    {#if stale}<StaleLinesNotice one={stale} onTakeUp={takeUp} />{/if}
     {#if note}<p class="fx-hint" role="status">{note}</p>{/if}
     <FrameElevation line={draft} {faces} {demand} selectedBar={selBar} secondBar={selBar2} selectedZone={selZone} {pointX} {failing}
       onBar={onBar} onZone={(id) => { selZone = id; selBar = selBar2 = null; }} onPoint={(x) => (pointX = x)} />
