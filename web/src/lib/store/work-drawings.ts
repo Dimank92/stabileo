@@ -31,6 +31,8 @@ import { foundationPlan, type PlanFooting } from '../sheets/plans/foundation-pla
 import { punchingPlan, type PunchingJoint } from '../sheets/plans/punching-plan';
 import { anchorPlan, jointSheet, steelFrameElevation, steelLevelPlan, type SteelBase, type SteelMember } from '../sheets/plans/steel-plans';
 import { barBreakdown, stirrupZones, type StirrupSpan } from '../sheets/plans/beam-plans';
+import { SLAB_LAYERS, slabBreakdown, slabLayerPlan, slabMarks, type PlanSlabPanel } from '../sheets/plans/slab-plan';
+import { storedDecisions } from './design-decisions';
 import { savedLinePieces } from './beam-line-store';
 import { bendingSchedule } from '../sheets/plans/bending-schedule';
 import { constructionDetails, type Tr } from '../sheets/plans/details';
@@ -42,7 +44,7 @@ import { builtBy, phaseEnd } from '../engine/site/phases';
 import { phasePlan, phaseSchedule, type PhaseGeometry } from '../sheets/plans/phase-plans';
 
 /** What a set can contain, in the order it is issued. `detailing` is the assemblies' own drawings. */
-export const PLAN_KINDS = ['notes', 'formwork', 'columns', 'beams', 'detailing', 'foundations', 'punching', 'stairs', 'tendons', 'steel', 'anchors', 'joints', 'bbs', 'details', 'phases'] as const;
+export const PLAN_KINDS = ['notes', 'formwork', 'columns', 'beams', 'slabs', 'detailing', 'foundations', 'punching', 'stairs', 'tendons', 'steel', 'anchors', 'joints', 'bbs', 'details', 'phases'] as const;
 export type PlanKind = (typeof PLAN_KINDS)[number];
 
 type V2 = { x: number; y: number };
@@ -217,6 +219,38 @@ function beams(c: PlanContext, doc: DocumentModel | null, axes: PlanAxis[]): Dra
       return { mark: mk.mark, count: mk.quantity, diameter: mk.diameterMm, cut: mk.cuttingLength, ...(r?.ok ? { shape: r.diagram } : {}) };
     }));
     const b = barBreakdown(line.id, marks, c.tr, c.fmt);
+    if (b) out.push(b);
+  }
+  return out;
+}
+
+/** The level's slab panels with the bars they hold: the person's where saved, else the design's. */
+export function levelSlabPanels(): Array<PlanSlabPanel & { z: number }> {
+  const m = modelStore.model, saved = storedDecisions().slabs ?? {};
+  const out: Array<PlanSlabPanel & { z: number }> = [];
+  for (const s of detailingStore.lastFloorRun?.slabs ?? []) {
+    if (!s.panel) continue;
+    // The panel's level, from the first element it reads (a quad or a plate of its mesh).
+    const id = s.panel.input.elements[0]?.id ?? Number(s.panelId.replace(/^P/, ''));
+    const shell = m.quads.get(id) ?? m.plates.get(id);
+    const n = shell && m.nodes.get((shell as { nodes: number[] }).nodes[0]!);
+    const i = s.panel.input;
+    out.push({ id: s.panelId, x0: i.x0, x1: i.x1, y0: i.y0, y1: i.y1, reinforcement: saved[s.panelId] ?? s.panel.reinforcement, z: n?.z ?? 0 });
+  }
+  return out;
+}
+
+function slabPlans(c: PlanContext, axes: PlanAxis[], levels: Array<{ name: string; z: number }>): DrawingInput[] {
+  const panels = levelSlabPanels(), out: DrawingInput[] = [];
+  const zs = [...new Set(panels.map((p) => Math.round(p.z * 100) / 100))].sort((a, b) => a - b);
+  for (const z of zs) {
+    const here = panels.filter((p) => Math.abs(p.z - z) < TOL);
+    const name = levels.find((l) => Math.abs(l.z - z) < TOL)?.name ?? `+${c.fmt(z, 2)}`;
+    const marks = slabMarks(here);
+    const box = boxOf(here.flatMap((p) => [{ x: p.x0 * 1000, y: p.y0 * 1000 }, { x: p.x1 * 1000, y: p.y1 * 1000 }]));
+    const scale = planScale({ x0: box.x0 - 1500, y0: box.y0 - 1500, x1: box.x1 + 1500, y1: box.y1 + 1500 }, c.format);
+    for (const layer of SLAB_LAYERS) { const d = slabLayerPlan(name, layer, here, marks, axes, scale, c.tr, c.fmt); if (d) out.push(d); }
+    const b = slabBreakdown(name, marks, c.tr, c.fmt);
     if (b) out.push(b);
   }
   return out;
@@ -442,6 +476,7 @@ export function workDrawings(doc: DocumentModel | null, kinds: ReadonlySet<PlanK
   add('formwork', () => formwork(c, axes, levels));
   add('columns', () => columnScheduleOf(c, levels));
   add('beams', () => beams(c, doc, axes));
+  add('slabs', () => slabPlans(c, axes, levels));
   add('foundations', () => foundations(c, axes));
   add('punching', () => punching(c, axes));
   add('stairs', () => stairs(c));
