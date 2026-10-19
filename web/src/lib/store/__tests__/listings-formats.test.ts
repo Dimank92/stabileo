@@ -5,6 +5,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import * as XLSX from 'xlsx';
+import { strFromU8, unzipSync } from 'fflate';
 import { historyStore, modelStore, resultsStore, uiStore } from '..';
 import { designRunStore } from '../design-run.svelte';
 import { verificationStore } from '../verification.svelte';
@@ -66,7 +67,7 @@ function csvRows(csv: string): string[][] {
 }
 
 describe('each listing in each format, with the same content', () => {
-  it('PDF, HTML, XLSX and CSV say the same, cell by cell', async () => {
+  it('PDF, HTML, DOCX, XLSX and CSV say the same, cell by cell', async () => {
     project();
     setWastePct(10);
     for (const id of LISTING_IDS) {
@@ -75,6 +76,11 @@ describe('each listing in each format, with the same content', () => {
       const html = (await listingBytes(id, 'html', 'es')) as string;
       const cells = [...html.matchAll(/<t[hd](?:\s[^>]*)?>([\s\S]*?)<\/t[hd]>/g)].map((m) => unesc(m[1]!));
       expect(cells, `${id} html`).toEqual(aoa.flat());
+      // DOCX: the same cells, in the document's table.
+      const docx = unzipSync((await listingBytes(id, 'docx', 'es')) as Uint8Array);
+      const xml = strFromU8(docx['word/document.xml']!);
+      const tcs = [...xml.matchAll(/<w:tc>([\s\S]*?)<\/w:tc>/g)].map((m) => unesc([...m[1]!.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)].map((t) => t[1]).join('')));
+      expect(tcs, `${id} docx`).toEqual(aoa.flat());
       // CSV: the same rows.
       expect(csvRows((await listingBytes(id, 'csv', 'es')) as string), `${id} csv`).toEqual(aoa);
       // PDF: every cell's text is on its pages.

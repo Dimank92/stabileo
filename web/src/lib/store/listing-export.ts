@@ -8,14 +8,15 @@ import { sheetLanguage } from './sheet-set';
 import { modelStore } from './model.svelte';
 import { loadXlsxModule } from '../export/excel';
 import { listingsWorkbook } from '../listings/listing-xlsx';
-import { toCsv, toHtml, toPdfPages } from '../listings/listing';
+import { toCsv, toDocModel, toHtml, toPdfPages } from '../listings/listing';
+import { docxBytes } from '../export/docx';
 import { sheetsToPdf } from '../sheets/to-pdf';
 import { bvbsFile, legsOf, mandrelOf, type BvbsBar } from '../listings/bvbs';
 import { designData } from './design-data';
 import type { DocumentModel } from '../engine/detailing/document-model';
 import { withExportLog } from './export-log';
 
-export type ListingFormat = 'pdf' | 'html' | 'xlsx' | 'csv';
+export type ListingFormat = 'pdf' | 'html' | 'docx' | 'xlsx' | 'csv';
 
 function save(name: string, type: string, data: BlobPart) {
   const url = URL.createObjectURL(new Blob([data], { type }));
@@ -31,12 +32,13 @@ export async function listingBytes(id: ListingId, format: ListingFormat, locale 
   switch (format) {
     case 'html': return toHtml(l, locale, projectName());
     case 'csv': return toCsv(l, locale);
+    case 'docx': return docxBytes(toDocModel(l, locale, projectName()));
     case 'pdf': return sheetsToPdf(toPdfPages(l, locale, projectName()), l.title);
     case 'xlsx': { const X = await loadXlsxModule(); return X ? listingsWorkbook(X, [l], locale) : null; }
   }
 }
 
-const MIME: Record<ListingFormat, string> = { pdf: 'application/pdf', html: 'text/html', csv: 'text/csv', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
+const MIME: Record<ListingFormat, string> = { docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', pdf: 'application/pdf', html: 'text/html', csv: 'text/csv', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
 
 export async function exportListing(id: ListingId, format: ListingFormat): Promise<void> {
   const data = await listingBytes(id, format);

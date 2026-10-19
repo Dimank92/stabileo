@@ -45,6 +45,7 @@
   import RcDocumentScope from './RcDocumentScope.svelte';
   import RcDocumentPreview from './RcDocumentPreview.svelte';
   import SheetsPanel from './SheetsPanel.svelte';
+  import ReportFormats from '../export/ReportFormats.svelte';
   import ListingsPanel from './ListingsPanel.svelte';
   import MemoriaButton from './MemoriaButton.svelte';
   import ExchangePanel from './ExchangePanel.svelte';
@@ -340,6 +341,8 @@
               onclick={() => runExport((d) => exportDetailingReport(d, exportCtx()))}>
         {t('detailing.doc.report')}
       </button>
+      <!-- The same report in the other four formats every report offers. -->
+      <ReportFormats prefix="doc-report" formats={['html', 'docx', 'xlsx', 'csv']} run={(f) => runExport((d) => exportDetailingReport(d, exportCtx(), f))} />
       <button data-testid="doc-dxf"
               onclick={() => runExport((d) => exportDetailingDxf(d, exportCtx()))}>
         {t('detailing.doc.dxf')}

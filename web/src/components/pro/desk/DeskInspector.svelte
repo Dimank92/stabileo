@@ -16,7 +16,8 @@
   import { designTableUi } from '../design/design-table-ui.svelte';
   import { openRebar3DView } from '../../../lib/store/rebar-open';
   import VerificationDetail from '../design/VerificationDetail.svelte';
-  import { copyFrame, equalizeFrames, framesOf } from '../../../lib/store/frame-equalize';
+  // One way to copy a frame: the repeats are copied by the same planner the copy panel uses.
+  import { applyFrameCopy, equalizeFrames, framesOf, previewFrameCopy } from '../../../lib/store/frame-equalize';
   import FrameCopyPanel from './FrameCopyPanel.svelte';
   import { jointChecks } from '../../../lib/store/joint-checks';
   import type { DeskRow } from './desk-rows';
@@ -173,7 +174,7 @@
         {:else}
           <p class="di-hint">{tp('desk.frameRepeats', { n: others.length })} {others.map((l) => l.label).join(' · ')}</p>
           <div class="di-actions">
-            <button onclick={() => { note = tp('desk.frameCopied', { n: copyFrame(frames.line, others).length }); }} data-testid="desk-frame-copy">{tp('desk.frameCopy', { n: others.length })}</button>
+            <button onclick={() => { note = tp('desk.frameCopied', { n: applyFrameCopy(previewFrameCopy(frames.line, others)).length }); }} data-testid="desk-frame-copy">{tp('desk.frameCopy', { n: others.length })}</button>
             <button onclick={() => { note = tp('desk.equalized', { n: equalizeFrames(frames.group!).length }); }} data-testid="desk-frame-equalize">{tp('desk.frameEqualize', { n: others.length + 1 })}</button>
           </div>
         {/if}

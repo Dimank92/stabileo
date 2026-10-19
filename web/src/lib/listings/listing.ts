@@ -8,6 +8,7 @@
  */
 import { drawTable } from '../sheets/plans/table';
 import type { Primitive } from '../sheets/primitives';
+import type { DocModel } from '../export/docx';
 
 export interface ListingColumn { key: string; label: string; unit?: string; align?: 'left' | 'right'; digits?: number }
 export type ListingValue = string | number | null;
@@ -94,4 +95,17 @@ function shift(p: Primitive, dx: number, dy: number): Primitive {
     case 'text': return { ...p, at: f(p.at) };
     case 'dimension': return { ...p, a: f(p.a), b: f(p.b) };
   }
+}
+
+/** The listing as a Word document: its title, the project, the table and the notes. */
+export function toDocModel(l: Listing, locale: string, project = ''): DocModel {
+  const aoa = toAoa(l, locale);
+  return {
+    title: l.title, landscape: l.columns.length > 6,
+    blocks: [
+      ...(project ? [{ kind: 'paragraph' as const, text: project, muted: true }] : []),
+      { kind: 'table' as const, head: aoa[0]!, rows: aoa.slice(1), align: l.columns.map((c) => c.align ?? 'left') },
+      ...(l.notes ?? []).map((n) => ({ kind: 'paragraph' as const, text: n, muted: true })),
+    ],
+  };
 }

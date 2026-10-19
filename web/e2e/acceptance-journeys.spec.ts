@@ -184,6 +184,22 @@ async function designAndDocument(page: Page, j: string): Promise<void> {
     const [xlsx] = await Promise.all([page.waitForEvent('download'), panel.getByTestId('exchange-xlsx').click()]);
     return { ifcColumns: (text.match(/IFCCOLUMN\(/g) ?? []).length, ifcBeams: (text.match(/IFCBEAM\(/g) ?? []).length, ifcSlabs: (text.match(/IFCSLAB\(/g) ?? []).length, outdatedBars: (text.match(/OUTDATED/g) ?? []).length, xlsx: xlsx.suggestedFilename() };
   });
+  // What this PR added, reachable on both journeys: slab sheets by layer, the listings in their
+  // formats, the bar schedule for bending machines and the sheets as DXF 2004.
+  await step(page, j, 'slab sheets, listings, BVBS and DXF 2004', async () => {
+    const desk = page.getByTestId('design-desk');
+    const list = await desk.getByTestId('sheets-list').innerText();
+    expect(list, 'slab reinforcement by layer').toMatch(/Losas por capa|Slabs by layer|Lajes por camada/);
+    const listings = desk.getByTestId('listings-panel');
+    await listings.scrollIntoViewIfNeeded();
+    const [html] = await Promise.all([page.waitForEvent('download'), listings.getByTestId('listing-checks-html').click()]);
+    const checks = readFileSync(await html.path(), 'utf8');
+    expect((checks.match(/<tr>/g) ?? []).length, 'checks listed').toBeGreaterThan(5);
+    const [bvbs] = await Promise.all([page.waitForEvent('download'), listings.getByTestId('listings-bvbs').click()]);
+    expect(readFileSync(await bvbs.path(), 'latin1')).toMatch(/^BF2D@/);
+    const [dxf] = await Promise.all([page.waitForEvent('download'), desk.getByTestId('sheets-dxf').click()]);
+    return { slabSheets: (list.match(/Losas por capa|Slabs by layer|Lajes por camada/g) ?? []).length, checkRows: (checks.match(/<tr>/g) ?? []).length - 1, dxf: dxf.suggestedFilename() };
+  });
   await step(page, j, 'leave desk', async () => { await leaveDesign(page); });
 }
 
@@ -208,6 +224,7 @@ test.describe('@slow acceptance of the two journeys', () => {
       // The bars stay (they are the person's), and every output built from them says it is out of date.
       await expect(desk.getByTestId('documents-outdated')).toBeVisible();
       await expect(desk.getByTestId('sheets-detailing-outdated')).toBeVisible();
+      await expect(desk.getByTestId('listings-detailing-outdated')).toBeVisible();
       return { detailingBefore: before, detailingAfter: await detailingTotals(page), deskSaysSolve: /solve|calcul/i.test(await desk.innerText()) };
     });
     await step(page, j, 'after the change: solve, design and detail again', async () => {
@@ -307,6 +324,9 @@ test.describe('@slow acceptance of the two journeys', () => {
       await expect(page.getByTestId('physical-table')).toBeVisible();
       return physical(page);
     });
+    // The second journey runs in Spanish: with the first in English and its last step in
+    // Portuguese, the three languages are walked.
+    await step(page, j, 'Spanish', async () => { await setAppLanguage(page, 'es'); });
     await designAndDocument(page, j);
     if (process.env.AUDIT_OUT) writeFileSync(`${process.env.AUDIT_OUT}-J2.json`, JSON.stringify(record.filter((r) => r.journey.startsWith('J2')), null, 2));
   });

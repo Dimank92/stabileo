@@ -10,6 +10,7 @@
   import { exportBvbs, exportListing, exportListingsWorkbook, type ListingFormat } from '../../../lib/store/listing-export';
   import { sheetLanguage } from '../../../lib/store/sheet-set';
   import type { DocumentModel } from '../../../lib/engine/detailing/document-model';
+  import OutdatedNotice from './OutdatedNotice.svelte';
 
   let { resolve }: { resolve: () => DocumentModel | null } = $props();
   let open = $state<ListingId | null>(null);
@@ -24,13 +25,15 @@
     if (on) cur.add(key); else cur.delete(key);
     setListingConfig(open, { ...conf, columns: allCols.map((c) => c.key).filter((k) => cur.has(k)) });
   }
-  const FORMATS: ListingFormat[] = ['pdf', 'html', 'xlsx', 'csv'];
+  const FORMATS: ListingFormat[] = ['pdf', 'html', 'docx', 'xlsx', 'csv'];
   let note = $state<string | null>(null);
   function bvbs() { const d = resolve(); if (d) exportBvbs(d, new Date().toISOString()); else note = t('list.ui.noDocument'); }
 </script>
 
 <section class="lp" data-testid="listings-panel">
   <h4>{t('list.ui.title')}</h4>
+  <!-- The quantities, the steel and the BVBS read the detailing: said when it is older than the model. -->
+  <OutdatedNotice what="detailing" testid="listings-detailing-outdated" />
   <div class="row">
     <label>{t('list.ui.waste')}<input type="number" min="0" max="50" step="1" value={st.wastePct ?? 0} onchange={(e) => setWastePct(Number(e.currentTarget.value))} data-testid="listings-waste" /> %</label>
     <button onclick={() => exportListingsWorkbook([...LISTING_IDS])} data-testid="listings-all-xlsx">{t('list.ui.allXlsx')}</button>
