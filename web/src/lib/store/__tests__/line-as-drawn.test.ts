@@ -93,13 +93,17 @@ describe('a line\'s bars, laid as drawn', () => {
     expect(JSON.stringify(long.run.assemblies.map((a) => a.unsupported))).not.toMatch(/Solape dibujado/);
   });
 
-  it('the two bars of a drawn lap are not a clash', () => {
+  it('the two bars of a drawn lap are not a clash; splices that do not fit beside each other are', () => {
     const { run, left, right } = cutAndDetail(1.0);
-    const clash = run.assemblies.flatMap((a) => a.conflicts ?? []).filter((c) => {
+    const between = run.assemblies.flatMap((a) => a.conflicts ?? []).filter((c) => {
       const ids = [c.barA ?? '', c.barB ?? '', ...((c as { barIds?: string[] }).barIds ?? [])].join(' ');
       return ids.includes(`-line-${left.id}-`) && ids.includes(`-line-${right.id}-`);
     });
-    expect(clash).toEqual([]);
+    // Each pair is in contact: no clearance under zero between the bars of one lap.
+    expect(between.filter((c) => (c.clearance ?? 0) <= 1e-6)).toEqual([]);
+    // Four contact splices of the bottom row do not fit the 0,20 m web with the clear spacing the
+    // bars need between one splice and the next: that is said, as spacing within the layer.
+    for (const c of between) expect(c.pairClass).toBe('sameLayerSpacing');
   });
 
   it('keeps each bar\'s identity across a regeneration', () => {

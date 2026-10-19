@@ -985,21 +985,65 @@ export function generateBeamBars(input: BeamGenerationInput): GeneratedBeam {
       for (const r of rows) {
         const inRow = pieces.filter((q) => q.row === r).sort((p, q) => p.from - q.from || p.lineBarId.localeCompare(q.lineBarId));
         const dia = Math.max(...inRow.map((q) => q.diameterMm));
-        // As many positions as bars stand side by side at once anywhere along the member.
+        // As many positions as bars stand side by side at once anywhere along the member, or as the
+        // line seats its row with (`place`): the same count in every member it crosses.
+        // A lap's two bars stand side by side in contact (§25.5.1.2): the pair takes one bar's
+        // positions, the second bar beside the first.
         const xs = [...new Set(inRow.flatMap((q) => [q.from, q.to]))].sort((a, b) => a - b);
-        let most = 0;
-        for (let k = 0; k + 1 < xs.length; k++) {
+        let most = Math.max(0, ...inRow.map((q) => q.place?.seats ?? 0));
+        for (let k = 0; !most && k + 1 < xs.length; k++) {
           const mid = (xs[k]! + xs[k + 1]!) / 2;
-          most = Math.max(most, inRow.filter((q) => q.from <= mid && q.to >= mid).reduce((n, q) => n + q.count, 0));
+          const here = inRow.filter((q) => q.from <= mid && q.to >= mid);
+          const paired = here.filter((q) => here.some((o) => o !== q && q.lapsWith.includes(o.lineBarId) && o.lineBarId < q.lineBarId));
+          most = Math.max(most, here.filter((q) => !paired.includes(q)).reduce((n, q) => n + q.count, 0));
         }
-        const slots = placeGroup(Math.max(1, most), dia, face === 'top', false, undefined, stacked)
-          .map((o) => ({ ...o }))
-          .sort((p, q) => p.layer - q.layer || Math.abs(q.across) - Math.abs(p.across) || p.across - q.across);
+        // Positions reserved by index on the row's largest bar; each bar stands at its own
+        // diameter's seat of the same index, so a bar running through a support stands at the same
+        // place either side of it and the two pieces are one bar (`lap-materialize` fuses them).
+        const order = (xs: Array<{ layer: number; across: number; x: number; y: number; z: number }>) =>
+          xs.map((o) => ({ ...o })).sort((p, q) => p.layer - q.layer || Math.abs(q.across) - Math.abs(p.across) || p.across - q.across);
+        // The row's own layout (`own`), not the coordinated slots the search chose for the
+        // generator's arrangement: a drawn bar stands where its row puts it in every member it
+        // crosses, the outer bars in the stirrup's bends. A clash with a crossing cage that this
+        // leaves is the collision check's to report.
+        const slots = order(placeGroup(Math.max(1, most), dia, face === 'top', true, undefined, stacked));
+        const seatsOf = new Map<number, typeof slots>([[dia, slots]]);
+        const seats = (d: number) => { let v = seatsOf.get(d); if (!v) { v = order(placeGroup(Math.max(1, most), d, face === 'top', true, undefined, stacked)); seatsOf.set(d, v); } return v; };
         // A row past the face's first stands that many layers in, by the clear owed between layers.
         const inward = face === 'top' ? -1 : 1;
         const deeper = r === 0 ? 0 : intoLayer(stacked, r, dia) - intoLayer(stacked, 0, dia);
-        const taken: Array<{ from: number; to: number; slots: number[] }> = [];
+        type Spot = { layer: number; across: number; x: number; y: number; z: number };
+        /** What each laid bar holds: slot indices it reserves, its base positions, and whether it stands beside them. */
+        const taken: Array<{ id: string; from: number; to: number; slots: number[]; base: Spot[]; beside: boolean; dia: number }> = [];
+        const besideOf = (sp: Spot, mm: number): Spot => {
+          const shift = mm / 1000, sgn = sp.across === 0 ? 1 : -Math.sign(sp.across);
+          return { ...sp, across: sp.across + sgn * shift, x: sp.x + across.x * sgn * shift, y: sp.y + across.y * sgn * shift, z: sp.z + across.z * sgn * shift };
+        };
         for (const q of inRow) {
+          if (q.place) {
+            // Seated on the line: the same positions in every member, mirrored across where the
+            // member runs against the line (its across axis is the line's reversed).
+            const own = seats(q.diameterMm);
+            const at = (i: number) => {
+              const sp = own[i] ?? own[own.length - 1]!;
+              return q.place!.mirrored ? own.reduce((m, o) => (Math.abs(o.across + sp.across) < Math.abs(m.across + sp.across) ? o : m), sp) : sp;
+            };
+            const base = q.place.slots.map(at);
+            const spots = q.place.besideMm ? base.map((sp) => besideOf(sp, q.place!.besideMm!)) : base;
+            taken.push({ id: q.lineBarId, from: q.from, to: q.to, slots: q.place.besideMm ? [] : q.place.slots, base, beside: !!q.place.besideMm, dia: q.diameterMm });
+            layAt(q, spots, r, deeper, inward);
+            continue;
+          }
+          // Lapped with a bar already laid: in contact beside it, toward the section's middle; a bar
+          // lapping one that stands beside its own partner goes back to the base positions.
+          const partner = taken.find((t) => q.lapsWith.includes(t.id) && t.to > q.from + 1e-6 && t.from < q.to - 1e-6);
+          if (partner) {
+            const base = partner.base.slice(0, q.count);
+            const spots = partner.beside ? base : base.map((sp) => besideOf(sp, (partner.dia + q.diameterMm) / 2));
+            layAt(q, spots, r, deeper, inward);
+            taken.push({ id: q.lineBarId, from: q.from, to: q.to, slots: [], base, beside: !partner.beside, dia: q.diameterMm });
+            continue;
+          }
           const busy = new Set(taken.filter((t) => t.to > q.from + 1e-6 && t.from < q.to - 1e-6).flatMap((t) => t.slots));
           const free = slots.map((_, i) => i).filter((i) => !busy.has(i));
           if (free.length < q.count) {
@@ -1007,33 +1051,40 @@ export function generateBeamBars(input: BeamGenerationInput): GeneratedBeam {
               `en x = ${q.from.toFixed(2)}–${q.to.toFixed(2)} m junto a las barras que la comparten.`);
           }
           const mine = (free.length >= q.count ? free : slots.map((_, i) => i)).slice(0, q.count);
-          taken.push({ from: q.from, to: q.to, slots: mine });
-          const zFace = face === 'bottom'
-            ? -(cage.halfUp - inset(q.diameterMm)) + raise
-            : cage.halfUp - inset(q.diameterMm) - drop;
-          const need = face === 'bottom' ? bottomNeed : 'develop' as const;
-          const at = (kind: 'support' | 'continue' | 'cut', side: 'I' | 'J', x: number, hook: boolean | undefined, layer: number): EndPlan =>
-            kind === 'cut'
-              ? { along: side === 'I' ? -x : x - input.L, ...(hook ? { hook: 90 as HookAngle } : {}) }
-              : endPlan(side, face, q.diameterMm, need, !!hook,
-                face === 'top' ? rowInboard(layer, q.diameterMm, nestClear(q.diameterMm)) : hook ? bottomHookInboardAt(side) + rowInboard(layer, q.diameterMm, nestClear(q.diameterMm)) : 0,
-                kind === 'support');
-          for (let k = 0; k < mine.length; k++) {
-            const sl = slots[mine[k]!]!;
-            const layer = r + sl.layer;
-            const offset = { x: sl.x + input.up.x * deeper * inward, y: sl.y + input.up.y * deeper * inward, z: sl.z + input.up.z * deeper * inward };
-            const id = `e${input.elementId}-line-${q.lineBarId}-${k}`;
-            barLayers[id] = layer;
-            const bar = supportedBar({
-              id, layerId: layerId(face, layer), dbMm: q.diameterMm, z: zFace, offset,
-              hookNormal: face === 'bottom' ? input.up : { x: -input.up.x, y: -input.up.y, z: -input.up.z },
-              i: at(q.start, 'I', q.from, q.hookStart, layer), j: at(q.end, 'J', q.to, q.hookEnd, layer),
-            });
-            bars.push({ ...bar, source: 'manual' });
-            byId.set(q.lineBarId, [...(byId.get(q.lineBarId) ?? []), { barId: id, across: sl.across, layer }]);
-          }
+          const own = seats(q.diameterMm);
+          const base = mine.map((i) => own[i] ?? slots[i]!);
+          taken.push({ id: q.lineBarId, from: q.from, to: q.to, slots: mine, base, beside: false, dia: q.diameterMm });
+          layAt(q, base, r, deeper, inward);
         }
         stacked.push([...new Set(inRow.map((q) => q.diameterMm))]);
+      }
+    }
+    /** Lay a piece's bars at the given positions, each end as the piece says (`LineBarEnd`). */
+    function layAt(q: LineBarPiece, spots: ReadonlyArray<{ layer: number; across: number; x: number; y: number; z: number }>, r: number, deeper: number, inward: number) {
+      const face = q.face;
+      const zFace = face === 'bottom'
+        ? -(cage.halfUp - inset(q.diameterMm)) + raise
+        : cage.halfUp - inset(q.diameterMm) - drop;
+      const need = face === 'bottom' ? bottomNeed : 'develop' as const;
+      const endOf = (kind: 'support' | 'continue' | 'cut', side: 'I' | 'J', x: number, hook: boolean | undefined, layer: number): EndPlan =>
+        kind === 'cut'
+          ? { along: side === 'I' ? -x : x - input.L, ...(hook ? { hook: 90 as HookAngle } : {}) }
+          : endPlan(side, face, q.diameterMm, need, !!hook,
+            face === 'top' ? rowInboard(layer, q.diameterMm, nestClear(q.diameterMm)) : hook ? bottomHookInboardAt(side) + rowInboard(layer, q.diameterMm, nestClear(q.diameterMm)) : 0,
+            kind === 'support');
+      for (let k = 0; k < spots.length; k++) {
+        const sl = spots[k]!;
+        const layer = r + sl.layer;
+        const offset = { x: sl.x + input.up.x * deeper * inward, y: sl.y + input.up.y * deeper * inward, z: sl.z + input.up.z * deeper * inward };
+        const id = `e${input.elementId}-line-${q.lineBarId}-${k}`;
+        barLayers[id] = layer;
+        const bar = supportedBar({
+          id, layerId: layerId(face, layer), dbMm: q.diameterMm, z: zFace, offset,
+          hookNormal: face === 'bottom' ? input.up : { x: -input.up.x, y: -input.up.y, z: -input.up.z },
+          i: endOf(q.start, 'I', q.from, q.hookStart, layer), j: endOf(q.end, 'J', q.to, q.hookEnd, layer),
+        });
+        bars.push({ ...bar, source: 'manual' });
+        byId.set(q.lineBarId, [...(byId.get(q.lineBarId) ?? []), { barId: id, across: sl.across, layer }]);
       }
     }
     // The laps drawn inside this member: each bar of one paired with the nearest of the other.
