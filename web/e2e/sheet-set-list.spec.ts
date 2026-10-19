@@ -59,4 +59,30 @@ test.describe('@slow the drawing set as a list', () => {
     await expect(page.getByTestId('sheets-list')).toContainText(/Encofrado a 1:50/);
     expect(errors).toEqual([]);
   });
+
+  test('a drawing given another scale and placed by hand keeps both when the set is laid out again', async ({ pro: page }) => {
+    await loadModel(page, 'rc-design-qa-8');
+    await designAll(page);
+    await openDocumentsStage(page);
+    await page.getByTestId('sheets-panel').scrollIntoViewIfNeeded();
+    await page.getByTestId('sheets-build').click();
+    await expect(page.getByTestId('sheets-count')).toBeVisible();
+    // A formwork sheet: a plan, with a scale to change (a table has none).
+    const formwork = () => page.getByTestId('sheets-list').locator('li', { hasText: /encofrado|Formwork/i }).first().locator('button.pick');
+    await formwork().click();
+    const composer = page.getByTestId('sheets-composer');
+    await composer.locator('summary').click();
+    await page.getByTestId('sheets-composer-scale').selectOption('200');
+    await page.getByTestId('sheets-composer-x').fill('40');
+    await page.getByTestId('sheets-composer-place').click();
+    await expect(page.getByTestId('sheets-preview')).toContainText('1:200');
+    // Laid out again: the adjustments are applied again.
+    await page.getByTestId('sheets-build').click();
+    await formwork().click();
+    await expect(page.getByTestId('sheets-preview')).toContainText('1:200');
+    await expect(page.getByTestId('sheets-composer').locator('summary')).toContainText(/ajustes|adjusted/);
+    // Only the chosen sheet is exported.
+    await page.getByTestId('sheets-choose-E-02').check();
+    await expect(page.getByTestId('sheets-count')).toContainText(/1 elegida|1 chosen/);
+  });
 });

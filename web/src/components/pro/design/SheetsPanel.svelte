@@ -15,6 +15,7 @@
   import SheetDisplayEditor from './SheetDisplayEditor.svelte';
   import TitleBlockEditor from './TitleBlockEditor.svelte';
   import SheetTemplates from './SheetTemplates.svelte';
+  import SheetComposer from './SheetComposer.svelte';
   import { PLAN_KINDS, type PlanKind } from '../../../lib/store/work-drawings';
   import type { DocumentModel } from '../../../lib/engine/detailing/document-model';
   import { designFingerprint } from '../../../lib/store/design-fingerprint';
@@ -65,6 +66,11 @@
     shown = Math.min(shown, Math.max(0, sheets.length - 1));
   }
   function cancel() { abort?.abort(); progress = null; }
+  /** The sheets chosen for a partial export; none chosen, all of them. */
+  let chosen = $state<Set<string>>(new Set());
+  const toExport = $derived(chosen.size ? sheets.filter((s) => chosen.has(s.number)) : sheets);
+  function choose(n: string, on: boolean) { const c = new Set(chosen); if (on) c.add(n); else c.delete(n); chosen = c; }
+  const conflicts = $derived(sheets[0]?.layoutConflicts ?? []);
 
   /** A setting changed: rebuild what is on screen so it never shows the previous one. */
   function patch(p: Parameters<typeof patchSheetSettings>[0]) {
@@ -133,18 +139,22 @@
     {/if}
     {#if sheets.length > 0}
       <!-- Sheets laid out before the last change are not downloaded: lay them out again first. -->
-      <button data-testid="sheets-pdf" disabled={outdated} onclick={() => exportSheetsPdf(doc, sheets, at(), projectName)}>{t('sheet.ui.pdf')}</button>
-      <button data-testid="sheets-dxf" disabled={outdated} onclick={() => exportSheetsDxf(doc, sheets, at())}>{t('sheet.ui.dxf')}</button>
+      <button data-testid="sheets-pdf" disabled={outdated} onclick={() => exportSheetsPdf(doc, toExport, at(), projectName)}>{t('sheet.ui.pdf')}</button>
+      <button data-testid="sheets-dxf" disabled={outdated} onclick={() => exportSheetsDxf(doc, toExport, at())}>{t('sheet.ui.dxf')}</button>
     {/if}
   </div>
 
   {#if built && sheets.length === 0}
     <p class="muted" data-testid="sheets-none">{t('sheet.ui.none')}</p>
   {:else if sheets.length > 0}
-    <p class="muted" data-testid="sheets-count">{tp('sheet.ui.count', { n: sheets.length })}</p>
+    <p class="muted" data-testid="sheets-count">{tp('sheet.ui.count', { n: sheets.length })}{chosen.size ? ` · ${tp('sheet.ui.chosen', { n: chosen.size })}` : ''}</p>
+    {#if conflicts.length}
+      <ul class="muted conflicts" data-testid="sheets-layout-conflicts">{#each conflicts as c}<li>{tp(`sheet.ui.conflict.${c.reason}`, { key: c.key, detail: c.detail ?? '' })}</li>{/each}</ul>
+    {/if}
     <ul class="list" data-testid="sheets-list">
       {#each sheets as s, i (s.number)}
         <li class:on={i === shown}>
+          <input type="checkbox" checked={chosen.has(s.number)} onchange={(e) => choose(s.number, e.currentTarget.checked)} aria-label={tp('sheet.ui.choose', { n: s.number })} data-testid={`sheets-choose-${s.number}`} />
           <button class="pick" data-testid={`sheets-item-${s.number}`} onclick={() => (shown = i)}>
             <span class="num">{s.number}</span><span class="ttl">{s.title}</span><span class="fmt">{s.format}</span>
           </button>
@@ -159,6 +169,7 @@
     {#if sheets[shown]}
       <!-- The sheet's own SVG writer escapes every text it draws. -->
       <div class="preview" data-testid="sheets-preview">{@html sheetSvg(sheets[shown]!, st.display, 'screen')}</div>
+      <SheetComposer sheet={sheets[shown]!} all={sheets} onChange={() => (sheets = projectSheetSet(doc, projectName))} />
     {/if}
   {/if}
 </section>
@@ -197,4 +208,5 @@
   .rev input { width: 3rem; }
   .preview { border: 1px solid var(--st-hair); border-radius: 3px; padding: 0.25rem; }
   .preview :global(svg) { display: block; width: 100%; height: auto; }
+  .conflicts { color: var(--st-warn); padding-left: 1rem; }
 </style>

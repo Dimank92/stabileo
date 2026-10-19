@@ -9,6 +9,8 @@ import { composeSheets, type DrawingInput } from './compose';
 import { blankGeometry, formatGeometry, type SheetFormat } from './formats';
 import { displayPrimitives, displayStyle, type SheetDisplay } from './display';
 import { fillLine, type TitleBlockTemplate } from './sheet-entries';
+import { arrangeDrawings, sizeChanged, textKeys, translate, type LayoutConflict, type SheetLayout } from './sheet-layout';
+import type { PlacedDrawing } from './compose';
 import { frameAndTitleBlock, type TitleBlockData } from './title-block';
 import { sheetToDxf } from './to-dxf';
 import { sheetToSvg } from './to-svg';
@@ -20,7 +22,14 @@ export const DEFAULT_SHEET_SETTINGS: SheetSetSettings = { format: 'A1', prefix: 
 
 export interface SheetRevision { code: string; date?: string; note?: string }
 
-export interface SetSheet { number: string; title: string; format: SheetFormat; width: number; height: number; primitives: Primitive[]; drawings: string[]; revision?: SheetRevision }
+export interface SetSheet {
+  number: string; title: string; format: SheetFormat; width: number; height: number; primitives: Primitive[]; drawings: string[]; revision?: SheetRevision;
+  /** Where each drawing sits on the sheet (for the composition editor); its primitives start after the frame's `blockCount`. */
+  placed?: PlacedDrawing[];
+  blockCount?: number;
+  /** On the index: the layout adjustments that did not hold after this generation. */
+  layoutConflicts?: LayoutConflict[];
+}
 
 export interface SheetSetInput {
   drawings: readonly DrawingInput[];
@@ -34,6 +43,8 @@ export interface SheetSetInput {
   titleBlock?: TitleBlockTemplate;
   /** The levels a sheet covers, by group, for the {planta} variable. */
   floorOf?: (group: string | undefined) => string | undefined;
+  /** The person's adjustments to the composition (`sheet-layout.ts`). */
+  layout?: SheetLayout;
 }
 
 export function buildSheetSet(i: SheetSetInput): SetSheet[] {
@@ -45,7 +56,36 @@ export function buildSheetSet(i: SheetSetInput): SetSheet[] {
   const block = (g: ReturnType<typeof formatGeometry>, d: Parameters<typeof frameAndTitleBlock>[1]) => (blank
     ? [{ kind: 'polyline' as const, layer: 'SHEET-FRAME', closed: true, points: [{ x: g.frame.x0, y: g.frame.y0 }, { x: g.frame.x1, y: g.frame.y0 }, { x: g.frame.x1, y: g.frame.y1 }, { x: g.frame.x0, y: g.frame.y1 }] }]
     : frameAndTitleBlock(g, d, i.label));
-  const composed = composeSheets(i.drawings, i.settings.format, geometryOf);
+  const arranged = arrangeDrawings(i.drawings, i.layout);
+  const conflicts = [...arranged.conflicts];
+  const byKey = new Map(arranged.drawings.map((d) => [d.key, d]));
+  const composed = composeSheets(arranged.drawings, i.settings.format, geometryOf);
+  // The adjustments that place: a drawing at its point, texts moved inside it, annotations.
+  for (const c of composed) {
+    for (const p of c.drawings) {
+      const a = i.layout?.drawings[p.key], d = byKey.get(p.key);
+      if (!a || !d) continue;
+      if ((a.at || a.moves) && sizeChanged(a, d)) { conflicts.push({ key: p.key, reason: 'sizeChanged' }); continue; }
+      if (a.moves) {
+        const keys = textKeys(d.primitives), at = new Map([...keys].map(([idx, k]) => [k, idx]));
+        for (const [k, delta] of Object.entries(a.moves)) {
+          const idx = at.get(k);
+          if (idx === undefined) { conflicts.push({ key: p.key, reason: 'textMissing', detail: k }); continue; }
+          c.primitives[p.from + idx] = translate([c.primitives[p.from + idx]!], delta)[0]!;
+        }
+      }
+      if (a.at) {
+        const delta = { x: a.at.x - p.x, y: a.at.y - p.y };
+        c.primitives.splice(p.from, p.to - p.from, ...translate(c.primitives.slice(p.from, p.to), delta));
+        p.x = a.at.x; p.y = a.at.y;
+      }
+    }
+  }
+  for (const n of i.layout?.annotations ?? []) {
+    const c = composed.find((x) => x.drawings.some((p) => p.key === n.onDrawing));
+    if (!c) { conflicts.push({ key: n.id, reason: 'anchorMissing', detail: n.onDrawing }); continue; }
+    c.primitives.push({ kind: 'text', layer: 'NOTE-TEXT', at: { ...n.at }, text: n.text, height: n.height });
+  }
   const num = (k: number) => `${i.settings.prefix}${String(i.settings.start + k).padStart(2, '0')}`;
   const sheets: SetSheet[] = composed.map((c, k) => {
     const g = geometryOf(c.format), number = num(k + 1);
@@ -54,7 +94,7 @@ export function buildSheetSet(i: SheetSetInput): SetSheet[] {
     const revision = i.revisions?.[number] ?? i.projectRevision;
     const tl = lines({ number, scale: scales, ...(c.group ? { group: c.group } : {}) });
     const tb = block(g, { ...i.project, sheetNumber: number, sheetTitle: title, scale: scales, format: c.format, ...(revision ? { revision } : {}), ...(tl ? { lines: tl } : {}) });
-    return { number, title, format: c.format, width: g.width, height: g.height, primitives: [...tb, ...c.primitives], drawings: c.drawings.map((d) => d.key), ...(revision ? { revision } : {}) };
+    return { number, title, format: c.format, width: g.width, height: g.height, primitives: [...tb, ...c.primitives], drawings: c.drawings.map((d) => d.key), placed: c.drawings, blockCount: tb.length, ...(revision ? { revision } : {}) };
   });
   // The index, first.
   const g = geometryOf(i.settings.format), number = num(0);
@@ -73,6 +113,7 @@ export function buildSheetSet(i: SheetSetInput): SetSheet[] {
     number, title: i.label('sheet.index.title'), format: i.settings.format, width: g.width, height: g.height, drawings: [],
     primitives: [...block(g, { ...i.project, sheetNumber: number, sheetTitle: i.label('sheet.index.title'), scale: '—', format: i.settings.format, ...(revision ? { revision } : {}), ...((tl) => (tl ? { lines: tl } : {}))(lines({ number, scale: '—' })) }), ...rows],
     ...(revision ? { revision } : {}),
+    ...(conflicts.length ? { layoutConflicts: conflicts } : {}),
   };
   return [index, ...sheets];
 }

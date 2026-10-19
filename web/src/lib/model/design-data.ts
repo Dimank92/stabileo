@@ -102,6 +102,8 @@ export interface ProjectDesignData {
     entries?: import('../sheets/sheet-entries').SheetEntry[];
     display?: import('../sheets/display').SheetDisplay;
     titleBlock?: import('../sheets/sheet-entries').TitleBlockTemplate;
+    /** The person's adjustments to the composed sheets, by drawing key (`sheets/sheet-layout.ts`). */
+    layout?: import('../sheets/sheet-layout').SheetLayout;
   };
   /** How a seismic project designs its concrete (`seismic-design.ts`). Absent: the defaults. */
   seismic?: import('./seismic-design').SeismicDesignSettings;

@@ -22,6 +22,8 @@ import { projectPhysicalFrame } from './physical-frame';
 import { cachedSceneModel } from '../engine/detailing/scene-cache';
 import { PLAN_KINDS, planContext, workDrawings, type PlanKind } from './work-drawings';
 import { defaultEntries, parseSetTemplate, type SheetEntry, type SheetSetTemplate } from '../sheets/sheet-entries';
+import { emptyLayout, type DrawingAdjust, type SheetLayout } from '../sheets/sheet-layout';
+import type { PlacedDrawing } from '../sheets/compose';
 
 export const sheetSettings = () => ({ ...DEFAULT_SHEET_SETTINGS, ...designData().sheets });
 export const patchSheetSettings = (p: Partial<ReturnType<typeof sheetSettings>>) => patchDesignData({ sheets: { ...sheetSettings(), ...p } });
@@ -116,6 +118,7 @@ function assemble(doc: DocumentModel | null, projectName: string, drawings: Draw
     ...(st.revisions ? { revisions: st.revisions } : {}),
     ...(rev ? { projectRevision: { code: rev.code, ...(rev.date ? { date: rev.date } : {}), ...(rev.note ? { note: rev.note } : {}) } } : {}),
     label: (k) => tAt(k, locale),
+    ...(st.layout ? { layout: st.layout } : {}),
     // The template's variables the project already states fill themselves; the template's own win.
     ...(st.titleBlock ? { titleBlock: { ...st.titleBlock, values: {
       ...(info?.job || tb.project || projectName ? { obra: info?.job || tb.project || projectName } : {}),
@@ -184,3 +187,37 @@ export function exportSheetsPdf(doc: DocumentModel | null, sheets: readonly SetS
   const write = () => save(filename, 'application/pdf', sheetSetPdf(sheets, title, sheetSettings().display));
   if (doc) withExportLog({ kind: 'sheetsPdf', doc, filename, at }, write); else write();
 }
+
+// ─── The composition, adjusted by hand ───
+
+export const sheetLayout = (): SheetLayout => sheetSettings().layout ?? emptyLayout();
+const setLayout = (layout: SheetLayout) => patchSheetSettings({ layout });
+
+/**
+ * Adjust a drawing as placed: its scale, the sheet of another drawing it goes to, its point on the
+ * sheet, a text moved inside it. The drawing's size now is kept with it, so a later generation that
+ * changed it says so instead of applying the adjustment over the new drawing.
+ */
+export function adjustDrawing(p: Pick<PlacedDrawing, 'key' | 'mw' | 'mh'>, patch: Partial<DrawingAdjust>): void {
+  const l = sheetLayout(), cur = l.drawings[p.key] ?? {};
+  const next: DrawingAdjust = { ...cur, ...patch, size: { w: p.mw, h: p.mh } };
+  for (const k of Object.keys(next) as Array<keyof DrawingAdjust>) if (next[k] === undefined) delete next[k];
+  setLayout({ ...l, drawings: { ...l.drawings, [p.key]: next } });
+}
+
+export function clearAdjust(key: string): void {
+  const l = sheetLayout(), { [key]: _gone, ...rest } = l.drawings;
+  setLayout({ ...l, drawings: rest });
+}
+
+export function addAnnotation(onDrawing: string, at: { x: number; y: number }, text: string, height = 2.5): void {
+  const l = sheetLayout();
+  setLayout({ ...l, annotations: [...l.annotations, { id: `n${Date.now().toString(36)}${l.annotations.length}`, onDrawing, at, text, height }] });
+}
+export function removeAnnotation(id: string): void {
+  const l = sheetLayout();
+  setLayout({ ...l, annotations: l.annotations.filter((n) => n.id !== id) });
+}
+
+/** Only these sheets, by number, as PDF or DXF (the index travels when asked for). */
+export const selectSheets = (sheets: readonly SetSheet[], numbers: ReadonlySet<string>) => sheets.filter((s) => numbers.has(s.number));
