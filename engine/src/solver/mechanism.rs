@@ -1640,7 +1640,9 @@ impl MechanismCheck {
     /// it, a blown-up solution) reported as the mechanism, by its free
     /// motions; any other error unchanged.
     pub fn explain_failure(&self, e: String) -> String {
-        let singular = e.contains("Singular") || e.contains("singular") || e.contains("mechanism");
+        let own = ["Structure is a mechanism", "Rotation not stiffened", "Nodal moment", "Load at node"];
+        let singular = (e.contains("Singular") || e.contains("singular") || e.contains("mechanism"))
+            && !own.iter().any(|p| e.starts_with(p));
         match self.message() {
             Some(m) if singular && !e.starts_with("Structure is a mechanism") => {
                 format!("{m} The solver could not factor its stiffness ({e}).")
@@ -1692,11 +1694,12 @@ impl MechanismCheck {
         if nodes.is_empty() {
             return Ok(());
         }
+        let also = self.message().map(|m| format!(" {m}")).unwrap_or_default();
         Err(format!(
             "Rotation not stiffened at node{} {}: nothing in the model resists the rotation of {} about an \
              axis that is not a global one (a member released about one bending axis, and nothing else \
              at the node), so the stiffness matrix is singular. Release the member about both bending \
-             axes there, or connect or restrain the node's rotation",
+             axes there, or connect or restrain the node's rotation.{also}",
             if nodes.len() == 1 { "" } else { "s" },
             list_nodes(&nodes),
             if nodes.len() == 1 { "that node" } else { "those nodes" },
