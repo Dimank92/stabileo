@@ -7,6 +7,7 @@
    * again) or sent back to the proposal.
    */
   import { untrack } from 'svelte';
+  import FamilyBatch from '../FamilyBatch.svelte';
   import { t, tp } from '../../../../lib/i18n';
   import { modelStore } from '../../../../lib/store';
   import { detailingStore } from '../../../../lib/store/detailing.svelte';
@@ -173,6 +174,7 @@
       </div>
     </section>
   {/if}
+  <FamilyBatch family="slab" />
 </div>
 
 <style>

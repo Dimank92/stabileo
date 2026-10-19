@@ -17,6 +17,7 @@
   import { openRebar3DView } from '../../../lib/store/rebar-open';
   import VerificationDetail from '../design/VerificationDetail.svelte';
   import { copyFrame, equalizeFrames, framesOf } from '../../../lib/store/frame-equalize';
+  import FrameCopyPanel from './FrameCopyPanel.svelte';
   import { jointChecks } from '../../../lib/store/joint-checks';
   import type { DeskRow } from './desk-rows';
   import BatchEditDialog from '../design/BatchEditDialog.svelte';
@@ -177,6 +178,7 @@
           </div>
         {/if}
         <button class="di-open-frame" onclick={() => (deskUi.tab = 'frame')} data-testid="desk-open-frame">{t('desk.openFrame')}</button>
+        <FrameCopyPanel line={frames.line} />
       </section>
     {/if}
 

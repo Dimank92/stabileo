@@ -92,6 +92,10 @@ export interface ProjectDesignData {
    * there is no slab.
    */
   exchange?: { ifcColumnTop?: 'slabTop' | 'slabSoffit' | 'axis' };
+  /** How far apart, mm, two members' lengths may be and their frames still repeat (`repeatedFrames`). Absent: 0, the same to the millimetre. */
+  frameToleranceMm?: number;
+  /** Cover a person set for one member, m, by element id: it replaces its kind's (`covers`). */
+  coverByElement?: Record<string, number>;
   sheets?: { format: import('../sheets/formats').SheetFormat; prefix: string; start: number; language?: string; kinds?: string[]; revisions?: Record<string, { code: string; date?: string; note?: string }> };
   /** How a seismic project designs its concrete (`seismic-design.ts`). Absent: the defaults. */
   seismic?: import('./seismic-design').SeismicDesignSettings;
@@ -193,6 +197,13 @@ export function migrateDesignData(raw: unknown): ProjectDesignData {
     ...(e.architecture && typeof e.architecture === 'object' && Array.isArray((e.architecture as { walls?: unknown }).walls) ? { architecture: e.architecture as ProjectDesignData['architecture'] } : {}),
     ...(e.federation && typeof e.federation === 'object' && Array.isArray((e.federation as { links?: unknown }).links) ? { federation: e.federation as ProjectDesignData['federation'] } : {}),
     ...(e.budget && typeof e.budget === 'object' && Array.isArray((e.budget as { bases?: unknown }).bases) ? { budget: e.budget as ProjectDesignData['budget'] } : {}),
+    ...((x) => (x && typeof x === 'object' && ['slabTop', 'slabSoffit', 'axis'].includes(String((x as { ifcColumnTop?: unknown }).ifcColumnTop))
+      ? { exchange: { ifcColumnTop: (x as { ifcColumnTop: 'slabTop' | 'slabSoffit' | 'axis' }).ifcColumnTop } } : {}))(e.exchange),
+    ...(typeof e.frameToleranceMm === 'number' && Number.isFinite(e.frameToleranceMm) && e.frameToleranceMm > 0 ? { frameToleranceMm: Math.min(e.frameToleranceMm, 500) } : {}),
+    ...((c) => (Object.keys(c).length ? { coverByElement: c } : {}))(
+      e.coverByElement && typeof e.coverByElement === 'object' && !Array.isArray(e.coverByElement)
+        ? Object.fromEntries(Object.entries(e.coverByElement as Record<string, unknown>).filter((x): x is [string, number] => typeof x[1] === 'number' && Number.isFinite(x[1]) && x[1] >= 0 && x[1] < 0.2))
+        : {}),
   };
 }
 
