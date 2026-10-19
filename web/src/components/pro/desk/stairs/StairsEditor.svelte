@@ -12,6 +12,7 @@
   import StairFlightFields from '../../stairs/StairFlightFields.svelte';
   import { stairPlates } from '../../../../lib/store/stair-link';
   import { uiStore } from '../../../../lib/store';
+  import StairFlightBuilder from './StairFlightBuilder.svelte';
 
   /*
    * The flight in metres, through the same fields the model's stair uses; the rest of the form
@@ -92,6 +93,9 @@
     </tbody>
   </table>
   {#if checks.length === 0}<p class="muted">{t('stair.ui.none')}</p>{/if}
+
+  <!-- The flight typed below, built in the model as its waist slab and designed as this stair. -->
+  <StairFlightBuilder {flight} width={num(form.width)} onDesigned={pick} />
 
   <details class="sf-sec" open>
     <summary>{selected ? t('stair.ui.edit') : t('stair.ui.new')}{#if selected}<button class="link" onclick={fresh}>{t('stair.ui.newOne')}</button>{/if}</summary>
