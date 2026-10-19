@@ -6,13 +6,16 @@
  *   Flexure    at each column face, the factored reactions of the piles beyond it times their
  *              lever arm; As = Mu/(φ·0,9·d·fy) on the cap's width, never under 0,0018·b·h.
  *   Shear      one-way at d from each face: a pile whose centre is d_p/2 or more past the section
- *              counts whole, d_p/2 or more before it not at all, linearly between (§13.4.2.5).
+ *              counts whole, d_p/2 or more before it not at all, linearly between (§13.4.2.5),
+ *              against Vc of Tabla 22.5.5.1 row (c), the cap having no stirrups (see `oneWayVc`).
  *   Punching   the column, less the piles inside its critical perimeter; and the most loaded
  *              corner pile on its own perimeter, cut by the cap's two edges.
  *
  * Local axes as `rigid-footing.ts`, piles and column centre about the cap's centroid.
  */
 import { checkPunchingShear, type PunchingCheck } from '../detailing/punching-shear';
+import { slabVc } from '../design/slabs/one-way-shear';
+import { CIRSOC201_DESIGN_EDITION, shearSqrtFc, type Cirsoc201Edition } from '../codes/argentina/cirsoc201-basis';
 
 export interface PileCapInput {
   B: number; L: number; thickness: number; cover: number; fc: number; fy: number;
@@ -21,13 +24,27 @@ export interface PileCapInput {
   column: { x: number; y: number; cx: number; cy: number };
   service: { N: number; Mx: number; My: number };
   factored: { N: number; Mx: number; My: number };
+  /** The CIRSOC 201 edition the one-way shear is read in. Absent: the design edition. */
+  edition?: Cirsoc201Edition;
+}
+
+/** How the one-way Vc was read: Tabla 22.5.5.1 (c) with its size factor and ρw, or 2005's 0,17. */
+export interface PileCapShear {
+  vu: number; phiVc: number; utilization: number;
+  basis: 'tabla22.5.5.1c' | 'cirsoc2005';
+  /** §22.5.5.1.3, 1 for 2005. */
+  lambdaS: number;
+  /** As/(bw·d) of the cap's flexural steel in this direction (with the minimum). */
+  rhoW: number;
+  /** §22.5.5.1.1 governed: Vc = 0,42·√f'c·bw·d. */
+  capped: boolean;
 }
 
 export interface PileCapResult {
   reactions: { service: number[]; factored: number[] };
   piles: { max: number; min: number; capacity: number; utilization: number; tension: boolean };
-  x: { mu: number; as: number; shear: { vu: number; phiVc: number; utilization: number } };
-  y: { mu: number; as: number; shear: { vu: number; phiVc: number; utilization: number } };
+  x: { mu: number; as: number; shear: PileCapShear };
+  y: { mu: number; as: number; shear: PileCapShear };
   punching: { column: number; cornerPile: number; checks: PunchingCheck[] };
   utilization: number;
 }
@@ -37,6 +54,28 @@ export function pileReactions(piles: ReadonlyArray<{ x: number; y: number }>, N:
   const cx = piles.reduce((s, p) => s + p.x, 0) / n, cy = piles.reduce((s, p) => s + p.y, 0) / n;
   const sx = piles.reduce((s, p) => s + (p.x - cx) ** 2, 0), sy = piles.reduce((s, p) => s + (p.y - cy) ** 2, 0);
   return piles.map((p) => N / n + (sx > 0 ? (My * (p.x - cx)) / sx : 0) + (sy > 0 ? (Mx * (p.y - cy)) / sy : 0));
+}
+
+/**
+ * One-way φVc of the cap across a width W, kN.
+ *
+ * CIRSOC 201-2025 §13.2.6.2(a) allows Vc = 0,17·λ·√f'c·bw·d only for shallow foundation members
+ * «continuamente apoyados sobre el suelo» and designed as rigid; a pile cap rests on its piles,
+ * so its one-way shear is §22.5.5.1. With no stirrups Av < Av,min, row (c) of Tabla 22.5.5.1:
+ * Vc = 0,66·λs·λ·ρw^⅓·√f'c·bw·d (Nu = 0 here), λs = √(2/(1 + 0,004·d)) ≤ 1 (§22.5.5.1.3, d in mm),
+ * Vc ≤ 0,42·λ·√f'c·bw·d (§22.5.5.1.1), √f'c ≤ 8,3 MPa (§22.5.3.1). It used 0,17·√f'c·bw·d,
+ * which on a cap 0,9 m deep at the minimum steel is about three times row (c).
+ *
+ * 2005 (CIRSOC 201-2005 §11.3.1.1) keeps 0,17·√f'c·bw·d: that edition has no size factor.
+ */
+export function pileCapOneWayVc(fc: number, W: number, d: number, as: number, edition: Cirsoc201Edition): Omit<PileCapShear, 'vu' | 'utilization'> {
+  const rhoW = W > 0 && d > 0 ? as / (W * d) : 0;
+  if (edition === '2005') {
+    return { phiVc: 0.75 * 0.17 * Math.sqrt(Math.min(fc, 70)) * W * d * 1000, basis: 'cirsoc2005', lambdaS: 1, rhoW, capped: false };
+  }
+  const { vc, lambdaS } = slabVc(fc, W, d, rhoW);
+  const vcMax = 0.42 * shearSqrtFc(fc) * W * d * 1000;
+  return { phiVc: 0.75 * Math.min(vc, vcMax), basis: 'tabla22.5.5.1c', lambdaS, rhoW, capped: vc > vcMax };
 }
 
 /** Share of a pile's reaction past a section at s (toward +), by §13.4.2.5. */
@@ -66,8 +105,10 @@ export function checkPileCap(c: PileCapInput): PileCapResult {
       });
       mu = Math.max(mu, m); vu = Math.max(vu, v);
     }
-    const phiVc = 0.75 * 0.17 * Math.sqrt(Math.min(c.fc, 70)) * W * d * 1000;
-    return { mu, as: Math.max((mu * 1000) / (0.9 * 0.9 * d * c.fy * 1e6), 0.0018 * W * c.thickness), shear: { vu, phiVc, utilization: vu / phiVc } };
+    const as = Math.max((mu * 1000) / (0.9 * 0.9 * d * c.fy * 1e6), 0.0018 * W * c.thickness);
+    // ρw from the steel this direction gets: the flexural As, never under the minimum.
+    const vc = pileCapOneWayVc(c.fc, W, d, as, c.edition ?? CIRSOC201_DESIGN_EDITION);
+    return { mu, as, shear: { vu, ...vc, utilization: vu / vc.phiVc } };
   };
   const x = dir('x'), y = dir('y');
 

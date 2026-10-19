@@ -98,11 +98,11 @@ export interface SlabJointForce {
    * Step in the column end moments across the joint, kN·m — the unbalanced moment the
    * connection transfers, about global x and y.
    *
-   * Collected and PASSED rather than omitted. §8.4.4.2 eccentric-shear moment transfer is
-   * not implemented, and the engine refuses a joint whose unbalanced moment is significant
-   * instead of reporting a direct-shear pass. Dropping these two numbers would turn that
-   * refusal into exactly the false pass it exists to prevent: an eccentric joint approved on
-   * a check that never saw its eccentricity.
+   * Collected and PASSED rather than omitted. The punching check evaluates the §8.4.4.2
+   * eccentric-shear moment transfer with them when the moment is significant
+   * (`checkPunchingShear`). Dropping these two numbers would turn that check into exactly the
+   * false pass it exists to prevent: an eccentric joint approved on a check that never saw its
+   * eccentricity.
    */
   unbalancedMomentX: number;
   unbalancedMomentY: number;

@@ -13,7 +13,7 @@
  *
  * §11.3.1.1  minimum thickness: the greater of 100 mm and 1/25 of the lesser of the
  *            unsupported length and unsupported height, for bearing walls
- * §11.5.4.6  in-plane shear strength V_n ≤ 0,83 √f'c A_cv
+ * §11.5.4.2  in-plane shear strength V_n ≤ 0,66 √f'c A_cv (0,83 in CIRSOC 201-2005)
  * §11.6.1    minimum distributed reinforcement, Tabla 11.6.1, by each direction's bar size
  *            and f_y; §11.6.2 where the in-plane shear passes 0,04·φ·λ·√f'c·Acv
  * §11.7.2    longitudinal bar spacing ≤ the lesser of 3h and 450 mm
@@ -144,7 +144,7 @@ export interface WallShearResult {
 /**
  * In-plane shear per §11.5.4.
  *
- * The §11.5.4.6 ceiling matters and is checked explicitly: above `0,83 √f'c A_cv` the
+ * The §11.5.4.2 ceiling matters and is checked explicitly: above `0,66 √f'c A_cv` the
  * wall fails by web crushing and adding horizontal steel does not help. Reporting a
  * shortfall that more reinforcement would fix, when it would not, sends the engineer
  * down the wrong path.

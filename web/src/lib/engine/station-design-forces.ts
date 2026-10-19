@@ -1339,7 +1339,30 @@ export interface ProvidedRebarResult {
   supportAnchorage?: import('./design/end-support-anchorage').SupportAnchorageVerdict[];
   /** Whether the beam's bars pass the column cages at its joints (`joint-threading-check.ts`). */
   jointThreading?: import('./design/joint-threading-check').JointThreadingVerdict[];
+  /**
+   * Shear regions of a shallow beam (h ≤ 250 mm) where CIRSOC 201-2025 §9.6.3.1 asks for Av,min
+   * (Vu > φVc) and the stirrups give less. The engine's checker exempts every such beam
+   * unconditionally (`min_shear_missing`), so no check row can carry it yet: the member is HELD
+   * on it (`verificationStore.memberHolds`), neither approved nor failed, until the engine applies
+   * the clause.
+   */
+  shallowMinShear?: ShallowMinShearHold[];
 }
+
+/** One shear region held on §9.6.3.1 (see `ProvidedRebarResult.shallowMinShear`). */
+export interface ShallowMinShearHold {
+  region: string;
+  /** kN, the worst tuple of the region (largest Vu/φVc). */
+  Vu: number; phiVc: number;
+  /** cm², at the stirrup spacing `spacing` (m); Av,min as the engine computes it (§9.6.3.4). */
+  Av: number; AvMin: number; spacing: number;
+  /** Section depth, m. */
+  h: number;
+  comboName?: string;
+}
+
+/** Tabla 9.6.3.1, «De poca altura»: h ≤ 250 mm. */
+export const SHALLOW_BEAM_MAX_H = 0.25;
 
 /**
  * A layout issue as a check row: the clear distance required over the one the bars have, the
@@ -1454,7 +1477,7 @@ export function computeShearCapacity(
   b: number, d: number, fc: number, fy: number, Nu: number = 0,
   /** Gross area (m², b·h) and the tension steel ratio As/(bw·d), when the caller has them. */
   opts: { Ag?: number; rhoW?: number; h?: number; edition?: RegulationEdition } = {},
-): { phiVn: number; phiVc: number; VsProv: number; phi: number; avBelowMin: boolean; capped: boolean; evaluated: boolean } {
+): { phiVn: number; phiVc: number; VsProv: number; phi: number; avBelowMin: boolean; capped: boolean; evaluated: boolean; AvMin?: number } {
   const phi = 0.75;
   const stirrupBar = REBAR_DB.find(r => r.diameter === stirrupDia);
   const legArea = stirrupBar ? stirrupBar.area : (Math.PI / 4) * (stirrupDia / 10) ** 2; // cm²
@@ -1475,6 +1498,8 @@ export function computeShearCapacity(
     phiVc: +(phi * r.Vc / 1e3).toFixed(2),
     VsProv: +(r.Vs / 1e3).toFixed(2),
     phi, avBelowMin: r.avBelowMin, capped: r.vsCapped, evaluated: true,
+    // cm² at the spacing given, Av,min of §9.6.3.4 as the engine reads it (edition, fyt).
+    AvMin: r.AvMin * 1e4,
   };
 }
 
@@ -2025,6 +2050,7 @@ export function verifyProvidedReinforcement(
 
   const checks: ProvidedRebarCheck[] = [];
   const checkedAxes = new Set<string>();
+  const shallowMinShear: ShallowMinShearHold[] = [];
 
   const axes: DesignAxes = options?.axes
     ?? resolveDesignAxes(elementType, { b: section?.b ?? 0.3, h: section?.h ?? 0.6 }, demands);
@@ -2598,8 +2624,25 @@ export function verifyProvidedReinforcement(
       { label: `Shear Support (${axes.shear})`, stir: stirSupport, tuples: [...startTuples, ...endTuples], range: [0, tStartEnd], rhoW: rhoSupport },
       { label: `Shear Span (${axes.shear})`, stir: stirSpan, tuples: spanTuples, range: [tStartEnd, tEndStart], rhoW: rhoSpan },
     ];
+    /*
+     * CIRSOC 201-2025 §9.6.3.1 and Tabla 9.6.3.1: a beam «de poca altura» (h ≤ 250 mm) is exempt
+     * from Av,min only where Vu ≤ φVc; where Vu > φVc «se debe colocar al menos Av,min». The
+     * engine's checker exempts it everywhere (`min_shear_missing` returns False for h ≤ 0,25 m),
+     * so a region where Vu > φVc with Av < Av,min is not approved here: it is held (below).
+     */
+    const shallowBeam = elementType === 'beam' && section.h <= SHALLOW_BEAM_MAX_H + 1e-9;
+    /*
+     * §9.6.3.1 on every other beam: Av,min «en todas las secciones donde Vu > φ·0,085·λ·√f'c·bw·d»
+     * (2025; 2005 §11.5.6.1: Vu > φVc/2), Av,min of §9.6.3.4 (2025: max(0,062·√f'c, 0,35)·bw·s/fyt,
+     * as the engine computes it with the project's fyt). An evaluated check: failing, with its row.
+     */
+    const minShearThreshold = (phiVc: number) => (spacingRule.edition === '2005'
+      ? 0.5 * phiVc
+      : 0.75 * 0.085 * shearSqrtFc(section.fc) * section.b * d * 1000);
     for (const ss of shearSpecs) {
       let worst: { ratio: number; Vu: number; phiVn: number; comboName: string; stationX: number } | null = null;
+      let held: ShallowMinShearHold | null = null;
+      let minShort: { Vu: number; threshold: number; AvMin: number; comboName: string; stationX: number } | null = null;
       let count = 0;
       let peakVu = 0; let peakCombo = ''; let peakX = 0;
       for (const t of ss.tuples) {
@@ -2616,6 +2659,36 @@ export function verifyProvidedReinforcement(
           { Ag: section.b * section.h, rhoW: ss.rhoW, h: section.h, edition: spacingRule.edition });
         const u = cap.phiVn > 1e-6 ? Vu / cap.phiVn : Number.POSITIVE_INFINITY;
         if (!worst || u > worst.ratio) worst = { ratio: u, Vu, phiVn: cap.phiVn, comboName: t.comboName, stationX: t.stationX };
+        if (shallowBeam && cap.evaluated && cap.avBelowMin && Vu > cap.phiVc + 1e-9
+          && (!held || Vu / Math.max(cap.phiVc, 1e-9) > held.Vu / Math.max(held.phiVc, 1e-9))) {
+          held = {
+            region: ss.label, Vu: +Vu.toFixed(2), phiVc: cap.phiVc,
+            Av: +(ss.stir.legs * (REBAR_DB.find((r) => r.diameter === ss.stir!.diameter)?.area ?? (Math.PI / 4) * (ss.stir.diameter / 10) ** 2)).toFixed(3),
+            AvMin: +(cap.AvMin ?? 0).toFixed(3), spacing: ss.stir.spacing, h: section.h, comboName: t.comboName,
+          };
+        }
+        if (elementType === 'beam' && !shallowBeam && cap.evaluated && cap.avBelowMin) {
+          const threshold = minShearThreshold(cap.phiVc);
+          if (Vu > threshold + 1e-9 && (!minShort || Vu - threshold > minShort.Vu - minShort.threshold)) {
+            minShort = { Vu, threshold, AvMin: cap.AvMin ?? 0, comboName: t.comboName, stationX: t.stationX };
+          }
+        }
+      }
+      if (held) shallowMinShear.push(held);
+      if (minShort && ss.stir) {
+        const av = ss.stir.legs * (REBAR_DB.find((r) => r.diameter === ss.stir!.diameter)?.area ?? (Math.PI / 4) * (ss.stir.diameter / 10) ** 2);
+        const clause = spacingRule.edition === '2005' ? '§11.5.6.1' : '§9.6.3.1';
+        const rule = spacingRule.edition === '2005' ? 'φVc/2' : 'φ·0,085·√f\'c·bw·d';
+        pushStrength({
+          category: `${ss.label} Av,min ${clause}`, demandCategory: null,
+          demand: +minShort.AvMin.toFixed(3), capacity: +av.toFixed(3),
+          utilization: av > 0 ? minShort.AvMin / av : Number.POSITIVE_INFINITY,
+          unit: 'cm²', method: 'area', tuplesChecked: count, regionRange: ss.range,
+          description: `Vu = ${minShort.Vu.toFixed(1)} kN > ${rule} = ${minShort.threshold.toFixed(1)} kN: Av,min required (${clause}); `
+            + `eØ${ss.stir.diameter} ${ss.stir.legs}L c/${(ss.stir.spacing * 100).toFixed(0)} gives Av = ${av.toFixed(2)} cm² < Av,min = ${minShort.AvMin.toFixed(2)} cm² (${spacingRule.edition === '2005' ? '§11.5.6.3' : '§9.6.3.4'}, fyt = ${section.fy} MPa)`,
+          comboName: minShort.comboName, stationX: minShort.stationX,
+          limiting: 'shear',
+        });
       }
       if (count === 0) continue;
       checkedAxes.add(axes.shear);
@@ -3109,6 +3182,7 @@ export function verifyProvidedReinforcement(
     worstUtilization,
     checkedAxes: [...checkedAxes],
     strengthCheckCount: strengthChecks.length,
+    ...(shallowMinShear.length ? { shallowMinShear } : {}),
   };
 }
 

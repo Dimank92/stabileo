@@ -37,10 +37,24 @@ interface Harness {
 
 let cachedHarness: Harness | null = null;
 
-/** The real chain: solve → design → detail. Nothing seeded. */
+/**
+ * The real chain: solve → design → detail. Nothing seeded but the beams' stirrup bar.
+ *
+ * The beams are offered Ø8 stirrups only. With the default Ø6, CIRSOC 201-2025 §9.6.3.1 asks
+ * Av,min wherever Vu > φ·0,085·√f'c·bw·d, and Ø6 2 ramas reach it only at 225 mm on these
+ * 300 mm webs (Av,min = 0,35·300·225/420 = 0,56 cm² ≤ 0,57), so the design closes the spacing
+ * to 225 mm from the start and nothing fails at the final geometry: the loop has nothing to do
+ * (`fixture-acceptance.test.ts` records that). Ø8 meets Av,min at 250 mm (1,01 cm²), so the
+ * search spends the table's nominal limit again and coordination moves it under: the scenario
+ * this file exists to test, with the same limits (24,8 and 24,3 cm), the same final
+ * utilisations (1,008 and 1,030) and the same repair (250 → 225 mm).
+ */
 function harness(): Harness {
   if (cachedHarness) return cachedHarness;
-  const solved = solveFixture(frame as never);
+  const raw = solveFixture(frame as never);
+  const contexts = new Map([...raw.contexts].map(([id, c]) => [id, c.elementType === 'beam'
+    ? { ...c, material: { ...c.material, stirrupDia: 8, stirrupDiametersMm: [8] } } : c]));
+  const solved = { ...raw, contexts };
   const summary = runDesign(cirsoc201Adapter, solved.contexts.values(), { maxRunMs: 180_000 });
   let calls = 0;
   const detail = (outcomes: ReadonlyMap<number, MemberDesignOutcome>) => {
@@ -133,8 +147,9 @@ describe('the four beams: the failure, the repair and the arithmetic behind both
     for (const fb of it1.feedback) {
       const pair = pairOf(fb.elementId);
       const fails = fb.failedChecks.filter((c) => c.status === 'fail');
-      // 7 and 8 lose enough depth to fail at BOTH ends and in the span; 5 and 6 only in the
-      // span, because their support region was already detailed at 225 mm.
+      // With Ø8 stirrups (see the harness) every region of the four is detailed at 250 mm, so
+      // all fail at both the supports and the span. (With Ø6, before §9.6.3.1 was checked, the
+      // supports of 5 and 6 were already at 225 mm and only their span failed.)
       expect(fails.length).toBeGreaterThan(0);
       expect(fails.map((c) => c.category)).toContain('Shear Span (Vz) s,max');
       for (const c of fails) {
@@ -189,8 +204,8 @@ describe('the four beams: the failure, the repair and the arithmetic behind both
     for (const r of loop().iterations[0].repairs) {
       expect(r.kind).toBe('FINAL_GEOMETRY_VERIFIED');
       const prev = before.get(r.elementId)!.accepted!;
-      // Every region ends up at 225 mm, and the SPAN region is the one that had to move on
-      // all four members. On 5 and 6 the support was already there.
+      // Every region ends up at 225 mm; the span moved on all four members (and, with Ø8,
+      // the supports too, which the assertion above already covers).
       expect(r.accepted!.regions!.stirrupsSpan!.spacing).toBeCloseTo(0.225, 6);
       expect(r.accepted!.regions!.stirrupsSupport!.spacing).toBeCloseTo(0.225, 6);
       expect(prev.regions!.stirrupsSpan!.spacing).toBeCloseTo(0.250, 6);
@@ -212,7 +227,8 @@ describe('the four beams: the failure, the repair and the arithmetic behind both
     //
     // 7 and 8 land at 0,883 and 5 and 6 at 0,910 — all four inside the target. Neither number
     // comes from the maximum-spacing rule: both are the member's SHEAR utilisation at its
-    // support, already detailed at 225 mm before the repair.
+    // support, at 225 mm after the repair (with Ø6 it was already there before; the numbers
+    // are the same with Ø8, whose shear strength is not what governs either).
     //
     // 5 and 6 read 0,922 rather than the 0,993 recorded before Diego's PR #78 review
     // (e20707a9). That review made the shear check take axial force compression-positive, so a
