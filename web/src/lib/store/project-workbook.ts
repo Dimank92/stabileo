@@ -16,7 +16,7 @@ import { staticsRows } from './statics-rows';
 import { unstableCombinations } from './active-results';
 import { elementStationDeflections } from './service-deflection';
 import { downloadBlob } from './file';
-import { t } from '../i18n';
+import { i18n, t } from '../i18n';
 import { buildSolverInput3D } from '../engine/solver-service';
 import { sectionStressModel } from '../engine/member-stresses';
 import { toCsv } from '../engine/result-tables';
@@ -28,6 +28,7 @@ import { combinationKind, type WorkbookSource } from '../export/workbook-results
 import { fitsInXlsx, safeText, type WorkbookSheet } from '../export/workbook-cells';
 import { specificationRows } from '../pro/specification-list';
 import { APP_VERSION, BUILD_COMMIT } from '../build-info';
+import { designSheets, physicalForceRows } from './design-exchange';
 
 function workbookModel(): WorkbookModel {
   const m = modelStore.model;
@@ -65,11 +66,12 @@ function workbookSources(pick: SourcePick = {}): WorkbookSource[] {
 /** The workbook's sheets for the project as it stands. Exported for the tests. */
 /**
  * What a caller can narrow: the model's sheets, the results', sheets of its own, which sheets by
- * name (`sheets`) and which solved sets (`sources`).
+ * name (`sheets`), which solved sets (`sources`) and the design sheets (`design`: elements,
+ * checks and verdict; absent, they go in).
  */
 export interface WorkbookOptions {
   model?: boolean; results?: boolean; extra?: readonly WorkbookSheet[];
-  sheets?: ReadonlySet<string>; sources?: SourcePick;
+  sheets?: ReadonlySet<string>; sources?: SourcePick; design?: boolean;
 }
 
 export function currentWorkbookSheets(stations: StationSpec, opts: WorkbookOptions = {}): WorkbookSheet[] {
@@ -98,7 +100,14 @@ export function currentWorkbookSheets(stations: StationSpec, opts: WorkbookOptio
     include: { model: opts.model, results: opts.results, sheets: opts.sheets },
     // The model's specifications, grouped by value as Specifications › List shows them; the
     // fields themselves are already in the Members, Supports and Quads sheets.
-    extra: [...(opts.model === false ? [] : [specificationsSheet()]), ...(opts.extra ?? [])],
+    extra: [
+      ...(opts.model === false ? [] : [specificationsSheet()]),
+      // The design as it stands: decisions and results per element, every check, and the forces
+      // of each physical member along it.
+      ...(opts.design === false ? [] : designSheets(t, i18n.locale)),
+      ...(opts.results === false || !resultsStore.results3D ? [] : [{ name: 'Physical member forces', rows: physicalForceRows() }]),
+      ...(opts.extra ?? []),
+    ],
   };
   return projectWorkbookSheets(input);
 }
