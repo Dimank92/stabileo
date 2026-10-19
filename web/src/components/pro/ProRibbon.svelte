@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { deskUi, openDesk } from '../../lib/store/design-desk-ui.svelte';
   import { designHome } from '../../lib/pro/design-home';
   import ProCommandPalette from './ProCommandPalette.svelte';
   import { t } from '../../lib/i18n';
@@ -156,12 +157,18 @@
   const stage = $derived(STAGES.find(s => s.id === activeStage) ?? STAGES[0]);
 
   function openStage(s: ProStage) {
+    moreOpen = null;
     // Landing on a stage lands on its first destination, so the panel always
     // agrees with the tab.
     if (TAB_STAGE[uiStore.proActiveTab] !== s.id) {
       uiStore.proActiveTab = s.id === 'design' ? designHome(modelStore.elements.values(), modelStore.materials) : s.home;
     }
     uiStore.proPanelVisible = true;
+    // Design has one door: the desk. The concrete and steel workflow screens stay under it, as the
+    // classic view, until everything they hold has moved into the desk. Docked beside the viewer,
+    // the desk leaves the bar in reach, and another stage leaves design (its state stays).
+    if (s.id === 'design') openDesk();
+    else deskUi.open = false;
   }
 
   function run(c: ProCmd) {
@@ -173,6 +180,8 @@
     if (c.tab) {
       uiStore.proActiveTab = c.tab;
       uiStore.proPanelVisible = true;
+      // The panel it opens is beside the viewer, where design's piece sheet was.
+      deskUi.open = false;
     }
     /*
      * A drawing command arms the pointer AND shows its table.
@@ -226,7 +235,73 @@
       return { tone: 'ok' as const, text: '' };
     })(),
   }));
+  /** Which on-demand group is open, if any. Closed by a pick, a click elsewhere or Escape. */
+  let moreOpen = $state<string | null>(null);
+  /*
+   * Fixed, at the button's foot: the group row scrolls sideways (`overflow-x: auto`), which would
+   * clip a list positioned inside it.
+   */
+  let morePos = $state({ left: 0, top: 0 });
+  function toggleMore(id: string, btn: HTMLElement) {
+    if (moreOpen === id) { moreOpen = null; return; }
+    const r = btn.getBoundingClientRect();
+    morePos = { left: Math.round(r.left), top: Math.round(r.bottom + 2) };
+    moreOpen = id;
+  }
+  $effect(() => {
+    if (!moreOpen) return;
+    const away = (e: Event) => { if (!(e.target as Element | null)?.closest?.('.pr-more')) moreOpen = null; };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') moreOpen = null; };
+    window.addEventListener('pointerdown', away, true);
+    window.addEventListener('keydown', esc);
+    return () => { window.removeEventListener('pointerdown', away, true); window.removeEventListener('keydown', esc); };
+  });
+
+  /** Whether a command reads as on: see `ProCmd.activeWhen`. */
+  function isOn(c: ProCmd): boolean {
+    return c.activeWhen ? c.activeWhen()
+      : (!!c.tab && uiStore.proActiveTab === c.tab)
+      || (!!c.diagram && shownDiagram === c.diagram)
+      || (!!c.tool && uiStore.currentTool === c.tool);
+  }
 </script>
+
+{#snippet cmd(c: ProCmd, inMenu: boolean)}
+  {@const on = !c.enabled || c.enabled()}
+  {@const steps = on ? [] : (c.blockedKeys?.() ?? []).map((k) => t(k))}
+  {@const why = steps.length
+    ? `${t('proRibbon.blockedIntro')}: ${steps.join(' · ')}`
+    : (on ? '' : t('ribbon.needsSolve'))}
+  {@const hint = [c.descKey ? t(c.descKey) : '', why].filter(Boolean).join(' — ')}
+  <button
+    class="pr-cmd"
+    class:pr-menu-item={inMenu}
+    role={inMenu ? 'menuitem' : undefined}
+    class:active={isOn(c)}
+    disabled={!on}
+    onclick={() => { if (inMenu) moreOpen = null; run(c); }}
+    title={hint ? `${t(c.labelKey)} — ${hint}` : t(c.labelKey)}
+    aria-describedby={hint ? `pr-cmd-desc-${c.id}` : undefined}
+    data-testid="pr-cmd-{c.id}"
+  >
+    <span class="pr-icon"><Icon name={c.icon ?? 'data'} rotate={c.rotate ?? 0} size={20} /></span>
+    <span class="pr-cmd-label" class:symbol={!!c.label}>
+      {c.label ?? (c.id === 'solve' && isSolving ? t('pro.solving') : t(c.labelKey))}
+    </span>
+  </button>
+  <!--
+    The same sentence the tooltip carries, as text.
+
+    A `title` is invisible to a keyboard, invisible to a screen reader that is not
+    hovering, and gone the moment the pointer leaves. A disabled command that can
+    only explain itself on hover cannot explain itself at all to the people most
+    likely to be stuck. Outside the button because a disabled button is not
+    focusable, and `aria-describedby` still resolves.
+  -->
+  {#if hint}
+    <span class="sr-only" id="pr-cmd-desc-{c.id}" data-testid="pr-cmd-why-{c.id}">{hint}</span>
+  {/if}
+{/snippet}
 
 <nav class="pro-ribbon" data-testid="pro-ribbon">
   <!--
@@ -371,46 +446,33 @@
     {#if ribbonOpen}
     <div class="pr-groups">
       {#each stage.groups as g (g.id)}
-        <section class="pr-group" data-group={g.id}>
-          <div class="pr-cmds">
-            {#each g.cmds as c (c.id)}
-              {@const on = !c.enabled || c.enabled()}
-              {@const steps = on ? [] : (c.blockedKeys?.() ?? []).map((k) => t(k))}
-              {@const why = steps.length
-                ? `${t('proRibbon.blockedIntro')}: ${steps.join(' · ')}`
-                : (on ? '' : t('ribbon.needsSolve'))}
-              {@const hint = [c.descKey ? t(c.descKey) : '', why].filter(Boolean).join(' — ')}
+        <section class="pr-group" class:pr-group-menu={g.menu} data-group={g.id}>
+          {#if g.menu}
+            <!-- Tools on demand: one button, its commands in a list under it (see `ProGroup.menu`). -->
+            <div class="pr-cmds pr-more">
               <button
                 class="pr-cmd"
-                class:active={c.activeWhen ? c.activeWhen()
-                  : (!!c.tab && uiStore.proActiveTab === c.tab)
-                  || (!!c.diagram && shownDiagram === c.diagram)
-                  || (!!c.tool && uiStore.currentTool === c.tool)}
-                disabled={!on}
-                onclick={() => run(c)}
-                title={hint ? `${t(c.labelKey)} — ${hint}` : t(c.labelKey)}
-                aria-describedby={hint ? `pr-cmd-desc-${c.id}` : undefined}
-                data-testid="pr-cmd-{c.id}"
+                class:active={g.cmds.some(isOn)}
+                aria-haspopup="menu"
+                aria-expanded={moreOpen === g.id}
+                onclick={(e) => toggleMore(g.id, e.currentTarget)}
+                title={t(g.labelKey)}
+                data-testid="pr-more-{g.id}"
               >
-                <span class="pr-icon"><Icon name={c.icon ?? 'data'} rotate={c.rotate ?? 0} size={20} /></span>
-                <span class="pr-cmd-label" class:symbol={!!c.label}>
-                  {c.label ?? (c.id === 'solve' && isSolving ? t('pro.solving') : t(c.labelKey))}
-                </span>
+                <span class="pr-icon"><Icon name="data" size={20} /></span>
+                <span class="pr-cmd-label">{t(g.labelKey)} ▾</span>
               </button>
-              <!--
-                The same sentence the tooltip carries, as text.
-
-                A `title` is invisible to a keyboard, invisible to a screen reader that is not
-                hovering, and gone the moment the pointer leaves. A disabled command that can
-                only explain itself on hover cannot explain itself at all to the people most
-                likely to be stuck. Outside the button because a disabled button is not
-                focusable, and `aria-describedby` still resolves.
-              -->
-              {#if hint}
-                <span class="sr-only" id="pr-cmd-desc-{c.id}" data-testid="pr-cmd-why-{c.id}">{hint}</span>
+              {#if moreOpen === g.id}
+                <div class="pr-more-list" role="menu" aria-label={t(g.labelKey)} style:left="{morePos.left}px" style:top="{morePos.top}px" data-testid="pr-more-list-{g.id}">
+                  {#each g.cmds as c (c.id)}{@render cmd(c, true)}{/each}
+                </div>
               {/if}
-            {/each}
-          </div>
+            </div>
+          {:else}
+            <div class="pr-cmds">
+              {#each g.cmds as c (c.id)}{@render cmd(c, false)}{/each}
+            </div>
+          {/if}
           <p class="pr-group-label">{t(g.labelKey)}</p>
         </section>
       {/each}
@@ -615,6 +677,24 @@
   .pr-cmd.active { color: var(--st-accent); border-color: var(--st-accent); }
 
   .pr-icon { display: flex; }
+
+  /* ── Tools on demand ───────────────────────────────────────────────── */
+  .pr-more { position: relative; }
+  .pr-more-list {
+    position: fixed;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px;
+    min-width: 13rem;
+    background: var(--st-surface);
+    border: 1px solid var(--st-hair-strong);
+    border-radius: var(--st-radius);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  }
+  .pr-more-list .pr-cmd.pr-menu-item { flex-direction: row; justify-content: flex-start; gap: 0.5rem; min-width: 0; padding: 0.3rem 0.5rem; }
+  .pr-more-list .pr-cmd.pr-menu-item .pr-cmd-label { display: inline; }
   .pr-cmd-label { white-space: nowrap; }
 
   /* A symbol is a symbol: mono, so N and My read as notation, not as words. */

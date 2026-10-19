@@ -27,6 +27,7 @@
   import { t, i18n, setLocale } from './lib/i18n';
   import { OFFERED_LOCALES } from './lib/i18n/store.svelte';
   import { deleteSelection } from './lib/actions/delete-selection';
+  import { overlayWasOpenAtKeydown } from './lib/utils/modal-overlay';
   import { cameraActions } from './lib/pro/camera-actions';
   import SheetGrab from './components/SheetGrab.svelte';
   import ContactMenu from './components/ContactMenu.svelte';
@@ -316,6 +317,10 @@
   import Icon from './components/ribbon/Icon.svelte';
   import ProPanel from './components/pro/ProPanel.svelte';
   import RebarWorkspace from './components/pro/design/RebarWorkspace.svelte';
+  import DesignDesk from './components/pro/desk/DesignDesk.svelte';
+  import { deskUi, deskLayout } from './lib/store/design-desk-ui.svelte';
+  /** Design docks beside the viewer on a desktop PRO screen; elsewhere it is a full-screen sheet. */
+  const deskDocked = $derived(uiStore.appMode === 'pro' && !uiStore.isMobile);
   import ProProjectFileActions from './components/pro/ProProjectFileActions.svelte';
   import ProRibbon from './components/pro/ProRibbon.svelte';
   import ProDrawBar from './components/pro/ProDrawBar.svelte';
@@ -796,6 +801,12 @@
     // Skip if focus is in an input/textarea/select
     const tag = (e.target as HTMLElement)?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    const key = e.key.toUpperCase();
+
+    // With the design desk, the 3-D workspace or a modal dialog over the model, the keys that edit
+    // the model or its selection are the overlay's, not the model's (`lib/utils/modal-overlay.ts`).
+    if (overlayWasOpenAtKeydown() && (e.key === 'Escape' || e.key === 'Delete' || e.key === 'Backspace'
+      || ((e.ctrlKey || e.metaKey) && (key === 'X' || key === 'V')))) return;
 
     // Escape leaves whatever is being drawn: the pending member end, the plate corners, the tool.
     // With nothing being drawn it clears the selection.
@@ -806,7 +817,6 @@
     }
 
     // Ctrl/Cmd+Z: Undo
-    const key = e.key.toUpperCase();
     if ((e.ctrlKey || e.metaKey) && key === 'Z' && !e.shiftKey) {
       e.preventDefault();
       historyStore.undo();
@@ -1267,6 +1277,37 @@
     }
     const w = uiStore.proPanelVisible ? uiStore.proPanelWidth : 0;
     root.style.setProperty('--st-right-panel-w', `${w}px`);
+  });
+
+  /*
+   * Design docked: the toasts anchor to the viewer's bottom-right corner, measured, rather than
+   * the window's. Anchored to the window they landed on design's canvas, over the plan and the
+   * editors, and took the clicks meant for them.
+   */
+  let mainAreaEl = $state<HTMLDivElement | null>(null);
+  $effect(() => {
+    const root = document.documentElement;
+    const el = mainAreaEl;
+    if (!(deskDocked && deskUi.open) || !el) {
+      root.style.removeProperty('--st-toast-right');
+      root.style.removeProperty('--st-toast-bottom');
+      return;
+    }
+    const place = () => {
+      const r = el.getBoundingClientRect();
+      root.style.setProperty('--st-toast-right', `${Math.round(window.innerWidth - r.right + 16)}px`);
+      root.style.setProperty('--st-toast-bottom', `${Math.round(window.innerHeight - r.bottom + 12)}px`);
+    };
+    place();
+    const ro = new ResizeObserver(place);
+    ro.observe(el);
+    window.addEventListener('resize', place);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', place);
+      root.style.removeProperty('--st-toast-right');
+      root.style.removeProperty('--st-toast-bottom');
+    };
   });
 
   function startProResize(e: MouseEvent) {
@@ -1801,9 +1842,22 @@
       </div>
     {/if}
 
-    <div class="app-body-inner" class:pro-body-row={uiStore.appMode === 'pro'}>
+    <div class="app-body-inner" class:pro-body-row={uiStore.appMode === 'pro'} class:desk-docked={deskDocked && deskUi.open}
+      style:--dd-canvas-h={deskDocked && deskUi.open ? `${deskLayout.canvasH}px` : undefined}>
 
-    <div class="main-area">
+    <!--
+      Design, docked around the viewer.
+      ─────────────────────────────────
+      On a desktop the design desk is the body of the Design stage rather than a sheet over the
+      window: its rail, canvas and piece sheet take the cells of this row's grid around
+      `.main-area`, which stays where it is, so the viewer is never remounted and keeps the
+      model's camera (`DesignDesk.svelte`). The PRO panel is hidden while it is open, not
+      unmounted (the ribbon is bound to it). On a phone the desk is still the full-screen sheet
+      mounted at the root below.
+    -->
+    {#if deskDocked}<DesignDesk docked />{/if}
+
+    <div class="main-area" bind:this={mainAreaEl}>
       <main class="viewport-container">
         {#if !uiStore.is3DWorkspace}
           <Viewport />
@@ -2148,6 +2202,7 @@
   and closing costs the model nothing.
 -->
 <RebarWorkspace />
+{#if !deskDocked}<DesignDesk />{/if}
 
 {#if uiStore.toasts.length > 0}
   <div class="toast-container" class:toast-over-sheet={uiStore.isMobile && uiStore.appMode === 'basico' && basicPanel !== null}>
@@ -2961,6 +3016,21 @@
     flex: 1;
     overflow: hidden;
   }
+  /*
+   * Design docked: the row becomes a grid of design's parts around the viewer. Head across the
+   * top; the rail on the left and the piece sheet on the right, both full height; the viewer in
+   * the centre with the canvas under it (the canvas sets its own height, dragged from its edge).
+   */
+  .app-body-inner.pro-body-row.desk-docked {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    /* The viewer keeps at least a strip on a short window; the canvas takes its height up to what it was dragged to. */
+    grid-template-rows: auto minmax(80px, 1fr) minmax(0, var(--dd-canvas-h, 40vh));
+    grid-template-areas: 'head head head' 'rail view sheet' 'rail canvas sheet';
+    min-height: 0;
+  }
+  .desk-docked > .main-area { grid-area: view; min-width: 0; min-height: 0; }
+  .desk-docked > :global(.pro-sidebar), .desk-docked > :global(.pro-panel-reopen) { display: none !important; }
 
   .sidebar {
     width: 250px;
@@ -3117,9 +3187,9 @@
        next. Anchored to the bottom-right instead: out of the command surface,
        and out of the way of the model's left-anchored drawing.
     */
-    bottom: 46px;
+    bottom: var(--st-toast-bottom, 46px);
     /* Clear of the right panel when one is open — BasicPanel publishes its width. */
-    right: calc(24px + var(--st-right-panel-w, 0px));
+    right: var(--st-toast-right, calc(24px + var(--st-right-panel-w, 0px)));
     z-index: 1100;
     display: flex;
     flex-direction: column;

@@ -22,6 +22,10 @@ import '../engine/design/adapters/unsupported-adapter';
 import { connectionPrompt } from './connection-prompt.svelte';
 import { scheduleDefinedLoadsSync, flushDefinedLoadsSync } from './defined-loads';
 import { viewVisibility } from './view-state.svelte';
+import { deskUi } from './design-desk-ui.svelte';
+import { designDrafts } from './design-drafts.svelte';
+import { rebarWorkspace } from './rebar-workspace.svelte';
+import { pruneDeletedMembers } from './selection-prune';
 
 // Wire model mutations to automatically clear stale results.
 // This ensures results never persist after the model changes,
@@ -45,12 +49,28 @@ modelStore._setOnNewProject(() => {
   uiStore.selfWeightCaseId = null;
   // The last floor and footing runs were the previous project's; its own are in its file.
   detailingStore.forgetRuns();
+  forgetDesignView();
 });
+
+/*
+ * Design's view of a project (its level, filter, editor, drafts) and the 3-D reinforcement
+ * view's selection belong to that project. A new project or another tab starts from nothing;
+ * a tab switch then restores the tab's own (`tabs.svelte.ts`).
+ */
+function forgetDesignView(): void {
+  deskUi.reset();
+  designDrafts.clear();
+  rebarWorkspace.reset();
+  rebarWorkspace.close();
+}
+uiStore.onSessionReset(forgetDesignView);
 
 // An analysis reads the definitions' loads current, even inside the moment a rewrite waits for.
 modelStore._setBeforeAnalysisInput(flushDefinedLoadsSync);
 
 modelStore._setOnMutation(() => {
+  // A deleted member leaves every selection, once the edit that deletes it has run.
+  queueMicrotask(pruneDeletedMembers);
   resultsStore.clear();
   verificationStore.invalidateAnalysis();
   /*

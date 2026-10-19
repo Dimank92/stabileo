@@ -20,11 +20,11 @@
  * explicit `appLocale`. That is deliberate: a name is only correct in a language.
  */
 
-import { test, expect } from './fixtures';
+import { test, expect, clickStage } from './fixtures';
 import type { Page } from '@playwright/test';
 
 const openStage = async (page: Page, stage: string) =>
-  page.getByTestId(`pr-stage-${stage}`).click();
+  clickStage(page, stage);
 
 /** The `data-group` of the section a command is rendered inside. */
 const groupOf = (page: Page, cmd: string) =>
@@ -37,28 +37,51 @@ const groupOrder = (page: Page) =>
   page.locator('.pr-groups section[data-group]')
     .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-group') ?? ''));
 
-test.describe('@smoke Model — Organize, Draw ending in Generators, and Code on its own', () => {
-  test('the groups run Organize, Draw, Properties, Conditions, Automate', async ({ pro: page }) => {
+/*
+ * Migrated with the «More tools» menu (design/43): the building constructor, the foundations,
+ * the physical elements and the generators left Organize and Draw for one on-demand group,
+ * `moreTools`, so a finite-element model is drawn with the general tools on screen. The same
+ * placement rules are asserted against the new arrangement: which group each command is in, the
+ * group order, the order inside the group, and that each command exists once.
+ */
+const openMoreTools = async (page: Page) => {
+  if (!(await page.getByTestId('pr-more-list-moreTools').isVisible())) await page.getByTestId('pr-more-moreTools').click();
+  await expect(page.getByTestId('pr-more-list-moreTools')).toBeVisible();
+};
+
+test.describe('@smoke Model — Organize, Draw, the tools on demand, and Code on its own', () => {
+  test('the groups run Organize, Draw, More tools, Properties, Conditions, Automate', async ({ pro: page }) => {
     await openStage(page, 'model');
-    expect(await groupOrder(page)).toEqual(['organize', 'draw', 'properties', 'conditions', 'automate']);
+    expect(await groupOrder(page)).toEqual(['organize', 'draw', 'moreTools', 'properties', 'conditions', 'automate']);
     for (const c of ['view', 'grid', 'groups']) expect(await groupOf(page, c)).toBe('organize');
-    for (const c of ['nodes', 'elements', 'shells', 'transform', 'edit', 'generators']) expect(await groupOf(page, c)).toBe('draw');
-    expect(await groupOf(page, 'code')).toBe('automate');
-    // Generators close Draw.
     const draw = await page.locator('section[data-group="draw"] button[data-testid^="pr-cmd-"]')
       .evaluateAll((n) => n.map((x) => x.getAttribute('data-testid')));
-    expect(draw.at(-1)).toBe('pr-cmd-generators');
+    expect(draw).toEqual(['pr-cmd-nodes', 'pr-cmd-elements', 'pr-cmd-shells', 'pr-cmd-transform', 'pr-cmd-edit']);
+    expect(await groupOf(page, 'code')).toBe('automate');
+    // The design-oriented tools are not on the ribbon until asked for.
+    for (const c of ['building', 'foundations', 'physical', 'generators']) await expect(page.getByTestId(`pr-cmd-${c}`), c).toHaveCount(0);
+    await openMoreTools(page);
+    for (const c of ['building', 'foundations', 'physical', 'generators']) expect(await groupOf(page, c), c).toBe('moreTools');
+    const more = await page.locator('[data-testid="pr-more-list-moreTools"] button[data-testid^="pr-cmd-"]')
+      .evaluateAll((n) => n.map((x) => x.getAttribute('data-testid')));
+    // Generators close the group.
+    expect(more).toEqual(['pr-cmd-building', 'pr-cmd-foundations', 'pr-cmd-physical', 'pr-cmd-generators']);
   });
 
   test('opens the generators panel, and exists exactly once', async ({ pro: page }) => {
     await openStage(page, 'model');
+    await openMoreTools(page);
     await expect(page.getByTestId('pr-cmd-generators')).toHaveCount(1);
     await page.getByTestId('pr-cmd-generators').click();
     await expect(page.getByTestId('pro-generators-panel')).toBeVisible();
+    // The menu closes on the pick, and its button reads as on while one of its panels shows.
+    await expect(page.getByTestId('pr-more-list-moreTools')).toBeHidden();
+    await expect(page.getByTestId('pr-more-moreTools')).toHaveClass(/active/);
   });
 
   test('explains what it generates, as text and not only as a tooltip', async ({ pro: page }) => {
     await openStage(page, 'model');
+    await openMoreTools(page);
     const btn = page.getByTestId('pr-cmd-generators');
     expect(await btn.getAttribute('aria-describedby'), 'points at a description').toBeTruthy();
     const why = page.getByTestId('pr-cmd-why-generators');
@@ -152,15 +175,17 @@ test.describe('@smoke Design — 3-D detailing is gated, and says what is missin
  * Portuguese is a section a Portuguese user cannot navigate.
  */
 for (const [locale, words] of [
-  ['es', { generators: /^dibujar$/i, button: /^generadores$/i, concrete: /hormig/i, metallic: /^met.licas$/i, rebar: /dise.o de armaduras/i, detail: /detallado 3d/i, profiles: /dise.o de perfiles/i, joints: /uniones met.licas/i }],
-  ['pt', { generators: /^desenhar$/i, button: /^geradores$/i, concrete: /concreto/i, metallic: /^met.licas$/i, rebar: /dimensionamento de armaduras/i, detail: /detalhamento 3d/i, profiles: /dimensionamento de perfis/i, joints: /liga..es met.licas/i }],
+  ['es', { generators: /^dibujar$/i, more: /^m.s herramientas$/i, button: /^generadores$/i, concrete: /hormig/i, metallic: /^met.licas$/i, rebar: /dise.o de armaduras/i, detail: /detallado 3d/i, profiles: /dise.o de perfiles/i, joints: /uniones met.licas/i }],
+  ['pt', { generators: /^desenhar$/i, more: /^mais ferramentas$/i, button: /^geradores$/i, concrete: /concreto/i, metallic: /^met.licas$/i, rebar: /dimensionamento de armaduras/i, detail: /detalhamento 3d/i, profiles: /dimensionamento de perfis/i, joints: /liga..es met.licas/i }],
 ] as const) {
   test.describe(`the hierarchy keeps its names in ${locale}`, () => {
     test.use({ appLocale: locale });
 
-    test('Model → Draw, closed by Generators', async ({ pro: page }) => {
+    test('Model → Draw, and Generators under More tools', async ({ pro: page }) => {
       await openStage(page, 'model');
       await expect(page.locator('section[data-group="draw"] .pr-group-label')).toHaveText(words.generators);
+      await expect(page.locator('section[data-group="moreTools"] .pr-group-label')).toHaveText(words.more);
+      await openMoreTools(page);
       await expect(page.getByTestId('pr-cmd-generators').locator('.pr-cmd-label')).toHaveText(words.button);
     });
 

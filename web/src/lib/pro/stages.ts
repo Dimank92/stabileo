@@ -1,3 +1,4 @@
+import { openDesk } from '../store/design-desk-ui.svelte';
 import { TWO_D_INTERNAL_FORCE_LABELS as F2D } from '../geometry/coordinate-system';
 import { resultsStore } from '../store/results.svelte';
 
@@ -97,7 +98,11 @@ export type ProCmd = {
    */
 };
 
-export type ProGroup = { id: string; labelKey: string; cmds: ProCmd[] };
+/**
+ * A group of commands. `menu`: drawn by the desktop ribbon as one button that opens its commands
+ * on demand, for tools a reader reaches for now and then; the phone grid lists them as any group.
+ */
+export type ProGroup = { id: string; labelKey: string; cmds: ProCmd[]; menu?: boolean };
 export type ProStage = { id: string; labelKey: string; home: string; groups: ProGroup[] };
 
 /**
@@ -177,7 +182,6 @@ export function buildProStages(ctx: ProStageContext): ProStage[] {
             { id: 'view', labelKey: 'view.title', icon: 'eye', tab: 'view' },
             { id: 'grid', labelKey: 'grid.title', icon: 'grid', tab: 'grid' },
             { id: 'groups', labelKey: 'groups.title', icon: 'groups', tab: 'groups' },
-            { id: 'physical', labelKey: 'physical.title', icon: 'physical', tab: 'physical' },
           ],
         },
         /*
@@ -192,10 +196,26 @@ export function buildProStages(ctx: ProStageContext): ProStage[] {
             { id: 'nodes', labelKey: 'pro.tabNodes', icon: 'node', tab: 'nodes' },
             { id: 'elements', labelKey: 'pro.tabElements', icon: 'element', tab: 'elements' },
             { id: 'shells', labelKey: 'pro.tabShells', icon: 'shell', tab: 'shells' },
-            { id: 'building', labelKey: 'building.title', icon: 'building', tab: 'building' },
-            { id: 'foundations', labelKey: 'fdn.title', icon: 'foundation', tab: 'foundations' },
             { id: 'transform', labelKey: 'transform.title', icon: 'transform', tab: 'transform' },
             { id: 'edit', labelKey: 'edit.title', icon: 'edit', tab: 'edit' },
+          ],
+        },
+        /*
+         * ── The tools for building and design, on demand ─────────────────
+         *
+         * The building constructor, the foundations, the physical elements and the generators make
+         * or describe a building for design. A finite-element model does not need them on screen
+         * while it is drawn node by node, so they sit behind one button; design's «Prepare» opens
+         * each of them in context. Same commands and same panels, one click further away.
+         */
+        {
+          id: 'moreTools',
+          labelKey: 'proRibbon.groupMoreTools',
+          menu: true,
+          cmds: [
+            { id: 'building', labelKey: 'building.title', icon: 'building', tab: 'building' },
+            { id: 'foundations', labelKey: 'fdn.title', icon: 'foundation', tab: 'foundations' },
+            { id: 'physical', labelKey: 'physical.title', icon: 'physical', tab: 'physical' },
             {
               id: 'generators',
               labelKey: 'proRibbon.cmdGenerators',
@@ -337,11 +357,12 @@ export function buildProStages(ctx: ProStageContext): ProStage[] {
          * is for: what this does, and to what.
          */
         {
-          // For every material: the project's design data.
+          // For every material: the project's design data and the desk that designs them all.
           id: 'general',
           labelKey: 'proRibbon.groupDesignGeneral',
           cmds: [
             { id: 'designData', labelKey: 'designData.title', icon: 'settings', tab: 'designData' },
+            { id: 'desk', labelKey: 'desk.title', descKey: 'desk.desc', icon: 'view3d', action: openDesk },
           ],
         },
         {

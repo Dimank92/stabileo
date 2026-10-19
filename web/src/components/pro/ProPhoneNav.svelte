@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { openDesk } from '../../lib/store/design-desk-ui.svelte';
   /**
    * The phone panel's pinned head: the two pills, and the stage list one of them opens.
    *
@@ -129,7 +130,7 @@
               class="pm-stage-item"
               class:active={shell.stage?.id === st.id}
               data-testid="pm-stage-{st.id}"
-              onclick={() => { uiStore.proActiveTab = st.home; shell.stageMenuOpen = false; }}
+              onclick={() => { uiStore.proActiveTab = st.home; shell.stageMenuOpen = false; if (st.id === 'design') openDesk(); }}
             >{t(st.labelKey)}</button>
           {/each}
         </div>

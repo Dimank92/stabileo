@@ -578,19 +578,23 @@ export function appLanguage(page: Page): Promise<string | null> {
   return page.getByTestId('lang-select').getAttribute('data-value');
 }
 
-/** The Design stage, on its concrete or steel workflow screen. */
-export async function openClassicDesign(page: Page): Promise<void> {
+/**
+ * The Design stage opens the design desk. `openDeskStage` lands on it; `openClassicDesign` lands
+ * on the concrete or steel workflow screen underneath (the classic view), for what the desk does
+ * not hold yet.
+ */
+export async function openDeskStage(page: Page): Promise<void> {
   await page.getByTestId('pr-stage-design').click();
+  if (!(await page.getByTestId('design-desk').isVisible())) await page.getByTestId('pr-cmd-desk').click();
+  await expect(page.getByTestId('design-desk')).toBeVisible();
 }
 
-/** A ribbon stage by name. */
-export async function clickStage(page: Page, stage: string): Promise<void> {
-  await page.getByTestId(`pr-stage-${stage}`).click();
-}
-
-/** A ribbon command by its id. */
-export async function ribbonCmd(page: Page, id: string): Promise<void> {
-  await page.getByTestId(`pr-cmd-${id}`).click();
+export async function openClassicDesign(page: Page): Promise<void> {
+  const desk = page.getByTestId('design-desk');
+  if (await desk.isVisible()) await page.getByTestId('desk-close').click();
+  await page.getByTestId('pr-stage-design').click();
+  if (await desk.isVisible()) await page.getByTestId('desk-close').click();
+  await expect(desk).toBeHidden();
 }
 
 /**
@@ -609,4 +613,42 @@ export async function declareBeamsNotLateral(page: Page): Promise<void> {
   await page.getByTestId('pr-cmd-designData').click();
   await page.getByTestId('design-data-lateral-beams').selectOption('gravity');
   await page.getByTestId('pr-cmd-design').click();
+}
+
+/** The desk's views: the piece editors are under «Piece», the specialties and the project under their menus. */
+const DESK_MENU: Record<string, string> = {
+  frame: 'desk-mode-piece', column: 'desk-mode-piece', wall: 'desk-mode-piece', slab: 'desk-mode-piece', joist: 'desk-mode-piece',
+  special: 'desk-mode-piece', pt: 'desk-mode-piece', stairs: 'desk-mode-piece', footing: 'desk-mode-piece', joint: 'desk-mode-piece',
+  elements: 'desk-mode-piece', geometry: 'desk-mode-pending', report: 'desk-mode-pending',
+  seismic: 'desk-menu-specialties', fire: 'desk-menu-specialties', materials: 'desk-menu-specialties', codes: 'desk-menu-specialties',
+  budget: 'desk-menu-project', collab: 'desk-menu-project', arch: 'desk-menu-project', site: 'desk-menu-project',
+};
+export async function deskTab(page: Page, tab: string): Promise<void> {
+  const target = page.getByTestId(`desk-tab-${tab}`);
+  if (!(await target.isVisible()) && DESK_MENU[tab]) await page.getByTestId(DESK_MENU[tab]!).click();
+  await target.click();
+}
+
+/**
+ * A ribbon stage by name. The Design stage opens the design desk over the panel; a spec that
+ * goes on to a ribbon command of that stage closes it first, which leaves the classic screen.
+ */
+export async function clickStage(page: Page, stage: string): Promise<void> {
+  await page.getByTestId(`pr-stage-${stage}`).click();
+  if (stage === 'design' && await page.getByTestId('design-desk').isVisible()) await page.getByTestId('desk-close').click();
+}
+
+/**
+ * The model ribbon's tools for building and design (the building constructor, the foundations,
+ * the physical elements, the generators) are behind «More tools» (`ProGroup.menu`), opened on
+ * demand. Every other command is on the ribbon itself. This presses a ribbon command wherever it
+ * lives, opening that menu first when the command is inside it.
+ */
+export const MORE_TOOLS = ['building', 'foundations', 'physical', 'generators'] as const;
+export async function ribbonCmd(page: Page, id: string): Promise<void> {
+  const cmd = page.getByTestId(`pr-cmd-${id}`);
+  if ((MORE_TOOLS as readonly string[]).includes(id) && !(await cmd.isVisible())) {
+    await page.getByTestId('pr-more-moreTools').click();
+  }
+  await cmd.click();
 }
