@@ -8214,6 +8214,8 @@ const es: Record<string, string> = {
   'outdated.sheets': 'Estas láminas se armaron antes del último cambio del modelo. Volvé a armarlas para descargarlas.',
   'outdated.memoria': 'El detallado es de un modelo anterior: las filas que salen de él (punzonado, armaduras) no describen el modelo actual.',
   'outdated.exchange': 'El detallado es de un modelo anterior: el IFC marca esas barras como desactualizadas.',
+  'outdated.workbook': 'Desactualizado: el modelo cambió después de generar el diseño y su detallado. Las hojas de diseño describen el modelo anterior y salen marcadas así en el archivo. Calculá, diseñá y generá el detallado de nuevo.',
+  'outdated.workbookStamp': 'DESACTUALIZADO: el modelo cambió después de generar este diseño y su detallado; esta hoja describe el modelo anterior. Exportado: {time}.',
   'detailing.document.outdated': 'Revisión {revision}: el modelo cambió después del detallado; no apta para construcción',
   'detailing.doc.readiness.OUTDATED': 'Desactualizado',
   'building.beamMaterial': 'Material de vigas',

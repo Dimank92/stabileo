@@ -8658,6 +8658,8 @@ const pt: Translations = {
   'outdated.sheets': 'Estas pranchas foram montadas antes da última mudança do modelo. Monte-as de novo para baixá-las.',
   'outdated.memoria': 'O detalhamento é de um modelo anterior: as linhas que vêm dele (punção, armaduras) não descrevem o modelo atual.',
   'outdated.exchange': 'O detalhamento é de um modelo anterior: o IFC marca essas barras como desatualizadas.',
+  'outdated.workbook': 'Desatualizado: o modelo mudou depois de gerar o dimensionamento e o detalhamento. As planilhas de dimensionamento descrevem o modelo anterior e saem marcadas assim no arquivo. Calcule, dimensione e gere o detalhamento novamente.',
+  'outdated.workbookStamp': 'DESATUALIZADO: o modelo mudou depois de gerar este dimensionamento e o detalhamento; esta planilha descreve o modelo anterior. Exportado: {time}.',
   'detailing.document.outdated': 'Revisão {revision}: o modelo mudou depois do detalhamento; não apta para construção',
   'detailing.doc.readiness.OUTDATED': 'Desatualizado',
   'building.beamMaterial': 'Material das vigas',

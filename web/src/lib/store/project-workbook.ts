@@ -29,6 +29,7 @@ import { fitsInXlsx, safeText, type WorkbookSheet } from '../export/workbook-cel
 import { specificationRows } from '../pro/specification-list';
 import { APP_VERSION, BUILD_COMMIT } from '../build-info';
 import { designSheets, physicalForceRows } from './design-exchange';
+import { detailingStore } from './detailing.svelte';
 
 function workbookModel(): WorkbookModel {
   const m = modelStore.model;
@@ -74,14 +75,28 @@ export interface WorkbookOptions {
   sheets?: ReadonlySet<string>; sources?: SourcePick; design?: boolean;
 }
 
+/**
+ * The design sheets, stamped when they describe an earlier model.
+ *
+ * The memoria, the IFC, the sheets and the exchange say it on screen (`OutdatedNotice`, from
+ * `detailingStore.modelStale`); a workbook leaves the app, so the stamp goes in the file: a first
+ * row on each design sheet, above its header, naming why and when the file was exported.
+ */
+export function stampOutdatedDesign(sheets: readonly WorkbookSheet[], exported: string, stale = detailingStore.modelStale): WorkbookSheet[] {
+  if (!stale) return [...sheets];
+  const stamp = safeText(t('outdated.workbookStamp').replace('{time}', exported));
+  return sheets.map((s) => ({ ...s, rows: [[stamp], ...s.rows] }));
+}
+
 export function currentWorkbookSheets(stations: StationSpec, opts: WorkbookOptions = {}): WorkbookSheet[] {
   const model = workbookModel();
+  const exported = new Date().toISOString();
   const input: ProjectWorkbookInput = {
     model,
     solved: buildSolverInput3D(model, false, false, { expandMemberOffsets: false }),
     projectName: modelStore.model.name,
     projectInfo: modelStore.projectInfo,
-    meta: { exported: new Date().toISOString(), commit: `${APP_VERSION} (${BUILD_COMMIT})` },
+    meta: { exported, commit: `${APP_VERSION} (${BUILD_COMMIT})` },
     results: {
       sources: workbookSources(opts.sources),
       stations,
@@ -104,7 +119,7 @@ export function currentWorkbookSheets(stations: StationSpec, opts: WorkbookOptio
       ...(opts.model === false ? [] : [specificationsSheet()]),
       // The design as it stands: decisions and results per element, every check, and the forces
       // of each physical member along it.
-      ...(opts.design === false ? [] : designSheets(t, i18n.locale)),
+      ...(opts.design === false ? [] : stampOutdatedDesign(designSheets(t, i18n.locale), exported)),
       ...(opts.results === false || !resultsStore.results3D ? [] : [{ name: 'Physical member forces', rows: physicalForceRows() }]),
       ...(opts.extra ?? []),
     ],

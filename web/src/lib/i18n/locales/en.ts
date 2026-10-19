@@ -8221,6 +8221,8 @@ const en: Record<string, string> = {
   'outdated.sheets': 'These sheets were laid out before the last change to the model. Lay them out again to download them.',
   'outdated.memoria': 'The detailing belongs to an earlier model: the rows that come from it (punching, reinforcement) do not describe the current model.',
   'outdated.exchange': 'The detailing belongs to an earlier model: the IFC marks those bars as out of date.',
+  'outdated.workbook': 'Out of date: the model changed after the design and its detailing were generated. The design sheets describe the earlier model and are marked so in the file. Analyze, design and generate the detailing again.',
+  'outdated.workbookStamp': 'OUT OF DATE: the model changed after this design and its detailing were generated; this sheet describes the earlier model. Exported: {time}.',
   'detailing.document.outdated': 'Revision {revision}: the model changed after the detailing; not for construction',
   'detailing.doc.readiness.OUTDATED': 'Out of date',
   'building.beamMaterial': 'Beam material',
