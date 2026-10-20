@@ -577,13 +577,25 @@ export function buildPhysicalFrame(input: PhysicalFrameInput): PhysicalFrame {
     slab.set(sh.key, solid({ id: `slab:${sh.key}`, kind: 'slab', elementIds: [], shellKey: sh.key, owner: { shellKey: sh.key }, layers }));
   }
 
-  // Formwork: every solid against its neighbours, slabs included.
-  const indexed: Indexed[] = solids.flatMap((s) => s.layers.map((layer) => ({ solid: s, layer, box: boxOf(layer.polygons) })));
+  // Formwork: every solid against its neighbours, slabs included. Worked out when it is read (the
+  // quantities and the IFC read it; the model viewer, which asks for the frame on every edit, does not).
+  let indexed: Indexed[] | null = null;
+  const index = () => (indexed ??= solids.flatMap((s) => s.layers.map((layer) => ({ solid: s, layer, box: boxOf(layer.polygons) }))));
   for (const s of solids) {
     if (s.kind === 'member') continue;
-    const sb = s.layers.length ? boxOf(s.layers.flatMap((l) => l.polygons)) : null;
-    const near = sb ? indexed.filter((o) => touches(o.box, sb)) : [];
-    s.formwork = formworkOf(s, near);
+    let value: number | undefined, known = false;
+    Object.defineProperty(s, 'formwork', {
+      enumerable: true, configurable: true,
+      get() {
+        if (!known) {
+          const sb = s.layers.length ? boxOf(s.layers.flatMap((l) => l.polygons)) : null;
+          value = formworkOf(s, sb ? index().filter((o) => touches(o.box, sb)) : []);
+          known = true;
+        }
+        return value;
+      },
+      set(v: number | undefined) { value = v; known = true; },
+    });
   }
 
   const owned = new Map<number, PhysicalSolid[]>();

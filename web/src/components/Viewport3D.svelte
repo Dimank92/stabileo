@@ -15,6 +15,7 @@
   import * as THREE from 'three';
   import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
   import { modelStore, uiStore, resultsStore, historyStore, dsmStepsStore, verificationStore } from '../lib/store';
+  import { setGeometryDrag } from '../lib/store/physical-frame';
   import { syncStructuralGrid } from '../lib/three/structural-grid-3d';
   import { syncUnderlays } from '../lib/three/underlay-3d';
   import { syncFootings } from '../lib/three/footings-3d';
@@ -1315,6 +1316,10 @@
   function syncShellOffsets() { if (draggedNodeId3D !== null) return; perfTimed(() => _syncShellOffsets(sceneCtx)); }
   /** Run the drag-suppressed decorative syncs once after a node drag finishes. */
   function finalizeDecorAfterDrag() {
+    // The concrete followed the drag at a lower rate: drawn once more where the node was left.
+    setGeometryDrag(false);
+    syncElements();
+    syncShells();
     syncLocalAxes();
     syncMemberOffsets();
     syncShellOffsets();
@@ -3413,6 +3418,7 @@
         if (delta.lengthSq() < 1e-18) return;
         if (!dragMoved3D) {
           historyStore.pushState();
+          setGeometryDrag(true);
           // Dragging a node that is not selected takes it (shift adds it).
           if (!uiStore.selectedNodes.has(draggedNodeId3D)) uiStore.selectNode(draggedNodeId3D, e.shiftKey);
         }
