@@ -13435,6 +13435,8 @@ const es: Record<string, string> = {
   "building.tab.stairs": "Escaleras",
   "building.tab.tools": "Herramientas",
   "building.tab.levels.hint": "Los ejes y los niveles del edificio, y un plano de fondo",
+  "building.step.next": "Siguiente: {step} →",
+  "building.step.done": "ya tiene elementos",
   "building.tab.columns.hint": "Columnas entre ejes o dibujadas",
   "building.tab.walls.hint": "Tabiques y muros sobre un eje, con sus aberturas",
   "building.tab.beams.hint": "Vigas sobre los ejes o dibujadas, y riostras",

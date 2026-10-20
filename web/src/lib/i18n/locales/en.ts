@@ -13446,6 +13446,8 @@ const en: Record<string, string> = {
   "building.tab.stairs": "Stairs",
   "building.tab.tools": "Tools",
   "building.tab.levels.hint": "The building's axes and levels, and a drawing underneath",
+  "building.step.next": "Next: {step} →",
+  "building.step.done": "already has elements",
   "building.tab.columns.hint": "Columns between axes or drawn",
   "building.tab.walls.hint": "Walls along an axis, with their openings",
   "building.tab.beams.hint": "Beams along the axes or drawn, and braces",

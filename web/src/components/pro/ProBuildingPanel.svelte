@@ -19,6 +19,7 @@
   import BuildingTools from './building/BuildingTools.svelte';
   import ProGridPanel from './ProGridPanel.svelte';
   import { untrack } from 'svelte';
+  import { physicalGroups } from '../../lib/store/physical';
 
   const grid = $derived(modelStore.grid);
   const levels = $derived(grid?.levels ?? []);
@@ -33,6 +34,19 @@
   const tool = $derived<BuildingTool>(ready ? buildingUi.tool : 'levels');
   let meshSize = $state(1);
 
+  /**
+   * The steps in the order a building is modelled (the levels and axes, the columns from bottom to
+   * top, the walls, the beams that frame into them, the slabs they close), each with whether it
+   * holds anything yet. The walls and the stairs are there when the building has them.
+   */
+  const OPTIONAL = new Set<BuildingTool>(['walls', 'stairs', 'tools']);
+  const done = $derived.by(() => {
+    void modelStore.model.groups;
+    const kinds = new Set(physicalGroups().map((g) => g.physical.kind));
+    return { levels: ready, columns: kinds.has('column'), walls: kinds.has('wall'), beams: kinds.has('beam'), slabs: kinds.has('slab'), stairs: kinds.has('stair'), tools: false } as Record<BuildingTool, boolean>;
+  });
+  /** The next step that holds nothing yet, past the one on screen: the walls and the stairs are skipped. */
+  const nextStep = $derived(BUILDING_TOOLS.slice(BUILDING_TOOLS.indexOf(tool) + 1).find((k) => !OPTIONAL.has(k) && !done[k]) ?? null);
   let last = $state<string | null>(null);
   const said = (r: PlaceResult) => (r.refused && r.created === 0 ? t(`building.refused.${r.refused}`) : tp('building.placed', { n: r.created, bars: r.elements, shells: r.shells }));
   const report = (text: string) => (last = text);
@@ -62,10 +76,13 @@
           {:else if k === 'stairs'}<polyline points="3,21 3,17 8,17 8,13 13,13 13,9 18,9 18,5 21,5" />
           {:else}<circle cx="12" cy="12" r="3" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" />{/if}
         </svg>
-        <span>{t(`building.tab.${k}`)}</span>
+        <span>{#if !OPTIONAL.has(k) || k === 'walls' || k === 'stairs'}<b class="bd-n">{BUILDING_TOOLS.indexOf(k) + 1}</b> {/if}{t(`building.tab.${k}`)}{#if done[k]} <span class="bd-done" aria-label={t('building.step.done')}>✓</span>{/if}</span>
       </button>
     {/each}
   </div>
+  {#if ready && nextStep && done[tool]}
+    <button class="pk-btn bd-next" onclick={() => (buildingUi.tool = nextStep)} data-testid="building-next-step">{tp('building.step.next', { step: t(`building.tab.${nextStep}`) })}</button>
+  {/if}
 
   {#if last}<p class="pk-hint bd-result" data-testid="building-result" role="status">{last}</p>{/if}
 
@@ -95,5 +112,8 @@
   .bd-tab.on { border-color: var(--st-accent); color: var(--st-text); background: var(--st-surface-3); }
   .bd-tab svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.4; }
   .bd-tab svg :global(.ax) { stroke-dasharray: 2 2; stroke-width: 0.9; }
+  .bd-n { font-weight: 600; color: var(--st-text-3); }
+  .bd-done { color: var(--st-ok); }
+  .bd-next { align-self: flex-start; font-size: 0.7rem; margin: 0 0 6px; }
   .bd-result { position: sticky; top: 0; z-index: 1; background: var(--st-surface); padding: 4px 6px; border-left: 2px solid var(--st-hair-strong); }
 </style>

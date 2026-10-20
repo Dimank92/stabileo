@@ -13079,6 +13079,8 @@ const pt: Translations = {
   "building.tab.stairs": "Escadas",
   "building.tab.tools": "Ferramentas",
   "building.tab.levels.hint": "Os eixos e os níveis do edifício, e um desenho de fundo",
+  "building.step.next": "Próximo: {step} →",
+  "building.step.done": "já tem elementos",
   "building.tab.columns.hint": "Pilares entre eixos ou desenhados",
   "building.tab.walls.hint": "Paredes sobre um eixo, com suas aberturas",
   "building.tab.beams.hint": "Vigas sobre os eixos ou desenhadas, e contraventamentos",
