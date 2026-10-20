@@ -5,6 +5,7 @@
  */
 import { modelStore } from '../../store/model.svelte';
 import { findCoincidentNode } from '../../engine/mesh-weld';
+import { weldTolerance } from '../weld-tolerance';
 import { splitAtNodes } from './cut-members';
 import { generateMesh, type MeshInput, type MeshOutput } from './mesher';
 import type { Vec3 } from './affine';
@@ -69,12 +70,30 @@ export function applyMesh(input: MeshInput, o: MeshApplyOptions, mesh: MeshOutpu
   if (!mesh) return null;
   const out: MeshApplyResult = { newNodes: 0, quads: [], plates: [], splitCount: 0, structured: mesh.structured, nodeIds: [] };
   if (regionOccupied(input, mesh.plane)) return { ...out, occupied: true };
-  modelStore.batch(() => {
+  // The model's nodes hashed by position, once: a mesh of thousands of points looked each one up
+  // against every node, and the whole slab of a building took minutes to land.
+  const tol = weldTolerance();
+  const cell = Math.max(tol * 4, 1e-3);
+  const key = (x: number, y: number, z: number) => `${Math.floor(x / cell)},${Math.floor(y / cell)},${Math.floor(z / cell)}`;
+  const buckets = new Map<string, Array<{ id: number; x: number; y: number; z: number }>>();
+  const put = (n: { id: number; x: number; y: number; z: number }) => { const k = key(n.x, n.y, n.z); const b = buckets.get(k); if (b) b.push(n); else buckets.set(k, [n]); };
+  for (const n of modelStore.nodes.values()) put({ id: n.id, x: n.x, y: n.y, z: n.z ?? 0 });
+  const near = (x: number, y: number, z: number): number | null => {
+    const cx = Math.floor(x / cell), cy = Math.floor(y / cell), cz = Math.floor(z / cell);
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (let k = -1; k <= 1; k++) {
+      const hit = findCoincidentNode(buckets.get(`${cx + i},${cy + j},${cz + k}`) ?? [], x, y, z, tol);
+      if (hit !== null) return hit;
+    }
+    return null;
+  };
+  modelStore.bulkMutate(() => {
     const ids = mesh.points.map((p) => {
-      const hit = findCoincidentNode(modelStore.nodes.values(), p[0], p[1], p[2]);
+      const hit = near(p[0], p[1], p[2]);
       if (hit !== null) return hit;
       out.newNodes++;
-      return modelStore.addNode(p[0], p[1], p[2] !== 0 ? p[2] : undefined);
+      const id = modelStore.addNode(p[0], p[1], p[2] !== 0 ? p[2] : undefined);
+      put({ id, x: p[0], y: p[1], z: p[2] });
+      return id;
     });
     out.nodeIds = ids;
     for (const c of mesh.cells) {
@@ -83,8 +102,11 @@ export function applyMesh(input: MeshInput, o: MeshApplyOptions, mesh: MeshOutpu
       else out.plates.push(modelStore.addPlate(n as [number, number, number], o.materialId, o.thickness));
     }
     if (o.splitBeams) {
-      const edge = [...mesh.boundary].filter((i) => !o.splitAt || o.splitAt(mesh.points[i]!)).map((i) => ids[i]!);
-      const cut = splitAtNodes([...modelStore.elements.keys()], edge);
+      // Every mesh node a member passes through cuts it: on the region's edge (the beams round a
+      // panel) and inside it (a beam in the slab's plane, which works with the slab only where
+      // they share nodes; left whole, it crossed the slab's nodes unconnected).
+      const at = mesh.points.map((_, i) => i).filter((i) => !o.splitAt || o.splitAt(mesh.points[i]!)).map((i) => ids[i]!);
+      const cut = splitAtNodes([...modelStore.elements.keys()], at);
       out.splitCount = cut.cut.reduce((s, x) => s + x.segments.length - 1, 0);
     }
   });
