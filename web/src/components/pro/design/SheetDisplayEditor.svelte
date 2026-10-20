@@ -45,7 +45,7 @@
   </table>
   <div class="lbl">
     <span>{t('sheet.ui.barLabel')}</span>
-    <input value={label.order.join(' ')} onchange={(e) => set({ barLabel: { ...label, order: e.currentTarget.value.split(/\s+/).filter((x): x is LabelPart => (PARTS as string[]).includes(x)) } })} data-testid="sheets-label-order" />
+    <input class="order" value={label.order.join(' ')} onchange={(e) => set({ barLabel: { ...label, order: e.currentTarget.value.split(/\s+/).filter((x): x is LabelPart => (PARTS as string[]).includes(x)) } })} data-testid="sheets-label-order" />
     {#each PARTS as p}
       <label>{t(`sheet.ui.part.${p}`)}<input class="aff" placeholder="pre" value={label.prefix?.[p] ?? ''} onchange={(e) => set({ barLabel: { ...label, prefix: { ...label.prefix, [p]: e.currentTarget.value } } })} /><input class="aff" placeholder="suf" value={label.suffix?.[p] ?? ''} onchange={(e) => set({ barLabel: { ...label, suffix: { ...label.suffix, [p]: e.currentTarget.value } } })} /></label>
     {/each}
@@ -70,6 +70,8 @@
   .chk { display: flex; align-items: center; gap: 0.25rem; }
   .lbl { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.6rem; margin: 0.25rem 0; }
   .lbl label { display: inline-flex; align-items: center; gap: 0.15rem; }
+  /* The order input holds the five part names: wide enough for them, never wider than the panel. */
+  .lbl .order { width: 17rem; max-width: 100%; }
   .aff { width: 2.4rem; }
   .row { display: flex; gap: 0.3rem; }
   .muted { margin: 0; color: var(--st-text-2); }
