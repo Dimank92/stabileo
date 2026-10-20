@@ -176,6 +176,15 @@ function loopPoints(f: Frame, loop: Loop2, h: number, sides: SideSpec[] | undefi
 
 // ─── Geometry helpers ─────────────────────────────────────────────
 
+/** Where on `a` (0…1) it crosses `b` at a point inside both, away from their ends; null otherwise. */
+function crossingParam(a: [P2, P2], b: [P2, P2]): number | null {
+  if (!segmentsCross(a, b)) return null;
+  const r: P2 = [a[1][0] - a[0][0], a[1][1] - a[0][1]], s: P2 = [b[1][0] - b[0][0], b[1][1] - b[0][1]];
+  const den = r[0] * s[1] - r[1] * s[0];
+  if (Math.abs(den) < 1e-15) return null;
+  return ((b[0][0] - a[0][0]) * s[1] - (b[0][1] - a[0][1]) * s[0]) / den;
+}
+
 /** Whether two segments cross at a point inside both, away from their ends. */
 function segmentsCross(a: [P2, P2], b: [P2, P2]): boolean {
   const d = (p: P2, q: P2, r: P2) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
@@ -281,6 +290,26 @@ function meshRegion(input: MeshInput): MeshOutput | null {
   const h = Math.max(input.size, 1e-3);
   if (input.outer.kind === 'polygon' && input.outer.points.some((p) => outOfPlane(f, p) > 1e-3)) return null;
   const fixed2 = (input.fixedPoints ?? []).filter((p) => outOfPlane(f, p) < 1e-4).map((p) => to2(f, p));
+  // The segments in the plane, cut where they cross the outline or a hole's: the crossings become
+  // stations of the outline, so the part of a segment inside the region can be an edge of the mesh
+  // (a perimeter beam reaching past the slab's edge to a column outside it).
+  const rawLoops = [input.outer, ...input.holes].filter((l): l is Extract<Loop2, { kind: 'polygon' }> => l.kind === 'polygon').map((l) => l.points.map((p) => to2(f, p)));
+  const segs2: Array<[P2, P2]> = (input.fixedSegments ?? [])
+    .filter(([p, q]) => outOfPlane(f, p) < 1e-4 && outOfPlane(f, q) < 1e-4)
+    .flatMap(([p3, q3]) => {
+      const p = to2(f, p3), q = to2(f, q3);
+      const ts: number[] = [];
+      for (const loop of rawLoops) for (let k = 0; k < loop.length; k++) {
+        const t = crossingParam([p, q], [loop[k]!, loop[(k + 1) % loop.length]!]);
+        if (t !== null) ts.push(t);
+      }
+      if (ts.length === 0) return [[p, q] as [P2, P2]];
+      const at = (t: number): P2 => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+      const cuts = [...new Set(ts.map((t) => Math.round(t * 1e9) / 1e9))].sort((a, b) => a - b);
+      for (const t of cuts) fixed2.push(at(t));
+      const chain = [p, ...cuts.map(at), q];
+      return chain.slice(1).map((b, k) => [chain[k]!, b] as [P2, P2]);
+    });
 
   const outer = loopPoints(f, input.outer, h, input.sides, fixed2);
   if (!outer) return null;
@@ -302,9 +331,7 @@ function meshRegion(input: MeshInput): MeshOutput | null {
   // The segments in the region's plane that run through its inside (a segment on its outline is
   // already a side of it): ends inside or on the outline, middle strictly inside.
   const reaches = (p: P2) => insideRegion(p) || nearLoop(p);
-  const interiorSegs: Array<[P2, P2]> = (input.fixedSegments ?? [])
-    .filter(([p, q]) => outOfPlane(f, p) < 1e-4 && outOfPlane(f, q) < 1e-4)
-    .map(([p, q]) => [to2(f, p), to2(f, q)] as [P2, P2])
+  const interiorSegs: Array<[P2, P2]> = segs2
     .filter(([p, q]) => {
       const mid: P2 = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
       return Math.hypot(q[0] - p[0], q[1] - p[1]) > 1e-6 && reaches(p) && reaches(q) && insideRegion(mid) && !nearLoop(mid);

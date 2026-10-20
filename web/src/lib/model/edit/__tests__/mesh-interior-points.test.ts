@@ -58,3 +58,25 @@ describe('a beam across the inside of a region', () => {
     for (const e of pieces) expect(quads.some((q) => q.nodes.includes(e.nodeI) && q.nodes.includes(e.nodeJ)), `piece ${e.id}`).toBe(true);
   });
 });
+
+describe('a beam reaching past the region\'s outline', () => {
+  beforeEach(() => { modelStore.clear(); historyStore.clear(); });
+
+  it('is followed inside it: its crossing with the outline is a station, the part inside an edge of the cells', () => {
+    // From a column 0,4 m outside the slab's edge, through the slab, to its far edge.
+    const a = modelStore.addNode(-0.4, 3.1, 3), b = modelStore.addNode(8, 3.1, 3);
+    modelStore.addElement(a, b);
+    const outer = { kind: 'polygon' as const, points: [[0, 0, 3], [8, 0, 3], [8, 6, 3], [0, 6, 3]] as Array<[number, number, number]> };
+    applyMesh({ outer, holes: [], size: 1, element: 'quad' }, { materialId: 1, thickness: 0.2, splitBeams: true });
+    const onLine = (n: { x: number; y: number }) => Math.abs(n.y - 3.1) < 1e-6;
+    const inside = [...modelStore.elements.values()].filter((e) => {
+      const p = modelStore.nodes.get(e.nodeI)!, q = modelStore.nodes.get(e.nodeJ)!;
+      return onLine(p) && onLine(q) && Math.min(p.x, q.x) >= -1e-6;
+    });
+    expect(inside.length).toBeGreaterThan(4);
+    const quads = [...modelStore.quads.values()];
+    for (const e of inside) expect(quads.some((q) => q.nodes.includes(e.nodeI) && q.nodes.includes(e.nodeJ)), `piece ${e.id}`).toBe(true);
+    // The outline carries the crossing as a node of the slab.
+    expect([...modelStore.nodes.values()].some((n) => Math.abs(n.x) < 1e-6 && Math.abs(n.y - 3.1) < 1e-6)).toBe(true);
+  });
+});
