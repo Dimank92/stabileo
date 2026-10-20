@@ -5192,6 +5192,7 @@ const es: Record<string, string> = {
   'exData.sec.beam': "Viga {d}",
   'exData.sec.column': "Col {d}",
   'axesBasis.stress-proxy': "eje de mayor tensión por flexión",
+  'axes.secondaryBySlab': '{axis} ({r} %) tomado por la losa como diafragma',
   'axesBasis.dominant-moment': "eje del mayor momento",
   'axesBasis.no-demand': "sin flexión: orientación por defecto",
   'proRibbon.groupTables': 'Tablas',

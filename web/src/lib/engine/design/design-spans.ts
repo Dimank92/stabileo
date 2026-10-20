@@ -35,7 +35,7 @@ import {
   computeBeamCriticalSections, extractGoverningDemands,
   type ElementStationResult, type StationForces,
 } from '../station-design-forces';
-import { resolveDesignAxes } from './design-axes';
+import { resolveDesignAxes, uprightBeam, withSlabDiaphragm } from './design-axes';
 import type { ContextModelData, MemberContext } from './member-context';
 import type { LimitingConstraint } from './outcome';
 import { spanLateralReading } from '../../model/lateral-system';
@@ -272,7 +272,8 @@ export function applySpanContexts(
       stations: merged,
       demands,
       criticalSections,
-      axes: resolveDesignAxes('beam', { b: rep.section.b, h: rep.section.h }, demands),
+      // As `buildMemberContext` reads a piece: the slab takes the in-plane axis of an upright beam with one.
+      axes: withSlabDiaphragm(resolveDesignAxes('beam', { b: rep.section.b, h: rep.section.h }, demands), !!rep.flange && uprightBeam(rep.modelData.elements.get(span.representative) as { rollAngle?: number } | undefined)),
       orientationSuspect: pieces.some((c) => c!.orientationSuspect),
       blocking,
       modelData,

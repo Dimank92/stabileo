@@ -5199,6 +5199,7 @@ const en: Record<string, string> = {
   'exData.sec.beam': "Beam {d}",
   'exData.sec.column': "Col {d}",
   'axesBasis.stress-proxy': "axis with the larger bending stress",
+  'axes.secondaryBySlab': '{axis} ({r} %) taken by the slab as its diaphragm',
   'axesBasis.dominant-moment': "axis of the larger moment",
   'axesBasis.no-demand': "no bending: default orientation",
   'proRibbon.groupTables': 'Tables',

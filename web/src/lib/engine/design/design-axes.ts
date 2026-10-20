@@ -49,6 +49,31 @@ export interface DesignAxes {
   basis: 'stress-proxy' | 'dominant-moment' | 'no-demand';
   /** Ratio secondary/primary governing moment (0 when no demand). */
   secondaryRatio: number;
+  /**
+   * The secondary axis's demand is carried by the slab cast with the beam, as its diaphragm: a
+   * beam bending in its strong axis under a slab takes the in-plane moment through the slab, not
+   * through its own width, and is not checked biaxially for it (`withSlabDiaphragm`).
+   */
+  secondaryCarriedBy?: 'slab';
+}
+
+/**
+ * A beam with a slab cast on it (its flange) bends in the slab's plane only together with the slab,
+ * which as a diaphragm is far stiffer and stronger in that plane than the beam's width: the
+ * in-plane moment (Mz) and its shear go to the slab. So the beam bending about its strong axis
+ * (My, vertical loads) is designed for it alone, and the secondary axis is stated as the slab's.
+ * A beam whose in-plane moment governs (a beam bending sideways, with no slab to take it) keeps
+ * its biaxial check.
+ */
+/** A beam with its section upright, turned less than 5° about its axis: its My bends it vertically. */
+export function uprightBeam(e: { rollAngle?: number } | undefined): boolean {
+  const roll = (((e?.rollAngle ?? 0) % 180) + 180) % 180;
+  return roll < 5 || roll > 175;
+}
+
+export function withSlabDiaphragm(axes: DesignAxes, hasFlange: boolean): DesignAxes {
+  if (!hasFlange || axes.flexure !== 'My' || !axes.biaxial) return axes;
+  return { ...axes, biaxial: false, secondaryCarriedBy: 'slab' };
 }
 
 /** Minimal geometric input — a rectangular section. */

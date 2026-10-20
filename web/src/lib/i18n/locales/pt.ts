@@ -4843,6 +4843,7 @@ const pt: Translations = {
   'exData.sec.beam': "Viga {d}",
   'exData.sec.column': "Pilar {d}",
   'axesBasis.stress-proxy': "eixo de maior tensão de flexão",
+  'axes.secondaryBySlab': '{axis} ({r} %) absorvido pela laje como diafragma',
   'axesBasis.dominant-moment': "eixo do maior momento",
   'axesBasis.no-demand': "sem flexão: orientação padrão",
   'pro.solveCable': 'Resolver Cabo',
