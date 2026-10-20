@@ -1764,6 +1764,8 @@ const pt: Translations = {
   'detailing.schedule.purpose.resistant': 'Resistente',
   'detailing.schedule.purpose.stirrupHanger': 'Construtiva (25.7.1.2)',
   'detailing.selectOne': 'Selecionar um conjunto.',
+  'detailing.findMember': 'Buscar um elemento (V1-2, C3…)',
+  'detailing.composeSheets': 'Compor em Plantas',
   'detailing.shape': 'Forma',
   'detailing.sheet': 'Prancha',
   'detailing.sheet.close': 'Fechar',

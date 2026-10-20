@@ -7526,6 +7526,8 @@ const es: Record<string, string> = {
   'detailing.assemblies': 'Conjuntos',
   'detailing.none': 'Todavía no hay conjuntos coordinados. Ejecutar el detallado desde la solapa de diseño.',
   'detailing.selectOne': 'Seleccionar un conjunto.',
+  'detailing.findMember': 'Buscar un miembro (V1-2, C3…)',
+  'detailing.composeSheets': 'Componer en Planos',
   'detailing.revision': 'Rev. {n}',
   'detailing.superseded': 'SUPERADO',
   'detailing.progress': 'Avance de revisión',

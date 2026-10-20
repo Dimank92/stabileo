@@ -7533,6 +7533,8 @@ const en: Record<string, string> = {
   'detailing.assemblies': 'Assemblies',
   'detailing.none': 'No coordinated assemblies yet. Run the detailing pipeline from the design tab.',
   'detailing.selectOne': 'Select an assembly.',
+  'detailing.findMember': 'Find a member (V1-2, C3…)',
+  'detailing.composeSheets': 'Compose in Drawings',
   'detailing.revision': 'Rev. {n}',
   'detailing.superseded': 'SUPERSEDED',
   'detailing.progress': 'Review progress',
