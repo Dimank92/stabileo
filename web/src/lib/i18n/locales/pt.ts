@@ -8183,6 +8183,7 @@ const pt: Translations = {
   'plan.slab.layer.topY': 'superior em y',
   'plan.slab.base': 'Malha base: {mesh}',
   'plan.slab.noBase': 'sem malha base nesta camada',
+  'plan.slab.perRib': '{n} por nervura',
   'plan.slab.breakdown': 'Detalhamento das lajes — {level}',
   'plan.slab.total': 'Total',
   'plan.slab.col.mark': 'Posição',

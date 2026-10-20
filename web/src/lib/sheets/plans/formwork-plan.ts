@@ -11,7 +11,13 @@ import { boxOf, drawAxes, levelMark, rectAt, type PlanAxis } from './plan-common
 
 export interface PlanColumn { name: string; at: { x: number; y: number }; section: { kind: 'rect'; b: number; h: number; rotDeg?: number } | { kind: 'circle'; D: number } | { kind: 'other'; label: string; b: number; h: number } }
 export interface PlanBeam { name: string; a: { x: number; y: number }; b: { x: number; y: number }; width: number; depth: number }
-export interface PlanSlab { name: string; outline: Array<{ x: number; y: number }>; thickness: number }
+export interface PlanSlab {
+  name: string; outline: Array<{ x: number; y: number }>; thickness: number;
+  /** Openings through the slab, drawn crossed. */
+  holes?: Array<Array<{ x: number; y: number }>>;
+  /** A waffle slab: its voids between the ribs and its solid zones (drops), seen from above. */
+  waffle?: { voids: Array<{ x0: number; x1: number; y0: number; y1: number }>; solids: Array<{ x0: number; x1: number; y0: number; y1: number }>; label: string };
+}
 export interface PlanWall { name: string; a: { x: number; y: number }; b: { x: number; y: number }; thickness: number }
 
 export interface FormworkInput {
@@ -49,8 +55,16 @@ export function formworkPlan(i: FormworkInput, title: string, fmt: (v: number) =
   for (const sl of i.slabs) {
     const o = sl.outline.map(mm);
     out.push({ kind: 'polyline', layer: 'FW-OUTLINE', closed: true, points: o });
+    for (const h of sl.holes ?? []) {
+      const q = h.map(mm), b = boxOf(q);
+      out.push({ kind: 'polyline', layer: 'FW-OUTLINE', closed: true, points: q });
+      out.push({ kind: 'line', layer: 'FW-HIDDEN', a: { x: b.x0, y: b.y0 }, b: { x: b.x1, y: b.y1 } }, { kind: 'line', layer: 'FW-HIDDEN', a: { x: b.x0, y: b.y1 }, b: { x: b.x1, y: b.y0 } });
+    }
+    // Below the topping, so hidden from above: the voids between the ribs and the drops' edges.
+    for (const r of sl.waffle?.voids ?? []) out.push({ kind: 'polyline', layer: 'FW-HIDDEN', closed: true, points: [{ x: r.x0 * k, y: r.y0 * k }, { x: r.x1 * k, y: r.y0 * k }, { x: r.x1 * k, y: r.y1 * k }, { x: r.x0 * k, y: r.y1 * k }] });
+    for (const r of sl.waffle?.solids ?? []) out.push({ kind: 'polyline', layer: 'FW-OUTLINE', closed: true, points: [{ x: r.x0 * k, y: r.y0 * k }, { x: r.x1 * k, y: r.y0 * k }, { x: r.x1 * k, y: r.y1 * k }, { x: r.x0 * k, y: r.y1 * k }] });
     const c = o.reduce((a, p) => ({ x: a.x + p.x / o.length, y: a.y + p.y / o.length }), { x: 0, y: 0 });
-    out.push({ kind: 'text', layer: 'FW-TAG', at: c, text: `${sl.name} — h ${cm(sl.thickness)}`, height: th * 1.1, align: 'center' });
+    out.push({ kind: 'text', layer: 'FW-TAG', at: c, text: sl.waffle ? `${sl.name} — ${sl.waffle.label}` : `${sl.name} — h ${cm(sl.thickness)}`, height: th * 1.1, align: 'center' });
   }
   for (const b of i.beams) {
     const A = mm(b.a), B = mm(b.b), L = Math.hypot(B.x - A.x, B.y - A.y) || 1;

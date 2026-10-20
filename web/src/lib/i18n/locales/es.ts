@@ -7738,6 +7738,7 @@ const es: Record<string, string> = {
   'plan.slab.layer.topY': 'superior en y',
   'plan.slab.base': 'Malla base: {mesh}',
   'plan.slab.noBase': 'sin malla base en esta capa',
+  'plan.slab.perRib': '{n} por nervio',
   'plan.slab.breakdown': 'Despiece de losas — {level}',
   'plan.slab.total': 'Total',
   'plan.slab.col.mark': 'Marca',

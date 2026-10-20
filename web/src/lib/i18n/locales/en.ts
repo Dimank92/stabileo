@@ -7745,6 +7745,7 @@ const en: Record<string, string> = {
   'plan.slab.layer.topY': 'top in y',
   'plan.slab.base': 'Base mat: {mesh}',
   'plan.slab.noBase': 'no base mat in this layer',
+  'plan.slab.perRib': '{n} per rib',
   'plan.slab.breakdown': 'Slab bar breakdown — {level}',
   'plan.slab.total': 'Total',
   'plan.slab.col.mark': 'Mark',
