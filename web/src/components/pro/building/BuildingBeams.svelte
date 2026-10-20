@@ -23,7 +23,10 @@
   const levels = $derived([...(grid?.levels ?? [])].sort((a, b) => a.z - b.z));
   const sections = $derived([...modelStore.sections.values()]);
   let typology = $state('dropped'), sectionX = $state(0), sectionY = $state(0), wantX = $state(true), wantY = $state(true);
-  let align = $state(0), ecc = $state(0);
+  /** Where a beam sits across its axis: −1, centred, +1, or the edges' beams flush with the columns' outer face. */
+  let align = $state<number | 'perimeter'>(0), ecc = $state(0);
+  /** The beams' top face on the level, the slab's top. */
+  let topFlush = $state(false);
   /** Each span pinned at both ends (simply supported on what carries it). */
   let pinned = $state(false);
   let x0 = $state(''), x1 = $state(''), y0 = $state(''), y1 = $state(''), levelFrom = $state(''), levelTo = $state('');
@@ -53,7 +56,10 @@
     if (!g) return;
     const box: { r?: ReturnType<typeof placeFrame> } = {};
     modelStore.batch(() => {
-      const r = box.r = placeFrame(g, spec, { beamTypology: typology, beamAlign: align, beamEccentricity: ecc });
+      const r = box.r = placeFrame(g, spec, {
+        beamTypology: typology, beamAlign: align === 'perimeter' ? 0 : align, beamEccentricity: ecc,
+        ...(align === 'perimeter' ? { beamPerimeterFlush: true } : {}), ...(topFlush ? { beamTopFlush: true } : {}),
+      });
       if (pinned) for (const id of r.bars) modelStore.updateElement(id, { releaseI: { my: true, mz: true, t: false }, releaseJ: { my: true, mz: true, t: false } });
     });
     const r = box.r;
@@ -89,11 +95,37 @@
     <label class="bk-field">{t('building.beamAlign')}
       <select bind:value={align} data-testid="building-beam-align">
         <option value={-1}>{t('building.align.minus')}</option><option value={0}>{t('building.align.centre')}</option><option value={1}>{t('building.align.plus')}</option>
+        <option value="perimeter">{t('building.align.perimeter')}</option>
       </select>
     </label>
+    <label class="bk-check"><input type="checkbox" bind:checked={topFlush} data-testid="building-beam-top-flush" /> {t('building.beam.topFlush')}</label>
     <label class="bk-field">{t('building.eccentricity')} <input type="number" step="0.05" bind:value={ecc} /></label>
     <label class="bk-check"><input type="checkbox" bind:checked={pinned} data-testid="building-beam-pinned" /> {t('building.beam.pinned')}</label>
   </div>
+
+  <!-- How the chosen seat reads, in plan and in section: the column, the beam, the level. -->
+  <figure class="bk-fig" data-testid="building-beam-figure">
+    <svg viewBox="0 0 200 74" role="img" aria-label={t('building.beam.figure')}>
+      <g class="plan">
+        <rect class="col" x="20" y="14" width="24" height="24" />
+        <rect class="col" x="150" y="14" width="24" height="24" />
+        {#if align === 'perimeter'}
+          <rect class="beam" x="44" y="14" width="106" height="14" />
+          <line class="axis" x1="10" y1="26" x2="184" y2="26" />
+        {:else}
+          {@const dy = align === -1 ? -5 : align === 1 ? 5 : 0}
+          <rect class="beam" x="44" y={19 + dy} width="106" height="14" />
+          <line class="axis" x1="10" y1="26" x2="184" y2="26" />
+        {/if}
+        <text x="97" y="50">{t(align === 'perimeter' ? 'building.beam.figPerimeter' : 'building.beam.figAxis')}</text>
+      </g>
+      <g class="section" transform="translate(0 4)">
+        <line class="level" x1="10" y1="58" x2="190" y2="58" />
+        <rect class="beam" x="80" y={topFlush ? 58 : 50} width="40" height="16" />
+        <text x="130" y="56">{t(topFlush ? 'building.beam.figTop' : 'building.beam.figCentre')}</text>
+      </g>
+    </svg>
+  </figure>
 
   <h5 class="bk-h">{t('building.betweenAxesTitle')}</h5>
   <BuildingRange bind:x0 bind:x1 bind:y0 bind:y1 bind:levelFrom bind:levelTo levelsLabel={t('building.beam.levels')} />
@@ -125,4 +157,12 @@
   .bk-warn { color: var(--st-warn); }
   .bk-seg { display: flex; gap: 4px; }
   .bk-seg .on { border-color: var(--st-accent); color: var(--st-text); }
+  .bk-fig { margin: 4px 0; }
+  .bk-fig svg { width: 100%; max-width: 18rem; height: auto; display: block; }
+  .bk-fig .col { fill: var(--st-surface-3); stroke: var(--st-text-2); stroke-width: 1; }
+  .bk-fig .beam { fill: color-mix(in srgb, var(--st-accent) 25%, transparent); stroke: var(--st-accent); stroke-width: 1; }
+  .bk-fig .axis { stroke: var(--st-text-3); stroke-dasharray: 4 3; stroke-width: 0.8; }
+  .bk-fig .level { stroke: var(--st-text-2); stroke-width: 1; }
+  .bk-fig text { font-size: 7px; fill: var(--st-text-2); text-anchor: middle; }
+  .bk-fig .section text { text-anchor: start; }
 </style>
