@@ -12803,6 +12803,7 @@ const en: Record<string, string> = {
   'slabEd.strip': 'Strip',
   'slabEd.kind.edge': 'edge',
   'slabEd.kind.middle': 'middle',
+  'slabEd.kind.rib': 'rib',
   'designData.slabBase': 'Slabs: predetermined base mat',
   'designData.slabBaseHint': 'When set, every panel takes it as its base and the design adds extra bars only where it falls short. Unset, the base is the bottom minimum.',
   'shell.comp.asBotX': 'As bottom x',

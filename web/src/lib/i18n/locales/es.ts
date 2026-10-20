@@ -12792,6 +12792,7 @@ const es: Record<string, string> = {
   'slabEd.strip': 'Faja',
   'slabEd.kind.edge': 'borde',
   'slabEd.kind.middle': 'central',
+  'slabEd.kind.rib': 'nervio',
   'designData.slabBase': 'Losas: armadura base predeterminada',
   'designData.slabBaseHint': 'Si se fija, cada paño la toma como base y el diseño agrega refuerzos sólo donde no alcanza. Sin fijar, la base es la mínima inferior.',
   'shell.comp.asBotX': 'As inferior x',

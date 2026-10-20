@@ -12436,6 +12436,7 @@ const pt: Translations = {
   'slabEd.strip': 'Faixa',
   'slabEd.kind.edge': 'borda',
   'slabEd.kind.middle': 'central',
+  'slabEd.kind.rib': 'nervura',
   'designData.slabBase': 'Lajes: armadura base predeterminada',
   'designData.slabBaseHint': 'Se definida, cada painel a usa como base e o dimensionamento acrescenta reforços só onde não basta. Sem definir, a base é a mínima inferior.',
   'shell.comp.asBotX': 'As inferior x',
