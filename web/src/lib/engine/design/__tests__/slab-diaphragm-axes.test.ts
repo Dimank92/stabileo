@@ -23,9 +23,14 @@ describe('the in-plane axis of a beam under its slab', () => {
     expect(slab.secondaryCarriedBy).toBe('slab');
   });
 
-  it('a beam bending sideways (its in-plane moment governing) keeps its biaxial check', () => {
-    const axes = resolveDesignAxes('beam', { b: 0.3, h: 0.5 }, demands(10, 100));
-    expect(axes.flexure).toBe('Mz');
-    expect(withSlabDiaphragm(axes, true)).toBe(axes);
+  it('a narrow band under its slab is designed about its depth, whatever its in-plane moment', () => {
+    // A 15 cm edge band: by stress its width «governs» under the slab's in-plane action.
+    const free = resolveDesignAxes('beam', { b: 0.15, h: 0.35 }, demands(20, 30));
+    expect(free.flexure).toBe('Mz');
+    expect(free.biaxial).toBe(true);
+    const slab = resolveDesignAxes('beam', { b: 0.15, h: 0.35 }, demands(20, 30), { slab: true });
+    expect(slab.flexure).toBe('My');
+    expect([slab.biaxial, slab.secondaryCarriedBy]).toEqual([false, 'slab']);
+    expect([slab.bFlex, slab.hFlex]).toEqual([0.15, 0.35]);
   });
 });

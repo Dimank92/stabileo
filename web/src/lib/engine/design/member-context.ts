@@ -26,7 +26,7 @@ import {
   type ElementDesignDemands,
   type ElementStationResult,
 } from '../station-design-forces';
-import { resolveDesignAxes, uprightBeam, withSlabDiaphragm, type DesignAxes } from './design-axes';
+import { resolveDesignAxes, uprightBeam, type DesignAxes } from './design-axes';
 import type { LimitingConstraint } from './outcome';
 import type { ProvenancedValue, RegulationEdition } from '../../codes/regulation';
 import { resolveMaxAggregateSize, type ConcreteProjectData } from '../../codes/project-code-settings';
@@ -337,7 +337,7 @@ export function buildMemberContext(
   // A beam with its slab, its section upright: the in-plane axis is the slab's diaphragm
   // (`withSlabDiaphragm`). A beam turned about its axis bends sideways under its own vertical
   // load, which no slab takes, and keeps its biaxial check.
-  const axes = withSlabDiaphragm(resolveDesignAxes(elementType, { b, h }, demands), elementType === 'beam' && uprightBeam(elem as { rollAngle?: number }) && !!opts.flangeOf?.(elementId));
+  const axes = resolveDesignAxes(elementType, { b, h }, demands, { slab: elementType === 'beam' && uprightBeam(elem as { rollAngle?: number }) && !!opts.flangeOf?.(elementId) });
   if (axes.basis === 'no-demand' && !blocking.includes('missingDemand')) blocking.push('missingDemand');
 
   return {
