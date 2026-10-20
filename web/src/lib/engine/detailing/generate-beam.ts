@@ -960,9 +960,13 @@ export function generateBeamBars(input: BeamGenerationInput): GeneratedBeam {
     slots: ReadonlyArray<{ across: number; layer: number }>, count: number, dia: number,
     occupied: ReadonlyArray<{ across: number; layer: number; dia: number }> = [],
   ): number[] | null => {
+    // A hundredth of a millimetre short is the two seats' arithmetic, not a bar out of place: the
+    // coordinated slots are laid from the row's seat and the continuous pair from its own bend,
+    // a few microns apart (3Ø16 in a 20 cm beam: 26,661 mm clear against 26,667), and the
+    // middle bar fell back to the group's own row, onto a column's face bar.
     const clearOf = (a: number, b: number) => (a + b) / 2000 + minClearSpacingInLayer(input.edition, {
       barDiameterMm: Math.max(a, b), maxAggregateSizeMm: input.maxAggregateSizeMm,
-    }).minClear + DEFAULT_TOLERANCES.placement - 1e-9;
+    }).minClear + DEFAULT_TOLERANCES.placement - 1e-5;
     const placed = occupied.map((o) => ({ ...o }));
     const out: number[] = [];
     const order = slots.map((sl, i) => ({ sl, i }))
