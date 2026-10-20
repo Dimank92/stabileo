@@ -3,7 +3,7 @@
  * and the title block template set, and the set kept as a template and applied to another
  * project. The builder's rules are pinned in `store/__tests__/sheet-set-template.test.ts`.
  */
-import { test, expect, designAll, loadModel, openDocumentsStage } from './fixtures';
+import { test, expect, designAll, loadModel, openDocumentsStage, openSheetsPlace } from './fixtures';
 
 test.use({ viewport: { width: 1400, height: 900 } });
 
@@ -13,7 +13,7 @@ test.describe('@slow the drawing set as a list', () => {
     page.on('pageerror', (e) => errors.push(e.message));
     await loadModel(page, 'rc-design-qa-8');
     await designAll(page);
-    await openDocumentsStage(page);
+    await openSheetsPlace(page, { setup: true });
     const panel = page.getByTestId('sheets-panel');
     await panel.scrollIntoViewIfNeeded();
 
@@ -49,11 +49,16 @@ test.describe('@slow the drawing set as a list', () => {
 
     await loadModel(page, 'rc-design-qa-8');
     await designAll(page);
-    await openDocumentsStage(page);
+    await openSheetsPlace(page, { setup: true });
     await page.getByTestId('sheets-panel').scrollIntoViewIfNeeded();
-    await page.getByTestId('sheets-templates').locator('summary').click();
+    // The drawings place stays mounted across the new project: its folds keep their state.
+    const unfold = async (id: string) => {
+      const d = page.getByTestId(id);
+      if (!(await d.evaluate((e) => (e as HTMLDetailsElement).open))) await d.locator('summary').first().click();
+    };
+    await unfold('sheets-templates');
     await page.getByTestId('sheets-tpl-apply-Estudio').click();
-    await page.getByTestId('sheets-entries').locator('summary').click();
+    await unfold('sheets-entries');
     await expect(page.getByTestId('sheets-entries').locator('li')).toHaveCount(entries);
     await page.getByTestId('sheets-build').click();
     await expect(page.getByTestId('sheets-list')).toContainText(/Encofrado a 1:50/);
@@ -63,7 +68,7 @@ test.describe('@slow the drawing set as a list', () => {
   test('a drawing given another scale and placed by hand keeps both when the set is laid out again', async ({ pro: page }) => {
     await loadModel(page, 'rc-design-qa-8');
     await designAll(page);
-    await openDocumentsStage(page);
+    await openSheetsPlace(page, { setup: true });
     await page.getByTestId('sheets-panel').scrollIntoViewIfNeeded();
     await page.getByTestId('sheets-build').click();
     await expect(page.getByTestId('sheets-count')).toBeVisible();

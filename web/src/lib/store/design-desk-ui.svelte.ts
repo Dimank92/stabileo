@@ -23,7 +23,7 @@ import { sortedLevels } from '../model/grid';
 import { designDrafts } from './design-drafts.svelte';
 import { tp } from '../i18n';
 
-export type DeskTab = 'prepare' | 'designData' | 'plan' | 'frame' | 'column' | 'wall' | 'slab' | 'joist' | 'footing' | 'seismic' | 'joint' | 'levels' | 'list' | 'steel' | 'connections' | 'report' | 'geometry' | 'materials' | 'special' | 'stairs' | 'pt' | 'elements' | 'fire' | 'codes' | 'detailing' | 'budget' | 'collab' | 'arch' | 'site' | 'documents';
+export type DeskTab = 'prepare' | 'designData' | 'plan' | 'frame' | 'column' | 'wall' | 'slab' | 'joist' | 'footing' | 'seismic' | 'joint' | 'levels' | 'list' | 'steel' | 'connections' | 'report' | 'geometry' | 'materials' | 'special' | 'stairs' | 'pt' | 'elements' | 'fire' | 'codes' | 'detailing' | 'budget' | 'collab' | 'arch' | 'site' | 'sheets' | 'listings' | 'documents';
 
 /**
  * How the desk's views are grouped. Preparing the model comes first: what it still lacks and the
@@ -43,7 +43,7 @@ export const DESK_GROUPS = {
   codes: ['codes'],
   pending: ['report', 'geometry'],
   detailing: ['detailing'],
-  documents: ['documents'],
+  documents: ['sheets', 'listings', 'documents'],
   specialties: ['seismic', 'fire', 'materials'],
   project: ['budget', 'collab', 'arch', 'site'],
 } as const satisfies Record<string, readonly DeskTab[]>;

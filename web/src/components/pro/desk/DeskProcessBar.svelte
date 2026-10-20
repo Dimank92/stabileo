@@ -12,6 +12,7 @@
    * (the rail lists them), and the actions shown are the ones that make sense for that step, one
    * of each: «Size…» and the frame equaliser while sizing, «Generate detailing» while detailing.
    */
+  import DeskGuide from './DeskGuide.svelte';
   import RecheckNotice from '../design/RecheckNotice.svelte';
   import RcRegenerationWarning from '../design/RcRegenerationWarning.svelte';
   import StaleLinesNotice from './frame/StaleLinesNotice.svelte';
@@ -63,7 +64,7 @@
     return designSteps(currentRcReadings(), size, { hasConcrete: hasConcrete() });
   });
   /** Where each step lands: the place it was last on, else its first. */
-  const HOME: Record<DeskStep, DeskTab> = { prepare: 'prepare', size: 'plan', detail: 'detailing', document: 'documents' };
+  const HOME: Record<DeskStep, DeskTab> = { prepare: 'prepare', size: 'plan', detail: 'detailing', document: 'sheets' };
   const lastOf = $state<Partial<Record<DeskStep, DeskTab>>>({});
   $effect(() => { const s = stepOf(deskUi.tab); if (s) lastOf[s] = deskUi.tab; });
 
@@ -109,6 +110,8 @@
       </li>
     {/each}
   </ol>
+
+  <DeskGuide {steps} {go} />
 
   <!-- The actions of the step in hand, one of each. -->
   <div class="dp-actions" role="group" aria-label={step ? t(`desk.step.${step}`) : t('desk.flow')} data-testid="desk-step-actions" data-step={step ?? ''}>

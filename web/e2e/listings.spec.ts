@@ -4,7 +4,7 @@
  * sheets as DXF 2004, DXF R12 and SVG. The content of each format is pinned cell by cell in
  * `store/__tests__/listings-formats.test.ts`; the DXF 2004 in `sheets/__tests__/to-dxf2004.test.ts`.
  */
-import { test, expect, designAll, loadModel, openDocumentsStage, designPlace } from './fixtures';
+import { test, expect, designAll, loadModel, openDocumentsStage, designPlace, openSheetsPlace } from './fixtures';
 import { readFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
 
@@ -22,7 +22,7 @@ test.describe('@slow listings and formats', () => {
     await designPlace(page, 'detailing');
     await page.getByTestId('cmd-generate-detailing').click();
     await expect.poll(async () => page.evaluate(() => (window.__stabileo as unknown as { detailingAssemblies(): unknown[] }).detailingAssemblies().length), { timeout: 30_000 }).toBeGreaterThan(0);
-    await openDocumentsStage(page);
+    await designPlace(page, 'listings');
     const panel = page.getByTestId('listings-panel');
     await panel.scrollIntoViewIfNeeded();
 
@@ -46,7 +46,7 @@ test.describe('@slow listings and formats', () => {
     expect(bvbs.bytes.toString('latin1')).toMatch(/^BF2D@/);
 
     // The sheets: DXF 2004 by default, R12 when asked, and SVG.
-    await page.getByTestId('sheets-panel').scrollIntoViewIfNeeded();
+    await openSheetsPlace(page, { setup: true });
     await page.getByTestId('sheets-build').click();
     await expect(page.getByTestId('sheets-count')).toBeVisible();
     expect((await download(page, 'sheets-dxf')).name).toMatch(/-dxf\.zip$/);

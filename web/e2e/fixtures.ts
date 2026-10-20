@@ -556,6 +556,20 @@ export { expect };
  * the one line that says so. Opening the stage by default would have hidden the problem instead
  * of describing it, and would undo the point of making Documents a stage.
  */
+/**
+ * The drawings place of design, its set laid out on arrival; `setup` also opens the set's
+ * configuration (format, kinds, entries, display, title block, details), which folds below the
+ * sheets there.
+ */
+export async function openSheetsPlace(page: Page, opts: { setup?: boolean } = {}): Promise<void> {
+  if (!(await page.getByTestId('sheets-panel').isVisible())) await designPlace(page, 'sheets');
+  await expect(page.getByTestId('sheets-build')).toBeEnabled({ timeout: 120_000 });
+  if (opts.setup) {
+    const setup = page.getByTestId('sheets-setup');
+    if (!(await setup.evaluate((d) => (d as HTMLDetailsElement).open))) await setup.locator('> summary').click();
+  }
+}
+
 export async function openDocumentsStage(page: Page): Promise<void> {
   if (await page.getByTestId('documents-stage').isVisible()) return;
   await designPlace(page, 'documents');
@@ -625,6 +639,8 @@ const PLACE: Record<string, { step: string; rail: string }> = {
   codes: { step: 'size', rail: 'desk-rail-codes' },
   detailing: { step: 'detail', rail: 'desk-rail-detailing' },
   documents: { step: 'document', rail: 'desk-rail-documents' },
+  sheets: { step: 'document', rail: 'desk-rail-sheets' },
+  listings: { step: 'document', rail: 'desk-rail-listings' },
 };
 export type DesignPlace = keyof typeof PLACE | 'otherCodes' | 'foreignCodes';
 

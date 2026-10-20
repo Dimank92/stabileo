@@ -4,8 +4,15 @@
   (`resolve` is the panel's single builder), in the documents' language, which may differ from the
   app's. A revision per sheet overrides the project's current one on that sheet and in the index.
 -->
+<script lang="ts" module>
+  /** The configuration's open state, across mounts of the panel in the session. */
+  let setupOpenKept: boolean | null = null;
+</script>
+
 <script lang="ts">
   import { t, tp, OFFERED_LOCALES } from '../../../lib/i18n';
+  import { onMount } from 'svelte';
+  import { detailingStore } from '../../../lib/store/detailing.svelte';
   import { SHEET_FORMATS, type SheetFormat } from '../../../lib/sheets/formats';
   import { sheetSvg, type SetSheet } from '../../../lib/sheets/sheet-set';
   import {
@@ -22,7 +29,14 @@
   import { designFingerprint } from '../../../lib/store/design-fingerprint';
   import OutdatedNotice from './OutdatedNotice.svelte';
 
-  let { resolve, projectName }: { resolve: () => DocumentModel | null; projectName: string } = $props();
+  /**
+   * `autoBuild`: the drawings place of the design desk. The set is laid out on arrival, the sheets
+   * come first and the set's configuration folds below them.
+   */
+  let { resolve, projectName, autoBuild = false }: { resolve: () => DocumentModel | null; projectName: string; autoBuild?: boolean } = $props();
+  /** Whether the set's configuration is open, kept while the panel comes and goes (`setupOpenKept`). */
+  let setupOpen = $state(setupOpenKept ?? !autoBuild);
+  $effect(() => { setupOpenKept = setupOpen; });
 
   let doc = $state<DocumentModel | null>(null);
   let sheets = $state<SetSheet[]>([]);
@@ -52,8 +66,13 @@
   // The set built entry by entry, with its progress and a way to stop it.
   let progress = $state<{ done: number; total: number; label: string } | null>(null);
   let abort: AbortController | null = null;
-  async function build() {
-    doc = resolve();
+  /**
+   * Lay the set out. On arrival in the drawings place (`autoBuild`) it reads the document already
+   * built, never builds one: building a document is a revision, and looking at the drawings is not
+   * a reason to issue one. «Lay out the sheets» builds it.
+   */
+  async function build(fromCurrent = false) {
+    doc = fromCurrent ? detailingStore.document : resolve();
     abort?.abort();
     const ctl = new AbortController(); abort = ctl;
     const from = designFingerprint();
@@ -67,6 +86,9 @@
     shown = Math.min(shown, Math.max(0, sheets.length - 1));
   }
   function cancel() { abort?.abort(); progress = null; }
+  onMount(() => { if (autoBuild) void build(true); });
+  /** The kinds of drawing in the set, in its order, each with the first sheet that holds it. */
+  const kindsInSet = $derived(sheets.map((s, i) => ({ title: s.title, i, has: s.drawings.length > 0 })).filter((x, j, all) => x.has && all.findIndex((y) => y.title === x.title) === j));
   let dxfVersion = $state<'2004' | 'r12'>('2004');
   /** The sheets chosen for a partial export; none chosen, all of them. */
   let chosen = $state<Set<string>>(new Set());
@@ -93,49 +115,53 @@
   <h4 id="sheets-title">{t('sheet.ui.title')}</h4>
   <p class="lead">{t('sheet.ui.lead')}</p>
 
+  <details class="setup" bind:open={setupOpen} data-testid="sheets-setup">
+    <summary>{t('sheet.ui.setup')} <span class="muted">· {st.format} · {tp('sheet.ui.kindsSummary', { n: kinds.size, m: PLAN_KINDS.length })}</span></summary>
   <div class="settings">
-    <label>{t('sheet.ui.format')}
-      <select data-testid="sheets-format" value={st.format}
-              onchange={(e) => patch({ format: e.currentTarget.value as SheetFormat })}>
-        {#each SHEET_FORMATS as f (f)}<option value={f}>{f}</option>{/each}
-      </select>
-    </label>
-    <label>{t('sheet.ui.language')}
-      <select data-testid="sheets-language" value={st.language ?? ''}
-              onchange={(e) => patch({ language: e.currentTarget.value || undefined })}>
-        <option value="">{t('sheet.ui.languageApp')}</option>
-        {#each OFFERED_LOCALES as l (l)}<option value={l}>{l}</option>{/each}
-      </select>
-    </label>
-    <label>{t('sheet.ui.prefix')}
-      <input data-testid="sheets-prefix" value={st.prefix} size="4"
-             onchange={(e) => patch({ prefix: e.currentTarget.value })} />
-    </label>
-    <label>{t('sheet.ui.start')}
-      <input data-testid="sheets-start" type="number" min="0" value={st.start}
-             onchange={(e) => patch({ start: Math.max(0, Math.round(Number(e.currentTarget.value) || 0)) })} />
-    </label>
-  </div>
-
-  <details class="kinds" data-testid="sheets-kinds">
-    <summary>{t('sheet.ui.kinds')} <span class="muted">· {tp('sheet.ui.kindsSummary', { n: kinds.size, m: PLAN_KINDS.length })}</span></summary>
-    <div class="kind-list">
-      {#each PLAN_KINDS as k (k)}
-        <label><input type="checkbox" data-testid={`sheets-kind-${k}`} checked={kinds.has(k)} onchange={() => toggleKind(k)} /> {t(`sheet.kind.${k}`)}</label>
-      {/each}
+      <label>{t('sheet.ui.format')}
+        <select data-testid="sheets-format" value={st.format}
+                onchange={(e) => patch({ format: e.currentTarget.value as SheetFormat })}>
+          {#each SHEET_FORMATS as f (f)}<option value={f}>{f}</option>{/each}
+        </select>
+      </label>
+      <label>{t('sheet.ui.language')}
+        <select data-testid="sheets-language" value={st.language ?? ''}
+                onchange={(e) => patch({ language: e.currentTarget.value || undefined })}>
+          <option value="">{t('sheet.ui.languageApp')}</option>
+          {#each OFFERED_LOCALES as l (l)}<option value={l}>{l}</option>{/each}
+        </select>
+      </label>
+      <label>{t('sheet.ui.prefix')}
+        <input data-testid="sheets-prefix" value={st.prefix} size="4"
+               onchange={(e) => patch({ prefix: e.currentTarget.value })} />
+      </label>
+      <label>{t('sheet.ui.start')}
+        <input data-testid="sheets-start" type="number" min="0" value={st.start}
+               onchange={(e) => patch({ start: Math.max(0, Math.round(Number(e.currentTarget.value) || 0)) })} />
+      </label>
     </div>
+  
+    <details class="kinds" data-testid="sheets-kinds">
+      <summary>{t('sheet.ui.kinds')} <span class="muted">· {tp('sheet.ui.kindsSummary', { n: kinds.size, m: PLAN_KINDS.length })}</span></summary>
+      <div class="kind-list">
+        {#each PLAN_KINDS as k (k)}
+          <label><input type="checkbox" data-testid={`sheets-kind-${k}`} checked={kinds.has(k)} onchange={() => toggleKind(k)} /> {t(`sheet.kind.${k}`)}</label>
+        {/each}
+      </div>
+    </details>
+  
+    <SheetEntriesEditor {entries} onChange={setEntries} />
+    <DetailCatalog {doc} onChange={() => { if (built) sheets = projectSheetSet(doc, projectName); }} />
+    <SheetDisplayEditor display={st.display} onChange={(d) => patch({ display: d })} />
+    <TitleBlockEditor template={st.titleBlock} onChange={(tb) => patch({ titleBlock: tb })} />
+    <SheetTemplates onApplied={() => { if (built) sheets = projectSheetSet(doc, projectName); }} />
+  
   </details>
-
-  <SheetEntriesEditor {entries} onChange={setEntries} />
-  <DetailCatalog {doc} onChange={() => { if (built) sheets = projectSheetSet(doc, projectName); }} />
-  <SheetDisplayEditor display={st.display} onChange={(d) => patch({ display: d })} />
-  <TitleBlockEditor template={st.titleBlock} onChange={(tb) => patch({ titleBlock: tb })} />
-  <SheetTemplates onApplied={() => { if (built) sheets = projectSheetSet(doc, projectName); }} />
 
   <OutdatedNotice what="detailing" testid="sheets-detailing-outdated" />
   <OutdatedNotice what="sheets" stale={outdated} testid="sheets-outdated" />
   <div class="actions">
-    <button data-testid="sheets-build" disabled={!!progress} onclick={build}>{t('sheet.ui.build')}</button>
+    <button data-testid="sheets-build" disabled={!!progress} onclick={() => build()}>{t('sheet.ui.build')}</button>
     {#if progress}
       <span class="muted" role="status" data-testid="sheets-progress">{tp('sheet.ui.progress', { done: progress.done + 1, total: progress.total, label: progress.label })}</span>
       <button data-testid="sheets-cancel" onclick={cancel}>{t('sheet.ui.cancel')}</button>
@@ -156,6 +182,12 @@
     {#if conflicts.length}
       <ul class="muted conflicts" data-testid="sheets-layout-conflicts">{#each conflicts as c}<li>{tp(`sheet.ui.conflict.${c.reason}`, { key: c.key, detail: c.detail ?? '' })}</li>{/each}</ul>
     {/if}
+    {#if kindsInSet.length > 1}
+      <!-- Straight to a kind of drawing: the first sheet that holds it. -->
+      <div class="jump" role="group" aria-label={t('sheet.ui.jump')} data-testid="sheets-jump">
+        {#each kindsInSet as k (k.title)}<button class:on={sheets[shown]?.title === k.title} onclick={() => (shown = k.i)} data-testid="sheets-jump-{k.i}">{k.title}</button>{/each}
+      </div>
+    {/if}
     <ul class="list" data-testid="sheets-list">
       {#each sheets as s, i (s.number)}
         <li class:on={i === shown}>
@@ -173,6 +205,12 @@
     </ul>
     {#if sheets[shown]}
       <!-- The sheet's own SVG writer escapes every text it draws. -->
+      <div class="one" role="group" aria-label={tp('sheet.ui.thisSheet', { n: sheets[shown]!.number })}>
+        <span class="muted">{tp('sheet.ui.thisSheet', { n: sheets[shown]!.number })}</span>
+        <button disabled={outdated} onclick={() => exportSheetsPdf(doc, [sheets[shown]!], at(), projectName)} data-testid="sheets-one-pdf">PDF</button>
+        <button disabled={outdated} onclick={() => exportSheetsDxf(doc, [sheets[shown]!], at(), dxfVersion)} data-testid="sheets-one-dxf">DXF</button>
+        <button disabled={outdated} onclick={() => exportSheetsSvg(doc, [sheets[shown]!], at())} data-testid="sheets-one-svg">SVG</button>
+      </div>
       <div class="preview" data-testid="sheets-preview">{@html sheetSvg(sheets[shown]!, st.display, 'screen')}</div>
       <SheetComposer sheet={sheets[shown]!} all={sheets} onChange={() => (sheets = projectSheetSet(doc, projectName))} />
     {/if}
@@ -214,4 +252,8 @@
   .preview { border: 1px solid var(--st-hair); border-radius: 3px; padding: 0.25rem; }
   .preview :global(svg) { display: block; width: 100%; height: auto; }
   .conflicts { color: var(--st-warn); padding-left: 1rem; }
+  .setup > summary { font-size: 0.7rem; cursor: pointer; color: var(--st-text); }
+  .jump, .one { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+  .jump button, .one button { font-size: 0.66rem; padding: 1px 8px; background: var(--st-surface-2); color: var(--st-text); border: 1px solid var(--st-hair-strong); border-radius: 3px; cursor: pointer; }
+  .jump button.on { border-color: var(--st-value); }
 </style>

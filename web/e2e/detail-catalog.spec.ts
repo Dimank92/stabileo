@@ -5,7 +5,7 @@
  * placement are pinned in `lib/sheets/details/__tests__/catalog.test.ts` and
  * `lib/store/__tests__/detail-catalog.test.ts`.
  */
-import { test, expect, designAll, loadModel, openDocumentsStage, designPlace } from './fixtures';
+import { test, expect, designAll, loadModel, openDocumentsStage, designPlace, openSheetsPlace } from './fixtures';
 
 test.use({ viewport: { width: 1400, height: 900 } });
 
@@ -18,7 +18,7 @@ test.describe('@slow detail catalogue', () => {
     await expect.poll(async () => page.evaluate(() =>
       (window.__stabileo as unknown as { detailingAssemblies(): unknown[] })
         .detailingAssemblies().length), { timeout: 30_000 }).toBeGreaterThan(0);
-    await openDocumentsStage(page);
+    await openSheetsPlace(page, { setup: true });
 
     const cat = page.getByTestId('sheets-details-catalog');
     await cat.scrollIntoViewIfNeeded();

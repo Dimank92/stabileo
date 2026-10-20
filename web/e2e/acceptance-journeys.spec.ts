@@ -161,6 +161,7 @@ async function designAndDocument(page: Page, j: string): Promise<void> {
   });
   await step(page, j, 'sheets with bending schedule', async () => {
     await expect(page.getByTestId('desk-step-document')).toHaveAttribute('data-open', 'true');
+    await designPlace(page, 'sheets');
     const desk = page.getByTestId('design-desk');
     await desk.getByTestId('sheets-build').click();
     const list = desk.getByTestId('sheets-list');
@@ -172,6 +173,7 @@ async function designAndDocument(page: Page, j: string): Promise<void> {
     return { sheets: await desk.getByTestId('sheets-count').innerText(), pdf: bytes.subarray(0, 5).toString(), list: text.split('\n').slice(0, 60) };
   });
   await step(page, j, 'memoria', async () => {
+    await designPlace(page, 'documents');
     await page.getByTestId('design-desk').getByTestId('memoria-open').first().click();
     const count = await page.getByTestId('memoria-count').innerText();
     await page.getByTestId('memoria-close').click();
@@ -188,8 +190,11 @@ async function designAndDocument(page: Page, j: string): Promise<void> {
   // formats, the bar schedule for bending machines and the sheets as DXF 2004.
   await step(page, j, 'slab sheets, listings, BVBS and DXF 2004', async () => {
     const desk = page.getByTestId('design-desk');
+    await designPlace(page, 'sheets');
+    await expect(desk.getByTestId('sheets-list')).toBeVisible({ timeout: 120_000 });
     const list = await desk.getByTestId('sheets-list').innerText();
     expect(list, 'slab reinforcement by layer').toMatch(/Losas por capa|Slabs by layer|Lajes por camada/);
+    await designPlace(page, 'listings');
     const listings = desk.getByTestId('listings-panel');
     await listings.scrollIntoViewIfNeeded();
     const [html] = await Promise.all([page.waitForEvent('download'), listings.getByTestId('listing-checks-html').click()]);
@@ -197,6 +202,8 @@ async function designAndDocument(page: Page, j: string): Promise<void> {
     expect((checks.match(/<tr>/g) ?? []).length, 'checks listed').toBeGreaterThan(5);
     const [bvbs] = await Promise.all([page.waitForEvent('download'), listings.getByTestId('listings-bvbs').click()]);
     expect(readFileSync(await bvbs.path(), 'latin1')).toMatch(/^BF2D@/);
+    await designPlace(page, 'sheets');
+    await expect(desk.getByTestId('sheets-dxf')).toBeVisible({ timeout: 120_000 });
     const [dxf] = await Promise.all([page.waitForEvent('download'), desk.getByTestId('sheets-dxf').click()]);
     return { slabSheets: (list.match(/Losas por capa|Slabs by layer|Lajes por camada/g) ?? []).length, checkRows: (checks.match(/<tr>/g) ?? []).length - 1, dxf: dxf.suggestedFilename() };
   });
@@ -223,7 +230,9 @@ test.describe('@slow acceptance of the two journeys', () => {
       const desk = page.getByTestId('design-desk');
       // The bars stay (they are the person's), and every output built from them says it is out of date.
       await expect(desk.getByTestId('documents-outdated')).toBeVisible();
+      await designPlace(page, 'sheets');
       await expect(desk.getByTestId('sheets-detailing-outdated')).toBeVisible();
+      await designPlace(page, 'listings');
       await expect(desk.getByTestId('listings-detailing-outdated')).toBeVisible();
       return { detailingBefore: before, detailingAfter: await detailingTotals(page), deskSaysSolve: /solve|calcul/i.test(await desk.innerText()) };
     });
@@ -268,7 +277,7 @@ test.describe('@slow acceptance of the two journeys', () => {
     await step(page, j, 'other language', async () => {
       await leaveDesign(page);
       await setAppLanguage(page, 'pt');
-      await deskDocs(page);
+      await designPlace(page, 'sheets');
       const desk = page.getByTestId('design-desk');
       const text = await desk.innerText();
       expect(text).toMatch(/Mesa de projeto/);
@@ -276,7 +285,7 @@ test.describe('@slow acceptance of the two journeys', () => {
       const sheetsPt = await desk.getByTestId('sheets-list').innerText();
       await leaveDesign(page);
       await setAppLanguage(page, 'es');
-      await deskDocs(page);
+      await designPlace(page, 'sheets');
       await page.getByTestId('design-desk').getByTestId('sheets-build').click();
       const sheetsEs = await page.getByTestId('design-desk').getByTestId('sheets-list').innerText();
       await leaveDesign(page);
