@@ -276,6 +276,29 @@ export async function turnRolledBeams(page: Page): Promise<void> {
 }
 
 /** Load a fixture and wait for the model to settle. */
+/**
+ * Columns at every intersection of the grid, then beams along its axes, through the Building
+ * panel's column and beam tools (one placement each, as a person does it). `levelTo` stops both at
+ * a level. Leaves the Building panel on its beams tool.
+ */
+export async function placeFrameFromGrid(page: Page, opts: { levelTo?: string } = {}): Promise<void> {
+  await page.getByTestId('building-tab-columns').click();
+  if (opts.levelTo) await page.getByTestId('building-level-to').selectOption({ label: opts.levelTo });
+  await page.getByTestId('building-columns-place').click();
+  await expect(page.getByTestId('building-result')).toBeVisible();
+  await page.getByTestId('building-tab-beams').click();
+  if (opts.levelTo) await page.getByTestId('building-level-to').selectOption({ label: opts.levelTo });
+  await page.getByTestId('building-beams-place').click();
+  await expect(page.getByTestId('building-result')).toBeVisible();
+}
+
+/** Slabs in every bay, from the Building panel's slab tool. */
+export async function placeSlabsFromGrid(page: Page): Promise<void> {
+  await page.getByTestId('building-tab-slabs').click();
+  await page.getByTestId('building-place-slabs').click();
+  await expect(page.getByTestId('building-result')).toBeVisible();
+}
+
 export async function loadModel(page: Page, name: string): Promise<number[]> {
   await withCrashGuard(page, page.evaluate(async (n) => {
     await window.__stabileoActions.loadExample(n);

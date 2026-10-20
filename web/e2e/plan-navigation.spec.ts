@@ -4,7 +4,7 @@
  * new working level moves the view with it; with the Pan tool a drag can slide instead of
  * orbiting; W and S move the plan view as A and D do; a right drag does not open the menu.
  */
-import { test, expect } from './fixtures';
+import { test, expect, placeFrameFromGrid } from './fixtures';
 import type { Page } from '@playwright/test';
 
 test.use({ viewport: { width: 1400, height: 900 } });
@@ -41,8 +41,7 @@ test.describe('@slow plan navigation', () => {
     await page.getByTestId('grid-heights').fill('3; 3; 3');
     await page.getByTestId('grid-generate-levels').click();
     await page.getByTestId('grid-open-building').click();
-    await page.getByTestId('grid-frame-create').click();
-    await expect(page.getByTestId('building-result')).toBeVisible();
+    await placeFrameFromGrid(page);
     await page.getByTestId('pr-cmd-grid').click();
     // Listed from the top level down.
     const levels = page.locator('[data-testid^="grid-activate-"]');

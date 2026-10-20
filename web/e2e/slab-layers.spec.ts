@@ -3,7 +3,7 @@
  * band and along a line, a band moved, saved. The four layer sheets and their breakdown are pinned
  * in `store/__tests__/slab-layer-plans.test.ts`; the geometry in `slab-bands.test.ts`.
  */
-import { test, expect, solveModel, computeDemands, openDeskStage, deskTab, ribbonCmd } from './fixtures';
+import { test, expect, solveModel, computeDemands, openDeskStage, deskTab, ribbonCmd, placeFrameFromGrid } from './fixtures';
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -15,7 +15,6 @@ test.describe('@slow slab bands, bar by bar', () => {
     // physical slabs, and the strip design reads the physical slab), with a floor load on it.
     await page.getByTestId('pr-stage-model').click();
     await ribbonCmd(page, 'building');
-    await page.getByTestId('building-open-grid').click();
     await page.getByTestId('grid-bays-x').fill('5');
     await page.getByTestId('grid-generate-x').click();
     await page.getByTestId('grid-bays-y').fill('4');
@@ -23,7 +22,8 @@ test.describe('@slow slab bands, bar by bar', () => {
     await page.getByTestId('grid-heights').fill('3');
     await page.getByTestId('grid-generate-levels').click();
     await page.getByTestId('grid-open-building').click();
-    await page.getByTestId('grid-frame-create').click();
+    await placeFrameFromGrid(page);
+    await page.getByTestId('building-tab-slabs').click();
     await page.getByTestId('building-place-slabs').click();
     await expect(page.getByTestId('building-result')).toContainText(/1 element/);
     await page.getByTestId('pr-cmd-loads').click();

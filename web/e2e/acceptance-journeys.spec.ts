@@ -12,7 +12,7 @@
  * and where it breaks. With `AUDIT_OUT` the record is written as JSON; with `AUDIT_SHOTS` each step
  * leaves a screenshot. It is an audit instrument: its assertions are the record.
  */
-import { test, expect, solveModel, setAppLanguage, openDeskStage, ribbonCmd, leaveDesign, designPlace, generateDetailing } from './fixtures';
+import { test, expect, solveModel, setAppLanguage, openDeskStage, ribbonCmd, leaveDesign, designPlace, generateDetailing, placeFrameFromGrid, placeSlabsFromGrid } from './fixtures';
 import { writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import type { Page } from '@playwright/test';
 
@@ -73,34 +73,33 @@ async function buildFromScratch(page: Page, j: string): Promise<void> {
     await page.getByTestId('grid-open-building').click();
   });
   await step(page, j, 'frame defaults', async () => {
-    const sel = page.getByTestId('grid-col-section').locator('xpath=ancestor::div[1]').locator('select');
     const pick = (l: import('@playwright/test').Locator) => l.evaluate((e) => (e as HTMLSelectElement).selectedOptions[0]?.textContent ?? '');
+    const column = await pick(page.getByTestId('grid-col-section'));
+    const columnTypology = await page.getByTestId('building-col-typology').locator('[aria-checked="true"]').first().innerText().catch(() => '?');
+    await page.getByTestId('building-tab-beams').click();
     return {
-      material: await pick(page.getByTestId('building-material')),
-      column: await pick(sel.nth(0)), beamX: await pick(sel.nth(1)), beamY: await pick(sel.nth(2)),
-      columnTypology: await page.getByTestId('building-col-typology').locator('[aria-pressed="true"], .on, .active').first().innerText().catch(() => '?'),
+      material: await pick(page.getByTestId('building-material')), column,
+      beamX: await pick(page.getByTestId('building-beam-section-x')), beamY: await pick(page.getByTestId('building-beam-section-y')), columnTypology,
     };
   });
   // The concrete typology proposes the concrete and the starter sections by itself.
   await step(page, j, 'typology proposes concrete', async () => {
     const pick = (l: import('@playwright/test').Locator) => l.evaluate((e) => (e as HTMLSelectElement).selectedOptions[0]?.textContent ?? '');
-    const sel = page.getByTestId('grid-col-section').locator('xpath=ancestor::div[1]').locator('select');
-    const out = { material: await pick(page.getByTestId('building-material')), column: await pick(sel.nth(0)), beam: await pick(sel.nth(1)),
-      beamMaterial: await pick(page.getByTestId('building-beam-material')), mismatch: await page.locator('[data-testid^="building-mismatch-"]').count() };
+    await page.getByTestId('building-tab-columns').click();
+    const column = await pick(page.getByTestId('grid-col-section'));
+    await page.getByTestId('building-tab-beams').click();
+    const out = { material: await pick(page.getByTestId('building-material')), column, beam: await pick(page.getByTestId('building-beam-section-x')) };
     expect(out.material).toBe('H-30');
     expect(out.column).toMatch(/30\s*[x×]\s*30/);
     expect(out.beam).toMatch(/20\s*[x×]\s*50/);
-    expect(out.mismatch).toBe(0);
     return out;
   });
   await step(page, j, 'frame', async () => {
-    await page.getByTestId('grid-frame-create').click();
-    await expect(page.getByTestId('building-result')).toBeVisible();
+    await placeFrameFromGrid(page);
     return census(page);
   });
   await step(page, j, 'slabs', async () => {
-    await page.getByTestId('building-place-slabs').click();
-    await expect(page.getByTestId('building-result')).toBeVisible();
+    await placeSlabsFromGrid(page);
     return census(page);
   });
   await step(page, j, 'physical elements listed', async () => physical(page));

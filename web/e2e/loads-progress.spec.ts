@@ -3,7 +3,7 @@
  * applying»): the preview and the apply show their step, a stopped preview leaves nothing behind,
  * and an applied plan closes the dialog once the loads are in the model.
  */
-import { test, expect } from './fixtures';
+import { test, expect, placeFrameFromGrid } from './fixtures';
 
 test.use({ viewport: { width: 1400, height: 900 } });
 
@@ -18,8 +18,7 @@ test.describe('@slow automatic loads, step by step', () => {
     await page.getByTestId('grid-heights').fill('3');
     await page.getByTestId('grid-generate-levels').click();
     await page.getByTestId('grid-open-building').click();
-    await page.getByTestId('grid-frame-create').click();
-    await expect(page.getByTestId('building-result')).toBeVisible();
+    await placeFrameFromGrid(page);
 
     await page.getByTestId('pr-stage-model').click();
     await page.getByTestId('pr-cmd-loads').click();
