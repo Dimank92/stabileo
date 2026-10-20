@@ -13351,5 +13351,16 @@ const en: Record<string, string> = {
   "autoLoad.work.draw": "Drawing the loads",
   "autoLoad.work.step": "Step {step} of {total}",
   "autoLoad.work.cancel": "Stop",
+  "viewport.planView": "Plan view",
+  "viewport.planViewOn": "Plan view: look at the working level from above, without orbiting, and drag to slide",
+  "viewport.planViewOff": "Leave the plan view",
+  "viewport.dragMode": "What a drag does",
+  "viewport.dragOrbitOn": "A drag orbits the model. Click to slide over the view's plane",
+  "viewport.dragSlideOn": "A drag slides over the view's plane. Click to orbit again",
+  "viewport.modePan3dSlide": "Pan — drag to slide over the view's plane; right-drag to orbit",
+  "viewport.modePanPlan": "Pan in plan — drag to slide over the level; the view does not orbit",
+  "viewport.dragSlide": "Drag slides (with Pan)",
+  "viewport.planExit": "Leave the plan",
+  "viewport.planChip": "Plan · {level}",
 };
 export default en;

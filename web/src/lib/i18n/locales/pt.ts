@@ -12984,5 +12984,16 @@ const pt: Translations = {
   "autoLoad.work.draw": "Desenhando as cargas",
   "autoLoad.work.step": "Passo {step} de {total}",
   "autoLoad.work.cancel": "Parar",
+  "viewport.planView": "Vista em planta",
+  "viewport.planViewOn": "Vista em planta: olhar o nível de trabalho de cima, sem girar, e arrastar para se deslocar",
+  "viewport.planViewOff": "Sair da vista em planta",
+  "viewport.dragMode": "O que arrastar faz",
+  "viewport.dragOrbitOn": "Arrastar gira o modelo. Clique para se deslocar pelo plano da vista",
+  "viewport.dragSlideOn": "Arrastar desloca pelo plano da vista. Clique para voltar a girar",
+  "viewport.modePan3dSlide": "Mover — arraste para se deslocar pelo plano da vista; com o botão direito, gira",
+  "viewport.modePanPlan": "Mover em planta — arraste para se deslocar pelo nível; a vista não gira",
+  "viewport.dragSlide": "Arrastar desloca (com Mover)",
+  "viewport.planExit": "Sair da planta",
+  "viewport.planChip": "Planta · {level}",
 };
 export default pt;

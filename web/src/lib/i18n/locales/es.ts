@@ -13340,5 +13340,16 @@ const es: Record<string, string> = {
   "autoLoad.work.draw": "Dibujando las cargas",
   "autoLoad.work.step": "Paso {step} de {total}",
   "autoLoad.work.cancel": "Detener",
+  "viewport.planView": "Vista en planta",
+  "viewport.planViewOn": "Vista en planta: mirar el nivel de trabajo desde arriba, sin girar, y arrastrar para desplazarte",
+  "viewport.planViewOff": "Salir de la vista en planta",
+  "viewport.dragMode": "Qué hace arrastrar",
+  "viewport.dragOrbitOn": "Arrastrar gira el modelo. Clic para desplazarte por el plano de la vista",
+  "viewport.dragSlideOn": "Arrastrar desplaza por el plano de la vista. Clic para volver a girar",
+  "viewport.modePan3dSlide": "Mover — arrastrá para desplazarte por el plano de la vista; con el botón derecho, girás",
+  "viewport.modePanPlan": "Mover en planta — arrastrá para desplazarte por el nivel; la vista no gira",
+  "viewport.dragSlide": "Arrastrar desplaza (con Mover)",
+  "viewport.planExit": "Salir de la planta",
+  "viewport.planChip": "Planta · {level}",
 };
 export default es;

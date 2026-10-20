@@ -342,6 +342,13 @@ function createUIStore() {
 
   // 3D camera mode
   let cameraMode3D = $state<'perspective' | 'orthographic'>('perspective');
+  /**
+   * The plan view: the model seen from above on the working level, the view held there (no
+   * orbit), a drag sliding over the floor and the storeys above it cut away.
+   */
+  let planView3D = $state<boolean>(false);
+  /** What a left drag does with the Pan tool in 3D: orbit the model, or slide over the view's plane. */
+  let dragMode3D = $state<'orbit' | 'slide'>('orbit');
 
   // 3D clipping plane
   let clippingEnabled = $state<boolean>(false);
@@ -993,6 +1000,10 @@ function createUIStore() {
 
     get cameraMode3D() { return cameraMode3D; },
     set cameraMode3D(v: 'perspective' | 'orthographic') { cameraMode3D = v; },
+    get planView3D() { return planView3D; },
+    set planView3D(v: boolean) { planView3D = v; },
+    get dragMode3D() { return dragMode3D; },
+    set dragMode3D(v: 'orbit' | 'slide') { dragMode3D = v; },
 
     get clippingEnabled() { return clippingEnabled; },
     set clippingEnabled(v: boolean) { clippingEnabled = v; },

@@ -38,6 +38,7 @@
   import { activeStretchHandles, handleUnder, stationOnRay, moveStretchEnd, handleMeshes, type StretchHandles } from '../lib/viewport3d/load-handles';
   import { drawState } from '../lib/store/draw-state.svelte';
   import { createDrawFeedback } from '../lib/viewport3d/draw-feedback';
+  import PlanViewChip from './viewport/PlanViewChip.svelte';
   import PointerModeButton from './PointerModeButton.svelte';
   import SelectionDeleteButton from './ribbon/SelectionDeleteButton.svelte';
   import ConnectionPrompt from './ConnectionPrompt.svelte';
@@ -659,6 +660,7 @@
     controls.zoomToCursor = true;
     // Close in on a small part, the near plane follows (see nearPlaneFor).
     controls.addEventListener('change', syncNearPlane);
+    applyNavigation();
 
     // ── Keyboard camera navigation ──
     // WASD = pan, Arrows = orbit, Q/E = up/down, Shift/Ctrl = speed boost
@@ -809,16 +811,20 @@
       const panSpeed = dist * 0.012 * boost;   // scale with zoom level
       const orbitSpeed = 0.02 * boost;          // radians per frame
 
-      // WASD — pan relative to camera orientation
-      const forward = _panVec.set(0, 0, 0);
-      if (keysPressed.has('w')) forward.z -= panSpeed;
-      if (keysPressed.has('s')) forward.z += panSpeed;
-      if (keysPressed.has('a')) forward.x -= panSpeed;
-      if (keysPressed.has('d')) forward.x += panSpeed;
-      if (forward.lengthSq() > 0) {
-        // Transform pan vector from camera-local to world space
-        forward.applyQuaternion(camera.quaternion);
-        forward.z = 0; // keep horizontal
+      // WASD — pan over the floor, relative to the camera. W/S move along the view's depth laid
+      // flat; looking down from above that depth is vertical, so they use the screen's up instead
+      // (laid flat it had shrunk to a sliver, and W/S barely moved the plan view).
+      const fw = (keysPressed.has('w') ? 1 : 0) - (keysPressed.has('s') ? 1 : 0);
+      const rt = (keysPressed.has('d') ? 1 : 0) - (keysPressed.has('a') ? 1 : 0);
+      if (fw || rt) {
+        const look = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        const ahead = Math.abs(look.z) > 0.9 ? new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion) : look;
+        ahead.z = 0;
+        const side = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+        side.z = 0;
+        if (ahead.lengthSq() > 1e-12) ahead.normalize();
+        if (side.lengthSq() > 1e-12) side.normalize();
+        const forward = _panVec.copy(ahead.multiplyScalar(fw * panSpeed)).add(side.multiplyScalar(rt * panSpeed));
         controls.target.add(forward);
         camera.position.add(forward);
       }
@@ -2031,8 +2037,33 @@
   }
 
   // ─── Context menu (right-click) ──────────────────────────
+  /**
+   * A right DRAG pans the view and must not open the menu; a right CLICK opens it. Where the
+   * browser fires the menu event on the press (Chrome on macOS) nothing has moved yet, so the
+   * menu waits for the release and opens only if the pointer stayed put; where it fires on the
+   * release, the distance is already known.
+   */
+  let rightDownAt: { x: number; y: number } | null = null;
+  let rightHeld = false;
+  let pendingMenu: MouseEvent | null = null;
+  const RIGHT_CLICK_PX = 5;
+  function onRightDown(e: PointerEvent) { if (e.button === 2) { rightDownAt = { x: e.clientX, y: e.clientY }; rightHeld = true; pendingMenu = null; } }
+  function onRightUp(e: PointerEvent) {
+    if (e.button !== 2) return;
+    rightHeld = false;
+    const moved = rightDownAt ? Math.hypot(e.clientX - rightDownAt.x, e.clientY - rightDownAt.y) : 0;
+    const pending = pendingMenu;
+    pendingMenu = null;
+    if (pending && moved <= RIGHT_CLICK_PX) openContextMenu3D(pending);
+  }
   function handleContextMenu3D(e: MouseEvent) {
     e.preventDefault();
+    if (rightHeld) { pendingMenu = e; return; }
+    if (rightDownAt && Math.hypot(e.clientX - rightDownAt.x, e.clientY - rightDownAt.y) > RIGHT_CLICK_PX) { rightDownAt = null; return; }
+    rightDownAt = null;
+    openContextMenu3D(e);
+  }
+  function openContextMenu3D(e: MouseEvent) {
     updateMouseNDC(e);
     if (!camera) return;
     raycaster.setFromCamera(mouse, camera);
@@ -3763,6 +3794,72 @@
     invalidate();
   }
 
+  // ─── Navigation: what a drag does, and the plan view ──────────
+  /**
+   * What the mouse does to the camera. By default a left drag orbits (right drag and Shift slide).
+   * With the Pan tool set to slide, or in the plan view, a left drag slides the view over its own
+   * plane, which seen from above is the floor; the plan view also holds the camera there (no orbit).
+   */
+  function applyNavigation() {
+    if (!controls) return;
+    const plan = uiStore.planView3D;
+    const leftSlides = plan || (uiStore.currentTool === 'pan' && uiStore.dragMode3D === 'slide');
+    controls.enableRotate = !plan;
+    controls.screenSpacePanning = true;
+    controls.mouseButtons = {
+      LEFT: leftSlides ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.DOLLY,
+      RIGHT: leftSlides && !plan ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN,
+    };
+    controls.touches = { ONE: leftSlides ? THREE.TOUCH.PAN : THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+  }
+  $effect(() => {
+    void uiStore.planView3D; void uiStore.dragMode3D; void uiStore.currentTool;
+    untrack(applyNavigation);
+  });
+
+  /** What the plan view replaced, put back when it is left. */
+  let beforePlan: { mode: 'perspective' | 'orthographic'; clip: { enabled: boolean; axis: 'x' | 'y' | 'z'; position: number } } | null = null;
+  /** Above the working level, a little over its floor: the beams and the slab on it stay, the storeys above go. */
+  const PLAN_CUT_M = 0.15;
+  function followLevel(z: number) {
+    if (!camera || !controls) return;
+    uiStore.clippingAxis = 'z';
+    uiStore.clippingPosition = z + PLAN_CUT_M;
+    uiStore.clippingEnabled = true;
+    const dz = z - controls.target.z;
+    controls.target.z += dz;
+    camera.position.z += dz;
+    controls.update();
+    invalidate();
+  }
+  function enterPlanView() {
+    if (!camera || !controls || beforePlan) return;
+    beforePlan = { mode: uiStore.cameraMode3D, clip: { enabled: uiStore.clippingEnabled, axis: uiStore.clippingAxis, position: uiStore.clippingPosition } };
+    setView('top');
+    if (uiStore.cameraMode3D === 'perspective') toggleCameraMode();
+    followLevel(uiStore.nodeCreateZ);
+    applyNavigation();
+  }
+  function exitPlanView() {
+    if (!beforePlan) return;
+    const b = beforePlan;
+    beforePlan = null;
+    uiStore.clippingEnabled = b.clip.enabled; uiStore.clippingAxis = b.clip.axis; uiStore.clippingPosition = b.clip.position;
+    if (uiStore.cameraMode3D !== b.mode) toggleCameraMode();
+    applyNavigation();
+    invalidate();
+  }
+  $effect(() => {
+    const on = uiStore.planView3D;
+    untrack(() => { if (on) enterPlanView(); else exitPlanView(); });
+  });
+  // The working level moves the plan view with it: the camera and the cut follow.
+  $effect(() => {
+    const z = uiStore.nodeCreateZ;
+    untrack(() => { if (uiStore.planView3D && beforePlan) followLevel(z); });
+  });
+
   function handleCameraViewEvent(e: Event) {
     const which = (e as CustomEvent<PresetView>).detail;
     if (['top', 'bottom', 'front', 'back', 'right', 'left', 'side', 'iso'].includes(which)) setView(which);
@@ -3806,6 +3903,8 @@
   }
 
   function setView(view: PresetView) {
+    // Another standard view leaves the plan view (which holds the camera above the floor).
+    if (view !== 'top' && uiStore.planView3D) uiStore.planView3D = false;
     _setView(view, camera, controls, modelStore.nodes);
     invalidate();
   }
@@ -4032,12 +4131,15 @@
   bind:this={container}
   style="cursor: {cursorStyle};"
   onmousedown={handleMouseDown}
+  onpointerdowncapture={onRightDown}
+  onpointerupcapture={onRightUp}
   onmouseup={handleMouseUp}
   ondblclick={handleDoubleClick3D}
   onmousemove={handleMouseMove}
   onmouseleave={handleMouseLeave}
   oncontextmenu={handleContextMenu3D}
 >
+  {#if uiStore.planView3D}<PlanViewChip />{/if}
   <!-- The despiece, drawn over the scene in screen space (`canvas/free-body.ts`); only while it is on. -->
   {#if resultsStore.diagramType === 'despiece'}
     <canvas class="fb-overlay" bind:this={fbCanvas} aria-hidden="true"></canvas>
@@ -4171,6 +4273,16 @@
             a reader turning clipping on usually wants to reach for the axis
             next, and a menu that vanished would make them open it again.
           -->
+          <!-- The plan view and what a drag does: states too, how the reader holds the view while modelling. -->
+          <button class="cam-item" class:on={uiStore.planView3D} onclick={() => { uiStore.planView3D = !uiStore.planView3D; }}
+                  title={uiStore.planView3D ? t('viewport.planViewOff') : t('viewport.planViewOn')} data-testid="nav-plan-view">
+            <span class="cam-glyph">▦</span><span>{t('viewport.planView')}</span>
+          </button>
+          <button class="cam-item" class:on={uiStore.dragMode3D === 'slide'} disabled={uiStore.planView3D}
+                  onclick={() => { uiStore.dragMode3D = uiStore.dragMode3D === 'slide' ? 'orbit' : 'slide'; }}
+                  title={uiStore.dragMode3D === 'slide' ? t('viewport.dragSlideOn') : t('viewport.dragOrbitOn')} data-testid="nav-drag-mode">
+            <span class="cam-glyph">✥</span><span>{t('viewport.dragSlide')}</span>
+          </button>
           <button class="cam-item" onclick={toggleCameraMode}>
             <span class="cam-glyph">{uiStore.cameraMode3D === 'perspective' ? 'P' : 'O'}</span>
             <span>{uiStore.cameraMode3D === 'perspective'
