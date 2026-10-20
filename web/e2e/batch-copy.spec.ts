@@ -14,6 +14,7 @@ test.describe('@smoke frame copy', () => {
     await solveModel(page);
     await openDeskStage(page);
     await page.getByTestId('desk-design').click();
+    if (await page.getByTestId('desk-run-resize').count()) await page.getByTestId('desk-run-resize').setChecked(false);
     await page.getByTestId('desk-run').click();
     await expect(page.getByTestId('desk-report')).toBeVisible({ timeout: 120_000 });
     const rows = page.locator('[data-testid^="desk-row-"]').filter({ has: page.locator('.dot.st-ok') });

@@ -94,9 +94,12 @@ test.describe('@slow plan navigation', () => {
     expect(byD).toBeGreaterThan(0);
     expect(byW / byD).toBeGreaterThan(0.4);
 
-    // Leaving it, from the chip: a left drag orbits again, and the menu has no «drag slides» item.
+    // Leaving it, from the chip: the tool held before it comes back; with Pan a left drag orbits
+    // again, and the menu has no «drag slides» item.
     await page.getByTestId('plan-view-exit').click();
     await expect(page.getByTestId('plan-view-chip')).toHaveCount(0);
+    await expect(page.getByTestId('pointer-mode')).toHaveAttribute('aria-pressed', 'false');
+    await page.getByTestId('pointer-mode').click();
     const o0 = await cam(page);
     await drag(page, 'left', 0, -140);
     expect(Math.abs((await cam(page)).polarDeg - o0.polarDeg)).toBeGreaterThan(3);

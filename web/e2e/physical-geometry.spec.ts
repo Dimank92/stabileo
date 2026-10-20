@@ -21,10 +21,13 @@ async function load(page: import('@playwright/test').Page) {
 test('@smoke the view menu turns the physical geometry on and back to the lines', async ({ pro: page }) => {
   await load(page);
   await page.getByTestId('cam-menu').click();
+  // One choice of four: the physical geometry, then the plain lines, never two at once.
   await page.getByTestId('cam-physical').click();
   await expect.poll(() => page.evaluate(() => window.__stabileo.renderMode3D())).toBe('physical');
-  await page.getByTestId('cam-physical').click();
+  await expect(page.getByTestId('cam-physical')).toHaveAttribute('aria-checked', 'true');
+  await page.getByTestId('cam-render-wireframe').click();
   await expect.poll(() => page.evaluate(() => window.__stabileo.renderMode3D())).toBe('wireframe');
+  await expect(page.getByTestId('cam-physical')).toHaveAttribute('aria-checked', 'false');
 });
 
 test.describe('@slow the joints of a designed frame', () => {

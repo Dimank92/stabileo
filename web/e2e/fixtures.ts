@@ -666,11 +666,17 @@ export async function openClassicDesign(page: Page): Promise<void> {
 }
 
 /** «Size…» over every member, from the top of the Design stage, keeping what was edited by hand. */
-export async function sizeAll(page: Page): Promise<void> {
+/**
+ * «Size…» over every member, in one pass: the sections kept, as the specs that read a design's
+ * counts were written. Enlarging the sections until every member verifies is the dialog's default
+ * and is pinned in `design-resize.test.ts`; on the 408-member frame its rounds outlast a spec.
+ */
+export async function sizeAll(page: Page, o: { resize?: boolean } = {}): Promise<void> {
   await openDeskStage(page);
   if (!(await page.getByTestId('desk-design').isVisible())) await page.getByTestId('desk-step-size').click();
   await page.getByTestId('desk-design').click();
   await page.getByTestId('desk-run-scope-all').check();
+  await page.getByTestId('desk-run-resize').setChecked(o.resize ?? false);
   await page.getByTestId('desk-run').click();
 }
 

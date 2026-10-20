@@ -16,6 +16,7 @@ async function designed(page: Page) {
   await solveModel(page);
   await openDeskStage(page);
   await page.getByTestId('desk-design').click();
+  await page.getByTestId('desk-run-resize').setChecked(false);
   await page.getByTestId('desk-run').click();
   await expect(page.getByTestId('desk-report')).toBeVisible({ timeout: 120_000 });
 }
