@@ -347,6 +347,11 @@ function createUIStore() {
    * orbit), a drag sliding over the floor and the storeys above it cut away.
    */
   let planView3D = $state<boolean>(false);
+  /**
+   * Where the plan view cuts the storeys above away, m: its own cut, apart from the cut plane a
+   * person sets (`clippingEnabled`). Null outside the plan view.
+   */
+  let planCutZ = $state<number | null>(null);
   /** What a left drag does with the Pan tool in 3D: orbit the model, or slide over the view's plane. */
   let dragMode3D = $state<'orbit' | 'slide'>('orbit');
 
@@ -1002,6 +1007,8 @@ function createUIStore() {
     set cameraMode3D(v: 'perspective' | 'orthographic') { cameraMode3D = v; },
     get planView3D() { return planView3D; },
     set planView3D(v: boolean) { planView3D = v; },
+    get planCutZ() { return planCutZ; },
+    set planCutZ(v: number | null) { planCutZ = v; },
     get dragMode3D() { return dragMode3D; },
     set dragMode3D(v: 'orbit' | 'slide') { dragMode3D = v; },
 

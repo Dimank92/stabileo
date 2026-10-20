@@ -144,6 +144,8 @@
 
   // ─── Clipping plane ─────────────────────────────────────────
   const clippingPlane = new THREE.Plane(planeNormal('XY').clone().negate(), 0);
+  /** The plan view's cut: everything above `planCutZ` is cut away. */
+  const planPlane = new THREE.Plane(planeNormal('XY').clone().negate(), 0);
 
   // ─── Raycaster ───────────────────────────────────────────────
   const raycaster = new THREE.Raycaster();
@@ -182,7 +184,9 @@
   /** The render's aspect while the timelapse draws at its own size; null otherwise. */
   let timelapseAspect: number | null = null;
   let toolBeforeTimelapse: typeof uiStore.currentTool | null = null;
-  let renderModeBeforeSections: 'wireframe' | 'solid' = 'wireframe';
+  /** How the bars can be drawn, one at a time, from the lightest to the building as built. */
+  const RENDER_MODES = ['wireframe', 'solid', 'sections', 'physical'] as const;
+  const RENDER_GLYPH: Record<(typeof RENDER_MODES)[number], string> = { wireframe: '╱', solid: '▬', sections: '⬡', physical: '▣' };
   let boxSelect3D = $state<{ startX: number; startY: number; endX: number; endY: number; additive: boolean } | null>(null);
   /** The lasso's outline while one is being drawn (`viewState.lasso`). */
   let lassoPath = $state<Array<{ x: number; y: number }>>([]);
@@ -1938,6 +1942,8 @@
     uiStore.clippingEnabled;
     uiStore.clippingAxis;
     uiStore.clippingPosition;
+    uiStore.planView3D;
+    uiStore.planCutZ;
     invalidate();
   });
 
@@ -3806,7 +3812,8 @@
   function applyNavigation() {
     if (!controls) return;
     const plan = uiStore.planView3D;
-    const leftSlides = plan || (uiStore.currentTool === 'pan' && uiStore.dragMode3D === 'slide');
+    // In the plan view the Pan tool slides over the floor; another tool keeps its own drag.
+    const leftSlides = uiStore.currentTool === 'pan' && (plan || uiStore.dragMode3D === 'slide');
     controls.enableRotate = !plan;
     controls.screenSpacePanning = true;
     controls.mouseButtons = {
@@ -3822,14 +3829,16 @@
   });
 
   /** What the plan view replaced, put back when it is left. */
-  let beforePlan: { mode: 'perspective' | 'orthographic'; clip: { enabled: boolean; axis: 'x' | 'y' | 'z'; position: number } } | null = null;
+  let beforePlan: { mode: 'perspective' | 'orthographic'; tool: typeof uiStore.currentTool } | null = null;
   /** Above the working level, a little over its floor: the beams and the slab on it stay, the storeys above go. */
   const PLAN_CUT_M = 0.15;
+  /**
+   * The plan view on level `z`: the camera over it and the plan's own cut a little above its floor.
+   * The cut plane a person set stays as it was: the two are separate (QA of 20-oct).
+   */
   function followLevel(z: number) {
     if (!camera || !controls) return;
-    uiStore.clippingAxis = 'z';
-    uiStore.clippingPosition = z + PLAN_CUT_M;
-    uiStore.clippingEnabled = true;
+    uiStore.planCutZ = z + PLAN_CUT_M;
     const dz = z - controls.target.z;
     controls.target.z += dz;
     camera.position.z += dz;
@@ -3838,17 +3847,20 @@
   }
   function enterPlanView() {
     if (!camera || !controls || beforePlan) return;
-    beforePlan = { mode: uiStore.cameraMode3D, clip: { enabled: uiStore.clippingEnabled, axis: uiStore.clippingAxis, position: uiStore.clippingPosition } };
+    beforePlan = { mode: uiStore.cameraMode3D, tool: uiStore.currentTool };
     setView('top');
     if (uiStore.cameraMode3D === 'perspective') toggleCameraMode();
     followLevel(uiStore.nodeCreateZ);
+    // On entering, a drag slides over the floor (the Pan tool); any other tool can still be taken.
+    uiStore.currentTool = 'pan';
     applyNavigation();
   }
   function exitPlanView() {
     if (!beforePlan) return;
     const b = beforePlan;
     beforePlan = null;
-    uiStore.clippingEnabled = b.clip.enabled; uiStore.clippingAxis = b.clip.axis; uiStore.clippingPosition = b.clip.position;
+    uiStore.planCutZ = null;
+    if (uiStore.currentTool === 'pan' && b.tool !== 'pan') uiStore.currentTool = b.tool;
     if (uiStore.cameraMode3D !== b.mode) toggleCameraMode();
     applyNavigation();
     invalidate();
@@ -4021,6 +4033,12 @@
 
   function updateClippingPlane() {
     if (!renderer) return;
+    const planes: THREE.Plane[] = [];
+    // The plan view's own cut, beside the cut plane a person set.
+    if (uiStore.planView3D && uiStore.planCutZ !== null) {
+      planPlane.constant = uiStore.planCutZ;
+      planes.push(planPlane);
+    }
     if (uiStore.clippingEnabled) {
       // Normal vector: axis direction (clips on negative side of plane)
       const normal = new THREE.Vector3(
@@ -4030,10 +4048,9 @@
       );
       clippingPlane.normal.copy(normal);
       clippingPlane.constant = uiStore.clippingPosition;
-      renderer.clippingPlanes = [clippingPlane];
-    } else {
-      renderer.clippingPlanes = [];
+      planes.push(clippingPlane);
     }
+    renderer.clippingPlanes = planes;
   }
 
   function syncOrthoFrustum(aspect?: number) {
@@ -4281,11 +4298,6 @@
                   title={uiStore.planView3D ? t('viewport.planViewOff') : t('viewport.planViewOn')} data-testid="nav-plan-view">
             <span class="cam-glyph">▦</span><span>{t('viewport.planView')}</span>
           </button>
-          <button class="cam-item" class:on={uiStore.dragMode3D === 'slide'} disabled={uiStore.planView3D}
-                  onclick={() => { uiStore.dragMode3D = uiStore.dragMode3D === 'slide' ? 'orbit' : 'slide'; }}
-                  title={uiStore.dragMode3D === 'slide' ? t('viewport.dragSlideOn') : t('viewport.dragOrbitOn')} data-testid="nav-drag-mode">
-            <span class="cam-glyph">✥</span><span>{t('viewport.dragSlide')}</span>
-          </button>
           <button class="cam-item" onclick={toggleCameraMode}>
             <span class="cam-glyph">{uiStore.cameraMode3D === 'perspective' ? 'P' : 'O'}</span>
             <span>{uiStore.cameraMode3D === 'perspective'
@@ -4307,36 +4319,22 @@
             <span>{uiStore.measureMode
               ? t('viewport3d.disableMeasure') : t('viewport3d.enableMeasure')}</span>
           </button>
-          <button
-            class="cam-item" class:on={uiStore.renderMode3D === 'sections'}
-            onclick={() => {
-              if (uiStore.renderMode3D === 'sections') {
-                uiStore.renderMode3D = renderModeBeforeSections;
-              } else {
-                renderModeBeforeSections = uiStore.renderMode3D === 'solid' ? 'solid' : 'wireframe';
-                uiStore.renderMode3D = 'sections';
-              }
-            }}
-          >
-            <span class="cam-glyph">{uiStore.renderMode3D === 'sections' ? '◫' : '⬡'}</span>
-            <span>{uiStore.renderMode3D === 'sections'
-              ? t('config.wireframe') : t('config.sections')}</span>
-          </button>
-          <button
-            class="cam-item" class:on={uiStore.renderMode3D === 'physical'} data-testid="cam-physical"
-            onclick={() => {
-              if (uiStore.renderMode3D === 'physical') {
-                uiStore.renderMode3D = renderModeBeforeSections;
-              } else {
-                renderModeBeforeSections = uiStore.renderMode3D === 'solid' ? 'solid' : 'wireframe';
-                uiStore.renderMode3D = 'physical';
-              }
-            }}
-          >
-            <span class="cam-glyph">▣</span>
-            <span>{uiStore.renderMode3D === 'physical'
-              ? t('config.wireframe') : t('config.physical')}</span>
-          </button>
+          <div class="cam-sep"></div>
+          <!--
+            How the bars are drawn: one choice of four (QA of 20-oct: «Modelo con secciones» and
+            «Geometría física» read as two things on at once). Each says what it draws.
+          -->
+          <div class="cam-group" role="radiogroup" aria-label={t('viewport.render.title')} data-testid="cam-render">
+            <span class="cam-group-title">{t('viewport.render.title')}</span>
+            {#each RENDER_MODES as m (m)}
+              <button class="cam-item" class:on={uiStore.renderMode3D === m} role="radio" aria-checked={uiStore.renderMode3D === m}
+                      onclick={() => { uiStore.renderMode3D = m; }} title={t(`viewport.render.${m}Hint`)}
+                      data-testid={m === 'physical' ? 'cam-physical' : `cam-render-${m}`}>
+                <span class="cam-glyph">{RENDER_GLYPH[m]}</span>
+                <span class="cam-two"><span>{t(`config.${m}`)}</span><small>{t(`viewport.render.${m}Hint`)}</small></span>
+              </button>
+            {/each}
+          </div>
           <div class="cam-sep"></div>
           <button
             class="cam-item" class:on={buildTimelapse.active} data-testid="cam-build-timelapse"
@@ -4739,6 +4737,10 @@
   }
 
   .cam-item:hover { background: var(--st-surface-3); color: var(--st-text); }
+  .cam-group { display: flex; flex-direction: column; }
+  .cam-group-title { font-size: 0.66rem; color: var(--st-text-3); padding: 2px 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .cam-two { display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 1px; }
+  .cam-two small { font-size: 0.64rem; color: var(--st-text-3); white-space: normal; max-width: 15rem; line-height: 1.25; }
 
   .cam-item.on { color: var(--st-accent); }
 

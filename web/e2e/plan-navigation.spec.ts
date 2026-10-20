@@ -1,8 +1,9 @@
 /**
- * Navigating a building from above (QA of 19-oct): the plan view looks at the working level from
- * overhead, a drag slides over it without turning the view, the storeys above are cut away and a
- * new working level moves the view with it; with the Pan tool a drag can slide instead of
- * orbiting; W and S move the plan view as A and D do; a right drag does not open the menu.
+ * Navigating a building from above (QA of 19-oct and 20-oct): the plan view looks at the working
+ * level from overhead and takes the Pan tool, so a drag slides over it without turning the view;
+ * the storeys above are cut away by the plan's own cut, and the menu's cut plane stays off; a
+ * level taken on the plan's chip moves the view with it; W and S move the plan view as A and D
+ * do; a right drag does not open the menu.
  */
 import { test, expect, placeFrameFromGrid } from './fixtures';
 import type { Page } from '@playwright/test';
@@ -54,10 +55,13 @@ test.describe('@slow plan navigation', () => {
     await page.locator('.cam-backdrop').click({ position: { x: 200, y: 450 } }); // closes it: the state items keep it open
     await expect(page.getByTestId('plan-view-chip')).toContainText(/N1/);
     await expect.poll(async () => (await cam(page)).polarDeg).toBeLessThan(2);
+    // Its cut is its own: the cut plane of the menu stays off, and its controls do not show.
+    await expect(page.locator('.clip-controls')).toHaveCount(0);
+    await expect(page.getByTestId('plan-view-cut')).toBeVisible();
     const c0 = await cam(page);
 
-    // A left drag slides over the floor and does not turn the view (the select tool draws a box; take Pan).
-    if ((await page.getByTestId('pointer-mode').getAttribute('aria-pressed')) !== 'true') await page.getByTestId('pointer-mode').click();
+    // Entering it took the Pan tool: a left drag slides over the floor and does not turn the view.
+    await expect(page.getByTestId('pointer-mode')).toHaveAttribute('aria-pressed', 'true');
     await drag(page, 'left', 160, 0);
     const c1 = await cam(page);
     expect(Math.hypot(c1.target[0] - c0.target[0], c1.target[1] - c0.target[1])).toBeGreaterThan(0.5);
@@ -68,9 +72,10 @@ test.describe('@slow plan navigation', () => {
     await drag(page, 'right', 0, 120);
     await expect(page.locator('.ctx-menu')).toHaveCount(0);
 
-    // Another working level: the view goes up with it.
-    await levels.nth(0).check();
+    // Another level, from the plan's chip: the view goes up with it.
+    await page.getByTestId('plan-view-level').selectOption({ label: await levels.nth(0).getAttribute('data-testid').then((x) => x!.replace('grid-activate-', '')) });
     await expect.poll(async () => (await cam(page)).target[2]).toBeGreaterThan(c1.target[2] + 1);
+    await expect(page.getByTestId('plan-view-chip')).not.toContainText(/N1\b/);
 
     // W moves the plan view as far as D does (laid flat from above, its direction had shrunk to
     // about 2 % of D's).
@@ -89,22 +94,13 @@ test.describe('@slow plan navigation', () => {
     expect(byD).toBeGreaterThan(0);
     expect(byW / byD).toBeGreaterThan(0.4);
 
-    // Leaving it, from the chip: a left drag orbits again.
+    // Leaving it, from the chip: a left drag orbits again, and the menu has no «drag slides» item.
     await page.getByTestId('plan-view-exit').click();
     await expect(page.getByTestId('plan-view-chip')).toHaveCount(0);
     const o0 = await cam(page);
     await drag(page, 'left', 0, -140);
     expect(Math.abs((await cam(page)).polarDeg - o0.polarDeg)).toBeGreaterThan(3);
-
-    // The Pan tool set to slide: a left drag moves the view and keeps its angle.
     await page.getByTestId('cam-menu').click();
-    await page.getByTestId('nav-drag-mode').click();
-    await page.locator('.cam-backdrop').click({ position: { x: 200, y: 450 } });
-    await settle(page);
-    const s0 = await cam(page);
-    await drag(page, 'left', 150, 60);
-    const s1 = await cam(page);
-    expect(Math.abs(s1.polarDeg - s0.polarDeg)).toBeLessThan(0.5);
-    expect(Math.hypot(s1.target[0] - s0.target[0], s1.target[1] - s0.target[1], s1.target[2] - s0.target[2])).toBeGreaterThan(0.3);
+    await expect(page.getByTestId('nav-drag-mode')).toHaveCount(0);
   });
 });
