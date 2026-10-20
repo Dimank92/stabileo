@@ -58,7 +58,7 @@ describe('code spectrum previews', () => {
   it.each(['missing', 'refused'] as const)('renders the %s engine failure in the Advanced panel', (failure) => {
     expect(isWasmReady()).toBe(true);
     flags.failure = failure;
-    const html = render(ProAdvancedTab, { props: {} }).body;
+    const html = render(ProAdvancedTab, { props: { advancedResults: {} } }).body;
     expect(html).toContain('data-testid="spectral-basis"');
     expect(html).toContain(failure === 'missing'
       ? t('engine.unavailable')
