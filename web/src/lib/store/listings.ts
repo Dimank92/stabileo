@@ -19,6 +19,7 @@ import { corbelChecks, openingChecks } from './special-elements';
 import { designLength } from './design-spans-store';
 import { checkClause } from '../engine/design/check-clauses';
 import { noticesOf } from '../engine/design/notice-catalogue';
+import { holdText } from './member-verdict';
 import { configure, type Listing, type ListingConfig } from '../listings/listing';
 
 export const LISTING_IDS = ['project', 'combinations', 'beams', 'beamSteel', 'columns', 'columnForces', 'slabs', 'foundation', 'stairs', 'checks', 'quantities', 'surfaces'] as const;
@@ -43,6 +44,17 @@ export function buildListing(id: ListingId, locale: string): Listing {
   const m = modelStore.model, st = listingSettings();
   const ctxOf = (x: number) => verificationStore.contextFor(x);
   const status = (s?: string) => (s ? tr(`list.status.${s}`) : '—');
+  /**
+   * The member's verdict, as the desk and the inspector state it (`memberVerdict`): its checks
+   * AND what holds it (an open detailing condition, a refusal, its analysis). A row of checks that
+   * pass says «verifica» for that check; the member's status says whether the member does. They
+   * read apart on the QA of 20-oct: «verifica» in the listing, «no verifica» in the panel.
+   */
+  const verdictOf = (eid: number) => {
+    const v = verificationStore.memberVerdict(eid);
+    const key = v.status === 'unavailable' ? 'notVerified' : v.status;
+    return { verdict: status(key), held: v.holds.length ? v.holds.map((h) => holdText(h, tr)).join(' · ') : '' };
+  };
   let l: Listing;
   switch (id) {
     case 'project': {
@@ -79,11 +91,13 @@ export function buildListing(id: ListingId, locale: string): Listing {
           rows.push({
             member: `#${eid}`, section: m.sections.get(m.elements.get(eid)?.sectionId ?? -1)?.name ?? '', region: reg ? tr(`list.region.${reg}`) : '—',
             check: c.category, demand: c.demand ?? null, capacity: c.capacity ?? null, required: c.required ?? null, provided: c.provided ?? null,
-            unit: c.unit, ratio: c.ratio, status: status(c.status), article: checkClause(c, 'beam') ?? '—', deflection: lx,
+            unit: c.unit, ratio: c.ratio, status: status(c.status), article: checkClause(c, 'beam') ?? '—', deflection: lx, ...verdictOf(eid),
           });
         }
+        // A member with no checks (refused, no bars) is listed all the same, with what holds it.
+        if (!v?.checks?.length) rows.push({ member: `#${eid}`, section: m.sections.get(m.elements.get(eid)?.sectionId ?? -1)?.name ?? '', region: '—', check: '—', demand: null, capacity: null, required: null, provided: null, unit: '', ratio: null, status: status('none'), article: '—', deflection: lx, ...verdictOf(eid) });
       }
-      l = { id, title, columns: [col('member'), col('section'), col('region'), col('check'), col('demand', undefined, 'right'), col('capacity', undefined, 'right'), col('required', undefined, 'right'), col('provided', undefined, 'right'), col('unit'), col('ratio', undefined, 'right'), col('status'), col('article'), col('deflection')], rows };
+      l = { id, title, columns: [col('member'), col('section'), col('region'), col('check'), col('demand', undefined, 'right'), col('capacity', undefined, 'right'), col('required', undefined, 'right'), col('provided', undefined, 'right'), col('unit'), col('ratio', undefined, 'right'), col('status'), col('article'), col('deflection'), col('verdict'), col('held')], rows };
       break;
     }
     case 'beamSteel': {
@@ -109,14 +123,14 @@ export function buildListing(id: ListingId, locale: string): Listing {
         const d = r?.column?.cornerDia ?? r?.shaped?.diameter ?? r?.longitudinal?.diameter;
         const As = r?.column ? 4 * Math.PI * (r.column.cornerDia / 20) ** 2 + (n! - 4) * Math.PI * (r.column.faceDia / 20) ** 2 : n && d ? n * Math.PI * (d / 20) ** 2 : 0;
         const Ag = ctx.section.b * ctx.section.h * 1e4;
-        rows.push({ member: `#${eid}`, kind: tr(`list.kind.${ctx.elementType}`), section: m.sections.get(m.elements.get(eid)?.sectionId ?? -1)?.name ?? '', bars: n && d ? `${n}Ø${d}` : '—', ties: r?.stirrups ? `eØ${r.stirrups.diameter} c/${Math.round(r.stirrups.spacing * 100)}` : '—', rho: Ag > 0 && As > 0 ? (As / Ag) * 100 : null, ratio: verificationStore.getDisplayRatio(eid), status: status(verificationStore.providedFor(eid)?.overallStatus) });
+        rows.push({ member: `#${eid}`, kind: tr(`list.kind.${ctx.elementType}`), section: m.sections.get(m.elements.get(eid)?.sectionId ?? -1)?.name ?? '', bars: n && d ? `${n}Ø${d}` : '—', ties: r?.stirrups ? `eØ${r.stirrups.diameter} c/${Math.round(r.stirrups.spacing * 100)}` : '—', rho: Ag > 0 && As > 0 ? (As / Ag) * 100 : null, ratio: verificationStore.getDisplayRatio(eid), status: verdictOf(eid).verdict, held: verdictOf(eid).held });
       }
       const saved = storedDecisions().walls ?? {};
       for (const w of detailingStore.lastFloorRun?.walls ?? []) {
         const r = saved[w.wallId] ?? w.reinforcement;
         rows.push({ member: w.wallId, kind: tr('list.kind.wall'), section: `${Math.round(w.input.thickness * 100)} cm`, bars: `V Ø${r.vertical.diameter} c/${Math.round(r.vertical.spacing * 100)}`, ties: `H Ø${r.horizontal.diameter} c/${Math.round(r.horizontal.spacing * 100)}`, rho: null, ratio: Math.max(w.shear.utilization, w.axialFlexure.utilization), status: '—' });
       }
-      l = { id, title, columns: [col('member'), col('kind'), col('section'), col('bars'), col('ties'), col('rho', '%', 'right', 2), col('ratio', undefined, 'right', 2), col('status')], rows };
+      l = { id, title, columns: [col('member'), col('kind'), col('section'), col('bars'), col('ties'), col('rho', '%', 'right', 2), col('ratio', undefined, 'right', 2), col('status'), col('held')], rows };
       break;
     }
     case 'columnForces': {
@@ -165,15 +179,17 @@ export function buildListing(id: ListingId, locale: string): Listing {
         const kind = ctx.elementType === 'column' ? 'column' : ctx.elementType === 'wall' ? 'wall' : 'beam';
         const v = verificationStore.providedFor(eid);
         const code = noticesOf(verificationStore.outcomeFor(eid)).map((n) => n.code).join(' ') || '';
-        for (const c of v?.checks ?? []) rows.push({ family: tr(`list.kind.${kind}`), member: `#${eid}`, check: c.category, computed: c.demand ?? c.required ?? null, limit: c.capacity ?? c.provided ?? null, unit: c.unit, ratio: c.ratio, status: status(c.status), article: checkClause(c, kind) ?? '—', notice: c.status === 'fail' ? code : '' });
+        const vd = verdictOf(eid);
+        for (const c of v?.checks ?? []) rows.push({ family: tr(`list.kind.${kind}`), member: `#${eid}`, check: c.category, computed: c.demand ?? c.required ?? null, limit: c.capacity ?? c.provided ?? null, unit: c.unit, ratio: c.ratio, status: status(c.status), article: checkClause(c, kind) ?? '—', notice: c.status === 'fail' ? code : '', ...vd });
+        if (!v?.checks?.length) rows.push({ family: tr(`list.kind.${kind}`), member: `#${eid}`, check: '—', computed: null, limit: null, unit: '', ratio: null, status: status('none'), article: '—', notice: code, ...vd });
       }
       const special = (fam: string, name: string, rs: ReadonlyArray<{ title: string; clause?: string; demand?: number; capacity?: number; unit?: string; ratio: number | null; status: string }>) => {
-        for (const r of rs) rows.push({ family: fam, member: name, check: r.title, computed: r.demand ?? null, limit: r.capacity ?? null, unit: r.unit ?? '', ratio: r.ratio, status: status(r.status), article: r.clause ?? '—', notice: '' });
+        for (const r of rs) rows.push({ family: fam, member: name, check: r.title, computed: r.demand ?? null, limit: r.capacity ?? null, unit: r.unit ?? '', ratio: r.ratio, status: status(r.status), article: r.clause ?? '—', notice: '', verdict: status(r.status), held: '' });
       };
       for (const c of corbelChecks()) special(tr('list.kind.corbel'), c.entry.name, c.rows);
       for (const o of openingChecks()) special(tr('list.kind.opening'), `#${o.entry.elementId}`, o.rows);
       for (const s of stairChecks()) special(tr('list.kind.stair'), s.entry.name, s.rows);
-      l = { id, title, columns: [col('family'), col('member'), col('check'), col('computed', undefined, 'right'), col('limit', undefined, 'right'), col('unit'), col('ratio', undefined, 'right'), col('status'), col('article'), col('notice')], rows };
+      l = { id, title, columns: [col('family'), col('member'), col('check'), col('computed', undefined, 'right'), col('limit', undefined, 'right'), col('unit'), col('ratio', undefined, 'right'), col('status'), col('article'), col('notice'), col('verdict'), col('held')], rows };
       break;
     }
     case 'quantities': {
