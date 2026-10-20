@@ -13332,5 +13332,13 @@ const es: Record<string, string> = {
   "sheet.ui.det.notInSet": "El juego no tiene lámina de ese tipo: va a la de detalles.",
   "sheet.ui.det.unplaced": "Sin lámina en el juego: {list}. Agregá la lámina de detalles o la de su tipo.",
   "sheet.ui.det.typical": "Sin elementos diseñados de: {list}. Esos detalles usan valores típicos y lo dicen en su cuadro.",
+  "autoLoad.work.plan": "Armando el plan de cargas",
+  "autoLoad.work.windModes": "Análisis modal para el viento",
+  "autoLoad.work.seismicModes": "Análisis modal para el sismo",
+  "autoLoad.work.compare": "Comparando con las cargas del modelo",
+  "autoLoad.work.apply": "Aplicando {n} cargas",
+  "autoLoad.work.draw": "Dibujando las cargas",
+  "autoLoad.work.step": "Paso {step} de {total}",
+  "autoLoad.work.cancel": "Detener",
 };
 export default es;

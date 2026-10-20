@@ -3707,6 +3707,14 @@ const ru: Translations = {
   'otherCodes.cert.comboUncertified': 'сочетание {combo} не сертифицировано',
   'otherCodes.cert.summary': 'Сертифицировано: {ok} проходят · {fail} не проходят · {open} не определено или не сертифицировано',
   'otherCodes.cert.tooltip': 'Строгий интервал коэффициента использования: формулы норм вычислены в интервальной арифметике по всем усилиям в пределах их сертифицированных оценок, для каждого определяющего воздействия. Проходит наверняка: верхняя граница меньше 1; не проходит наверняка: нижняя граница больше 1.',
+  "autoLoad.work.plan": "Построение плана нагрузок",
+  "autoLoad.work.windModes": "Модальный анализ для ветра",
+  "autoLoad.work.seismicModes": "Модальный анализ для сейсмики",
+  "autoLoad.work.compare": "Сравнение с нагрузками модели",
+  "autoLoad.work.apply": "Применение нагрузок: {n}",
+  "autoLoad.work.draw": "Отрисовка нагрузок",
+  "autoLoad.work.step": "Шаг {step} из {total}",
+  "autoLoad.work.cancel": "Остановить",
 } as const satisfies Record<string, string>;
 
 export default ru;

@@ -3702,6 +3702,14 @@ const ko: Translations = {
   'otherCodes.cert.comboUncertified': '조합 {combo}이(가) 인증되지 않음',
   'otherCodes.cert.summary': '인증: 만족 {ok} · 불만족 {fail} · 판정 불가 또는 미인증 {open}',
   'otherCodes.cert.tooltip': '활용률의 엄밀한 포함: 각 지배 요구에 대해 인증된 한계 내의 모든 힘에 대해 기준식을 구간 연산으로 평가합니다. 확실히 만족: 상한이 1 미만; 확실히 불만족: 하한이 1 초과.',
+  "autoLoad.work.plan": "하중 계획 작성 중",
+  "autoLoad.work.windModes": "풍하중 모드 해석",
+  "autoLoad.work.seismicModes": "지진 모드 해석",
+  "autoLoad.work.compare": "모델 하중과 비교 중",
+  "autoLoad.work.apply": "하중 {n}개 적용 중",
+  "autoLoad.work.draw": "하중 그리는 중",
+  "autoLoad.work.step": "{total}단계 중 {step}단계",
+  "autoLoad.work.cancel": "중지",
 } as const satisfies Record<string, string>;
 
 export default ko;

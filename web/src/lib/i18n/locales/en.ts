@@ -13343,5 +13343,13 @@ const en: Record<string, string> = {
   "sheet.ui.det.notInSet": "The set has no sheet of that kind: it goes on the details sheet.",
   "sheet.ui.det.unplaced": "No sheet in the set for: {list}. Add the details sheet or one of its kind.",
   "sheet.ui.det.typical": "Nothing designed yet for: {list}. Those details use typical values and their table says so.",
+  "autoLoad.work.plan": "Building the load plan",
+  "autoLoad.work.windModes": "Modal analysis for the wind",
+  "autoLoad.work.seismicModes": "Modal analysis for the earthquake",
+  "autoLoad.work.compare": "Comparing with the model's loads",
+  "autoLoad.work.apply": "Applying {n} loads",
+  "autoLoad.work.draw": "Drawing the loads",
+  "autoLoad.work.step": "Step {step} of {total}",
+  "autoLoad.work.cancel": "Stop",
 };
 export default en;

@@ -3704,6 +3704,14 @@ const zh: Translations = {
   'otherCodes.cert.comboUncertified': '组合 {combo} 未认证',
   'otherCodes.cert.summary': '认证：满足 {ok} · 不满足 {fail} · 无法判定或未认证 {open}',
   'otherCodes.cert.tooltip': '利用率的严格包含：对每个控制需求，在认证上界内的所有内力上以区间运算计算规范公式。确定满足：上端小于 1；确定不满足：下端大于 1。',
+  "autoLoad.work.plan": "正在生成荷载方案",
+  "autoLoad.work.windModes": "风的模态分析",
+  "autoLoad.work.seismicModes": "地震的模态分析",
+  "autoLoad.work.compare": "与模型荷载比较",
+  "autoLoad.work.apply": "正在施加 {n} 个荷载",
+  "autoLoad.work.draw": "正在绘制荷载",
+  "autoLoad.work.step": "第 {step} 步，共 {total} 步",
+  "autoLoad.work.cancel": "停止",
 } as const satisfies Record<string, string>;
 
 export default zh;

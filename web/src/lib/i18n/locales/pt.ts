@@ -12976,5 +12976,13 @@ const pt: Translations = {
   "sheet.ui.det.notInSet": "O jogo não tem prancha desse tipo: vai para a de detalhes.",
   "sheet.ui.det.unplaced": "Sem prancha no jogo: {list}. Acrescente a prancha de detalhes ou a do seu tipo.",
   "sheet.ui.det.typical": "Sem elementos dimensionados de: {list}. Esses detalhes usam valores típicos e o seu quadro o indica.",
+  "autoLoad.work.plan": "Montando o plano de cargas",
+  "autoLoad.work.windModes": "Análise modal para o vento",
+  "autoLoad.work.seismicModes": "Análise modal para o sismo",
+  "autoLoad.work.compare": "Comparando com as cargas do modelo",
+  "autoLoad.work.apply": "Aplicando {n} cargas",
+  "autoLoad.work.draw": "Desenhando as cargas",
+  "autoLoad.work.step": "Passo {step} de {total}",
+  "autoLoad.work.cancel": "Parar",
 };
 export default pt;

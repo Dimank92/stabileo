@@ -3723,5 +3723,13 @@ const de: Translations = {
   'otherCodes.cert.comboUncertified': 'Kombination {combo} ist nicht zertifiziert',
   'otherCodes.cert.summary': 'Zertifiziert: {ok} erfüllt · {fail} nicht erfüllt · {open} nicht entscheidbar oder nicht zertifiziert',
   'otherCodes.cert.tooltip': 'Strenge Einschließung der Ausnutzung: die Normformeln in Intervallarithmetik ausgewertet über jede Schnittgröße innerhalb ihrer zertifizierten Schranke, für jede maßgebende Beanspruchung. Zertifiziert erfüllt: das obere Ende liegt unter 1; zertifiziert nicht erfüllt: das untere Ende liegt über 1.',
+  "autoLoad.work.plan": "Lastplan wird erstellt",
+  "autoLoad.work.windModes": "Modalanalyse für Wind",
+  "autoLoad.work.seismicModes": "Modalanalyse für Erdbeben",
+  "autoLoad.work.compare": "Vergleich mit den Lasten des Modells",
+  "autoLoad.work.apply": "{n} Lasten werden angewendet",
+  "autoLoad.work.draw": "Lasten werden gezeichnet",
+  "autoLoad.work.step": "Schritt {step} von {total}",
+  "autoLoad.work.cancel": "Anhalten",
 };
 export default de;

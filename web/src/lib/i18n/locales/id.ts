@@ -3705,6 +3705,14 @@ const id: Translations = {
   'otherCodes.cert.comboUncertified': 'kombinasi {combo} tidak tersertifikasi',
   'otherCodes.cert.summary': 'Tersertifikasi: {ok} memenuhi · {fail} tidak memenuhi · {open} tidak pasti atau tidak tersertifikasi',
   'otherCodes.cert.tooltip': 'Kurungan ketat rasio utilisasi: rumus peraturan dievaluasi dengan aritmetika interval atas setiap gaya dalam batas tersertifikasinya, untuk setiap tuntutan yang menentukan. Pasti memenuhi: ujung atas di bawah 1; pasti tidak memenuhi: ujung bawah di atas 1.',
+  "autoLoad.work.plan": "Menyusun rencana beban",
+  "autoLoad.work.windModes": "Analisis modal untuk angin",
+  "autoLoad.work.seismicModes": "Analisis modal untuk gempa",
+  "autoLoad.work.compare": "Membandingkan dengan beban model",
+  "autoLoad.work.apply": "Menerapkan {n} beban",
+  "autoLoad.work.draw": "Menggambar beban",
+  "autoLoad.work.step": "Langkah {step} dari {total}",
+  "autoLoad.work.cancel": "Hentikan",
 } as const satisfies Record<string, string>;
 
 export default id;

@@ -3716,5 +3716,13 @@ const it: Translations = {
   'otherCodes.cert.comboUncertified': 'la combinazione {combo} non è certificata',
   'otherCodes.cert.summary': 'Certificato: {ok} verificati · {fail} non verificati · {open} indecisi o non certificati',
   'otherCodes.cert.tooltip': 'Intervallo rigoroso del tasso di lavoro: le formule della norma valutate in aritmetica degli intervalli su ogni sollecitazione entro il suo limite certificato, per ogni domanda determinante. Verificato con certezza: l\'estremo superiore è sotto 1; non verificato con certezza: l\'estremo inferiore è sopra 1.',
+  "autoLoad.work.plan": "Costruzione del piano dei carichi",
+  "autoLoad.work.windModes": "Analisi modale per il vento",
+  "autoLoad.work.seismicModes": "Analisi modale per il sisma",
+  "autoLoad.work.compare": "Confronto con i carichi del modello",
+  "autoLoad.work.apply": "Applicazione di {n} carichi",
+  "autoLoad.work.draw": "Disegno dei carichi",
+  "autoLoad.work.step": "Passo {step} di {total}",
+  "autoLoad.work.cancel": "Ferma",
 };
 export default it;

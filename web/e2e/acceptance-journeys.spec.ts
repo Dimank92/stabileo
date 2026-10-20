@@ -116,6 +116,7 @@ async function loads(page: Page, j: string): Promise<void> {
     const outcome = await page.getByTestId('al-apply').isEnabled();
     if (!outcome) throw new Error('apply disabled: ' + (await page.getByTestId('al-preview').innerText().catch(() => '')).slice(0, 400));
     await page.getByTestId('al-apply').click();
+    await expect(page.getByTestId('al-apply')).toHaveCount(0, { timeout: 60_000 });
     const c = await census(page);
     expect(c.loads).toBeGreaterThan(0);
     return c;

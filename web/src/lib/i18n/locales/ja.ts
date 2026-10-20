@@ -3695,6 +3695,14 @@ const ja: Translations = {
   'otherCodes.cert.comboUncertified': '組合せ {combo} は未認証',
   'otherCodes.cert.summary': '認証: 適合 {ok} · 不適合 {fail} · 判定不能または未認証 {open}',
   'otherCodes.cert.tooltip': '検定比の厳密な包含: 各支配的な荷重について、認証済み上界内のすべての力に対し規準式を区間演算で評価します。確実に適合: 上端が 1 未満。確実に不適合: 下端が 1 超。',
+  "autoLoad.work.plan": "荷重計画を作成中",
+  "autoLoad.work.windModes": "風のモーダル解析",
+  "autoLoad.work.seismicModes": "地震のモーダル解析",
+  "autoLoad.work.compare": "モデルの荷重と比較中",
+  "autoLoad.work.apply": "{n} 件の荷重を適用中",
+  "autoLoad.work.draw": "荷重を描画中",
+  "autoLoad.work.step": "ステップ {step} / {total}",
+  "autoLoad.work.cancel": "停止",
 } as const satisfies Record<string, string>;
 
 export default ja;

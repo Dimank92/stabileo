@@ -3715,5 +3715,13 @@ const tr: Translations = {
   'otherCodes.cert.comboUncertified': '{combo} kombinasyonu sertifikalı değil',
   'otherCodes.cert.summary': 'Sertifikalı: {ok} sağlıyor · {fail} sağlamıyor · {open} belirsiz veya sertifikasız',
   'otherCodes.cert.tooltip': 'Kullanım oranının kesin aralığı: yönetmelik formülleri, her belirleyici etki için sertifikalı sınırı içindeki her kuvvet üzerinde aralık aritmetiğiyle değerlendirilir. Kesin sağlıyor: üst uç 1’den küçük; kesin sağlamıyor: alt uç 1’den büyük.',
+  "autoLoad.work.plan": "Yük planı hazırlanıyor",
+  "autoLoad.work.windModes": "Rüzgâr için modal analiz",
+  "autoLoad.work.seismicModes": "Deprem için modal analiz",
+  "autoLoad.work.compare": "Modelin yükleriyle karşılaştırılıyor",
+  "autoLoad.work.apply": "{n} yük uygulanıyor",
+  "autoLoad.work.draw": "Yükler çiziliyor",
+  "autoLoad.work.step": "Adım {step} / {total}",
+  "autoLoad.work.cancel": "Durdur",
 };
 export default tr;

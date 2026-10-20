@@ -3716,5 +3716,13 @@ const fr: Translations = {
   'otherCodes.cert.comboUncertified': 'la combinaison {combo} n\'est pas certifiée',
   'otherCodes.cert.summary': 'Certifié : {ok} vérifiés · {fail} non vérifiés · {open} indécis ou non certifiés',
   'otherCodes.cert.tooltip': 'Encadrement rigoureux du taux de travail : les formules de la norme évaluées en arithmétique d\'intervalles sur tout effort dans sa borne certifiée, pour chaque sollicitation déterminante. Vérifié avec certitude : la borne supérieure est inférieure à 1 ; non vérifié avec certitude : la borne inférieure est supérieure à 1.',
+  "autoLoad.work.plan": "Construction du plan de charges",
+  "autoLoad.work.windModes": "Analyse modale pour le vent",
+  "autoLoad.work.seismicModes": "Analyse modale pour le séisme",
+  "autoLoad.work.compare": "Comparaison avec les charges du modèle",
+  "autoLoad.work.apply": "Application de {n} charges",
+  "autoLoad.work.draw": "Dessin des charges",
+  "autoLoad.work.step": "Étape {step} sur {total}",
+  "autoLoad.work.cancel": "Arrêter",
 };
 export default fr;

@@ -3703,6 +3703,14 @@ const ar: Translations = {
   'otherCodes.cert.comboUncertified': 'التركيبة {combo} غير معتمدة',
   'otherCodes.cert.summary': 'معتمد: {ok} يحقق · {fail} لا يحقق · {open} غير حاسم أو غير معتمد',
   'otherCodes.cert.tooltip': 'حصر صارم لنسبة الاستخدام: معادلات الكود مُقيَّمة بحساب الفترات على كل قوة ضمن حدها المعتمد، لكل طلب حاكم. يحقق بيقين: الطرف الأعلى أقل من 1؛ لا يحقق بيقين: الطرف الأدنى أكبر من 1.',
+  "autoLoad.work.plan": "إعداد خطة الأحمال",
+  "autoLoad.work.windModes": "تحليل نمطي للرياح",
+  "autoLoad.work.seismicModes": "تحليل نمطي للزلزال",
+  "autoLoad.work.compare": "المقارنة مع أحمال النموذج",
+  "autoLoad.work.apply": "تطبيق {n} من الأحمال",
+  "autoLoad.work.draw": "رسم الأحمال",
+  "autoLoad.work.step": "الخطوة {step} من {total}",
+  "autoLoad.work.cancel": "إيقاف",
 } as const satisfies Record<string, string>;
 
 export default ar;

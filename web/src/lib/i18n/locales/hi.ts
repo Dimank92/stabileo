@@ -3715,5 +3715,13 @@ const hi: Translations = {
   'otherCodes.cert.comboUncertified': 'संयोजन {combo} प्रमाणित नहीं है',
   'otherCodes.cert.summary': 'प्रमाणित: {ok} उत्तीर्ण · {fail} अनुत्तीर्ण · {open} अनिर्णीत या अप्रमाणित',
   'otherCodes.cert.tooltip': 'उपयोग अनुपात का कठोर अंतराल: संहिता के सूत्र हर निर्णायक माँग के लिए, प्रमाणित सीमा के भीतर हर बल पर अंतराल अंकगणित में मूल्यांकित। निश्चित उत्तीर्ण: ऊपरी सिरा 1 से कम; निश्चित अनुत्तीर्ण: निचला सिरा 1 से अधिक।',
+  "autoLoad.work.plan": "भार योजना बनाई जा रही है",
+  "autoLoad.work.windModes": "हवा के लिए मोडल विश्लेषण",
+  "autoLoad.work.seismicModes": "भूकंप के लिए मोडल विश्लेषण",
+  "autoLoad.work.compare": "मॉडल के भारों से तुलना",
+  "autoLoad.work.apply": "{n} भार लागू किए जा रहे हैं",
+  "autoLoad.work.draw": "भार बनाए जा रहे हैं",
+  "autoLoad.work.step": "चरण {step} / {total}",
+  "autoLoad.work.cancel": "रोकें",
 };
 export default hi;
