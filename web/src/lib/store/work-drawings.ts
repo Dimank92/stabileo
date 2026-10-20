@@ -42,7 +42,7 @@ import { SLAB_LAYERS, slabBreakdown, slabLayerPlan, slabMarks, type PlanSlabPane
 import { storedDecisions } from './design-decisions';
 import { savedLinePieces } from './beam-line-store';
 import { bendingSchedule } from '../sheets/plans/bending-schedule';
-import { constructionDetails, type Tr } from '../sheets/plans/details';
+import type { Tr } from '../sheets/details/def';
 import { generalNotes } from '../sheets/plans/general-notes';
 import { stairSchedule, stairSection, tendonPlan, tendonProfileDrawing, type TendonPanel } from '../sheets/plans/stair-pt-plans';
 import { ptPanels, stairChecks, stressingPlan } from './stairs-pt';
@@ -525,13 +525,6 @@ function notes(c: PlanContext, hasSteel: boolean): DrawingInput {
   }, c.tr);
 }
 
-function details(c: PlanContext, doc: DocumentModel | null): DrawingInput[] {
-  const count = new Map<number, number>();
-  for (const a of doc?.assemblies ?? []) for (const mk of a.source.marks) if (mk.role === 'longitudinal') count.set(mk.diameterMm, (count.get(mk.diameterMm) ?? 0) + mk.quantity);
-  const bar = [...count.entries()].sort((p, q) => q[1] - p[1])[0]?.[0] ?? 16;
-  return constructionDetails({ bar, tie: designData().stirrupDiaMm ?? 8, cover: Math.round(coverOf('column') * 1000) }, c.tr);
-}
-
 function stairs(c: PlanContext): DrawingInput[] {
   const checks = stairChecks();
   const out = checks.map((s) => stairSection(`stair-${s.entry.id}`, c.tr('plan.stair.title', { name: s.entry.name }), s.entry, s.design, coverOf('slab'), c.tr, c.fmt));
@@ -628,7 +621,8 @@ export function workDrawings(doc: DocumentModel | null, kinds: ReadonlySet<PlanK
   add('anchors', () => anchors(c, axes));
   add('joints', () => joints(c));
   add('bbs', () => (doc ? bendingSchedule(doc, c.tr, c.fmt) : []));
-  add('details', () => details(c, doc));
+  // The details kind draws what the catalogue places on it (`store/sheet-set.ts`, `sheets/details/catalog.ts`).
+  add('details', () => []);
   add('phases', () => phases(c, axes));
   return out;
 }

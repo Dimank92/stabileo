@@ -10,10 +10,13 @@ import { aciRgb, layerDef, type LayerStyle } from './layers';
 const PT = 72 / 25.4;
 const f = (n: number) => (Math.round(n * 1000) / 1000).toString();
 
-/** WinAnsi bytes for a string; characters outside it become «?». */
+/** Signs the sheets write that WinAnsi lacks, spelled with the ones it has. */
+const SPELLED: Record<string, string> = { '≥': '>=', '≤': '<=', 'ℓ': 'l', '→': '->', '≈': '~', '√': 'sqrt', 'φ': 'phi', '∅': 'Ø' };
+
+/** WinAnsi bytes for a string; characters outside it become their spelling above, or «?». */
 function winAnsi(s: string): number[] {
   const out: number[] = [];
-  for (const ch of s) {
+  for (const ch of [...s].map((x) => SPELLED[x] ?? x).join('')) {
     const c = ch.codePointAt(0)!;
     if (c < 128 || (c >= 160 && c <= 255)) out.push(c);
     else if (c === 0x2019) out.push(0x92); else if (c === 0x2013) out.push(0x96); else if (c === 0x2014) out.push(0x97);

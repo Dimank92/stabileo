@@ -16,6 +16,7 @@
   import TitleBlockEditor from './TitleBlockEditor.svelte';
   import SheetTemplates from './SheetTemplates.svelte';
   import SheetComposer from './SheetComposer.svelte';
+  import DetailCatalog from './DetailCatalog.svelte';
   import { PLAN_KINDS, type PlanKind } from '../../../lib/store/work-drawings';
   import type { DocumentModel } from '../../../lib/engine/detailing/document-model';
   import { designFingerprint } from '../../../lib/store/design-fingerprint';
@@ -126,6 +127,7 @@
   </details>
 
   <SheetEntriesEditor {entries} onChange={setEntries} />
+  <DetailCatalog {doc} onChange={() => { if (built) sheets = projectSheetSet(doc, projectName); }} />
   <SheetDisplayEditor display={st.display} onChange={(d) => patch({ display: d })} />
   <TitleBlockEditor template={st.titleBlock} onChange={(tb) => patch({ titleBlock: tb })} />
   <SheetTemplates onApplied={() => { if (built) sheets = projectSheetSet(doc, projectName); }} />

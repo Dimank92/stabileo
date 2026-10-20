@@ -24,6 +24,8 @@ import { PLAN_KINDS, planContext, workDrawings, type PlanKind } from './work-dra
 import { defaultEntries, parseSetTemplate, type SheetEntry, type SheetSetTemplate } from '../sheets/sheet-entries';
 import { emptyLayout, type DrawingAdjust, type SheetLayout } from '../sheets/sheet-layout';
 import type { PlacedDrawing } from '../sheets/compose';
+import { drawDetails, placeDetails, type DetailChoice } from '../sheets/details/catalog';
+import { chosenDetails, projectDetailValues } from './detail-catalog';
 
 export const sheetSettings = () => ({ ...DEFAULT_SHEET_SETTINGS, ...designData().sheets });
 export const patchSheetSettings = (p: Partial<ReturnType<typeof sheetSettings>>) => patchDesignData({ sheets: { ...sheetSettings(), ...p } });
@@ -57,7 +59,22 @@ export function setSheetRevision(number: string, r: SheetRevision | null): void 
 }
 
 /** One entry's drawings, each in its group and with its scale and format (`SheetEntry`). */
-function entryDrawings(doc: DocumentModel | null, projectName: string, e: SheetEntry, named: Map<string, number>): DrawingInput[] {
+/** The chosen details for each entry of the set (`placeDetails`), drawn with the project's values once per set. */
+function detailsPlan(doc: DocumentModel | null, entries: readonly SheetEntry[]) {
+  const { byEntry } = placeDetails(chosenDetails(), entries);
+  let values: ReturnType<typeof projectDetailValues> | null = null;
+  return (e: SheetEntry, ctx: ReturnType<typeof planContext>): DrawingInput[] => {
+    const cs: DetailChoice[] | undefined = byEntry.get(e.id);
+    if (!cs?.length) return [];
+    values ??= projectDetailValues(doc);
+    return drawDetails(cs, values, ctx.tr, ctx.fmt);
+  };
+}
+
+/** The chosen details the set has no sheet for: their kind is not in it and neither is a details entry. */
+export const unplacedDetails = (): DetailChoice[] => placeDetails(chosenDetails(), sheetEntries()).unplaced;
+
+function entryDrawings(doc: DocumentModel | null, projectName: string, e: SheetEntry, named: Map<string, number>, details?: ReturnType<typeof detailsPlan>): DrawingInput[] {
   const locale = sheetLanguage(), st = sheetSettings();
   const kind = e.kind as PlanKind;
   const ctx = planContext(locale, (e.format ?? st.format) as SheetFormat, e);
@@ -73,15 +90,17 @@ function entryDrawings(doc: DocumentModel | null, projectName: string, e: SheetE
   const label = e.label || ctx.tr(`sheet.kind.${kind}`);
   const n = (named.get(label) ?? 0) + 1; named.set(label, n);
   const group = n > 1 ? `${label} (${n})` : label;
-  return ds
+  // The construction details chosen for this entry's sheets go after its own drawings, each at its own scale.
+  const extra = (details?.(e, ctx) ?? []).map((d) => ({ ...d, group, ...(e.format ? { format: e.format } : {}), key: `${e.id}:${d.key}` }));
+  return [...ds
     .filter((d) => e.tables !== false || !d.table)
     // A name the person gave the entry heads each of its drawings, so a sheet of one drawing reads it too.
-    .map((d) => ({ ...d, ...(e.label ? { title: `${e.label} — ${d.title}` } : {}), group, ...(e.scale && !d.paper ? { scale: e.scale } : {}), ...(e.format ? { format: e.format } : {}), key: `${e.id}:${d.key}` }));
+    .map((d) => ({ ...d, ...(e.label ? { title: `${e.label} — ${d.title}` } : {}), group, ...(e.scale && !d.paper ? { scale: e.scale } : {}), ...(e.format ? { format: e.format } : {}), key: `${e.id}:${d.key}` })), ...extra];
 }
 
 export function projectSheetSet(doc: DocumentModel | null, projectName: string): SetSheet[] {
-  const named = new Map<string, number>();
-  return assemble(doc, projectName, sheetEntries().flatMap((e) => entryDrawings(doc, projectName, e, named)));
+  const named = new Map<string, number>(), entries = sheetEntries(), details = detailsPlan(doc, entries);
+  return assemble(doc, projectName, entries.flatMap((e) => entryDrawings(doc, projectName, e, named, details)));
 }
 
 /**
@@ -90,13 +109,13 @@ export function projectSheetSet(doc: DocumentModel | null, projectName: string):
  * returns null (nothing half-built is shown).
  */
 export async function projectSheetSetAsync(doc: DocumentModel | null, projectName: string, opts: { onProgress?: (done: number, total: number, entry: SheetEntry) => void; signal?: AbortSignal } = {}): Promise<SetSheet[] | null> {
-  const entries = sheetEntries(), named = new Map<string, number>(), drawings: DrawingInput[] = [];
+  const entries = sheetEntries(), named = new Map<string, number>(), drawings: DrawingInput[] = [], details = detailsPlan(doc, entries);
   for (const [i, e] of entries.entries()) {
     if (opts.signal?.aborted) return null;
     opts.onProgress?.(i, entries.length, e);
     await new Promise((r) => setTimeout(r, 0));
     if (opts.signal?.aborted) return null;
-    drawings.push(...entryDrawings(doc, projectName, e, named));
+    drawings.push(...entryDrawings(doc, projectName, e, named, details));
   }
   if (opts.signal?.aborted) return null;
   return assemble(doc, projectName, drawings);
