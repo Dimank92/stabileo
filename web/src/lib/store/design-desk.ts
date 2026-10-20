@@ -67,6 +67,11 @@ export function deskMembers(): DeskMember[] {
   const incomplete = new Set(steelInputCompleteness({ elements: modelStore.elements, nodes: modelStore.nodes, sections: modelStore.sections, materials: modelStore.materials, supports: modelStore.supports } as never).map((g) => g.elementId));
   if (verificationStore.steelMap.size > 0 || incomplete.size > 0) for (const id of incomplete) { steel.add(id); }
   for (const id of steel) ids.add(id);
+  // One row per design member: a span's pieces are one beam, listed under the piece it is designed under.
+  for (const id of [...ids]) {
+    const sp = verificationStore.contextFor(id)?.span;
+    if (sp && sp.representative !== id && ids.has(sp.representative)) ids.delete(id);
+  }
   // The other materials: their own checker's result (`material-check.svelte.ts`).
   const other = materialCheckState.results;
   for (const id of other.keys()) { ids.add(id); steel.delete(id); }

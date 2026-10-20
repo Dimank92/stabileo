@@ -11,6 +11,7 @@ import { detailingStore } from './detailing.svelte';
 import { jointDesignStore } from './joint-design.svelte';
 import { steelJoints } from './joint-typology';
 import { physicalGroups, physicalThickness } from './physical';
+import { memberNames, wallNames } from './member-names';
 import { coverOf, designData } from './design-data';
 import { resolveConcreteProperties } from './detailing-project-inputs';
 import { regulationsStore } from './regulations.svelte';
@@ -115,9 +116,16 @@ function sectionOf(id: number): PlanColumn['section'] {
   return { kind: 'other', label: s.name, b: s.b ?? 0.3, h: s.h ?? 0.3 };
 }
 
-/** Column names by plan position, top row first and left to right, the way plans are read. */
+/**
+ * Column names by plan position: the physical column's where every position has one, the name
+ * the desk and the listings give it (`member-names.ts`); otherwise by position, top row first and
+ * left to right, the way plans are read.
+ */
 function columnNames(cols: readonly Frame[]): Map<string, string> {
-  const at = [...new Map(cols.map((c) => [`${c.a.x.toFixed(2)},${c.a.y.toFixed(2)}`, { x: c.a.x, y: c.a.y }])).entries()];
+  const at = [...new Map(cols.map((c) => [`${c.a.x.toFixed(2)},${c.a.y.toFixed(2)}`, { x: c.a.x, y: c.a.y, id: c.id }])).entries()];
+  const names = memberNames();
+  const physical = at.map(([k, p]) => [k, names.physical(p.id)] as const);
+  if (physical.every(([, n]) => !!n) && new Set(physical.map(([, n]) => n)).size === physical.length) return new Map(physical as Array<[string, string]>);
   at.sort((p, q) => (Math.abs(q[1].y - p[1].y) > TOL ? q[1].y - p[1].y : p[1].x - q[1].x));
   return new Map(at.map(([k], i) => [k, `C${i + 1}`]));
 }
@@ -139,9 +147,16 @@ function formwork(c: PlanContext, axes: PlanAxis[], levels: Array<{ name: string
   levels.forEach((lv, li) => {
     const columns: PlanColumn[] = cols.filter((f) => Math.min(f.a.z, f.b.z) < lv.z - TOL && Math.max(f.a.z, f.b.z) > lv.z - TOL)
       .map((f) => ({ name: names.get(posKey(f.a)) ?? `C${f.id}`, at: f.a, section: sectionOf(f.sectionId) }));
-    const beams: PlanBeam[] = all.filter((f) => !isVertical(f) && isLevel(f) && Math.abs(f.a.z - lv.z) < TOL).map((f, i) => {
+    // One beam per span between supports, named as the desk names it (`member-names.ts`): the
+    // pieces the slab's mesh cut it into are one beam on the plan.
+    const named = memberNames(), spansDrawn = new Set<string>();
+    const P = (id: number) => { const n = m.nodes.get(id)!; return { x: n.x, y: n.y, z: n.z ?? 0 }; };
+    const beams: PlanBeam[] = all.filter((f) => !isVertical(f) && isLevel(f) && Math.abs(f.a.z - lv.z) < TOL).flatMap((f) => {
       const s = m.sections.get(f.sectionId);
-      return { name: `V${(li + 1) * 100 + i + 1}`, a: f.a, b: f.b, width: s?.b ?? 0.2, depth: s?.h ?? 0.5 };
+      const sp = named.span(f.id);
+      if (sp && spansDrawn.has(sp.key)) return [];
+      if (sp) spansDrawn.add(sp.key);
+      return [{ name: named.name(f.id), a: sp ? P(sp.start) : f.a, b: sp ? P(sp.end) : f.b, width: s?.b ?? 0.2, depth: s?.h ?? 0.5 }];
     });
     const slabs: PlanSlab[] = [], walls: PlanWall[] = [];
     for (const g of groups) {
@@ -377,9 +392,11 @@ function columnElevations(c: PlanContext, levels: Array<{ name: string; z: numbe
 
 function wallElevations(c: PlanContext): DrawingInput[] {
   const saved = storedDecisions().walls ?? {};
-  return (detailingStore.lastFloorRun?.walls ?? []).map((w) => {
+  const walls = detailingStore.lastFloorRun?.walls ?? [];
+  const named = wallNames(walls);
+  return walls.map((w) => {
     const r = saved[w.wallId] ?? w.reinforcement;
-    return wallElevation({ id: w.wallId, length: w.input.length, height: w.input.height, vertical: r.vertical, horizontal: r.horizontal, curtains: r.curtains, ...(r.boundary ? { boundary: r.boundary } : {}), ...(r.openings ? { openings: r.openings } : {}) }, c.tr, c.fmt);
+    return wallElevation({ id: w.wallId, name: named.get(w.wallId) ?? w.wallId, length: w.input.length, height: w.input.height, vertical: r.vertical, horizontal: r.horizontal, curtains: r.curtains, ...(r.boundary ? { boundary: r.boundary } : {}), ...(r.openings ? { openings: r.openings } : {}) }, c.tr, c.fmt);
   });
 }
 

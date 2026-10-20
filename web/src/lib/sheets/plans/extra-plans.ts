@@ -143,7 +143,7 @@ export function columnElevation(name: string, lifts: readonly ElevationLift[], t
 
 // ─── A wall's elevation ───
 
-export interface WallElevation { id: string; length: number; height: number; vertical: { diameter: number; spacing: number }; horizontal: { diameter: number; spacing: number }; curtains: number; boundary?: { count: number; diameter: number }; openings?: { count: number; diameter: number } }
+export interface WallElevation { id: string; /** The physical wall's name, where it has one (`member-names.ts`). */ name?: string; length: number; height: number; vertical: { diameter: number; spacing: number }; horizontal: { diameter: number; spacing: number }; curtains: number; boundary?: { count: number; diameter: number }; openings?: { count: number; diameter: number } }
 
 /** A wall face-on: its outline, the mesh drawn at its spacings, the boundary bars at its ends and the bars around its openings. */
 export function wallElevation(w: WallElevation, tr: Tr, fmt: Fmt): DrawingInput {
@@ -161,7 +161,7 @@ export function wallElevation(w: WallElevation, tr: Tr, fmt: Fmt): DrawingInput 
   if (w.boundary) for (const x of [80, L - 80]) out.push({ kind: 'polyline', layer: 'RC-BAR', closed: true, points: [{ x: x - 60, y: 0 }, { x: x + 60, y: 0 }, { x: x + 60, y: H }, { x: x - 60, y: H }], dia: w.boundary.diameter });
   out.push({ kind: 'dimension', layer: 'RC-DIM', a: { x: 0, y: -300 }, b: { x: L, y: -300 }, offset: 0, text: fmt(w.length, 2) });
   out.push({ kind: 'dimension', layer: 'RC-DIM', a: { x: -300, y: H }, b: { x: -300, y: 0 }, offset: 0, text: fmt(w.height, 2) });
-  return { key: `wall-${w.id}`, title: tr('plan.wall.title', { id: w.id }), primitives: out, width: L + 1200, height: H + 400 + lines.length * 220 + 600, origin: { x: -600, y: -600 } };
+  return { key: `wall-${w.id}`, title: tr('plan.wall.title', { id: w.name ?? w.id }), primitives: out, width: L + 1200, height: H + 400 + lines.length * 220 + 600, origin: { x: -600, y: -600 } };
 }
 
 // ─── Corbels ───

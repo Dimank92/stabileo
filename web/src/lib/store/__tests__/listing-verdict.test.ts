@@ -7,6 +7,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { verificationStore } from '../verification.svelte';
 import { building, designAndDocument } from './span-fixture';
 import { buildListing } from '../listings';
+import { memberNames } from '../member-names';
 import * as wasmSolver from '../../engine/wasm-solver';
 import '../../engine/design/adapters/cirsoc201-adapter';
 import '../../engine/design/adapters/unsupported-adapter';
@@ -20,7 +21,7 @@ describe('the listings read the member verdict', () => {
   it('a refused beam: its rows say «sin verificar» with the refusal, whatever its local rows say', () => {
     building(1);
     designAndDocument();
-    const refused = [...verificationStore.contexts.values()].filter((c) => verificationStore.outcomeFor(c.elementId)?.outcome === 'SEARCH_EXHAUSTED').map((c) => `#${c.elementId}`);
+    const refused = [...verificationStore.contexts.values()].filter((c) => verificationStore.outcomeFor(c.elementId)?.outcome === 'SEARCH_EXHAUSTED').map((c) => memberNames().name(c.elementId));
     expect(refused.length).toBeGreaterThan(0);
     for (const id of ['checks', 'beams'] as const) {
       const l = buildListing(id, 'es');

@@ -20,6 +20,7 @@ import { designLength } from './design-spans-store';
 import { checkClause } from '../engine/design/check-clauses';
 import { noticesOf } from '../engine/design/notice-catalogue';
 import { holdText } from './member-verdict';
+import { memberNames, wallNames } from './member-names';
 import { configure, type Listing, type ListingConfig } from '../listings/listing';
 
 export const LISTING_IDS = ['project', 'combinations', 'beams', 'beamSteel', 'columns', 'columnForces', 'slabs', 'foundation', 'stairs', 'checks', 'quantities', 'surfaces'] as const;
@@ -50,6 +51,9 @@ export function buildListing(id: ListingId, locale: string): Listing {
    * pass says «verifica» for that check; the member's status says whether the member does. They
    * read apart on the QA of 20-oct: «verifica» in the listing, «no verifica» in the panel.
    */
+  const names = memberNames();
+  /** A span's pieces share one context: listed once, under the piece it is designed under. */
+  const listed = (eid: number) => { const sp = ctxOf(eid)?.span; return !sp || sp.representative === eid; };
   const verdictOf = (eid: number) => {
     const v = verificationStore.memberVerdict(eid);
     const key = v.status === 'unavailable' ? 'notVerified' : v.status;
@@ -82,20 +86,20 @@ export function buildListing(id: ListingId, locale: string): Listing {
       const defl = deflectionChecks().rows;
       const rows: Listing['rows'] = [];
       for (const [eid, ctx] of verificationStore.contexts) {
-        if (ctx.elementType !== 'beam') continue;
+        if (ctx.elementType !== 'beam' || !listed(eid)) continue;
         const v = verificationStore.providedFor(eid);
         const dv = defl.get(eid), L = designLength(eid, ctxOf);
         const lx = dv && dv.measured > 1e-9 ? `L/${Math.round(L / dv.measured)}` : '—';
         for (const c of v?.checks ?? []) {
           const reg = regionOf(c.regionRange);
           rows.push({
-            member: `#${eid}`, section: m.sections.get(m.elements.get(eid)?.sectionId ?? -1)?.name ?? '', region: reg ? tr(`list.region.${reg}`) : '—',
+            member: names.name(eid), section: m.sections.get(m.elements.get(eid)?.sectionId ?? -1)?.name ?? '', region: reg ? tr(`list.region.${reg}`) : '—',
             check: c.category, demand: c.demand ?? null, capacity: c.capacity ?? null, required: c.required ?? null, provided: c.provided ?? null,
             unit: c.unit, ratio: c.ratio, status: status(c.status), article: checkClause(c, 'beam') ?? '—', deflection: lx, ...verdictOf(eid),
           });
         }
         // A member with no checks (refused, no bars) is listed all the same, with what holds it.
-        if (!v?.checks?.length) rows.push({ member: `#${eid}`, section: m.sections.get(m.elements.get(eid)?.sectionId ?? -1)?.name ?? '', region: '—', check: '—', demand: null, capacity: null, required: null, provided: null, unit: '', ratio: null, status: status('none'), article: '—', deflection: lx, ...verdictOf(eid) });
+        if (!v?.checks?.length) rows.push({ member: names.name(eid), section: m.sections.get(m.elements.get(eid)?.sectionId ?? -1)?.name ?? '', region: '—', check: '—', demand: null, capacity: null, required: null, provided: null, unit: '', ratio: null, status: status('none'), article: '—', deflection: lx, ...verdictOf(eid) });
       }
       l = { id, title, columns: [col('member'), col('section'), col('region'), col('check'), col('demand', undefined, 'right'), col('capacity', undefined, 'right'), col('required', undefined, 'right'), col('provided', undefined, 'right'), col('unit'), col('ratio', undefined, 'right'), col('status'), col('article'), col('deflection'), col('verdict'), col('held')], rows };
       break;
@@ -123,12 +127,13 @@ export function buildListing(id: ListingId, locale: string): Listing {
         const d = r?.column?.cornerDia ?? r?.shaped?.diameter ?? r?.longitudinal?.diameter;
         const As = r?.column ? 4 * Math.PI * (r.column.cornerDia / 20) ** 2 + (n! - 4) * Math.PI * (r.column.faceDia / 20) ** 2 : n && d ? n * Math.PI * (d / 20) ** 2 : 0;
         const Ag = ctx.section.b * ctx.section.h * 1e4;
-        rows.push({ member: `#${eid}`, kind: tr(`list.kind.${ctx.elementType}`), section: m.sections.get(m.elements.get(eid)?.sectionId ?? -1)?.name ?? '', bars: n && d ? `${n}Ø${d}` : '—', ties: r?.stirrups ? `eØ${r.stirrups.diameter} c/${Math.round(r.stirrups.spacing * 100)}` : '—', rho: Ag > 0 && As > 0 ? (As / Ag) * 100 : null, ratio: verificationStore.getDisplayRatio(eid), status: verdictOf(eid).verdict, held: verdictOf(eid).held });
+        rows.push({ member: names.name(eid), kind: tr(`list.kind.${ctx.elementType}`), section: m.sections.get(m.elements.get(eid)?.sectionId ?? -1)?.name ?? '', bars: n && d ? `${n}Ø${d}` : '—', ties: r?.stirrups ? `eØ${r.stirrups.diameter} c/${Math.round(r.stirrups.spacing * 100)}` : '—', rho: Ag > 0 && As > 0 ? (As / Ag) * 100 : null, ratio: verificationStore.getDisplayRatio(eid), status: verdictOf(eid).verdict, held: verdictOf(eid).held });
       }
       const saved = storedDecisions().walls ?? {};
+      const wallName = wallNames(detailingStore.lastFloorRun?.walls ?? []);
       for (const w of detailingStore.lastFloorRun?.walls ?? []) {
         const r = saved[w.wallId] ?? w.reinforcement;
-        rows.push({ member: w.wallId, kind: tr('list.kind.wall'), section: `${Math.round(w.input.thickness * 100)} cm`, bars: `V Ø${r.vertical.diameter} c/${Math.round(r.vertical.spacing * 100)}`, ties: `H Ø${r.horizontal.diameter} c/${Math.round(r.horizontal.spacing * 100)}`, rho: null, ratio: Math.max(w.shear.utilization, w.axialFlexure.utilization), status: '—' });
+        rows.push({ member: wallName.get(w.wallId) ?? w.wallId, kind: tr('list.kind.wall'), section: `${Math.round(w.input.thickness * 100)} cm`, bars: `V Ø${r.vertical.diameter} c/${Math.round(r.vertical.spacing * 100)}`, ties: `H Ø${r.horizontal.diameter} c/${Math.round(r.horizontal.spacing * 100)}`, rho: null, ratio: Math.max(w.shear.utilization, w.axialFlexure.utilization), status: '—' });
       }
       l = { id, title, columns: [col('member'), col('kind'), col('section'), col('bars'), col('ties'), col('rho', '%', 'right', 2), col('ratio', undefined, 'right', 2), col('status'), col('held')], rows };
       break;
@@ -141,7 +146,7 @@ export function buildListing(id: ListingId, locale: string): Listing {
         for (const [cid, r] of resultsStore.perCase3D) {
           const f = r.elementForces.find((x) => x.elementId === eid);
           if (!f) continue;
-          rows.push({ member: `#${eid}`, case: caseName(cid), n: f.nStart, vy: f.vyStart, vz: f.vzStart, my: f.myStart, mz: f.mzStart, t: f.mxStart });
+          rows.push({ member: names.name(eid), case: caseName(cid), n: f.nStart, vy: f.vyStart, vz: f.vzStart, my: f.myStart, mz: f.mzStart, t: f.mxStart });
         }
       }
       l = { id, title, columns: [col('member'), col('case'), col('n', 'kN', 'right', 1), col('vy', 'kN', 'right', 1), col('vz', 'kN', 'right', 1), col('my', 'kN·m', 'right', 1), col('mz', 'kN·m', 'right', 1), col('t', 'kN·m', 'right', 1)], rows, notes: [tr('list.columnForces.note')] };
@@ -176,12 +181,13 @@ export function buildListing(id: ListingId, locale: string): Listing {
     case 'checks': {
       const rows: Listing['rows'] = [];
       for (const [eid, ctx] of verificationStore.contexts) {
+        if (!listed(eid)) continue;
         const kind = ctx.elementType === 'column' ? 'column' : ctx.elementType === 'wall' ? 'wall' : 'beam';
         const v = verificationStore.providedFor(eid);
         const code = noticesOf(verificationStore.outcomeFor(eid)).map((n) => n.code).join(' ') || '';
         const vd = verdictOf(eid);
-        for (const c of v?.checks ?? []) rows.push({ family: tr(`list.kind.${kind}`), member: `#${eid}`, check: c.category, computed: c.demand ?? c.required ?? null, limit: c.capacity ?? c.provided ?? null, unit: c.unit, ratio: c.ratio, status: status(c.status), article: checkClause(c, kind) ?? '—', notice: c.status === 'fail' ? code : '', ...vd });
-        if (!v?.checks?.length) rows.push({ family: tr(`list.kind.${kind}`), member: `#${eid}`, check: '—', computed: null, limit: null, unit: '', ratio: null, status: status('none'), article: '—', notice: code, ...vd });
+        for (const c of v?.checks ?? []) rows.push({ family: tr(`list.kind.${kind}`), member: names.name(eid), check: c.category, computed: c.demand ?? c.required ?? null, limit: c.capacity ?? c.provided ?? null, unit: c.unit, ratio: c.ratio, status: status(c.status), article: checkClause(c, kind) ?? '—', notice: c.status === 'fail' ? code : '', ...vd });
+        if (!v?.checks?.length) rows.push({ family: tr(`list.kind.${kind}`), member: names.name(eid), check: '—', computed: null, limit: null, unit: '', ratio: null, status: status('none'), article: '—', notice: code, ...vd });
       }
       const special = (fam: string, name: string, rs: ReadonlyArray<{ title: string; clause?: string; demand?: number; capacity?: number; unit?: string; ratio: number | null; status: string }>) => {
         for (const r of rs) rows.push({ family: fam, member: name, check: r.title, computed: r.demand ?? null, limit: r.capacity ?? null, unit: r.unit ?? '', ratio: r.ratio, status: status(r.status), article: r.clause ?? '—', notice: '', verdict: status(r.status), held: '' });
