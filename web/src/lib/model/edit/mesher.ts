@@ -41,7 +41,10 @@ export interface MeshInput {
   /** Per side of a polygon outline, in order. */
   sides?: SideSpec[];
   element: 'quad' | 'tri';
-  /** Model points that must be mesh points if they lie on a boundary. */
+  /**
+   * Model points that must be mesh points: on a boundary, as stations of its side; inside the
+   * region, as vertices of the mesh (a column standing in a slab with no beam round it).
+   */
   fixedPoints?: Vec3[];
   /** Normal of a circle outline's plane; default +Z. */
   normal?: Vec3;
@@ -256,8 +259,16 @@ export function generateMesh(input: MeshInput): MeshOutput | null {
     holes.push(loop.pts);
   }
 
+  // The fixed points strictly inside the region: vertices the mesh must have. A structured grid
+  // cannot place them, so a region holding any is meshed the unstructured way.
+  const outerPoly = outer.pts;
+  const insideRegion = (p: P2) => inPoly(p, outerPoly) && !holes.some((hl) => inPoly(p, hl));
+  const nearLoop = (p: P2) => [outerPoly, ...holes].some((loop) => loop.some((a, k) => segDist(p, a, loop[(k + 1) % loop.length]!) < 1e-4));
+  const interiorFixed = fixed2.filter((p) => insideRegion(p) && !nearLoop(p))
+    .filter((p, i, all) => all.findIndex((q) => Math.hypot(q[0] - p[0], q[1] - p[1]) < 1e-6) === i);
+
   // ── Structured: four sides, no holes, opposite sides matching ──
-  if (input.outer.kind === 'polygon' && input.outer.points.length === 4 && holes.length === 0 && convex(input.outer.points.map((p) => to2(f, p)))) {
+  if (interiorFixed.length === 0 && input.outer.kind === 'polygon' && input.outer.points.length === 4 && holes.length === 0 && convex(input.outer.points.map((p) => to2(f, p)))) {
     const s = outer.perSide.map((pts, i) => [...pts, outer.perSide[(i + 1) % 4]![0]!]);
     if (s[0]!.length === s[2]!.length && s[1]!.length === s[3]!.length) {
       const nu = s[0]!.length - 1, nv = s[1]!.length - 1;
@@ -300,7 +311,7 @@ export function generateMesh(input: MeshInput): MeshOutput | null {
   // when existing nodes lie on the circle, so their connections survive meshing.
   const fixedCircleBoundary = input.outer.kind === 'circle'
     && fixed2.some((p) => Math.abs(Math.hypot(p[0], p[1]) - (input.outer as { radius: number }).radius) <= 1e-4);
-  if (input.outer.kind === 'circle' && holes.length === 0 && input.element === 'quad' && !fixedCircleBoundary) {
+  if (input.outer.kind === 'circle' && holes.length === 0 && input.element === 'quad' && !fixedCircleBoundary && interiorFixed.length === 0) {
     const r = input.outer.radius;
     // Divisions per quarter, even, so the centre is a node (a dome's crown, a plate's middle).
     const n = Math.max(2, 2 * Math.round((Math.PI * r) / 4 / h));
@@ -371,11 +382,14 @@ export function generateMesh(input: MeshInput): MeshOutput | null {
   for (let y = y0 + dy / 2; y < y1; y += dy, row++) {
     for (let x = x0 + (row % 2 ? h / 2 : h / 4); x < x1; x += h) {
       const p: P2 = [x, y];
-      if (inside(p) && boundaryDist(p) > 0.6 * h) interior.push(p);
+      // A lattice point gives way to a fixed point near it, which takes its place.
+      if (inside(p) && boundaryDist(p) > 0.6 * h && !interiorFixed.some((q) => Math.hypot(q[0] - p[0], q[1] - p[1]) < 0.5 * h)) interior.push(p);
     }
     if (interior.length + nBoundary0 > MAX_TRIANGULATION_POINTS) return null;
   }
   pts.push(...interior);
+  const fixedFrom = pts.length;
+  pts.push(...interiorFixed);
 
   // Conforming: split any boundary segment the triangulation does not contain.
   let tris: Array<[number, number, number]> = [];
@@ -415,7 +429,7 @@ export function generateMesh(input: MeshInput): MeshOutput | null {
   const area2 = (t: [number, number, number]) => (pts[t[1]]![0] - pts[t[0]]![0]) * (pts[t[2]]![1] - pts[t[0]]![1]) - (pts[t[2]]![0] - pts[t[0]]![0]) * (pts[t[1]]![1] - pts[t[0]]![1]);
   for (let it = 0; it < 4; it++) {
     for (let i = 0; i < pts.length; i++) {
-      if (isBoundary.has(i) || i < nBoundary0) continue;
+      if (isBoundary.has(i) || i < nBoundary0 || i >= fixedFrom) continue;
       const nb = nbrs.get(i);
       if (!nb || nb.size === 0) continue;
       let sx = 0, sy = 0;
