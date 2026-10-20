@@ -13391,6 +13391,7 @@ const es: Record<string, string> = {
   "building.slabs.simplify": "Volver a una placa por paño",
   "building.slabs.simplified": "{n} losas volvieron a una placa por paño; el próximo cálculo las vuelve a mallar.",
   "building.slabs.meshedAtSolve": "{n} losas se subdividieron para el cálculo ({shells} placas).",
+  "building.slabs.footprintsAtSolve": "{n} losas se volvieron a subdividir para que cada columna las sostenga en toda su sección.",
   "desk.tab.sheets": "Planos",
   "desk.tab.listings": "Listados",
   "desk.tab.sheetsHint": "Todos los planos del proyecto en láminas numeradas, por tipo, para ver, componer y exportar",

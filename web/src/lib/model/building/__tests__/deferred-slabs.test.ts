@@ -1,8 +1,9 @@
 /**
  * Q5's closing criterion (QA of 19-oct: «a simple slab, unmeshed, that is meshed when analysed»):
  *  - placed to wait, each panel is one shell and the beams stay whole;
- *  - meshed at the analysis, it is the slab meshed at placement: the same shells, the same beam
- *    cuts and the same displacements under the same loads;
+ *  - meshed at the analysis, it is the slab meshed at placement with its columns' sections in it
+ *    (QA of 20-oct): grid lines on the columns' faces and the nodes inside them tied to the
+ *    columns, the same beam cuts, and the same displacements within 5 % under the same loads;
  *  - its surface loads go with it, both ways;
  *  - put back to one shell per panel, the model is the one placed: the beams whole again, the
  *    mesh's nodes gone, the load kept; and the next analysis meshes it again.
@@ -55,7 +56,7 @@ beforeAll(async () => {
 describe('a slab meshed at the analysis', () => {
   beforeEach(() => { modelStore.clear(); historyStore.clear(); });
 
-  it('waits as one shell, meshes as the slab meshed at placement and solves the same', () => {
+  it('waits as one shell, meshes with its columns\' sections in it, and solves as the slab meshed at placement', () => {
     build(false);
     const now = census();
     const meshedNow = probes(solve());
@@ -70,13 +71,23 @@ describe('a slab meshed at the analysis', () => {
 
     const m = meshDeferredSlabs();
     expect(m.slabs).toBe(1);
-    expect(census()).toEqual(now);
+    // Meshed at the analysis, the panel has grid lines on the columns' faces (`column-footprints.ts`)
+    // and the slab nodes inside each column's section are tied to the column's node: each corner
+    // column holds 3 of them (the corner of its faces and one on each beam), 12 in all. The beams
+    // are cut at the same edge nodes outside the columns as at placement, so they are as many.
+    const atSolveCensus = census();
+    expect(atSolveCensus.elements).toBe(now.elements);
+    expect(atSolveCensus.nodes).toBeGreaterThan(now.nodes);
+    const ties = (modelStore.model.constraints ?? []).filter((k) => k.type === 'rigidLink');
+    expect(ties).toHaveLength(12);
     expect(slabsToMesh()).toBe(0);
     expect(slabsToSimplify()).toBe(1);
     const atSolve = probes(solve());
-    expect(atSolve.mid).toBeCloseTo(meshedNow.mid, 9);
-    expect(atSolve.beam).toBeCloseTo(meshedNow.beam, 9);
+    // The same slab under the same load, on a grid a little different: the middle and the beams
+    // move as the slab meshed at placement does, within 5 % (0,2 % at the middle, measured).
     expect(Math.abs(atSolve.mid)).toBeGreaterThan(1e-4);
+    expect(Math.abs(atSolve.mid / meshedNow.mid - 1)).toBeLessThan(0.05);
+    expect(Math.abs(atSolve.beam / meshedNow.beam - 1)).toBeLessThan(0.05);
   });
 
   it('goes back to one shell per panel, the beams whole and the load kept, and meshes again', () => {

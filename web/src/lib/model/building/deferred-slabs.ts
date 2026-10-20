@@ -18,6 +18,7 @@ import { meshQuad } from '../edit/mesh-region';
 import { mergeCollinear } from '../edit/merge-collinear';
 import type { PhysicalData } from '../physical/types';
 import type { SurfaceLoad3D, ThermalLoadQuad3D } from '../../store/model.svelte';
+import { columnFootprintsAt, footprintGrid, outsideFootprints, tieFootprints, untieNodes } from './column-footprints';
 
 type Deferred = ReturnType<typeof physicalGroups>[number] & { physical: PhysicalData & { meshAtSolve: NonNullable<PhysicalData['meshAtSolve']> } };
 const deferred = (): Deferred[] => physicalGroups().filter((g): g is Deferred => g.physical.kind === 'slab' && !!g.physical.meshAtSolve);
@@ -37,7 +38,7 @@ export function meshDeferredSlabs(): { slabs: number; shells: number } {
       const quads = g.members.quads ?? [];
       // One shell per panel is what was placed; anything else was edited by hand and is left as it is.
       if (quads.length !== 1) continue;
-      const r = meshQuad(quads[0]!, { density: { mode: 'targetSize', size: g.physical.meshAtSolve.size }, splitBeams: true });
+      const r = meshWithFootprints(quads[0]!, g.physical.meshAtSolve.size);
       if (!r || 'refused' in r) continue;
       out.slabs++; out.shells += r.quadCount;
       modelStore.setGroupData(g.id, { ...g.physical, meshAtSolve: { ...g.physical.meshAtSolve, meshed: true } } as unknown as Record<string, unknown>);
@@ -67,6 +68,8 @@ export function simplifySlabs(ids?: readonly number[]): { slabs: number; removed
       const thermal = modelStore.loads.filter((l) => l.type === 'thermalQuad3d' && onFirst(l as never)).map((l) => l.data as ThermalLoadQuad3D);
       const meshNodes = new Set(quads.flatMap((id) => modelStore.quads.get(id)!.nodes));
       for (const n of panel) meshNodes.delete(n);
+      // The column ties the mesh made (`column-footprints.ts`) go with its nodes.
+      untieNodes(meshNodes);
       for (const id of quads) modelStore.removeQuad(id);
       const q = modelStore.addQuad(panel as [number, number, number, number], first.materialId, first.thickness);
       if (first.offset) modelStore.setShellOffset('quad', q, first.offset);
@@ -93,4 +96,53 @@ export function simplifySlabs(ids?: readonly number[]): { slabs: number; removed
     }
   });
   return out;
+}
+
+/**
+ * Mesh one shell at `size` on the grid with lines on its columns' faces, and tie the slab nodes
+ * inside each column's section to the column (`column-footprints.ts`); a shell that is not an
+ * axis-aligned rectangle is meshed on the mesher's own grid. One undo step with the caller's.
+ */
+export function meshWithFootprints(quadId: number, size: number): ReturnType<typeof meshQuad> {
+  const quad = modelStore.quads.get(quadId);
+  if (!quad) return null;
+  const corners = quad.nodes.map((id) => modelStore.nodes.get(id)!);
+  const z = corners[0]?.z ?? 0;
+  const columns = columnFootprintsAt(z);
+  const grid = footprintGrid(corners, size, columns);
+  const r = meshQuad(quadId, { density: { mode: 'targetSize', size }, splitBeams: true, ...(grid ? { mesh: grid, splitAt: outsideFootprints(columns, z) } : {}) });
+  if (r && !('refused' in r) && grid) tieFootprints(new Set(r.quads.flatMap((q) => modelStore.quads.get(q)?.nodes ?? [])), columns);
+  return r;
+}
+
+/**
+ * The slabs a solve meshed before their columns' sections were represented: meshed, with columns
+ * at the panel and not one slab node tied to them. Each goes back to one shell and is meshed
+ * again on the footprint grid, as one step.
+ */
+export function slabsWithoutFootprints(): number[] {
+  const tied = new Set((modelStore.model.constraints ?? []).flatMap((k) => (k.type === 'rigidLink' ? [k.slaveNode as number] : [])));
+  return deferred().filter((g) => {
+    if (!g.physical.meshAtSolve.meshed) return false;
+    const corners = g.physical.meshAtSolve.panel.map((id) => modelStore.nodes.get(id));
+    if (corners.some((c) => !c)) return false;
+    const z = corners[0]!.z ?? 0;
+    const cols = columnFootprintsAt(z);
+    if (!footprintGrid(corners as never, g.physical.meshAtSolve.size, cols)) return false;
+    const nodes = new Set((g.members.quads ?? []).flatMap((q) => modelStore.quads.get(q)?.nodes ?? []));
+    const reached = cols.filter((c) => nodes.has(c.node));
+    return reached.length > 0 && ![...nodes].some((n) => tied.has(n));
+  }).map((g) => g.id);
+}
+
+/** Re-mesh the slabs `slabsWithoutFootprints` names: back to one shell, then on the footprint grid. */
+export function representFootprints(): { slabs: number } {
+  const ids = slabsWithoutFootprints();
+  if (ids.length === 0) return { slabs: 0 };
+  let n = 0;
+  modelStore.batch(() => {
+    simplifySlabs(ids);
+    n = meshDeferredSlabs().slabs;
+  });
+  return { slabs: n };
 }

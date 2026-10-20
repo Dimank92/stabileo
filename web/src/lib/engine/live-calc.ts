@@ -10,7 +10,7 @@
  * stays thin.
  */
 
-import { meshDeferredSlabs } from '../model/building/deferred-slabs';
+import { meshDeferredSlabs, representFootprints } from '../model/building/deferred-slabs';
 import { syncDefinedLoadsForAnalysis } from '../store/defined-loads';
 import { spectralOrSay } from '../actions/solve';
 import { nodesOnMembers } from './nodes-on-members';
@@ -193,6 +193,10 @@ export async function runGlobalSolve(): Promise<void> {
   // Slabs placed to be meshed at the analysis get their mesh first, so what follows (the floor
   // loads, the solve, the results, the slab design) reads the mesh (`deferred-slabs.ts`).
   if (uiStore.is3DWorkspace) {
+    // A slab meshed before its columns' sections were represented is meshed again with them
+    // (`column-footprints.ts`): held at one node, its load split is the mesh's, not the building's.
+    const f = representFootprints();
+    if (f.slabs > 0) uiStore.toast(tp('building.slabs.footprintsAtSolve', { n: f.slabs }), 'info');
     const m = meshDeferredSlabs();
     if (m.slabs > 0) uiStore.toast(tp('building.slabs.meshedAtSolve', { n: m.slabs, shells: m.shells }), 'info');
   }

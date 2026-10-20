@@ -13035,6 +13035,7 @@ const pt: Translations = {
   "building.slabs.simplify": "Voltar a uma placa por painel",
   "building.slabs.simplified": "{n} lajes voltaram a uma placa por painel; o próximo cálculo volta a gerar a malha.",
   "building.slabs.meshedAtSolve": "{n} lajes foram subdivididas para o cálculo ({shells} placas).",
+  "building.slabs.footprintsAtSolve": "{n} lajes foram subdivididas de novo para que cada pilar as sustente em toda a seção.",
   "desk.tab.sheets": "Plantas",
   "desk.tab.listings": "Listagens",
   "desk.tab.sheetsHint": "Todas as plantas do projeto em pranchas numeradas, por tipo, para ver, compor e exportar",

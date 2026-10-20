@@ -13402,6 +13402,7 @@ const en: Record<string, string> = {
   "building.slabs.simplify": "Back to one shell per panel",
   "building.slabs.simplified": "{n} slabs are back to one shell per panel; the next analysis meshes them again.",
   "building.slabs.meshedAtSolve": "{n} slabs were subdivided for the analysis ({shells} shells).",
+  "building.slabs.footprintsAtSolve": "{n} slabs were subdivided again so that each column holds them over its whole section.",
   "desk.tab.sheets": "Drawings",
   "desk.tab.listings": "Listings",
   "desk.tab.sheetsHint": "Every drawing of the project on numbered sheets, by kind, to view, compose and export",
