@@ -32,9 +32,10 @@ jobs:
         with:
           workspaces: engine
 
+      # Stryker 10 requires Node >= 22 (engines of @stryker-mutator/core).
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
 
