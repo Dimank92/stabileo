@@ -38,3 +38,23 @@ describe('fixed points inside a region', () => {
     expect([...modelStore.quads.values()].some((q) => q.nodes.includes(top))).toBe(true);
   });
 });
+
+describe('a beam across the inside of a region', () => {
+  beforeEach(() => { modelStore.clear(); historyStore.clear(); });
+
+  it('is followed by the mesh: every piece of it is an edge of the slab\'s cells', () => {
+    const a = modelStore.addNode(0, 2.3, 3), b = modelStore.addNode(8, 2.9, 3);
+    modelStore.addElement(a, b);
+    const outer = { kind: 'polygon' as const, points: [[0, 0, 3], [8, 0, 3], [8, 6, 3], [0, 6, 3]] as Array<[number, number, number]> };
+    applyMesh({ outer, holes: [], size: 1, element: 'quad' }, { materialId: 1, thickness: 0.2, splitBeams: true });
+    // The beam is cut into pieces, each with both ends on one quad: the slab is its flange.
+    const pieces = [...modelStore.elements.values()].filter((e) => {
+      const p = modelStore.nodes.get(e.nodeI)!, q = modelStore.nodes.get(e.nodeJ)!;
+      const onLine = (n: { x: number; y: number }) => Math.abs((n.y - 2.3) - (n.x * 0.6) / 8) < 1e-6;
+      return onLine(p) && onLine(q);
+    });
+    expect(pieces.length).toBeGreaterThan(4);
+    const quads = [...modelStore.quads.values()];
+    for (const e of pieces) expect(quads.some((q) => q.nodes.includes(e.nodeI) && q.nodes.includes(e.nodeJ)), `piece ${e.id}`).toBe(true);
+  });
+});

@@ -65,8 +65,13 @@ export function regionOccupied(input: MeshInput, plane: MeshOutput['plane'], exc
 
 /** Every model node, as the points a boundary may have to pass through. */
 export const modelPoints = (): Vec3[] => [...modelStore.nodes.values()].map((n) => [n.x, n.y, n.z ?? 0]);
+/** The model's bars as segments, for a mesh to follow where they lie in its region (`MeshInput.fixedSegments`). */
+export const modelSegments = (): Array<[Vec3, Vec3]> => [...modelStore.elements.values()].flatMap((e) => {
+  const a = modelStore.nodes.get(e.nodeI), b = modelStore.nodes.get(e.nodeJ);
+  return a && b ? [[[a.x, a.y, a.z ?? 0], [b.x, b.y, b.z ?? 0]] as [Vec3, Vec3]] : [];
+});
 
-export function applyMesh(input: MeshInput, o: MeshApplyOptions, mesh: MeshOutput | null = generateMesh({ ...input, fixedPoints: input.fixedPoints ?? modelPoints() })): MeshApplyResult | null {
+export function applyMesh(input: MeshInput, o: MeshApplyOptions, mesh: MeshOutput | null = generateMesh({ ...input, fixedPoints: input.fixedPoints ?? modelPoints(), fixedSegments: input.fixedSegments ?? modelSegments() })): MeshApplyResult | null {
   if (!mesh) return null;
   const out: MeshApplyResult = { newNodes: 0, quads: [], plates: [], splitCount: 0, structured: mesh.structured, nodeIds: [] };
   if (regionOccupied(input, mesh.plane)) return { ...out, occupied: true };
