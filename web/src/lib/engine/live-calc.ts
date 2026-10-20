@@ -10,6 +10,7 @@
  * stays thin.
  */
 
+import { meshDeferredSlabs } from '../model/building/deferred-slabs';
 import { syncDefinedLoadsForAnalysis } from '../store/defined-loads';
 import { spectralOrSay } from '../actions/solve';
 import { nodesOnMembers } from './nodes-on-members';
@@ -18,7 +19,7 @@ import { modelStore, resultsStore, uiStore } from '../store';
 import { is3DWorkspace } from '../utils/workspace';
 import { requestAutosave } from '../store/autosave-service';
 import { publishCombinations3D, activePerCombo3D } from '../store/active-results';
-import { t } from '../i18n';
+import { t, tp } from '../i18n';
 import { initSolver, isWasmReady, combineResults3D } from './wasm-solver';
 import { computeGoverning2D, computeGoverning3D } from './governing-case';
 import { hasNonlinearBehaviour } from './member-behaviour';
@@ -189,6 +190,12 @@ async function liveCalc2D(isStale: () => boolean): Promise<void> {
  * Handles 2D and 3D, combinations, toasts and mobile panel.
  */
 export async function runGlobalSolve(): Promise<void> {
+  // Slabs placed to be meshed at the analysis get their mesh first, so what follows (the floor
+  // loads, the solve, the results, the slab design) reads the mesh (`deferred-slabs.ts`).
+  if (uiStore.is3DWorkspace) {
+    const m = meshDeferredSlabs();
+    if (m.slabs > 0) uiStore.toast(tp('building.slabs.meshedAtSolve', { n: m.slabs, shells: m.shells }), 'info');
+  }
   // Floor loads kept as definitions are rewritten first when the model moved under them, so the
   // guard below starts from the model that is solved (`store/defined-loads.ts`).
   if (uiStore.is3DWorkspace) syncDefinedLoadsForAnalysis();

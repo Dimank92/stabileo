@@ -13028,5 +13028,15 @@ const pt: Translations = {
   "building.col.cover": "Cobrimento (mm)",
   "building.col.coverProject": "do projeto",
   "building.beam.pinned": "Extremidades articuladas",
+  "building.slabs.meshWhen": "Malha para o cálculo",
+  "building.slabs.meshAtSolve": "ao calcular",
+  "building.slabs.meshNow": "agora",
+  "building.slabs.meshAtSolveHint": "Cada painel fica como uma única placa e as vigas inteiras, assim o modelo continua leve. O primeiro cálculo a subdivide no tamanho indicado e corta as vigas onde a malha as toca.",
+  "building.slabs.meshNowHint": "Cada painel é subdividido agora no tamanho indicado, cortando as vigas onde a malha as toca.",
+  "building.slabs.waiting": "{n} lajes esperam sua malha: são subdivididas ao calcular.",
+  "building.slabs.meshedCount": "{n} lajes ficaram com malha pelo cálculo.",
+  "building.slabs.simplify": "Voltar a uma placa por painel",
+  "building.slabs.simplified": "{n} lajes voltaram a uma placa por painel; o próximo cálculo volta a gerar a malha.",
+  "building.slabs.meshedAtSolve": "{n} lajes foram subdivididas para o cálculo ({shells} placas).",
 };
 export default pt;

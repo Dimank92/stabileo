@@ -13384,5 +13384,15 @@ const es: Record<string, string> = {
   "building.col.cover": "Recubrimiento (mm)",
   "building.col.coverProject": "del proyecto",
   "building.beam.pinned": "Extremos articulados",
+  "building.slabs.meshWhen": "Malla para el cálculo",
+  "building.slabs.meshAtSolve": "al calcular",
+  "building.slabs.meshNow": "ahora",
+  "building.slabs.meshAtSolveHint": "Cada paño queda como una sola placa y las vigas enteras, así el modelo sigue liviano. El primer cálculo la subdivide al tamaño indicado y corta las vigas donde la malla las toca.",
+  "building.slabs.meshNowHint": "Cada paño se subdivide ahora al tamaño indicado y corta las vigas donde la malla las toca.",
+  "building.slabs.waiting": "{n} losas esperan su malla: se subdividen al calcular.",
+  "building.slabs.meshedCount": "{n} losas quedaron malladas por el cálculo.",
+  "building.slabs.simplify": "Volver a una placa por paño",
+  "building.slabs.simplified": "{n} losas volvieron a una placa por paño; el próximo cálculo las vuelve a mallar.",
+  "building.slabs.meshedAtSolve": "{n} losas se subdividieron para el cálculo ({shells} placas).",
 };
 export default es;

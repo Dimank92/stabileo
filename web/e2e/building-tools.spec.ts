@@ -52,10 +52,13 @@ test.describe('@smoke building on the grid', () => {
     const census = () => page.evaluate(() => window.__stabileo.modelCensus());
     expect((await census()).elements).toBe(8);
 
+    // The slab waits for its mesh: one shell, the beams whole.
     await page.getByTestId('building-tab-slabs').click();
+    await expect(page.getByTestId('building-slab-mesh-solve')).toBeChecked();
     await page.getByTestId('building-place-slabs').click();
     await expect(page.getByTestId('building-result')).toContainText(/1 element/);
-    expect((await census()).elements).toBeGreaterThan(8);
+    expect((await census()).elements).toBe(8);
+    await expect(page.getByTestId('building-slabs-waiting')).toBeVisible();
 
     await ribbonCmd(page, 'physical');
     await expect(page.getByTestId('physical-filter-column')).toContainText('4');
@@ -72,9 +75,21 @@ test.describe('@smoke building on the grid', () => {
     expect((await census()).loads).toBeGreaterThan(loadsBefore);
     await page.keyboard.press(process.platform === 'darwin' ? 'Meta+z' : 'Control+z');
 
-    // The slab undoes on its own: the beams it cut are whole again.
+    // The slab undoes on its own.
     await page.keyboard.press(process.platform === 'darwin' ? 'Meta+z' : 'Control+z');
     expect((await census()).elements).toBe(8);
+
+    // Placed again and solved: the analysis meshes it (the beams cut where the mesh meets them),
+    // and it goes back to one shell per panel on request.
+    await ribbonCmd(page, 'building');
+    await page.getByTestId('building-tab-slabs').click();
+    await page.getByTestId('building-place-slabs').click();
+    await page.evaluate(async () => { await window.__stabileoActions.solve(); });
+    await expect.poll(async () => (await census()).elements).toBeGreaterThan(8);
+    await expect(page.getByTestId('building-slabs-simplify')).toBeVisible();
+    await page.getByTestId('building-slabs-simplify').click();
+    expect((await census()).elements).toBe(8);
+    await expect(page.getByTestId('building-slabs-waiting')).toBeVisible();
   });
 
   test('ramp, copy between levels, diaphragms and drawing declared members', async ({ pro: page }) => {

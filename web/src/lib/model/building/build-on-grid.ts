@@ -107,11 +107,14 @@ export function placeFrame(g: StructuralGrid, spec: FrameBetweenAxes, o: {
  * Slabs in the panels the beams close at each level: a grid bay, an L, any outline the beams
  * bound, found as the floor loads find them. A ring of beams inside a panel (a stair well) stays
  * open. Each panel is meshed at the size given, cutting its beams at the mesh's edge nodes so slab
- * and beams share them, and becomes one slab. A joist slab is modelled as a one-way slab of the
+ * and beams share them, and becomes one slab; asked to wait (`meshAtSolve`), a panel is one shell
+ * until the first solve meshes it. A joist slab is modelled as a one-way slab of the
  * thickness given; the joists' design reads its typology. Panels already holding shells are left.
  */
 export function placeSlabs(g: StructuralGrid, o: {
   levels: string[]; thickness: number; materialId: number; meshSize: number; typology?: string;
+  /** One shell per panel now, meshed at `meshSize` by the first solve (`deferred-slabs.ts`). */
+  meshAtSolve?: boolean;
 }): PlaceResult {
   const name = nextName('L');
   let created = 0, shells = 0;
@@ -122,14 +125,17 @@ export function placeSlabs(g: StructuralGrid, o: {
       if (!l) continue;
       const onLevel = (id: number) => Math.abs((modelStore.nodes.get(id)?.z ?? 0) - l.z) < 1e-6;
       const beams = [...modelStore.elements.values()].filter((e) => onLevel(e.nodeI) && onLevel(e.nodeJ)).map((e) => e.id);
-      const r = fillHoles(beams, o.materialId, o.thickness, { density: { mode: 'targetSize', size: o.meshSize } });
+      const r = fillHoles(beams, o.materialId, o.thickness, o.meshAtSolve ? {} : { density: { mode: 'targetSize', size: o.meshSize } });
       if ('refused' in r) { refused = r.refused; continue; }
       if (r.faces.length === 0 && r.skippedExisting > 0) refused = 'occupied';
       for (const f of r.faces) {
         created++; shells += f.quads.length + f.plates.length;
+        // A panel that came out as one quad waits for its mesh; any other shape is meshed as filled.
+        const panel = o.meshAtSolve && f.quads.length === 1 && f.plates.length === 0 ? modelStore.quads.get(f.quads[0]!)?.nodes : undefined;
         declare(name(), f, {
           kind: 'slab', provenance: 'declared', levelFrom: l.id, levelTo: l.id,
           ...(o.typology ? { typology: o.typology } : {}),
+          ...(panel ? { meshAtSolve: { size: o.meshSize, meshed: false, panel: [...panel] } } : {}),
         });
       }
     }

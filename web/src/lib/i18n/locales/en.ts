@@ -13395,5 +13395,15 @@ const en: Record<string, string> = {
   "building.col.cover": "Cover (mm)",
   "building.col.coverProject": "the project's",
   "building.beam.pinned": "Pinned ends",
+  "building.slabs.meshWhen": "Mesh for the analysis",
+  "building.slabs.meshAtSolve": "at the analysis",
+  "building.slabs.meshNow": "now",
+  "building.slabs.meshAtSolveHint": "Each panel stays one shell and the beams stay whole, so the model stays light. The first analysis subdivides it at the size given and cuts the beams where the mesh meets them.",
+  "building.slabs.meshNowHint": "Each panel is subdivided now at the size given, cutting the beams where the mesh meets them.",
+  "building.slabs.waiting": "{n} slabs wait for their mesh: they are subdivided at the analysis.",
+  "building.slabs.meshedCount": "{n} slabs were meshed by the analysis.",
+  "building.slabs.simplify": "Back to one shell per panel",
+  "building.slabs.simplified": "{n} slabs are back to one shell per panel; the next analysis meshes them again.",
+  "building.slabs.meshedAtSolve": "{n} slabs were subdivided for the analysis ({shells} shells).",
 };
 export default en;
