@@ -87,8 +87,25 @@
   }
   function cancel() { abort?.abort(); progress = null; }
   onMount(() => { if (autoBuild) void build(true); });
-  /** The kinds of drawing in the set, in its order, each with the first sheet that holds it. */
-  const kindsInSet = $derived(sheets.map((s, i) => ({ title: s.title, i, has: s.drawings.length > 0 })).filter((x, j, all) => x.has && all.findIndex((y) => y.title === x.title) === j));
+  /**
+   * The kinds of plan in the set, in its order, each with how many sheets it takes and the first
+   * one (QA of 20-oct: a jump per sheet title made forty chips of one set). A sheet's kind is its
+   * entry's, read from its first drawing's key (`entry:drawing`).
+   */
+  const kindsInSet = $derived.by(() => {
+    const out: Array<{ kind: string; title: string; i: number; n: number }> = [];
+    sheets.forEach((s, i) => {
+      const entry = s.drawings[0]?.split(':')[0];
+      if (!entry) return;
+      const e = entries.find((x) => x.id === entry);
+      const kind = e?.kind ?? entry;
+      const at = out.find((x) => x.kind === kind && x.title === (e?.label || t(`sheet.kind.${kind}`)));
+      if (at) at.n++; else out.push({ kind, title: e?.label || t(`sheet.kind.${kind}`), i, n: 1 });
+    });
+    return out;
+  });
+  /** The kind of the sheet on screen, for the jump that holds it. */
+  const shownKind = $derived.by(() => { const s = sheets[shown]; const entry = s?.drawings[0]?.split(':')[0]; return entries.find((x) => x.id === entry)?.kind ?? entry; });
   let dxfVersion = $state<'2004' | 'r12'>('2004');
   /** The sheets chosen for a partial export; none chosen, all of them. */
   let chosen = $state<Set<string>>(new Set());
@@ -185,7 +202,7 @@
     {#if kindsInSet.length > 1}
       <!-- Straight to a kind of drawing: the first sheet that holds it. -->
       <div class="jump" role="group" aria-label={t('sheet.ui.jump')} data-testid="sheets-jump">
-        {#each kindsInSet as k (k.title)}<button class:on={sheets[shown]?.title === k.title} onclick={() => (shown = k.i)} data-testid="sheets-jump-{k.i}">{k.title}</button>{/each}
+        {#each kindsInSet as k (k.i)}<button class:on={shownKind === k.kind} onclick={() => (shown = k.i)} data-testid="sheets-jump-{k.i}">{k.title}{k.n > 1 ? ` · ${k.n}` : ''}</button>{/each}
       </div>
     {/if}
     <ul class="list" data-testid="sheets-list">

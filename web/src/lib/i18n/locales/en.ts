@@ -7654,6 +7654,7 @@ const en: Record<string, string> = {
   'plan.cols.title': 'Column schedule',
   'plan.cols.level': 'Level',
   'plan.beam.stirrups': 'Stirrups — line {line}',
+  'plan.beam.line': 'line {line}',
   'plan.beam.breakdown': 'Bar breakdown — line {line}',
   'plan.found.title': 'Foundation plan and setting out',
   'plan.found.table': 'Footing schedule',

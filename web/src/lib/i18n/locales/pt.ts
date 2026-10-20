@@ -8092,6 +8092,7 @@ const pt: Translations = {
   'plan.cols.title': 'Quadro de pilares',
   'plan.cols.level': 'Nível',
   'plan.beam.stirrups': 'Estribos — linha {line}',
+  'plan.beam.line': 'linha {line}',
   'plan.beam.breakdown': 'Detalhamento das barras — linha {line}',
   'plan.found.title': 'Planta de fundações e locação',
   'plan.found.table': 'Tabela de sapatas',

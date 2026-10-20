@@ -98,6 +98,11 @@ export interface RenderOptions {
   /** Design status per member, for the notes those sheets carry. */
   statusOf?: (elementId: number) => ElementStatus | undefined;
   /**
+   * A member's name as the project names it (`member-names.ts`: a column «C3 · N2», a beam's
+   * span «V3-1»); absent, its element number.
+   */
+  memberName?: (elementId: number) => string;
+  /**
    * Which of this document's members were retouched by hand, and whether that is knowable.
    *
    * ── Why it is a four-state value and not a list ────────────────
@@ -1521,7 +1526,7 @@ function structureSheets(
   for (const s of scene.solids) {
     if (s.kind !== 'column' || s.elementIds.length === 0) continue;
     const id = s.elementIds[0];
-    const c = cap('column', { id: String(id) });
+    const c = cap('column', { id: opts.memberName?.(id) ?? String(id) });
     emit(`structure-column-${id}-detail`,
       drawColumnDetail({ scene, title: titleFor(c), statusOf, elementId: id }), c);
   }

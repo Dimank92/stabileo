@@ -86,6 +86,27 @@ export function slabLayerPlan(level: string, layer: SlabLayer, panels: readonly 
     const at = first.label ? { x: first.label.x * k, y: first.label.y * k } : { x: ((mid[0].x + mid[1].x) / 2) * k + 1 * s, y: ((mid[0].y + mid[1].y) / 2) * k + 1 * s };
     out.push({ kind: 'text', layer: 'RC-TEXT', at, text: `${m.mark} ${m.count}Ø${m.diameter} c/${cm(m.spacing)} L=${fmt(m.length, 2)}${m.bands.length > 1 ? ` (${m.bands.length}×)` : ''}`, height: 2.4 });
   }
+  // The base mat drawn in each panel that has one, as a slab plan draws a mesh: one bar of it
+  // across the panel, the spread it repeats over dimensioned across, and the bar's diameter and
+  // spacing. Stated only in a line of text, a bottom layer of base mats alone drew no bar at all
+  // (QA of 20-oct).
+  const alongX = layer.endsWith('X');
+  for (const p of bases) {
+    const b = p.reinforcement.base[layer]!;
+    const inset = 0.05;
+    const xm = (p.x0 + p.x1) / 2, ym = (p.y0 + p.y1) / 2;
+    // A bottom mat's bar a little off the middle and a top mat's on the other side, so the two
+    // layers of one panel never sit on one line when both are shown.
+    const shift = (layer.startsWith('top') ? -1 : 1) * 0.12 * (alongX ? p.y1 - p.y0 : p.x1 - p.x0);
+    const a = alongX ? { x: (p.x0 + inset) * k, y: (ym + shift) * k } : { x: (xm + shift) * k, y: (p.y0 + inset) * k };
+    const c = alongX ? { x: (p.x1 - inset) * k, y: (ym + shift) * k } : { x: (xm + shift) * k, y: (p.y1 - inset) * k };
+    out.push({ kind: 'line', layer: 'RC-BAR', a, b: c, dia: b.diameter });
+    const d0 = alongX ? { x: (xm + 0.18 * (p.x1 - p.x0)) * k, y: (p.y0 + inset) * k } : { x: (p.x0 + inset) * k, y: (ym + 0.18 * (p.y1 - p.y0)) * k };
+    const d1 = alongX ? { x: d0.x, y: (p.y1 - inset) * k } : { x: (p.x1 - inset) * k, y: d0.y };
+    out.push({ kind: 'line', layer: 'RC-DIM', a: d0, b: d1 });
+    for (const e of [d0, d1]) out.push({ kind: 'circle', layer: 'RC-DIM', c: e, r: 0.6 * s, fill: true });
+    out.push({ kind: 'text', layer: 'RC-TEXT', at: { x: (a.x + c.x) / 2 + 1 * s, y: (a.y + c.y) / 2 + 1 * s }, text: `Ø${b.diameter} c/${cm(b.spacing)}`, height: 2.4 });
+  }
   const box = boxOf(pts);
   out.push(...drawAxes(axes, box, s));
   // The base mats of the layer, stated once with the panels each covers.

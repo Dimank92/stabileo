@@ -26,6 +26,7 @@ import { emptyLayout, type DrawingAdjust, type SheetLayout } from '../sheets/she
 import type { PlacedDrawing } from '../sheets/compose';
 import { drawDetails, placeDetails, type DetailChoice } from '../sheets/details/catalog';
 import { chosenDetails, projectDetailValues } from './detail-catalog';
+import { memberNames } from './member-names';
 
 export const sheetSettings = () => ({ ...DEFAULT_SHEET_SETTINGS, ...designData().sheets });
 export const patchSheetSettings = (p: Partial<ReturnType<typeof sheetSettings>>) => patchDesignData({ sheets: { ...sheetSettings(), ...p } });
@@ -81,7 +82,7 @@ function entryDrawings(doc: DocumentModel | null, projectName: string, e: SheetE
   let ds: DrawingInput[];
   if (kind === 'detailing') {
     ds = doc
-      ? renderDrawings(doc, { locale, projectName, retouched: retouchedIn(doc), members: sheetMembers(), coverOf: coverForMember, scene: sceneOf(doc) }).sheets
+      ? renderDrawings(doc, { locale, projectName, retouched: retouchedIn(doc), members: sheetMembers(), coverOf: coverForMember, scene: sceneOf(doc), memberName: (id) => memberNames().atLevel(id) }).sheets
         // The caption names the drawing; the project and the readiness go to the title block.
         .map((s) => ({ key: s.name, title: s.caption ?? s.name, ...drawingPrimitives(s.sheet, locale) }))
       : [];
@@ -95,7 +96,8 @@ function entryDrawings(doc: DocumentModel | null, projectName: string, e: SheetE
   return [...ds
     .filter((d) => e.tables !== false || !d.table)
     // A name the person gave the entry heads each of its drawings, so a sheet of one drawing reads it too.
-    .map((d) => ({ ...d, ...(e.label ? { title: `${e.label} — ${d.title}` } : {}), group, ...(e.scale && !d.paper ? { scale: e.scale } : {}), ...(e.format ? { format: e.format } : {}), key: `${e.id}:${d.key}` })), ...extra];
+    // A drawing that names a group of its own (a beam line) starts sheets of its own within the entry's.
+    .map((d) => ({ ...d, ...(e.label ? { title: `${e.label} — ${d.title}` } : {}), group: d.group ? `${group} · ${d.group}` : group, ...(e.scale && !d.paper ? { scale: e.scale } : {}), ...(e.format ? { format: e.format } : {}), key: `${e.id}:${d.key}` })), ...extra];
 }
 
 export function projectSheetSet(doc: DocumentModel | null, projectName: string): SetSheet[] {

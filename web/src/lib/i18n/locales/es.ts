@@ -7647,6 +7647,7 @@ const es: Record<string, string> = {
   'plan.cols.title': 'Cuadro de columnas',
   'plan.cols.level': 'Nivel',
   'plan.beam.stirrups': 'Estribos — línea {line}',
+  'plan.beam.line': 'línea {line}',
   'plan.beam.breakdown': 'Despiece — línea {line}',
   'plan.found.title': 'Planta de fundaciones y replanteo',
   'plan.found.table': 'Planilla de bases',

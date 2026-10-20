@@ -210,10 +210,24 @@ function beamLines(axes: PlanAxis[]): Array<{ id: string; spans: Frame[] }> {
     if (Math.abs(dx / L) > 0.02 && Math.abs(dy / L) > 0.02) continue; // skewed beams have no line
     by.set(key, [...(by.get(key) ?? []), f]);
   }
-  return [...by.entries()].map(([k, fs]) => {
+  // Level by level from the bottom, and on each level by the axis's name, the way a set is read.
+  const entries = [...by.entries()].sort(([a], [b]) => {
+    const [za, , na] = a.split('|'), [zb, , nb] = b.split('|');
+    return Number(za) - Number(zb) || na!.localeCompare(nb!, undefined, { numeric: true });
+  });
+  return entries.map(([k, fs]) => {
     const [z, along, name] = k.split('|');
     fs.sort((p, q) => (along === 'x' ? Math.min(p.a.x, p.b.x) - Math.min(q.a.x, q.b.x) : Math.min(p.a.y, p.b.y) - Math.min(q.a.y, q.b.y)));
-    return { id: `${name} +${Number(z).toFixed(2)}`, spans: fs };
+    // The pieces the slab's mesh cut a span into are one span: its first piece stands for it.
+    const named = memberNames(), seen = new Set<string>(), spans: Frame[] = [];
+    for (const f of fs) {
+      const sp = named.span(f.id);
+      if (sp && seen.has(sp.key)) continue;
+      if (sp) seen.add(sp.key);
+      const P = (id: number) => { const n = modelStore.model.nodes.get(id)!; return { x: n.x, y: n.y, z: n.z ?? 0 }; };
+      spans.push(sp ? { ...f, id: sp.representative, a: P(sp.start), b: P(sp.end), name: named.name(f.id) } : f);
+    }
+    return { id: `${name} +${Number(z).toFixed(2)}`, spans };
   });
 }
 
@@ -238,16 +252,22 @@ function beams(c: PlanContext, doc: DocumentModel | null, axes: PlanAxis[]): Dra
         ...(reg?.stirrupsSpan ? { span: { diameter: reg.stirrupsSpan.diameter, spacing: reg.stirrupsSpan.spacing } } : {}),
       };
     });
+    // Each line on sheets of its own: its stirrups and its breakdown, never beside another line's.
+    const group = c.tr('plan.beam.line', { line: line.id });
     const z = stirrupZones(line.id, spans, c.tr);
-    if (z) out.push(z);
+    if (z) out.push({ ...z, group });
     // The breakdown of the assemblies that hold this line's beams.
-    const ids = new Set(line.spans.map((f) => f.id));
-    const marks = (doc?.assemblies ?? []).filter((a) => a.elementIds.some((id) => ids.has(id))).flatMap((a) => a.source.marks.map((mk) => {
+    // The line's own bars: those of its spans' pieces. An assembly holds a whole level, and its
+    // every mark under each line was a breakdown of the level, the same on every line's sheet.
+    const named = memberNames();
+    const ids = new Set(line.spans.flatMap((f) => named.span(f.id)?.elements ?? [f.id]));
+    const ownBar = (a: { bars: ReadonlyArray<{ id: string; ownerElementIds: readonly number[] }> }, barId: string) => a.bars.find((b) => b.id === barId)?.ownerElementIds.some((id) => ids.has(id)) ?? false;
+    const marks = (doc?.assemblies ?? []).filter((a) => a.elementIds.some((id) => ids.has(id))).flatMap((a) => a.source.marks.filter((mk) => mk.barIds.some((b) => ownBar(a, b))).map((mk) => {
       const r = rcShapeForMark(mk.barIds, (id) => a.bars.find((b) => b.id === id));
       return { mark: mk.mark, count: mk.quantity, diameter: mk.diameterMm, cut: mk.cuttingLength, ...(r?.ok ? { shape: r.diagram } : {}) };
     }));
     const b = barBreakdown(line.id, marks, c.tr, c.fmt);
-    if (b) out.push(b);
+    if (b) out.push({ ...b, group });
   }
   return out;
 }

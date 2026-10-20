@@ -26,6 +26,8 @@ import { designSpans, type DesignSpan, type SpanSourceModel } from '../engine/de
 export interface MemberNames {
   /** The member's name: its physical member's, a beam's span, or its number. */
   name(elementId: number): string;
+  /** The name with the level a column lift reaches («C3 · N2»): a column's floors apart, on a sheet. */
+  atLevel(elementId: number): string;
   /** The physical element's name, where the element belongs to one. */
   physical(elementId: number): string | undefined;
   /** The span a beam piece belongs to, as the design reads it. */
@@ -87,6 +89,14 @@ export function memberNames(): MemberNames {
       return g?.name ?? `#${id}`;
     },
     physical: (id) => groupOfElement.get(id)?.name,
+    atLevel(id) {
+      const base = names.name(id);
+      if (!vertical(id)) return base;
+      const e = m.elements.get(id)!;
+      const top = Math.max(m.nodes.get(e.nodeI)?.z ?? 0, m.nodes.get(e.nodeJ)?.z ?? 0);
+      const lv = (m.grid?.levels ?? []).find((l) => Math.abs(l.z - top) < 1e-3);
+      return `${base} · ${lv ? lv.name : `+${top.toFixed(2)}`}`;
+    },
     span: (id) => spanOf.get(id),
     shellGroup: (kind, id) => (kind === 'quad' ? groupOfQuad : groupOfPlate).get(id),
   };
