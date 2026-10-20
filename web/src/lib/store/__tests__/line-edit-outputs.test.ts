@@ -158,10 +158,11 @@ describe('an edit in the frame editor reaches every output', () => {
     setColumnLap(lower, 1.5);
     expect(stack.lifts.every((l) => columnLapOf(l.id) === 1.5)).toBe(true);
     const longer = lapsOf();
-    // The lower lift's bars now run 1,5 m past the joint: the splice starts above the 0,50 m
-    // beam centred on the floor at 3 m, at 3,25 m.
+    // The lower lift's bars now run 1,5 m past the end of their crank: above the 0,50 m beam
+    // centred on the floor at 3 m (3,25 m) they turn inward by two Ø16 in contact over 6 × 16 mm
+    // (§10.7.4.1), and the splice starts there.
     expect(Math.max(...longer)).toBeGreaterThan(Math.max(...before));
-    expect(Math.max(...longer)).toBeCloseTo(3.25 + 1.5, 2);
+    expect(Math.max(...longer)).toBeCloseTo(3.25 + 0.096 + 1.5, 3);
     setColumnLap(lower, 0.2);
     const run = detailingStore.generate()!;
     expect(JSON.stringify(run.assemblies.map((a) => a.unsupported))).toMatch(/25\.5/);
