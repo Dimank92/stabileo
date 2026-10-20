@@ -817,10 +817,13 @@
       const fw = (keysPressed.has('w') ? 1 : 0) - (keysPressed.has('s') ? 1 : 0);
       const rt = (keysPressed.has('d') ? 1 : 0) - (keysPressed.has('a') ? 1 : 0);
       if (fw || rt) {
-        const look = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-        const ahead = Math.abs(look.z) > 0.9 ? new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion) : look;
+        // The camera's own axes in the world: right, screen-up, and back (it looks down its −back).
+        const side = new THREE.Vector3(), screenUp = new THREE.Vector3(), back = new THREE.Vector3();
+        camera.updateMatrixWorld();
+        camera.matrixWorld.extractBasis(side, screenUp, back);
+        const look = back.negate();
+        const ahead = Math.abs(look.z) > 0.9 ? screenUp : look;
         ahead.z = 0;
-        const side = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
         side.z = 0;
         if (ahead.lengthSq() > 1e-12) ahead.normalize();
         if (side.lengthSq() > 1e-12) side.normalize();
