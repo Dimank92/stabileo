@@ -24,6 +24,8 @@
   const sections = $derived([...modelStore.sections.values()]);
   let typology = $state('dropped'), sectionX = $state(0), sectionY = $state(0), wantX = $state(true), wantY = $state(true);
   let align = $state(0), ecc = $state(0);
+  /** Each span pinned at both ends (simply supported on what carries it). */
+  let pinned = $state(false);
   let x0 = $state(''), x1 = $state(''), y0 = $state(''), y1 = $state(''), levelFrom = $state(''), levelTo = $state('');
   const fam = $derived(typologyFamily('beam', typology));
   const materialId = $derived(buildingUi.materialFor(fam));
@@ -47,8 +49,15 @@
   const count = $derived(layout?.members.length ?? 0);
 
   function place() {
-    if (!grid) return;
-    const r = placeFrame(grid, spec, { beamTypology: typology, beamAlign: align, beamEccentricity: ecc });
+    const g = grid;
+    if (!g) return;
+    const box: { r?: ReturnType<typeof placeFrame> } = {};
+    modelStore.batch(() => {
+      const r = box.r = placeFrame(g, spec, { beamTypology: typology, beamAlign: align, beamEccentricity: ecc });
+      if (pinned) for (const id of r.bars) modelStore.updateElement(id, { releaseI: { my: true, mz: true, t: false }, releaseJ: { my: true, mz: true, t: false } });
+    });
+    const r = box.r;
+    if (!r) return;
     uiStore.setSelection(new Set(), new Set(r.bars), false);
     report(tp('grid.frameCreated', { members: r.elements, nodes: r.nodes, welded: r.welded, duplicates: r.duplicates }));
   }
@@ -83,6 +92,7 @@
       </select>
     </label>
     <label class="bk-field">{t('building.eccentricity')} <input type="number" step="0.05" bind:value={ecc} /></label>
+    <label class="bk-check"><input type="checkbox" bind:checked={pinned} data-testid="building-beam-pinned" /> {t('building.beam.pinned')}</label>
   </div>
 
   <h5 class="bk-h">{t('building.betweenAxesTitle')}</h5>

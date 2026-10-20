@@ -13022,5 +13022,11 @@ const pt: Translations = {
   "building.tab.slabs.hint": "Lajes nos painéis da grelha",
   "building.tab.stairs.hint": "Escadas com seus lances e patamares",
   "building.tab.tools.hint": "Rampas, copiar entre níveis e diafragmas",
+  "building.col.pinnedHead": "Articulado no topo",
+  "building.col.kStrong": "Flambagem k (eixo forte)",
+  "building.col.kWeak": "Flambagem k (eixo fraco)",
+  "building.col.cover": "Cobrimento (mm)",
+  "building.col.coverProject": "do projeto",
+  "building.beam.pinned": "Extremidades articuladas",
 };
 export default pt;

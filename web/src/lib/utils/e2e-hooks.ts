@@ -271,6 +271,8 @@ export interface StabileoTestHooks {
   nodeIds(): number[];
   /** A node's coordinates, m. */
   nodePosition(id: number): { x: number; y: number; z: number } | null;
+  /** What a member states beyond its geometry: buckling factors and end releases. */
+  memberStatement(id: number): { kStrong?: number; kWeak?: number; releaseI?: { my: boolean; mz: boolean }; releaseJ?: { my: boolean; mz: boolean } } | null;
   nodePos(id: number): { x: number; y: number; z: number } | null;
   /** The shells, and whether a quad carries curvature into the solve. */
   quadIds(): number[];
@@ -734,6 +736,12 @@ export function installE2EHooks(): void {
     rebarSummary,
     elementIds: () => [...modelStore.elements.keys()].sort((a, b) => a - b),
     nodeIds: () => [...modelStore.nodes.keys()].sort((a, b) => a - b),
+    memberStatement: (id: number) => {
+      const e = modelStore.elements.get(id);
+      if (!e) return null;
+      return { ...(e.kStrong !== undefined ? { kStrong: e.kStrong } : {}), ...(e.kWeak !== undefined ? { kWeak: e.kWeak } : {}),
+        ...(e.releaseI ? { releaseI: { my: e.releaseI.my, mz: e.releaseI.mz } } : {}), ...(e.releaseJ ? { releaseJ: { my: e.releaseJ.my, mz: e.releaseJ.mz } } : {}) };
+    },
     nodePosition: (id: number) => { const n = modelStore.nodes.get(id); return n ? { x: n.x, y: n.y, z: n.z ?? 0 } : null; },
     nodePos: (id: number) => {
       const n = modelStore.nodes.get(id);

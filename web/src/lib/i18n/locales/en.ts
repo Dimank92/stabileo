@@ -13389,5 +13389,11 @@ const en: Record<string, string> = {
   "building.tab.slabs.hint": "Slabs in the bays of the grid",
   "building.tab.stairs.hint": "Stairs with their flights and landings",
   "building.tab.tools.hint": "Ramps, copying between levels and diaphragms",
+  "building.col.pinnedHead": "Pinned at the head",
+  "building.col.kStrong": "Buckling k (strong axis)",
+  "building.col.kWeak": "Buckling k (weak axis)",
+  "building.col.cover": "Cover (mm)",
+  "building.col.coverProject": "the project's",
+  "building.beam.pinned": "Pinned ends",
 };
 export default en;

@@ -13378,5 +13378,11 @@ const es: Record<string, string> = {
   "building.tab.slabs.hint": "Losas en los paños de la grilla",
   "building.tab.stairs.hint": "Escaleras con sus tramos y descansos",
   "building.tab.tools.hint": "Rampas, copiar entre niveles y diafragmas",
+  "building.col.pinnedHead": "Articulada en la cabeza",
+  "building.col.kStrong": "Pandeo k (eje fuerte)",
+  "building.col.kWeak": "Pandeo k (eje débil)",
+  "building.col.cover": "Recubrimiento (mm)",
+  "building.col.coverProject": "del proyecto",
+  "building.beam.pinned": "Extremos articulados",
 };
 export default es;

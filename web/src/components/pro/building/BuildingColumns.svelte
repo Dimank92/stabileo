@@ -15,6 +15,7 @@
   import { fittingChoice, sectionFits, typologyFamily } from '../../../lib/model/building/typology-defaults';
   import { buildingUi } from '../../../lib/store/building-ui.svelte';
   import { nextMember } from '../../../lib/store/next-member.svelte';
+  import { setMemberCovers } from '../../../lib/store/design-data';
   import { untrack } from 'svelte';
 
   let { report }: { report: (text: string) => void } = $props();
@@ -24,6 +25,8 @@
   const sections = $derived([...modelStore.sections.values()]);
   let typology = $state('concrete'), section = $state(0), fixBase = $state(true), angle = $state(0);
   let fixedPoint = $state<[number, number]>([0, 0]);
+  /** Effective-length factors about the strong and the weak axis, the head pinned, a cover of its own (mm, empty: the project's). */
+  let kStrong = $state(1), kWeak = $state(1), pinnedHead = $state(false), cover = $state<number | null>(null);
   let x0 = $state(''), x1 = $state(''), y0 = $state(''), y1 = $state(''), levelFrom = $state(''), levelTo = $state('');
   const fam = $derived(typologyFamily('column', typology));
   const materialId = $derived(buildingUi.materialFor(fam));
@@ -42,8 +45,27 @@
   const count = $derived(layout?.members.length ?? 0);
 
   function place() {
-    if (!grid) return;
-    const r = placeFrame(grid, spec, { columnTypology: typology, fixBase, columnAngle: angle, columnFixedPoint: fixedPoint });
+    const g = grid;
+    if (!g) return;
+    const box: { r?: ReturnType<typeof placeFrame> } = {};
+    // The columns and what is stated about them: one step.
+    modelStore.batch(() => {
+      const r = box.r = placeFrame(g, spec, { columnTypology: typology, fixBase, columnAngle: angle, columnFixedPoint: fixedPoint });
+      for (const id of r.bars) {
+        const e = modelStore.elements.get(id);
+        if (!e) continue;
+        const zi = modelStore.nodes.get(e.nodeI)?.z ?? 0, zj = modelStore.nodes.get(e.nodeJ)?.z ?? 0;
+        const head = { my: true, mz: true, t: false };
+        const patch = {
+          ...(kStrong !== 1 ? { kStrong } : {}), ...(kWeak !== 1 ? { kWeak } : {}),
+          ...(pinnedHead ? (zj >= zi ? { releaseJ: head } : { releaseI: head }) : {}),
+        };
+        if (Object.keys(patch).length > 0) modelStore.updateElement(id, patch);
+      }
+      if (cover !== null && cover > 0) setMemberCovers(r.bars, cover / 1000);
+    });
+    const r = box.r;
+    if (!r) return;
     uiStore.setSelection(new Set(), new Set(r.bars), false);
     report(tp('grid.frameCreated', { members: r.elements, nodes: r.nodes, welded: r.welded, duplicates: r.duplicates }));
   }
@@ -81,6 +103,12 @@
     </div>
     <label class="bk-field">{t('building.columnAngle')} <input type="number" step="15" bind:value={angle} data-testid="building-col-angle" /></label>
     <label class="bk-check"><input type="checkbox" bind:checked={fixBase} /> {t('building.fixBase')}</label>
+    <label class="bk-check"><input type="checkbox" bind:checked={pinnedHead} data-testid="building-col-pinned-head" /> {t('building.col.pinnedHead')}</label>
+  </div>
+  <div class="bk-row">
+    <label class="bk-field">{t('building.col.kStrong')} <input type="number" min="0.5" max="3" step="0.05" bind:value={kStrong} data-testid="building-col-k-strong" /></label>
+    <label class="bk-field">{t('building.col.kWeak')} <input type="number" min="0.5" max="3" step="0.05" bind:value={kWeak} data-testid="building-col-k-weak" /></label>
+    <label class="bk-field">{t('building.col.cover')} <input type="number" min="10" step="5" placeholder={t('building.col.coverProject')} value={cover ?? ''} onchange={(e) => (cover = e.currentTarget.value === '' ? null : Number(e.currentTarget.value))} data-testid="building-col-cover" /></label>
   </div>
 
   <h5 class="bk-h">{t('building.betweenAxesTitle')}</h5>

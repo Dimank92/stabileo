@@ -34,8 +34,18 @@ test.describe('@smoke building on the grid', () => {
     // 2 × 2 intersections, one storey: 4 columns, then 4 beams.
     await expect(page.getByTestId('building-tab-columns')).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByTestId('building-columns-place')).toContainText('4');
+    // Stated with the placement: buckling factors and a pinned head.
+    await page.getByTestId('building-col-k-strong').fill('1.2');
+    await page.getByTestId('building-col-k-weak').fill('1.5');
+    await page.getByTestId('building-col-pinned-head').check();
     await page.getByTestId('building-columns-place').click();
     await expect(page.getByTestId('building-result')).toContainText('4');
+    const statements = await page.evaluate(() => window.__stabileo.elementIds().map((id) => window.__stabileo.memberStatement(id)));
+    expect(statements).toHaveLength(4);
+    for (const st of statements) {
+      expect(st).toMatchObject({ kStrong: 1.2, kWeak: 1.5 });
+      expect(st!.releaseJ?.my || st!.releaseI?.my).toBe(true);
+    }
     await page.getByTestId('building-tab-beams').click();
     await expect(page.getByTestId('building-beams-place')).toContainText('4');
     await page.getByTestId('building-beams-place').click();
