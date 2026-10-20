@@ -213,6 +213,11 @@ export interface SceneSolid {
    * was refused. It has concrete and no steel, and it must still appear.
    */
   assemblyId?: string;
+  /**
+   * Every assembly the concrete belongs to, when there is more than one: a joint where a beam
+   * line meets another, or meets a column stack. Shown while any of them is.
+   */
+  assemblyIds?: string[];
   elementIds: number[];
   /** Closed base polygon in model coordinates, m. Never repeats the first point. */
   base: Point3[];
@@ -669,17 +674,25 @@ export function buildSceneModel(doc: DocumentModel, opts: SceneOptions = {}): Sc
     });
   }
 
-  // Each joint, attributed to its owner: the column that fills it, or the deepest beam.
+  /**
+   * Each joint, belonging to every member that meets in it. Its owner (the column that fills it,
+   * or the deepest beam) still names its assembly first, but the joint is drawn while ANY of its
+   * members is: tied to the owner alone, isolating the other beam of a corner, or a column left
+   * out, emptied the corner the two beams share.
+   */
   for (const j of opts.physical?.joint.values() ?? []) {
     const owner = j.owner.elementId!;
-    if (!wantedMembers.has(owner)) continue;
+    const members = [...new Set([owner, ...j.elementIds])].filter((id) => wantedMembers.has(id));
+    if (members.length === 0) continue;
+    const assemblies = [...new Set(members.map((id) => assemblyOfMember.get(id)).filter((a): a is string => a !== undefined))];
     solids.push(...layerSolids(j.layers, (n) => ({
       id: n === 0 ? `joint:${j.nodeId}` : `joint:${j.nodeId}:${n}`,
       kind: 'joint' as const,
-      assemblyId: assemblyOfMember.get(owner),
-      elementIds: [owner],
+      assemblyId: assemblyOfMember.get(owner) ?? assemblies[0],
+      ...(assemblies.length > 1 ? { assemblyIds: assemblies } : {}),
+      elementIds: members,
       label: msg('detailing.scene.solid.joint', { id: j.nodeId! }),
-      reinforced: barsOfElement.has(owner),
+      reinforced: members.some((id) => barsOfElement.has(id)),
     })));
   }
 
@@ -962,8 +975,9 @@ export function solidMatchesFilter(s: SceneSolid, f: SceneFilter): boolean {
    * is false — so deriving solid visibility from the visible assemblies put it back in the
    * dark the instant a checkbox was touched. It is governed by `hideUnreinforced` above.
    */
-  if (f.assemblyIds && s.assemblyId !== undefined && !f.assemblyIds.includes(s.assemblyId)) {
-    return false;
+  if (f.assemblyIds) {
+    const own = s.assemblyIds ?? (s.assemblyId !== undefined ? [s.assemblyId] : []);
+    if (own.length > 0 && !own.some((a) => f.assemblyIds!.includes(a))) return false;
   }
   return true;
 }

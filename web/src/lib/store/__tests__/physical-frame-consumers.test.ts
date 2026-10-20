@@ -24,7 +24,7 @@ import { projectPhysicalFrame, physicalLayersOf } from '../physical-frame';
 import { measure } from '../takeoff';
 import { projectIfcInput } from '../ifc-export';
 import { frameVolume, layerVolume, polygonArea } from '../../engine/physical/physical-frame';
-import { buildSceneModel, type SceneSolid } from '../../engine/detailing/scene-model';
+import { buildSceneModel, solidMatchesFilter, type SceneSolid } from '../../engine/detailing/scene-model';
 import { buildDocumentModel } from '../../engine/detailing/document-model';
 import { membersFromModel } from '../../engine/detailing/member-geometry';
 import { createElementGroup } from '../../three/create-element-mesh';
@@ -102,6 +102,29 @@ describe('one geometry for every output that draws or measures the concrete', ()
     expect(scene.solids.reduce((a, s) => a + sceneVolume(s), 0)).toBeCloseTo(frameVolume(f), 9);
     for (const id of ids()) expect(sceneVolume(scene.solids.find((s) => s.id === `member:${id}`)!)).toBeCloseTo(f.member.get(id)!.volume, 9);
     expect(scene.solids.filter((s) => s.kind === 'joint').length).toBeGreaterThanOrEqual(f.joint.size);
+  });
+
+  it('a joint belongs to every member meeting in it: isolating either beam of a corner keeps it', () => {
+    const f = projectPhysicalFrame();
+    const doc = buildDocumentModel({ seriesId: 'S', revision: { number: 1, at: '2026-10-19T00:00:00Z', author: 'test', detailingRevision: 1, demandRevision: 1 }, regulations: [], assemblies: [], laps: [], certificates: [] });
+    const { members } = membersFromModel({ elementIds: ids(), nodes: [...modelStore.model.nodes.values()], elements: [...modelStore.model.elements.values()], sections: [...modelStore.model.sections.values()] });
+    const scene = buildSceneModel(doc, { members, physical: f });
+    for (const j of f.joint.values()) {
+      const solid = scene.solids.find((s) => s.id === `joint:${j.nodeId}`)!;
+      expect(new Set(solid.elementIds)).toEqual(new Set(j.elementIds));
+      // Any one of its members isolated draws it (it used to follow its owner alone).
+      for (const id of j.elementIds) expect(solidMatchesFilter(solid, { elementIds: [id] }), `joint ${j.nodeId} with ${id} isolated`).toBe(true);
+    }
+  });
+
+  it('the sections view draws the concrete as built too: a corner of two beams is closed, not overlapped', () => {
+    const f = projectPhysicalFrame();
+    let total = 0;
+    for (const id of ids()) {
+      const g = createElementGroup({ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, { elementId: id, elementType: 'frame', renderMode: 'sections', physicalLayers: physicalLayersOf(f, id)! });
+      g.traverse((o) => { if ((o as THREE.Mesh).isMesh && o.userData.physicalConcrete) total += meshVolume((o as THREE.Mesh).geometry); });
+    }
+    expect(Math.abs(total - frameVolume(f))).toBeLessThan(1e-5 * frameVolume(f));
   });
 
   it('the IFC writes exactly the frame: profiles swept over the cut segments plus the joints owned', () => {

@@ -216,8 +216,10 @@ export function syncElements(ctx: SceneSyncContext): void {
   }
 
   const groupOf = groupIndex();
-  // The physical mode's concrete: each member's solid and the joints attributed to it.
-  const physical = renderMode === 'physical' && !project2D ? projectPhysicalFrame() : null;
+  // The concrete as built: each member's solid and the joints attributed to it. In the physical
+  // mode, and in the sections mode too for the concrete the frame cuts: swept from node to node,
+  // two beams meeting at a corner overlapped in one quarter and left the outer one empty.
+  const physical = (renderMode === 'physical' || renderMode === 'sections') && !project2D ? projectPhysicalFrame() : null;
   const physicalOf = (id: number) => (physical ? physicalLayersOf(physical, id) : undefined);
   const physicalKey = (id: number) => {
     const ls = physicalOf(id);

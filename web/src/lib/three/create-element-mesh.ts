@@ -53,8 +53,8 @@ export interface CreateElementOpts {
   /** Render mode: wireframe=simple lines, solid=cylinders, sections=extruded profiles */
   renderMode?: 'wireframe' | 'solid' | 'sections' | 'physical';
   /**
-   * In `physical` mode, the member's concrete as built and the joints it owns
-   * (`store/physical-frame.ts`). Absent, the member is drawn as in `sections`.
+   * In the `physical` and `sections` modes, the member's concrete as built and the joints it owns
+   * (`store/physical-frame.ts`). Absent, the member is drawn as its section.
    */
   physicalLayers?: readonly PrismLayer[];
   /** Element local axes (from computeLocalAxes3D) used to orient extruded sections. */
@@ -92,7 +92,7 @@ export function createElementGroup(
   else if (opts.hovered) baseColor = COLORS.elementHovered;
 
   // Cut by the physical frame: its layers, or nothing where the joints took it whole.
-  const physicalCut = opts.renderMode === 'physical' && opts.physicalLayers !== undefined;
+  const physicalCut = (opts.renderMode === 'physical' || opts.renderMode === 'sections') && opts.physicalLayers !== undefined;
   const physical = physicalCut ? prismLayersGeometry(opts.physicalLayers!) : null;
   // A member the physical frame did not cut is drawn as its section, like every steel member.
   const mode = opts.renderMode === 'physical' ? 'sections' : opts.renderMode ?? 'solid';
