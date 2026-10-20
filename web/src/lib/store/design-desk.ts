@@ -5,6 +5,7 @@
  * the final report: by level, how many members verify, warn, fail or could not be checked, and
  * which do not verify, each with the codes of its notices.
  */
+import type { ResizeChange, ResizeRun } from './design-resize';
 import { materialCheckState, runMaterialChecks, type MaterialMemberResult, type OtherMaterialFamily } from './material-check.svelte';
 import { modelStore } from './model.svelte';
 import { designRunStore } from './design-run.svelte';
@@ -43,6 +44,8 @@ export interface DeskReport {
   steel: number | null;
   skipped: { locked: number; edited: number };
   levels: LevelReport[];
+  /** The sections a sizing run enlarged, and why it stopped (`design-resize.ts`). */
+  resized?: { changes: ResizeChange[]; rounds: number; stopped: ResizeRun['stopped'] };
 }
 
 const STATUSES: DisplayStatus[] = ['ok', 'warn', 'fail', 'provisional', 'unavailable', 'stale'];
