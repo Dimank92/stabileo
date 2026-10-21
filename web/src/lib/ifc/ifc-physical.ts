@@ -125,15 +125,15 @@ export function buildIfcFragment(members: IfcMember[], surfaces: IfcSurface[], o
   let elements = 0;
   if (o.declare) {
     const zOf = (id: number) => frag.nodes.find((n) => n.id === id)?.z ?? 0;
-    const group = (gid: number, name: string, kind: PhysicalKind, members: ModelGroup['members'], zs: number[]): ModelGroup => {
-      const data: PhysicalData = { kind, provenance: 'declared', levelFrom: levelAt(Math.min(...zs), o.levels), levelTo: levelAt(Math.max(...zs), o.levels) };
+    const group = (gid: number, name: string, kind: PhysicalKind, members: ModelGroup['members'], zs: number[], typology?: string): ModelGroup => {
+      const data: PhysicalData = { kind, provenance: 'declared', levelFrom: levelAt(Math.min(...zs), o.levels), levelTo: levelAt(Math.max(...zs), o.levels), ...(typology ? { typology } : {}) };
       return { id: gid, name, kind: PHYSICAL_GROUP_KIND, origin: 'user', members, data: data as unknown as Record<string, unknown> };
     };
     let gid = 1;
     mapping.elements.forEach((e, k) => {
       const m = bars.find((b) => b.id === e.member);
       if (!m) return;
-      frag.groups.push(group(gid++, m.name, choiceOf(m.ifcClass, m.type) as PhysicalKind, { elements: [k + 1] }, [zOf(e.nodeI), zOf(e.nodeJ)]));
+      frag.groups.push(group(gid++, m.name, choiceOf(m.ifcClass, m.type) as PhysicalKind, { elements: [k + 1] }, [zOf(e.nodeI), zOf(e.nodeJ)], m.typology));
       elements++;
     });
     for (const [s, sh] of shellsOf) {

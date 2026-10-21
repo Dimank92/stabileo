@@ -22,6 +22,8 @@ export interface IfcMember {
   storey?: string;
   /** The object's IFC GlobalId: what a later version of the file is compared by. */
   globalId?: string;
+  /** The physical typology the file states (a footing beam: 'foundation'). */
+  typology?: string;
   /** A column's rotation in plan, degrees: where its profile's x axis points. */
   rollDeg?: number;
   /**
@@ -48,6 +50,42 @@ export interface IfcSurface {
   globalId?: string;
   /** The object's type as the file names it (a slab's system: «30+5 … nervio 12 … intereje 82», a drop). */
   objectType?: string;
+}
+
+/**
+ * A footing of the file: a pad or a strip, as its plan rectangle (the smallest that holds its
+ * solid), m, with its underside and top elevations. A footing beam is read as a member instead.
+ */
+export interface IfcFootingRead {
+  id: number;
+  kind: 'pad' | 'strip';
+  name: string;
+  /** Plan centre, and the rectangle's sides along its own axes, m. */
+  centre: { x: number; y: number };
+  /** Side along `angle` and across it, m. */
+  length: number; width: number;
+  /** Direction of `length`, degrees from x. */
+  angle: number;
+  zBottom: number; zTop: number;
+  materialName?: string;
+  storey?: string;
+  globalId?: string;
+}
+
+/**
+ * A stair of the file, as its flights: each the mid-surface of its inclined slab between its
+ * lower and upper edges (each edge's two ends, left to right as seen going up), and its waist.
+ */
+export interface IfcStairRead {
+  id: number;
+  name: string;
+  flights: Array<{ low: [{ x: number; y: number; z: number }, { x: number; y: number; z: number }]; high: [{ x: number; y: number; z: number }, { x: number; y: number; z: number }]; waist: number }>;
+  /** Its landings: the corners of each at its mid-depth, in order round it, and its depth, m. */
+  landings?: Array<{ corners: [{ x: number; y: number; z: number }, { x: number; y: number; z: number }, { x: number; y: number; z: number }, { x: number; y: number; z: number }]; thickness: number }>;
+  /** The riser height the file states, m, when it does. */
+  riserHeight?: number;
+  storey?: string;
+  globalId?: string;
 }
 
 /** A storey of the file: its name and elevation, m. */

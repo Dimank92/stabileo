@@ -1,10 +1,12 @@
 <script lang="ts">
   import { modelStore, uiStore, resultsStore } from '../lib/store';
-  import type { IfcMember, IfcMappingResult, IfcStorey, IfcSurface } from '../lib/ifc/ifc-mapper';
+  import type { IfcFootingRead, IfcStairRead, IfcMember, IfcMappingResult, IfcStorey, IfcSurface } from '../lib/ifc/ifc-mapper';
   import { t, tp } from '../lib/i18n';
   import { buildIfcFragment, chosenParts, classesIn, connectShells, fixBases, storeyLevels, type ClassChoice, type IfcBuilding } from '../lib/ifc/ifc-physical';
   import { analyticalFromIfc, type FloorRegion } from '../lib/ifc/ifc-analytical';
   import { meshFloors } from '../lib/ifc/ifc-floors';
+  import { placeFootings } from '../lib/ifc/ifc-footings';
+  import { placeStairs } from '../lib/ifc/ifc-stairs';
   import { insertFragment } from '../lib/model/edit/transformed-copy';
   import { IDENTITY } from '../lib/model/edit/affine';
   import { placementStore } from '../lib/store/placement.svelte';
@@ -15,6 +17,8 @@
   let members = $state.raw<IfcMember[]>([]);
   let surfaces = $state.raw<IfcSurface[]>([]);
   let storeys = $state.raw<IfcStorey[]>([]);
+  let ifcFootings = $state.raw<IfcFootingRead[]>([]);
+  let ifcStairs = $state.raw<IfcStairRead[]>([]);
   let building = $state.raw<IfcBuilding | null>(null);
   const mappingResult = $derived<IfcMappingResult | null>(building?.mapping ?? null);
   /** What each IFC class becomes; the defaults follow the class. */
@@ -45,6 +49,8 @@
   $effect(() => {
     if (!file) {
       members = [];
+      ifcFootings = [];
+      ifcStairs = [];
       surfaces = [];
       storeys = [];
       building = null;
@@ -67,6 +73,8 @@
         members = result.members;
         surfaces = result.surfaces;
         storeys = result.storeys;
+        ifcFootings = result.footings;
+        ifcStairs = result.stairs;
         choices = {};
         parseWarnings = result.warnings;
         remapModel();
@@ -137,6 +145,10 @@
       connectShells(r.quads, r.plates);
       if (floors.length) meshFloors(floors, { meshSize, declare: declareElements });
       if (fixFeet) fixBases();
+      // The file's pads and strips, under the columns and walls they carry.
+      if (ifcFootings.length) placeFootings(ifcFootings);
+      // The file's flights, built and joined to the floors they reach (the model of calculation only).
+      if (ifcStairs.length && floors.length) placeStairs(ifcStairs, levelsFor(true));
     });
     resultsStore.clear();
     // IFC is imported in PRO and stays there. Setting the mode to '3d' here used to switch the
