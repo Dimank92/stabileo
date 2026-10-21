@@ -345,7 +345,7 @@ export function buildSimplified2DModel(
     'custom3d': 'pinned',
   };
   const outSupports = new Map<number, { id: number; nodeId: number; type: string; [k: string]: unknown }>();
-  const supByMergedNode = new Map<number, { id: number; type: string; [k: string]: unknown }>();
+  const supByMergedNode = new Map<number, { id: number; nodeId: number; type: string; [k: string]: unknown }>();
 
   for (const s of supports) {
     const mergedId = mergeMap.get(s.nodeId) ?? s.nodeId;
