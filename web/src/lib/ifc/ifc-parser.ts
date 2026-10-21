@@ -54,6 +54,12 @@ export async function parseIfc(data: ArrayBuffer, opts?: { wasmPath?: string }):
   const members: IfcMember[] = [];
   let nextId = 1;
 
+  if (!(modelID >= 0)) {
+    // A schema the reader does not open (IFC2X2, say) gives no model; said so, with the file's own name for it.
+    const head = new TextDecoder().decode(new Uint8Array(data, 0, Math.min(data.byteLength, 4096)));
+    const schema = /FILE_SCHEMA\s*\(\s*\(\s*'([^']+)'/i.exec(head)?.[1] ?? '?';
+    throw new Error(tp('ifc.unsupportedSchema', { schema }));
+  }
   /**
    * Metres per file length unit, from the project's IfcUnitAssignment.
    *

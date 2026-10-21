@@ -12,10 +12,10 @@
 
   let { open = false, file = null as File | null, onclose = (() => {}) as () => void } = $props();
 
-  let members = $state<IfcMember[]>([]);
-  let surfaces = $state<IfcSurface[]>([]);
-  let storeys = $state<IfcStorey[]>([]);
-  let building = $state<IfcBuilding | null>(null);
+  let members = $state.raw<IfcMember[]>([]);
+  let surfaces = $state.raw<IfcSurface[]>([]);
+  let storeys = $state.raw<IfcStorey[]>([]);
+  let building = $state.raw<IfcBuilding | null>(null);
   const mappingResult = $derived<IfcMappingResult | null>(building?.mapping ?? null);
   /** What each IFC class becomes; the defaults follow the class. */
   let choices = $state<Record<string, ClassChoice>>({});
@@ -30,7 +30,7 @@
    * Off, the members are welded where the file places them.
    */
   let analytical = $state(true);
-  let floors = $state<FloorRegion[]>([]);
+  let floors = $state.raw<FloorRegion[]>([]);
   const BAR_CHOICES: ClassChoice[] = ['column', 'beam', 'brace', 'ignore'];
   const SURFACE_CHOICES: ClassChoice[] = ['slab', 'wall', 'ignore'];
   const canImport = $derived(!!building && building.bars + building.shells + floors.length > 0);
@@ -143,6 +143,9 @@
     // app to Basic — its ribbon, its panel and its URL — with the PRO button left unresponsive.
     uiStore.toast(tp('ifc.importedBuilding', { e: b.bars, s: b.shells, p: b.elements }), 'success');
     onclose();
+    // The view on the building: a file's coordinates are its site's, often metres off the origin.
+    setTimeout(() => window.dispatchEvent(new Event('stabileo-zoom-to-fit')), 200);
+    setTimeout(() => window.dispatchEvent(new Event('stabileo-zoom-to-fit')), 600);
   }
 
   /** Insert the file into the open model with the ghost: pick where it goes, welds included. */
@@ -187,7 +190,7 @@
               <label>{t('ifc.snapTolerance')}</label>
               <input type="number" step="0.001" min="0.001" value={snapTolerance} onchange={handleToleranceChange} />
             </div>
-            <label class="ifc-field">
+            <label class="ifc-check">
               <input type="checkbox" bind:checked={membersAsTruss} onchange={() => remapModel()} />
               {t('ifc.membersAsTruss')}
             </label>
@@ -213,21 +216,21 @@
                 </tbody>
               </table>
               <IfcPreview {members} {surfaces} {choices} />
-              <div class="ifc-options">
+              <div class="ifc-options ifc-options-list">
                 {#if surfaces.length > 0}
                   <div class="ifc-field">
                     <label for="ifc-mesh">{t('ifc.meshSize')}</label>
                     <input id="ifc-mesh" type="number" step="0.1" min="0.1" bind:value={meshSize} onchange={() => remapModel()} />
                   </div>
                 {/if}
-                <label class="ifc-field"><input type="checkbox" bind:checked={declareElements} onchange={() => remapModel()} /> {t('ifc.declare')}</label>
+                <label class="ifc-check"><input type="checkbox" bind:checked={declareElements} onchange={() => remapModel()} /> {t('ifc.declare')}</label>
                 {#if storeys.length > 0}
-                  <label class="ifc-field"><input type="checkbox" bind:checked={storeysAsLevels} onchange={() => remapModel()} /> {tp('ifc.storeysAsLevels', { n: storeys.length })}</label>
+                  <label class="ifc-check"><input type="checkbox" bind:checked={storeysAsLevels} onchange={() => remapModel()} /> {tp('ifc.storeysAsLevels', { n: storeys.length })}</label>
                 {/if}
                 {#if storeys.length > 0 && storeysAsLevels}
-                  <label class="ifc-field"><input type="checkbox" bind:checked={analytical} onchange={() => remapModel()} data-testid="ifc-analytical" /> {t('ifc.analytical')}</label>
+                  <label class="ifc-check"><input type="checkbox" bind:checked={analytical} onchange={() => remapModel()} data-testid="ifc-analytical" /> {t('ifc.analytical')}</label>
                 {/if}
-                <label class="ifc-field"><input type="checkbox" bind:checked={fixFeet} data-testid="ifc-fix-bases" /> {t('ifc.fixBases')}</label>
+                <label class="ifc-check"><input type="checkbox" bind:checked={fixFeet} data-testid="ifc-fix-bases" /> {t('ifc.fixBases')}</label>
               </div>
             </div>
           {/if}
@@ -407,11 +410,31 @@
     margin-bottom: 12px;
   }
 
+  /* The import's choices, one under the other: their words are sentences, not field names. */
+  .ifc-options-list {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
   .ifc-field {
     display: flex;
     flex-direction: column;
     gap: 4px;
   }
+
+  /* A checkbox and its words on one line, as light as the field labels. */
+  .ifc-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: #ccc;
+    cursor: pointer;
+  }
+
+  .ifc-check input { width: auto; margin: 0; }
 
   .ifc-field label {
     font-size: 0.7rem;

@@ -52,19 +52,22 @@ export function meshFloors(floors: readonly FloorRegion[], o: { meshSize: number
     const res = applyMesh({ outer: { kind: 'polygon', points: f.outer.map(P) }, holes: f.holes.map((h) => ({ kind: 'polygon' as const, points: h.map(P) })), size, element: 'quad' }, { materialId: mat, thickness: f.thickness, splitBeams: true });
     if (!res || res.occupied) { out.failed.push(`${f.level.name}`); continue; }
     const solid = f.zones.length ? materialId(f.materialName) : mat;
-    for (const q of res.quads) {
-      const quad = modelStore.quads.get(q)!;
-      const ps = quad.nodes.map((n) => modelStore.nodes.get(n)!);
-      const c = { x: ps.reduce((s, p) => s + p.x, 0) / ps.length, y: ps.reduce((s, p) => s + p.y, 0) / ps.length };
-      const zone = f.zones.find((zn) => inside(c, zn.outline));
-      if (zone) modelStore.updateQuad(q, { materialId: solid, thickness: zone.thickness });
-      const t = modelStore.quads.get(q)!.thickness;
-      modelStore.setShellOffset('quad', q, { frame: 'global', x: 0, y: 0, z: -t / 2 } as never);
-    }
-    for (const p of res.plates) {
-      const t = modelStore.plates.get(p)?.thickness ?? f.thickness;
-      modelStore.setShellOffset('plate', p, { frame: 'global', x: 0, y: 0, z: -t / 2 } as never);
-    }
+    // One commit for the floor's shells, not one per shell.
+    modelStore.bulkMutate(() => {
+      for (const q of res.quads) {
+        const quad = modelStore.quads.get(q)!;
+        const ps = quad.nodes.map((n) => modelStore.nodes.get(n)!);
+        const c = { x: ps.reduce((s, p) => s + p.x, 0) / ps.length, y: ps.reduce((s, p) => s + p.y, 0) / ps.length };
+        const zone = f.zones.find((zn) => inside(c, zn.outline));
+        if (zone) modelStore.updateQuad(q, { materialId: solid, thickness: zone.thickness });
+        const t = modelStore.quads.get(q)!.thickness;
+        modelStore.setShellOffset('quad', q, { frame: 'global', x: 0, y: 0, z: -t / 2 } as never);
+      }
+      for (const p of res.plates) {
+        const t = modelStore.plates.get(p)?.thickness ?? f.thickness;
+        modelStore.setShellOffset('plate', p, { frame: 'global', x: 0, y: 0, z: -t / 2 } as never);
+      }
+    });
     out.slabs++; out.shells += res.quads.length + res.plates.length;
     if (o.declare) {
       const gid = modelStore.addGroup(f.names.length === 1 ? f.names[0]! : `Losa ${f.level.name}`, 'physicalMember', { quads: res.quads, plates: res.plates }, {
