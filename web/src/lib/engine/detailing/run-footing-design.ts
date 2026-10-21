@@ -318,19 +318,20 @@ export function runFootingDesign(given: RunFootingDesignInput): RunFootingDesign
   const nameOf = (id: number) => given.footings.find((x) => x.id === id)?.name ?? `F${id}`;
   const strapNotes = (f: Footing): { assumptions: EngineMessage[]; unsupported: EngineMessage[] } => {
     const a: EngineMessage[] = [], u: EngineMessage[] = [];
-    const own = strapped.straps.find((x) => x.footingId === f.id);
-    if (own) {
-      a.push(msg('footing.assumption.strap', { footing: f.name, partner: nameOf(own.partnerId), L: +own.L.toFixed(2), e: +own.e.toFixed(2), factor: +own.factor.toFixed(3), M: +own.M.toFixed(1), V: +own.V.toFixed(1) }));
-      const sec = f.strap;
+    const own = strapped.straps.filter((x) => x.footingId === f.id);
+    if (own.length) a.push(msg(own[0]!.bothWays ? 'footing.assumption.strapCentred' : 'footing.assumption.strapOneWay', { footing: f.name, factor: +own[0]!.factor.toFixed(3) }));
+    for (const x of own) {
+      a.push(msg('footing.assumption.strap', { footing: f.name, partner: nameOf(x.partnerId), L: +x.L.toFixed(2), e: +x.e.toFixed(2), M: +x.M.toFixed(1), V: +x.V.toFixed(1) }));
+      const sec = f.straps?.find((k) => k.toFootingId === x.partnerId && (k.nodeId === undefined || k.nodeId === x.partnerNodeId));
       if (sec?.b && sec.h) {
         const d = sec.h - 0.05;
-        const as = (own.M / (0.9 * 0.9 * d * input.fy * 1000)) * 1e4;
+        const as = (x.M / (0.9 * 0.9 * d * input.fy * 1000)) * 1e4;
         const phiVc = 0.75 * 0.17 * Math.sqrt(input.fc) * sec.b * d * 1000;
-        a.push(msg('footing.assumption.strapSteel', { footing: f.name, b: Math.round(sec.b * 100), h: Math.round(sec.h * 100), as: +as.toFixed(2), V: +own.V.toFixed(1), phiVc: +phiVc.toFixed(1) }));
+        a.push(msg('footing.assumption.strapSteel', { footing: f.name, partner: nameOf(x.partnerId), b: Math.round(sec.b * 100), h: Math.round(sec.h * 100), as: +as.toFixed(2), V: +x.V.toFixed(1), phiVc: +phiVc.toFixed(1) }));
       }
     }
     for (const x of strapped.straps.filter((k) => k.partnerId === f.id)) {
-      a.push(msg('footing.assumption.strapRelief', { footing: f.name, partner: nameOf(x.footingId), relief: +(x.factor - 1).toFixed(3) }));
+      a.push(msg(x.relief >= 0 ? 'footing.assumption.strapRelief' : 'footing.assumption.strapLoad', { footing: f.name, partner: nameOf(x.footingId), dR: +Math.abs(x.relief).toFixed(1) }));
     }
     const bal = strapped.balanced.find((x) => x.footingId === f.id);
     if (bal) a.push(msg(bal.h !== undefined ? 'footing.assumption.balancedProp' : 'footing.assumption.balanced', { footing: f.name, e: +bal.e.toFixed(2), m: +bal.m.toFixed(1), h: +(bal.h ?? 0).toFixed(1) }));

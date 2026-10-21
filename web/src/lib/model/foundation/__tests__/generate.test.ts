@@ -77,7 +77,7 @@ describe('foundations in the model', () => {
     // Each footing a strap leaves is balanced by it, toward the footing at its other end.
     for (const s of straps) {
       const f = [...modelStore.model.footings.values()].find((x) => x.nodeId === s.a)!;
-      expect(modelStore.model.footings.get(f.strap!.toFootingId)!.nodeId).toBe(s.b);
+      expect(f.straps!.map((x) => modelStore.model.footings.get(x.toFootingId)!.nodeId)).toContain(s.b);
     }
     // Proposed again, nothing new.
     expect(proposeTies(6.5, 45)).toHaveLength(0);

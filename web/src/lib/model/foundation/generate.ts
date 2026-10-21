@@ -230,7 +230,7 @@ export function placeFoundationBeams(list: BeamProposal[], o: { sectionId: numbe
         const fs = [...modelStore.model.footings.values()];
         const f = fs.find((x) => x.nodeId === p.a), g = fs.find((x) => x.nodeId === p.b);
         const sec = modelStore.model.sections.get(o.sectionId);
-        if (f && g && !f.strap) modelStore.updateFooting(f.id, { strap: { toFootingId: g.id, ...(sec?.b ? { b: sec.b } : {}), ...(sec?.h ? { h: sec.h } : {}) } });
+        if (f && g && !f.straps?.some((x) => x.toFootingId === g.id)) modelStore.updateFooting(f.id, { straps: [...(f.straps ?? []), { toFootingId: g.id, ...(sec?.b ? { b: sec.b } : {}), ...(sec?.h ? { h: sec.h } : {}) }] });
       }
       n++;
     }

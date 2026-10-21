@@ -91,28 +91,42 @@
            onchange={(e) => modelStore.updateFooting(f.id, { balanced: e.currentTarget.checked ? { by: 'structure', ...(f.balanced?.height ? { height: f.balanced.height } : {}) } : undefined })} />
     {t('footing.ui.balanced')}
   </label>
-  <label>{t('footing.ui.strap')}
-    <select data-testid="footing-strap"
+  {#each f.straps ?? [] as s, k (k)}
+    <label>{t('footing.ui.strap')}
+      <select data-testid="footing-strap-{k}"
+              onchange={(e) => {
+                const v = e.currentTarget.value, list = [...(f.straps ?? [])];
+                if (v === '') list.splice(k, 1); else list[k] = { ...s, toFootingId: Number(v), nodeId: undefined };
+                modelStore.updateFooting(f.id, { straps: list.length ? list : undefined });
+              }}>
+        <option value="">{t('footing.ui.noStrap')}</option>
+        {#each [...modelStore.model.footings.values()].filter((g) => g.id !== f.id) as g (g.id)}
+          <option value={g.id} selected={s.toFootingId === g.id}>{g.name}</option>
+        {/each}
+      </select>
+    </label>
+    <label>{t('footing.ui.strapB')}
+      <QuantityInput quantity="length" value={s.b ?? 0} testid="footing-strap-b-{k}"
+             onchange={(v) => modelStore.updateFooting(f.id, { straps: (f.straps ?? []).map((x, j) => (j === k ? { ...x, b: v > 0 ? v : undefined } : x)) })} />
+    </label>
+    <label>{t('footing.ui.strapH')}
+      <QuantityInput quantity="length" value={s.h ?? 0} testid="footing-strap-h-{k}"
+             onchange={(v) => modelStore.updateFooting(f.id, { straps: (f.straps ?? []).map((x, j) => (j === k ? { ...x, h: v > 0 ? v : undefined } : x)) })} />
+    </label>
+  {/each}
+  <label>{t('footing.ui.addStrap')}
+    <select data-testid="footing-strap-add" value=""
             onchange={(e) => {
               const v = e.currentTarget.value;
-              modelStore.updateFooting(f.id, { strap: v === '' ? undefined : { ...(f.strap ?? {}), toFootingId: Number(v) } });
+              if (v !== '') modelStore.updateFooting(f.id, { straps: [...(f.straps ?? []), { toFootingId: Number(v) }] });
+              e.currentTarget.value = '';
             }}>
-      <option value="" selected={!f.strap}>{t('footing.ui.noStrap')}</option>
+      <option value="">—</option>
       {#each [...modelStore.model.footings.values()].filter((g) => g.id !== f.id) as g (g.id)}
-        <option value={g.id} selected={f.strap?.toFootingId === g.id}>{g.name}</option>
+        <option value={g.id}>{g.name}</option>
       {/each}
     </select>
   </label>
-  {#if f.strap}
-    <label>{t('footing.ui.strapB')}
-      <QuantityInput quantity="length" value={f.strap.b ?? 0} testid="footing-strap-b"
-             onchange={(v) => modelStore.updateFooting(f.id, { strap: { ...f.strap!, ...(v > 0 ? { b: v } : { b: undefined }) } })} />
-    </label>
-    <label>{t('footing.ui.strapH')}
-      <QuantityInput quantity="length" value={f.strap.h ?? 0} testid="footing-strap-h"
-             onchange={(v) => modelStore.updateFooting(f.id, { strap: { ...f.strap!, ...(v > 0 ? { h: v } : { h: undefined }) } })} />
-    </label>
-  {/if}
   <label>{t('footing.ui.column')}
     <select data-testid="footing-column"
             onchange={(e) => {

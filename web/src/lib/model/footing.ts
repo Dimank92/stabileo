@@ -122,10 +122,12 @@ export interface Footing {
   /** The wall a strip footing runs under (a `physicalMember` group). */
   wallGroupId?: number;
   /**
-   * The footing a strap beam ties this one to: its offset from its column is then the strap's
-   * to carry, and it is checked centred (`engine/foundation/strap-footing.ts`).
+   * The strap beams that tie this footing to others: what lies along each, its offset from its
+   * column and the column's moment, is then the strap's to carry, and with straps both ways it is
+   * checked centred (`engine/foundation/strap-footing.ts`). `nodeId`: where the strap reaches the
+   * partner, when not at its own node (a strip's wall); b × h, its section, m.
    */
-  strap?: { toFootingId: number; b?: number; h?: number };
+  straps?: Array<{ toFootingId: number; nodeId?: number; b?: number; h?: number }>;
   /**
    * The offset across a footing taken by the structure above it rather than by the soil: a basement
    * wall on an eccentric strip, propped by the floor at its head, carries the moment of the offset as
@@ -523,7 +525,14 @@ export function migrateFootings(raw: unknown, defaults: { cover: number }): Foot
         ? { anchor: [e.anchor[0], e.anchor[1]] as [number, number] } : {}),
       ...(typeof e.wallGroupId === 'number' && Number.isFinite(e.wallGroupId) ? { wallGroupId: e.wallGroupId } : {}),
       ...(e.balanced && (e.balanced as { by?: unknown }).by === 'structure' ? { balanced: { by: 'structure' as const, ...(typeof (e.balanced as { height?: unknown }).height === 'number' ? { height: (e.balanced as { height: number }).height } : {}) } } : {}),
-      ...(e.strap && typeof (e.strap as { toFootingId?: unknown }).toFootingId === 'number' ? { strap: { toFootingId: (e.strap as { toFootingId: number }).toFootingId, ...(typeof (e.strap as { b?: unknown }).b === 'number' ? { b: (e.strap as { b: number }).b } : {}), ...(typeof (e.strap as { h?: unknown }).h === 'number' ? { h: (e.strap as { h: number }).h } : {}) } } : {}),
+      ...(Array.isArray(e.straps) ? (() => {
+        const n = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : undefined);
+        const list = (e.straps as Array<Record<string, unknown>>).filter((x) => x && n(x.toFootingId) !== undefined).map((x) => ({
+          toFootingId: n(x.toFootingId)!, ...(n(x.nodeId) !== undefined ? { nodeId: n(x.nodeId)! } : {}),
+          ...(n(x.b) !== undefined ? { b: n(x.b)! } : {}), ...(n(x.h) !== undefined ? { h: n(x.h)! } : {}),
+        }));
+        return list.length ? { straps: list } : {};
+      })() : {}),
       ...(e.piles && typeof e.piles === 'object' ? (() => {
         const p = e.piles as Record<string, unknown>;
         const piles = { count: num(p.count, 0), diameter: num(p.diameter, 0), length: num(p.length, 0), spacing: num(p.spacing, 0) };
