@@ -6062,6 +6062,7 @@ const es: Record<string, string> = {
   'desk.resized.reason.column': 'ninguna armadura de columna verifica',
   'desk.resized.undo': 'Deshacer vuelve todas estas secciones a como estaban, en un solo paso.',
   'desk.resized.stopped.verified': 'Cada miembro tiene una armadura que verifica para su sección.',
+  'desk.resized.stopped.blocked': 'No se propone otro cambio automático de sección. Quedan verificaciones fallidas, incompletas o bloqueadas; revisá los resultados por miembro antes de continuar.',
   'desk.resized.stopped.noChange': 'Quedan miembros sin armadura que verifique y sus secciones ya no pueden crecer (1,20 m, o un miembro bloqueado).',
   'desk.resized.stopped.maxRounds': 'Se detuvo después de {n} vueltas con miembros todavía sin armadura que verifique.',
   'desk.resized.stopped.solveFailed': 'El cálculo falló después de agrandar las secciones; se conservan los cambios hasta ese punto.',

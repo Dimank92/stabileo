@@ -6069,6 +6069,7 @@ const en: Record<string, string> = {
   'desk.resized.reason.column': 'no column reinforcement verifies',
   'desk.resized.undo': 'Undo puts all these sections back as they were, in one step.',
   'desk.resized.stopped.verified': 'Each member has a reinforcement that verifies for its section.',
+  'desk.resized.stopped.blocked': 'No further automatic section change is proposed. Some checks remain failed, incomplete or blocked; review the member results before continuing.',
   'desk.resized.stopped.noChange': 'Some members have no reinforcement that verifies and their sections can no longer grow (1.20 m, or a locked member).',
   'desk.resized.stopped.maxRounds': 'Stopped after {n} rounds with members still lacking a reinforcement that verifies.',
   'desk.resized.stopped.solveFailed': 'The analysis failed after the sections were enlarged; the changes up to that point are kept.',

@@ -5521,6 +5521,7 @@ const pt: Translations = {
   'desk.resized.reason.column': 'nenhuma armadura de pilar verifica',
   'desk.resized.undo': 'Desfazer devolve todas essas seções ao que eram, em um só passo.',
   'desk.resized.stopped.verified': 'Cada elemento tem uma armadura que verifica para a sua seção.',
+  'desk.resized.stopped.blocked': 'Nenhuma outra alteração automática de seção é proposta. Há verificações reprovadas, incompletas ou bloqueadas; revise os resultados por elemento antes de continuar.',
   'desk.resized.stopped.noChange': 'Restam elementos sem armadura que verifique e suas seções já não podem crescer (1,20 m, ou um elemento bloqueado).',
   'desk.resized.stopped.maxRounds': 'Parou depois de {n} rodadas com elementos ainda sem armadura que verifique.',
   'desk.resized.stopped.solveFailed': 'O cálculo falhou depois de aumentar as seções; as alterações até esse ponto são mantidas.',

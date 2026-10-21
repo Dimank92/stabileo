@@ -58,7 +58,7 @@ import type { ProvidedRebarResult } from '../station-design-forces';
 import type { FinalGeometryRecord, RunDetailingResult } from './run-detailing';
 
 /** How the whole loop ended. Same vocabulary as a single member's repair. */
-export type LoopOutcome = RepairKind | 'FEEDBACK_LOOP_CYCLE_DETECTED';
+export type LoopOutcome = RepairKind | 'FEEDBACK_LOOP_CYCLE_DETECTED' | 'FINAL_DETAIL_REGRESSION';
 
 /**
  * Precedence when several members end differently.
@@ -73,6 +73,7 @@ const OUTCOME_PRECEDENCE: LoopOutcome[] = [
   'UNSUPPORTED_FINAL_GEOMETRY_CHECK',
   'CANDIDATE_ENVELOPE_EXHAUSTED',
   'FEEDBACK_LOOP_CYCLE_DETECTED',
+  'FINAL_DETAIL_REGRESSION',
   'FEEDBACK_LOOP_TRUNCATED',
 ];
 
@@ -119,6 +120,10 @@ export interface LoopIteration {
   repairs: RepairResult[];
   /** Members whose reinforcement actually changed as a result. */
   changed: number[];
+  /** Proposed replacements, including trials rejected after full coordination. */
+  proposed: number[];
+  /** A locally passing repair made the full detail worse; retain the previous assignment. */
+  rejected?: 'FINAL_DETAIL_REGRESSION';
   /** Assemblies that own a changed member, and therefore must be re-coordinated. */
   affectedAssemblies: string[];
   /** Members sharing a joint with a changed member — the adjacency that must move with it. */
@@ -129,7 +134,7 @@ export interface LoopIteration {
 
 export interface DesignFeedbackLoopResult {
   outcome: LoopOutcome;
-  /** The detailing result to persist: the last one produced, always fully re-verified. */
+  /** The retained detailing result, paired with the assignment that produced it. */
   result: RunDetailingResult;
   /** The reinforcement assignment that produced `result`. */
   outcomes: ReadonlyMap<number, MemberDesignOutcome>;
@@ -137,7 +142,7 @@ export interface DesignFeedbackLoopResult {
   /** Members still failing re-verification, with the reason the repair could not fix them. */
   unrepaired: Array<{
     elementId: number;
-    kind: RepairKind;
+    kind: LoopOutcome;
     limiting: LimitingConstraint[];
     finalUtilization: number;
   }>;
@@ -191,7 +196,7 @@ function adjacentTo(
 /**
  * Run the loop.
  *
- * Returns the LAST detailing result, which is always one that has been re-verified at its
+ * Returns the retained detailing result, which is always one that has been re-verified at its
  * own final geometry — never an earlier pass's geometry with a later pass's certificates.
  */
 export function runDesignFeedbackLoop(
@@ -200,8 +205,9 @@ export function runDesignFeedbackLoop(
   const maxIterations = input.maxIterations ?? DEFAULT_MAX_ITERATIONS;
   const locked = input.lockedMembers ?? new Set<number>();
   const iterations: LoopIteration[] = [];
-  /** Verdicts already computed, keyed `rebarHash@finalGeometryHash`. Shared across passes. */
-  const memo = new Map<string, ProvidedRebarResult>();
+  // Identical bars and layer offsets do not imply identical demands, sections or materials.
+  // Share verdicts across passes of ONE member, never across different members.
+  const memberMemos = new Map<number, Map<string, ProvidedRebarResult>>();
   /** Arrangements known not to verify at some geometry, per member. */
   const rejectedByMember = new Map<number, Set<string>>();
   /** Cost of the last accepted arrangement, per member, for monotone progress. */
@@ -223,6 +229,7 @@ export function runDesignFeedbackLoop(
   const lastRepairs = new Map<number, RepairResult>();
   const lastFeedback = new Map<number, FinalGeometryDesignFeedback>();
   let cycleDetected = false;
+  let detailRegressed = false;
 
   for (let iter = 1; ; iter++) {
     const failing = failingRecords(result, input.contexts);
@@ -240,6 +247,8 @@ export function runDesignFeedbackLoop(
       const ctx = input.contexts.get(rec.elementId);
       const current = outcomes.get(rec.elementId);
       if (!ctx || !current?.accepted) continue;
+      let memo = memberMemos.get(rec.elementId);
+      if (!memo) { memo = new Map(); memberMemos.set(rec.elementId, memo); }
 
       const ctxAtFinal: MemberContext = {
         ...ctx,
@@ -322,16 +331,18 @@ export function runDesignFeedbackLoop(
     const adjacentMembers = adjacentTo(changed, result);
 
     const nextHash = assignmentHashOf(nextOutcomes);
-    iterations.push({
+    const iteration: LoopIteration = {
       index: iter,
       failed: failing.map((r) => r.elementId),
       feedback,
       repairs,
-      changed: [...changed].sort((a, b) => a - b),
+      changed: [],
+      proposed: [...changed].sort((a, b) => a - b),
       affectedAssemblies,
       adjacentMembers,
-      assignmentHash: nextHash,
-    });
+      assignmentHash: assignmentHashOf(outcomes),
+    };
+    iterations.push(iteration);
     stats.iterations = iter;
 
     // Nothing moved: every failing member is unrepairable for a reason already recorded.
@@ -353,9 +364,17 @@ export function runDesignFeedbackLoop(
     // against a cage that no longer exists. The affected set is reported so the scope is
     // visible, and `feedback-loop.test.ts` asserts the corresponding invariant — assemblies
     // owning no changed member come back byte-identical.
-    outcomes = nextOutcomes;
-    result = input.detail(outcomes);
+    const trial = input.detail(nextOutcomes);
     stats.detailingRuns++;
+    if (detailRegresses(result, trial)) {
+      detailRegressed = true;
+      iteration.rejected = 'FINAL_DETAIL_REGRESSION';
+      break;
+    }
+    outcomes = nextOutcomes;
+    result = trial;
+    iteration.changed = iteration.proposed;
+    iteration.assignmentHash = nextHash;
   }
 
   // ── Classify the ending ──
@@ -365,7 +384,10 @@ export function runDesignFeedbackLoop(
     const fb = lastFeedback.get(rec.elementId);
     return {
       elementId: rec.elementId,
-      kind: repair?.kind ?? ('FEEDBACK_LOOP_TRUNCATED' as RepairKind),
+      // A certificate at the previous geometry is not a pass at the retained geometry.
+      kind: !repair || repair.kind === 'FINAL_GEOMETRY_VERIFIED'
+        ? (detailRegressed ? 'FINAL_DETAIL_REGRESSION' : 'FEEDBACK_LOOP_TRUNCATED') as LoopOutcome
+        : repair.kind,
       limiting: repair?.limiting ?? [],
       finalUtilization: fb?.finalUtilization ?? Number.NaN,
     };
@@ -379,11 +401,48 @@ export function runDesignFeedbackLoop(
   if (stillFailing.length > 0) {
     const kinds = new Set<LoopOutcome>(unrepaired.map((u) => u.kind));
     if (cycleDetected) kinds.add('FEEDBACK_LOOP_CYCLE_DETECTED');
+    if (detailRegressed) kinds.add('FINAL_DETAIL_REGRESSION');
     if (stats.truncated) kinds.add('FEEDBACK_LOOP_TRUNCATED');
     outcome = OUTCOME_PRECEDENCE.find((k) => kinds.has(k)) ?? 'FEEDBACK_LOOP_TRUNCATED';
   }
 
   return { outcome, result, outcomes, iterations, unrepaired, sectionAdvice, stats };
+}
+
+/**
+ * A local repair must survive full detailing. Do not trade a previously verified member,
+ * missing verification, or an additional physical blocker for fewer local check failures.
+ * These are separate gates, not a weighted score where steel savings can cancel a failure.
+ */
+function detailRegresses(before: RunDetailingResult, after: RunDetailingResult): boolean {
+  const passes = (status: FinalGeometryRecord['status']) => status === 'ok' || status === 'warn';
+  const next = new Map(after.reverification.map(r => [r.elementId, r]));
+  if (before.reverification.some(r => !next.has(r.elementId)
+    || (passes(r.status) && !passes(next.get(r.elementId)!.status)))) return true;
+  const counts = (r: RunDetailingResult) => [
+    r.reverification.filter(v => v.status === 'fail').length,
+    r.reverification.filter(v => v.status === 'noBars' || v.status === 'noVerifier').length,
+    r.skipped.length,
+    r.provisionalMembers.length,
+    r.assemblies.reduce((n, a) => n + a.conflicts.filter(c => c.severity !== 'marginal').length, 0),
+    r.assemblies.reduce((n, a) => n + a.unsupported.length, 0),
+  ];
+  const previous = counts(before);
+  if (counts(after).some((n, i) => n > previous[i])) return true;
+  const blockers = (r: RunDetailingResult) => {
+    const tally = new Map<string, number>();
+    for (const a of r.assemblies) {
+      for (const u of a.unsupported) tally.set(u.key, (tally.get(u.key) ?? 0) + 1);
+      for (const c of a.conflicts) {
+        if (c.severity === 'marginal') continue;
+        const key = `conflict:${c.severity}`;
+        tally.set(key, (tally.get(key) ?? 0) + 1);
+      }
+    }
+    return tally;
+  };
+  const priorBlockers = blockers(before);
+  return [...blockers(after)].some(([key, n]) => n > (priorBlockers.get(key) ?? 0));
 }
 
 /**
