@@ -86,6 +86,33 @@
     <QuantityInput quantity="length" value={f.eccentricityL} testid="footing-ecc-l"
            onchange={(v) => modelStore.updateFooting(f.id, { eccentricityL: v })} />
   </label>
+  <label class="check">
+    <input type="checkbox" checked={f.balanced?.by === 'structure'} data-testid="footing-balanced"
+           onchange={(e) => modelStore.updateFooting(f.id, { balanced: e.currentTarget.checked ? { by: 'structure', ...(f.balanced?.height ? { height: f.balanced.height } : {}) } : undefined })} />
+    {t('footing.ui.balanced')}
+  </label>
+  <label>{t('footing.ui.strap')}
+    <select data-testid="footing-strap"
+            onchange={(e) => {
+              const v = e.currentTarget.value;
+              modelStore.updateFooting(f.id, { strap: v === '' ? undefined : { ...(f.strap ?? {}), toFootingId: Number(v) } });
+            }}>
+      <option value="" selected={!f.strap}>{t('footing.ui.noStrap')}</option>
+      {#each [...modelStore.model.footings.values()].filter((g) => g.id !== f.id) as g (g.id)}
+        <option value={g.id} selected={f.strap?.toFootingId === g.id}>{g.name}</option>
+      {/each}
+    </select>
+  </label>
+  {#if f.strap}
+    <label>{t('footing.ui.strapB')}
+      <QuantityInput quantity="length" value={f.strap.b ?? 0} testid="footing-strap-b"
+             onchange={(v) => modelStore.updateFooting(f.id, { strap: { ...f.strap!, ...(v > 0 ? { b: v } : { b: undefined }) } })} />
+    </label>
+    <label>{t('footing.ui.strapH')}
+      <QuantityInput quantity="length" value={f.strap.h ?? 0} testid="footing-strap-h"
+             onchange={(v) => modelStore.updateFooting(f.id, { strap: { ...f.strap!, ...(v > 0 ? { h: v } : { h: undefined }) } })} />
+    </label>
+  {/if}
   <label>{t('footing.ui.column')}
     <select data-testid="footing-column"
             onchange={(e) => {
