@@ -4389,6 +4389,14 @@
     display: block;
     width: 100% !important;
     height: 100% !important;
+    /*
+     * three r186's OrbitControls writes an inline cursor on its canvas — 'auto' at connect
+     * (its base class runs disconnect() first), 'grab'/'grabbing' around a drag. An inline
+     * style beats the wrapper's own `cursor: {cursorStyle}`, so the crosshair that drawing
+     * a node, a member or a plate shows never reached the canvas. The wrapper is the one
+     * place that knows the active tool, so it rules; the canvas inherits it.
+     */
+    cursor: inherit !important;
   }
   .inset-frame {
     position: absolute;
