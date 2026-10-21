@@ -77,6 +77,8 @@
           '' + pkgs.lib.optionalString pkgs.stdenv.isLinux ''
             # The shell replaces XDG_DATA_DIRS; without the system dirs WebKit finds no MIME database and refuses every load.
             export XDG_DATA_DIRS="''${XDG_DATA_DIRS:+$XDG_DATA_DIRS:}/usr/local/share:/usr/share"
+            # Playwright checks browser libraries with the ldd on PATH, which here is the shell's and cannot see the system's.
+            export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1
           '';
 
           LANG = "en_US.UTF-8";
