@@ -402,15 +402,8 @@ jobs:
         run: make web.deps
       - name: Install browser system dependencies
         run: nix develop --command bash -c "cd web && npx playwright install-deps chromium firefox webkit"
-      - name: Environment the Nix shell adds (diagnostics)
-        run: |
-          env | sort > "$RUNNER_TEMP/env-runner.txt"
-          nix develop --command bash -c 'env | sort' > "$RUNNER_TEMP/env-nix.txt"
-          diff "$RUNNER_TEMP/env-runner.txt" "$RUNNER_TEMP/env-nix.txt" | grep '^>' | cut -c1-160 || true
       - name: Bit-identical in Node and every browser
         run: make test.web.determinism
-        env:
-          DEBUG: pw:browser
       - name: Upload determinism artifacts
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
