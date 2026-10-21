@@ -98,6 +98,8 @@ export interface MemberContext {
   flange?: { bf: number; hf: number; kind: 'T' | 'L'; datum?: 'insertion' | 'assumed' };
   /** A beam in the plane of a slab cast with its top, flange or not: the slab's diaphragm is there. */
   inSlabPlane?: boolean;
+  /** The factor on J the member was analysed with, when below 1 (`AnalysisSettings.beamTorsion`). */
+  torsionStiffness?: number;
   /**
    * The member's FINAL physical geometry, when coordination has moved its steel.
    *
@@ -262,6 +264,8 @@ export interface BuildContextOptions {
   flangeOf?: (elementId: number) => { bf: number; hf: number; kind: 'T' | 'L'; datum?: 'insertion' | 'assumed' } | undefined;
   /** Whether a beam lies in the plane of a slab cast with its top, flange or not (`beamsInSlabPlane`). */
   inSlabPlane?: (elementId: number) => boolean;
+  /** The factor on J a member is analysed with (`solveStiffnessFactors`). */
+  torsionStiffnessOf?: (elementId: number) => number;
   /** The project's declaration of each member's role in the lateral system (`store/lateral-system.ts`). */
   lateralOf?: (elementId: number, kind: 'beam' | 'column' | 'wall') => LateralReading;
 }
@@ -353,6 +357,7 @@ export function buildMemberContext(
     section: { id: sec?.id ?? -1, name: sec?.name ?? '—', b, h },
     ...(elementType === 'beam' && opts.flangeOf?.(elementId) ? { flange: opts.flangeOf(elementId)! } : {}),
     ...(inSlab ? { inSlabPlane: true } : {}),
+    ...((() => { const j = opts.torsionStiffnessOf?.(elementId); return j !== undefined && j < 1 ? { torsionStiffness: j } : {}; })()),
     ...(opts.lateralOf ? { lateral: opts.lateralOf(elementId, elementType) } : {}),
     material: {
       fc: fc ?? 0, fy, cover, stirrupDia, maxAggregateSize,
