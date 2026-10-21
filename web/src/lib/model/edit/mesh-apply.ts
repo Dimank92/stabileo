@@ -101,10 +101,12 @@ export function applyMesh(input: MeshInput, o: MeshApplyOptions, mesh: MeshOutpu
       return id;
     });
     out.nodeIds = ids;
+    const at3 = (id: number) => { const p = modelStore.nodes.get(id)!; return { x: p.x, y: p.y, z: p.z ?? 0 }; };
     for (const c of mesh.cells) {
-      const n = c.map((i) => ids[i]!);
-      if (n.length === 4) out.quads.push(modelStore.addQuad(n as [number, number, number, number], o.materialId, o.thickness));
-      else out.plates.push(modelStore.addPlate(n as [number, number, number], o.materialId, o.thickness));
+      for (const n of validCells(c.map((i) => ids[i]!), at3)) {
+        if (n.length === 4) out.quads.push(modelStore.addQuad(n as [number, number, number, number], o.materialId, o.thickness));
+        else out.plates.push(modelStore.addPlate(n as [number, number, number], o.materialId, o.thickness));
+      }
     }
     if (o.splitBeams) {
       // Every mesh node a member passes through cuts it: on the region's edge (the beams round a
@@ -117,3 +119,46 @@ export function applyMesh(input: MeshInput, o: MeshApplyOptions, mesh: MeshOutpu
   });
   return out;
 }
+
+/**
+ * A mesh cell as the model can hold it, once its points have landed on the model's nodes.
+ *
+ * Two points of a cell within the weld tolerance of one existing node land on that node, and the
+ * cell loses a corner: a quad whose two opposite corners became one node folds over itself, and the
+ * solve refused the whole model for it (a column a few centimetres from a beam the mesh follows).
+ * Repeated corners are dropped; three left in order make a triangle; a cell that encloses no area
+ * is left out (it was a sliver between two points the weld made one). A quad with four corners that
+ * turns back on itself is split along the diagonal that leaves two proper triangles.
+ */
+export function validCells(n: readonly number[], at: (id: number) => { x: number; y: number; z: number }): number[][] {
+  const cyc = n.filter((id, i) => id !== n[(i + n.length - 1) % n.length]);
+  const uniq = [...new Set(cyc)];
+  const area = (ids: readonly number[]) => {
+    // Twice the area, from the cross products about the first corner (any plane).
+    const p = ids.map(at), o = p[0]!;
+    let x = 0, y = 0, z = 0;
+    for (let i = 1; i + 1 < p.length; i++) {
+      const a = { x: p[i]!.x - o.x, y: p[i]!.y - o.y, z: p[i]!.z - o.z }, b = { x: p[i + 1]!.x - o.x, y: p[i + 1]!.y - o.y, z: p[i + 1]!.z - o.z };
+      x += a.y * b.z - a.z * b.y; y += a.z * b.x - a.x * b.z; z += a.x * b.y - a.y * b.x;
+    }
+    return { x, y, z, m: Math.hypot(x, y, z) };
+  };
+  if (uniq.length < 3 || cyc.length !== uniq.length) {
+    // A spike (a corner repeated across the cell) or fewer than three corners: the corners left,
+    // in order, if they still make a triangle with area.
+    if (uniq.length === 3 && cyc.length === 3 && area(uniq).m > 1e-8) return [uniq];
+    return [];
+  }
+  if (uniq.length === 3) return area(uniq).m > 1e-8 ? [uniq] : [];
+  // Four corners: the two triangles on each diagonal must face the way the whole cell does.
+  const whole = area(uniq);
+  if (whole.m <= 1e-8) return [];
+  const dot = (t: number[]) => { const a = area(t); return a.x * whole.x + a.y * whole.y + a.z * whole.z; };
+  const [a, b, c, d] = uniq as [number, number, number, number];
+  if (dot([a, b, c]) > 0 && dot([a, c, d]) > 0 && dot([b, c, d]) > 0 && dot([a, b, d]) > 0) return [uniq];
+  for (const pair of [[[a, b, c], [a, c, d]], [[a, b, d], [b, c, d]]]) {
+    if (pair.every((t) => dot(t) > 1e-10)) return pair;
+  }
+  return [];
+}
+
