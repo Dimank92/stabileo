@@ -2,13 +2,9 @@
   import { modelStore, uiStore, resultsStore } from '../lib/store';
   import type { IfcFootingRead, IfcStairRead, IfcMember, IfcMappingResult, IfcStorey, IfcSurface } from '../lib/ifc/ifc-mapper';
   import { t, tp } from '../lib/i18n';
-  import { buildIfcFragment, chosenParts, classesIn, connectShells, fixBases, storeyLevels, type ClassChoice, type IfcBuilding } from '../lib/ifc/ifc-physical';
-  import { analyticalFromIfc, type FloorRegion } from '../lib/ifc/ifc-analytical';
-  import { meshFloors } from '../lib/ifc/ifc-floors';
-  import { placeFootings } from '../lib/ifc/ifc-footings';
-  import { placeStairs } from '../lib/ifc/ifc-stairs';
-  import { insertFragment } from '../lib/model/edit/transformed-copy';
-  import { IDENTITY } from '../lib/model/edit/affine';
+  import { classesIn, connectShells, type ClassChoice, type IfcBuilding } from '../lib/ifc/ifc-physical';
+  import type { FloorRegion } from '../lib/ifc/ifc-analytical';
+  import { mapIfcBuilding, replaceWithIfcBuilding, type IfcImportOptions } from '../lib/ifc/ifc-import';
   import { placementStore } from '../lib/store/placement.svelte';
   import IfcPreview from './IfcPreview.svelte';
 
@@ -93,25 +89,12 @@
     reader.readAsArrayBuffer(file);
   });
 
-  /** The levels the elements are declared on: the storeys, when they become the model's levels. */
-  const levelsFor = (replace: boolean) => (storeysAsLevels && (replace || !modelStore.grid?.levels.length) ? storeyLevels(storeys) : modelStore.grid?.levels ?? []);
+  /** The dialog's choices, as the import takes them (`ifc-import.ts`). */
+  const options = (): IfcImportOptions => ({ choices, snapTolerance, membersAsTruss, meshSize, declare: declareElements, storeysAsLevels, analytical, fixFeet });
 
   function remapModel(replace = true) {
-    if (members.length === 0 && surfaces.length === 0) {
-      building = null;
-      return;
-    }
     try {
-      const levels = levelsFor(replace);
-      if (analytical && levels.length > 0) {
-        const parts = chosenParts(members, surfaces, choices);
-        const an = analyticalFromIfc(parts.members, parts.surfaces, levels);
-        floors = an.floors;
-        building = buildIfcFragment(an.members, an.walls, { snapTolerance, membersAsTruss, choices, meshSize, declare: declareElements, levels });
-      } else {
-        floors = [];
-        building = buildIfcFragment(members, surfaces, { snapTolerance, membersAsTruss, choices, meshSize, declare: declareElements, levels });
-      }
+      ({ building, floors } = mapIfcBuilding({ members, surfaces, storeys }, options(), replace));
       error = null;
     } catch (e: any) {
       error = e.message || t('ifc.mapError');
@@ -135,21 +118,9 @@
     if (!building) return;
     // The import replaces the open model: it is asked, not done.
     if (hasModel && !confirm(t('ifc.replaceConfirm'))) return;
-    remapModel(true);
-    const b = building!;
-    modelStore.batch(() => {
-      modelStore.clear();
-      modelStore.model.name = fileName.replace(/\.ifc$/i, '') || modelStore.model.name;
-      if (storeysAsLevels && storeys.length > 0) modelStore.setGrid({ axes: [], levels: storeyLevels(storeys) });
-      const r = insertFragment(b.fragment, [{ A: IDENTITY, t: [0, 0, 0] }]);
-      connectShells(r.quads, r.plates);
-      if (floors.length) meshFloors(floors, { meshSize, declare: declareElements });
-      if (fixFeet) fixBases();
-      // The file's pads and strips, under the columns and walls they carry.
-      if (ifcFootings.length) placeFootings(ifcFootings);
-      // The file's flights, built and joined to the floors they reach (the model of calculation only).
-      if (ifcStairs.length && floors.length) placeStairs(ifcStairs, levelsFor(true));
-    });
+    const b = replaceWithIfcBuilding({ members, surfaces, storeys, footings: ifcFootings, stairs: ifcStairs }, options(), fileName.replace(/\.ifc$/i, '') || undefined);
+    if (!b) return;
+    building = b;
     resultsStore.clear();
     // IFC is imported in PRO and stays there. Setting the mode to '3d' here used to switch the
     // app to Basic — its ribbon, its panel and its URL — with the PRO button left unresponsive.
