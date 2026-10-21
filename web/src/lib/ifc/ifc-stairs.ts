@@ -10,7 +10,7 @@
  * the slab it reaches).
  *
  * The stair is then joined to the structure: each of its free edges and its landings' borders to
- * the nearest node of the building within 0,6 m, by a rigid link; a lower edge with nothing near
+ * the nearest node of the building within 0,6 m, by a stiff connector; a lower edge with nothing near
  * is set in the ground (fixed). A part of a stair joined to nothing is left out, which a solve
  * would refuse as disconnected. Each flight kept is declared a stair (`designStairFromFlight`)
  * with its riser, tread, steps, width and waist, for the stair design.
@@ -31,6 +31,12 @@ const REACH = 0.6;
 const ON_LANDING = 0.15, ON_LANDING_Z = 0.3;
 /** Cuts of a landing closer than this are one: no sliver shells, m. */
 const CUT_MERGE = 0.1;
+/**
+ * The stiffness a stair is joined to the structure with, kN/m and kN·m/rad: some ten times a
+ * concrete slab's own over a metre, so the joint holds as a rigid one would without spoiling the
+ * solve's conditioning.
+ */
+const LINK_K = 1e7, LINK_KR = 1e6;
 /** A riser where the file states none: what a dwelling stair has. */
 const DEFAULT_RISER = 0.175;
 
@@ -143,9 +149,12 @@ export function placeStairs(stairs: readonly IfcStairRead[], levels: readonly Le
   };
   const idOf = (p: P) => findCoincidentNode(modelStore.model.nodes.values(), p.x, p.y, p.z);
   const tiedNodes = new Set<number>(), fixedNodes = new Set<number>();
+  // A stiff connector, not a rigid-link constraint: the constraints' check went over every node
+  // for each of them, which took a building's combinations from seconds to minutes, and a model with
+  // constraints withholds the participation factors its response spectrum needs.
   const tie = (id: number, master: number) => {
     if (tiedNodes.has(id) || fixedNodes.has(id)) return;
-    modelStore.addConstraint({ type: 'rigidLink', masterNode: master, slaveNode: id, dofs: [0, 1, 2, 3, 4, 5] } as never);
+    modelStore.addConnector({ nodeI: master, nodeJ: id, kAxial: LINK_K, kShear: LINK_K, kShearZ: LINK_K, kMoment: LINK_KR, kBendY: LINK_KR, kBendZ: LINK_KR });
     tiedNodes.add(id); slaves.add(id);
   };
   for (const f of flights) {

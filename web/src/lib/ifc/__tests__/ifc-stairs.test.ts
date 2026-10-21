@@ -22,8 +22,11 @@ describe('stairs from a file', () => {
       flights: [{ low: [{ x: 0, y: 0.55, z: -2.45 }, { x: 0, y: -0.55, z: -2.45 }], high: [{ x: 2.6, y: 0.55, z: -0.12 }, { x: 2.6, y: -0.55, z: -0.12 }], waist: 0.15 }],
     }], levels);
     expect(r).toMatchObject({ flights: 1, landings: 0, tied: 1, grounded: 1, skipped: [] });
-    const links = modelStore.model.constraints as Array<{ masterNode: number }>;
-    expect(links.map((c) => c.masterNode).sort()).toEqual([f1, f2].sort());
+    // Joined by stiff connectors, not constraints: a solve with constraints is slow on a building and
+    // gives a response spectrum no participation factors.
+    expect(modelStore.model.constraints).toHaveLength(0);
+    const links = [...(modelStore.model.connectors?.values() ?? [])];
+    expect(links.map((c) => c.nodeI).sort()).toEqual([f1, f2].sort());
     expect([...modelStore.supports.values()].filter((s) => s.type === 'fixed3d')).toHaveLength(2);
     const e = stairEntries().at(-1)!;
     expect(e).toMatchObject({ steps: 14, waist: 0.15 });
@@ -56,7 +59,7 @@ describe('stairs from a file', () => {
     const at = (x: number, y: number) => [...modelStore.nodes.values()].find((n) => Math.hypot(n.x - x, n.y - y, (n.z ?? 0) - 1.25) < 1e-6)?.id;
     for (const [x, y] of [[2.5, 0], [2.5, 1]]) expect(landingNodes.has(at(x, y)!)).toBe(true);
     // The top ties to the floor, the landing's far side to the wall.
-    const masters = new Set((modelStore.model.constraints as Array<{ masterNode: number }>).map((c) => c.masterNode));
+    const masters = new Set([...(modelStore.model.connectors?.values() ?? [])].map((c) => c.nodeI));
     for (const n of [t1, t2, w1, w2]) expect(masters.has(n)).toBe(true);
   });
 
