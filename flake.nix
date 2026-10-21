@@ -74,6 +74,9 @@
             export MIX_HOME="''${MIX_HOME:-$PWD/.mix}"
             export HEX_HOME="''${HEX_HOME:-$PWD/.hex}"
             export ERL_AFLAGS="''${ERL_AFLAGS:--kernel shell_history enabled}"
+          '' + pkgs.lib.optionalString pkgs.stdenv.isLinux ''
+            # The shell replaces XDG_DATA_DIRS; without the system dirs WebKit finds no MIME database and refuses every load.
+            export XDG_DATA_DIRS="''${XDG_DATA_DIRS:+$XDG_DATA_DIRS:}/usr/local/share:/usr/share"
           '';
 
           LANG = "en_US.UTF-8";
