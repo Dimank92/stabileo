@@ -119,7 +119,7 @@
     <p class="di-hint">{t('desk.pickMember')}</p>
   {:else}
     <header class="di-head">
-      <h4>{row.name}</h4>
+      <h4 data-member-id={row.id}>{row.name}</h4>
       <span class="di-status st-{row.status}" data-testid="desk-status" data-status={row.status} data-local={verdict?.local}>{t(`desk.f.${row.status === 'provisional' ? 'fail' : row.status === 'stale' ? 'unavailable' : row.status}`)}{row.ratio !== null ? ` · ${t('verdict.local.ratio')} ${row.ratio.toFixed(2)}` : ''}</span>
       <span class="di-decision" data-testid="desk-decision">{t(`desk.d.${decision}`)}</span>
     </header>

@@ -130,6 +130,7 @@ async function designAndDocument(page: Page, j: string): Promise<void> {
     await page.getByTestId('desk-design').click();
     // The slabs too: frames are the default, a building has floors.
     await page.getByTestId('desk-run-family-slab').check();
+    if (await page.getByTestId('desk-run-resize').count()) await page.getByTestId('desk-run-resize').setChecked(false);
     await page.getByTestId('desk-run').click();
     await expect(page.getByTestId('desk-report')).toBeVisible({ timeout: 180_000 });
     const counts = await page.evaluate(() => window.__stabileo.runCounts());
@@ -241,6 +242,7 @@ test.describe('@slow acceptance of the two journeys', () => {
       await solveModel(page);
       await openDeskStage(page);
       await page.getByTestId('desk-design').click();
+      if (await page.getByTestId('desk-run-resize').count()) await page.getByTestId('desk-run-resize').setChecked(false);
       await page.getByTestId('desk-run').click();
       await expect(page.getByTestId('desk-report')).toBeVisible({ timeout: 180_000 });
       const report = await page.getByTestId('desk-report').innerText();
