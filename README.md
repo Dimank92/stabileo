@@ -162,8 +162,8 @@ Its toolchain and PostgreSQL come from the Nix flake:
 
 ```bash
 make setup         # claim an instance, start PostgreSQL, fetch deps, create and seed the DB
-make backend.run   # http://localhost:4100
-make web.run       # http://localhost:4000, pointed at that backend
+make backend.run   # http://localhost:4100 (4100 + INST*10)
+make web.run       # http://localhost:4000 (4000 + INST*10), pointed at that backend
 make test.backend  # backend tests
 ```
 

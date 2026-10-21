@@ -1,4 +1,4 @@
-import { request } from './client';
+import { API_URL, request } from './client';
 import type { Account, LoginInput, Session } from './auth';
 
 export interface AdminAccount extends Account {
@@ -23,6 +23,40 @@ export interface ListUsersParams {
   search?: string;
 }
 
+export type AllowedEmailSortBy = 'email' | 'inserted_at';
+
+export interface ListAllowedEmailsParams {
+  limit?: number;
+  offset?: number;
+  sort_by?: AllowedEmailSortBy;
+  sort_dir?: SortDir;
+  status?: StatusFilter;
+  search?: string;
+}
+
+export interface AdminAuthConfig {
+  password_login: boolean;
+  google_login: boolean;
+}
+
+export interface AdminSettings {
+  user_login_enabled: boolean;
+}
+
+export interface AllowedEmail {
+  id: string;
+  email: string;
+  is_active: boolean;
+  added_by: { id: string; email: string } | null;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface AllowedEmailPage {
+  data: AllowedEmail[];
+  meta: ListMeta;
+}
+
 export interface ListMeta {
   total: number;
   limit: number;
@@ -43,7 +77,7 @@ export const ADMIN_BASE = '/api/v1/admin';
 
 const PARAM_ORDER: (keyof ListUsersParams)[] = ['search', 'status', 'sort_by', 'sort_dir', 'limit', 'offset'];
 
-export function usersQueryString(params: ListUsersParams = {}): string {
+export function usersQueryString(params: ListUsersParams | ListAllowedEmailsParams = {}): string {
   const qs = new URLSearchParams();
   for (const key of PARAM_ORDER) {
     const value = params[key];
@@ -56,11 +90,27 @@ export function usersQueryString(params: ListUsersParams = {}): string {
   return out ? `?${out}` : '';
 }
 
+function allowedEmailPath(id: string): string {
+  return `${ADMIN_BASE}/allowed-emails/${encodeURIComponent(id)}`;
+}
+
+export function googleSignInUrl(): string {
+  return `${API_URL}${ADMIN_BASE}/auth/google`;
+}
+
 function userPath(id: string, action?: string): string {
   return `${ADMIN_BASE}/users/${encodeURIComponent(id)}${action ? `/${action}` : ''}`;
 }
 
 export const adminApi = {
+  authConfig(): Promise<AdminAuthConfig> {
+    return request<AdminAuthConfig>('GET', `${ADMIN_BASE}/auth/config`);
+  },
+
+  exchangeOAuthCode(code: string): Promise<AdminSession> {
+    return request<AdminSession>('POST', `${ADMIN_BASE}/auth/oauth/exchange`, { body: { code } });
+  },
+
   login(input: LoginInput): Promise<AdminSession> {
     return request<AdminSession>('POST', `${ADMIN_BASE}/auth/login`, { body: input });
   },
@@ -95,5 +145,25 @@ export const adminApi = {
 
   forceLogout(id: string): Promise<ForceLogoutResult> {
     return request<ForceLogoutResult>('POST', userPath(id, 'force-logout'), { auth: true });
+  },
+
+  async getSettings(): Promise<AdminSettings> {
+    return (await request<{ data: AdminSettings }>('GET', `${ADMIN_BASE}/settings`, { auth: true })).data;
+  },
+
+  async updateSettings(settings: AdminSettings): Promise<AdminSettings> {
+    return (await request<{ data: AdminSettings }>('PUT', `${ADMIN_BASE}/settings`, { body: settings, auth: true })).data;
+  },
+
+  listAllowedEmails(params: ListAllowedEmailsParams = {}): Promise<AllowedEmailPage> {
+    return request<AllowedEmailPage>('GET', `${ADMIN_BASE}/allowed-emails${usersQueryString(params)}`, { auth: true });
+  },
+
+  async addAllowedEmail(email: string): Promise<AllowedEmail> {
+    return (await request<{ data: AllowedEmail }>('POST', `${ADMIN_BASE}/allowed-emails`, { body: { email }, auth: true })).data;
+  },
+
+  async removeAllowedEmail(id: string): Promise<AllowedEmail> {
+    return (await request<{ data: AllowedEmail }>('DELETE', allowedEmailPath(id), { auth: true })).data;
   },
 };

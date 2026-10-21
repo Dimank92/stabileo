@@ -2,7 +2,7 @@ defmodule StabileoRepo.Factory do
   @moduledoc "Test data builders."
 
   alias StabileoRepo.Repo
-  alias StabileoRepo.Schemas.{Account, Session}
+  alias StabileoRepo.Schemas.{Account, AdminAllowedEmail, Session}
 
   @password "factory-password"
 
@@ -23,6 +23,24 @@ defmodule StabileoRepo.Factory do
     |> Account.registration_changeset()
     |> Ecto.Changeset.put_change(:is_active, is_active)
     |> Repo.insert!()
+  end
+
+  def insert(:admin, attrs) do
+    attrs = Map.new(attrs)
+    account = insert(:account, Map.merge(%{email: "admin@example.com", name: "Admin"}, attrs))
+    insert(:allowed_email, email: account.email)
+    account
+  end
+
+  def insert(:allowed_email, attrs) do
+    attrs = Map.new(attrs)
+
+    Repo.insert!(
+      struct(
+        AdminAllowedEmail,
+        Map.merge(%{email: unique_email("allowed"), is_active: true}, attrs)
+      )
+    )
   end
 
   def insert(:session, attrs) do

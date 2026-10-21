@@ -7,18 +7,29 @@ defmodule StabileoAuth do
   """
 
   alias StabileoAuth.{AccountJSON, Accounts, Sessions, Tokens}
+  alias StabileoRepo.Features
   alias StabileoRepo.Schemas.{Account, Session}
 
+  @doc "Closed while `user_login_enabled` is off; see `StabileoRepo.Features`."
   def register(attrs, metadata \\ %{}) do
-    with {:ok, account} <- Accounts.register(attrs) do
+    with :ok <- user_login_open(),
+         {:ok, account} <- Accounts.register(attrs) do
       start_session(account, metadata, "app")
     end
   end
 
+  @doc "Closed while `user_login_enabled` is off. Refresh is not: existing sessions keep working."
   def login(email, password, metadata \\ %{}) do
-    with {:ok, account} <- Accounts.authenticate(email, password) do
+    with :ok <- user_login_open(),
+         {:ok, account} <- Accounts.authenticate(email, password) do
       sign_in(account, metadata, "app")
     end
+  end
+
+  def config, do: %{user_login_enabled: Features.user_login_enabled?()}
+
+  defp user_login_open do
+    if Features.user_login_enabled?(), do: :ok, else: {:error, :user_login_disabled}
   end
 
   def refresh(refresh_token, metadata \\ %{}, app \\ "app", allowed? \\ fn _ -> true end) do
@@ -57,7 +68,8 @@ defmodule StabileoAuth do
     end
   end
 
-  defp session_payload(%Account{} = account, %Session{} = session, app) do
+  @doc false
+  def session_payload(%Account{} = account, %Session{} = session, app) do
     with {:ok, access_token} <- Tokens.generate_access_token(account, session, app),
          {:ok, refresh_token} <- Tokens.generate_refresh_token(session, app) do
       {:ok,

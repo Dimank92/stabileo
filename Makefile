@@ -17,9 +17,10 @@
 NIX_RUN = nix develop --command
 
 # Multi-instance support: INST=0 (default), INST=1, ... Each instance gets its own
-# backend port and databases, so several checkouts/worktrees can run side by side:
-#   INST=0: backend 4100, db stabileo_dev
-#   INST=1: backend 4110, db stabileo_dev_1
+# ports and databases, so several checkouts/worktrees can run side by side:
+#   INST=0: web 4000, admin 4001, backend 4100, db stabileo_dev
+#   INST=1: web 4010, admin 4011, backend 4110, db stabileo_dev_1
+# web/vite.config.ts and backend/config/dev.exs derive the same ports from INST.
 # INST is read from .stabileo-inst (gitignored, one per checkout), which
 # `make inst.claim` writes. An explicit INST=N still wins.
 INST ?= $(shell cat .stabileo-inst 2>/dev/null || echo 0)
@@ -38,6 +39,8 @@ SUBMAKE = $(MAKE) --no-print-directory
 INST_DB_SUFFIX = $(if $(filter 0,$(INST)),,_$(INST))
 DB_NAME = stabileo_dev$(INST_DB_SUFFIX)
 BACKEND_PORT := $(shell expr 4100 + $(INST) \* 10)
+WEB_PORT := $(shell expr 4000 + $(INST) \* 10)
+ADMIN_PORT := $(shell expr 4001 + $(INST) \* 10)
 
 export INST
 
@@ -51,8 +54,8 @@ help:
 	@echo ""
 	@echo "Development:"
 	@echo "  make backend.run    - Start the Phoenix backend (port 4100 + INST*10)"
-	@echo "  make web.run        - Build the WASM engine and start the web app (port 4000)"
-	@echo "  make admin.run      - Start the admin site (port 4001), no WASM build"
+	@echo "  make web.run        - Build the WASM engine and start the web app (port 4000 + INST*10)"
+	@echo "  make admin.run      - Start the admin site (port 4001 + INST*10), no WASM build"
 	@echo "  make admin.build    - Build the admin site into web/dist-admin"
 	@echo "  make console        - IEx console on the backend"
 	@echo "  make routes         - Show backend routes"
@@ -261,13 +264,13 @@ web.setup:
 	$(NIX_RUN) bash -c "cd web && npm install"
 
 web.run: wasm
-	$(NIX_RUN) bash -c "cd web && npm install && VITE_API_URL=http://localhost:$(BACKEND_PORT) npm run dev"
+	$(NIX_RUN) bash -c "cd web && npm install && VITE_API_URL=http://localhost:$(BACKEND_PORT) npm run dev -- --port $(WEB_PORT)"
 
 web.build: wasm
 	$(NIX_RUN) bash -c "cd web && npm install && npm run build"
 
 admin.run:
-	$(NIX_RUN) bash -c "cd web && VITE_APP_TYPE=admin VITE_API_URL=http://localhost:$(BACKEND_PORT) npx vite --port 4001"
+	$(NIX_RUN) bash -c "cd web && VITE_APP_TYPE=admin VITE_API_URL=http://localhost:$(BACKEND_PORT) npx vite --port $(ADMIN_PORT)"
 
 admin.build:
 	$(NIX_RUN) bash -c "cd web && npm run build:admin"
@@ -413,8 +416,8 @@ ports:
 	@echo "INST=$(INST)"
 	@echo "  backend   $(BACKEND_PORT)   db $(DB_NAME)"
 	@echo "  test db   stabileo_test$(INST_DB_SUFFIX)"
-	@echo "  web       4000 (VITE_API_URL=http://localhost:$(BACKEND_PORT))"
-	@echo "  admin     4001 (VITE_API_URL=http://localhost:$(BACKEND_PORT))"
+	@echo "  web       $(WEB_PORT) (VITE_API_URL=http://localhost:$(BACKEND_PORT))"
+	@echo "  admin     $(ADMIN_PORT)"
 	@echo "  postgres  $(PG_PORT) (shared, data namespaced per INST)"
 
 services: inst.check git.setup postgres.start

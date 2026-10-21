@@ -6,13 +6,16 @@ defmodule StabileoAuth.AdminTest do
   alias StabileoRepo.Schemas.{Account, Session}
 
   setup do
-    %{admin: Factory.insert(:account, email: "admin@example.com", name: "Admin")}
+    {:ok, _} = StabileoRepo.Features.set_user_login_enabled(true)
+    %{admin: Factory.insert(:admin)}
   end
 
   describe "AdminAccess.admin?/1" do
-    test "is true only for allowlisted emails, case-insensitively", %{admin: admin} do
+    test "is true only for allowlisted emails at an allowed domain", %{admin: admin} do
       assert AdminAccess.admin?(admin)
       assert AdminAccess.admin?(%Account{email: "ADMIN@example.com"})
+      Factory.insert(:allowed_email, email: "outside@elsewhere.org")
+      refute AdminAccess.admin?(%Account{email: "outside@elsewhere.org"})
       refute AdminAccess.admin?(Factory.insert(:account))
       refute AdminAccess.admin?(nil)
     end
@@ -51,9 +54,7 @@ defmodule StabileoAuth.AdminTest do
 
     test "refuses once the account is no longer an admin", %{admin: admin} do
       {:ok, session} = Admin.login(admin.email, Factory.password())
-      previous = Application.get_env(:stabileo_auth, :admin_emails)
-      Application.put_env(:stabileo_auth, :admin_emails, [])
-      on_exit(fn -> Application.put_env(:stabileo_auth, :admin_emails, previous) end)
+      Repo.update_all(StabileoRepo.Schemas.AdminAllowedEmail, set: [is_active: false])
 
       assert {:error, :forbidden} = Admin.refresh(session.refresh_token)
     end

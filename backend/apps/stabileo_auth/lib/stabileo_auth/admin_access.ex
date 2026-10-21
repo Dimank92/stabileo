@@ -1,19 +1,20 @@
 defmodule StabileoAuth.AdminAccess do
   @moduledoc """
-  Who is an admin: an account whose email is in the allowlist
-  (`config :stabileo_auth, :admin_emails`). Read on every call, so removing an
-  email takes effect on the next request.
+  Who is an admin: an account whose email is at an allowed domain and on the
+  active admin allowlist. Read on every call, so a removal takes effect on the
+  next request.
   """
 
+  alias StabileoAuth.AdminAllowedEmails
   alias StabileoRepo.Schemas.Account
 
-  def admin?(%Account{email: email}), do: String.downcase(email) in emails()
+  def admin?(%Account{email: email}) do
+    AdminAllowedEmails.domain_allowed?(email) and AdminAllowedEmails.active?(email)
+  end
 
   def admin?(_), do: false
 
-  defp emails do
-    :stabileo_auth
-    |> Application.get_env(:admin_emails, [])
-    |> Enum.map(&(&1 |> String.trim() |> String.downcase()))
+  def password_login? do
+    Application.get_env(:stabileo_auth, :admin_password_login, false) == true
   end
 end

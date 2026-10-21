@@ -67,6 +67,16 @@ function refreshSession(): Promise<boolean> {
   return refreshing;
 }
 
+async function startSession(open: () => Promise<AdminSession>): Promise<Account> {
+  status = 'loading';
+  try {
+    return applySession(await open());
+  } catch (e) {
+    status = account ? 'authenticated' : 'anonymous';
+    throw e;
+  }
+}
+
 setAuthHooks({ accessToken: () => accessToken, refresh: refreshSession });
 
 export const adminAuth = {
@@ -82,14 +92,12 @@ export const adminAuth = {
     if (!ok && status === 'loading') status = account ? 'authenticated' : 'anonymous';
   },
 
-  async login(input: LoginInput): Promise<Account> {
-    status = 'loading';
-    try {
-      return applySession(await adminApi.login(input));
-    } catch (e) {
-      status = account ? 'authenticated' : 'anonymous';
-      throw e;
-    }
+  login(input: LoginInput): Promise<Account> {
+    return startSession(() => adminApi.login(input));
+  },
+
+  exchangeOAuthCode(code: string): Promise<Account> {
+    return startSession(() => adminApi.exchangeOAuthCode(code));
   },
 
   async logout(): Promise<void> {

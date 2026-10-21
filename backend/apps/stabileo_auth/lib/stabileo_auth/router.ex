@@ -18,6 +18,7 @@ defmodule StabileoAuth.Router do
   scope "/", StabileoAuth.Controllers do
     pipe_through(:api)
 
+    get("/config", AuthController, :config)
     post("/register", AuthController, :register)
     post("/login", AuthController, :login)
     post("/refresh", AuthController, :refresh)

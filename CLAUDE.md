@@ -25,15 +25,19 @@ dev database.
 
 **Terminal 1 - Backend:** `make backend.run` (migrates, then starts Phoenix on 4100 + INST*10)
 
-**Terminal 2 - Web:** `make web.run` (builds the WASM engine, starts Vite on 4000 pointed at this instance's backend)
+**Terminal 2 - Web:** `make web.run` (builds the WASM engine, starts Vite on 4000 + INST*10 pointed at this instance's backend)
 
-**Admin site:** `make admin.run` (http://localhost:4001, the staff admin; no WASM build needed)
+**Terminal 3 - Admin site:** `make admin.run` (4001 + INST*10, the staff admin; no WASM build needed)
 
-Account features in the web app are behind the `accounts` feature flag: on in
-dev, off in production builds until the backend is deployed.
+Account features in the web app are behind the build-time `accounts` flag (on in
+dev, off in production builds until the backend is deployed) and, at runtime,
+behind `user_login_enabled`, which starts off and is turned on from the admin
+site's Settings page.
 
-Other instances shift the backend port by `INST * 10`; `make ports` prints the
-map for this checkout. `make services.stop` stops PostgreSQL.
+Every port shifts by `INST * 10` (web 4000, admin 4001, backend 4100 at INST=0),
+and `web/vite.config.ts` and `backend/config/dev.exs` derive theirs from the same
+`INST`; never hard-code one. `make ports` prints the map for this checkout and
+`make services.stop` stops PostgreSQL.
 
 ## Demo Credentials
 
@@ -42,7 +46,7 @@ password `stabileo-demo-password` (`StabileoRepo.DemoPassword`).
 
 | Email | Name | Locale | Admin |
 |-------|------|--------|-------|
-| admin@stabileo.com | Stabileo Admin | es | yes (dev/test allowlist) |
+| admin@stabileo.com | Stabileo Admin | es | yes (dev only: password sign-in, `stabileo.com` allowed in dev) |
 | demo@stabileo.com | Demo Engineer | es | no |
 | demo-en@stabileo.com | Demo Engineer (EN) | en | no |
 

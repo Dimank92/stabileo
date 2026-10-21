@@ -1,9 +1,36 @@
 defmodule StabileoAuth.Controllers.AuthControllerTest do
   use StabileoAuth.ConnCase, async: true
 
+  import Ecto.Query
+
   alias StabileoRepo.Schemas.{Account, Session}
 
   @account_keys ~w(id email name company job_title country locale email_verified_at inserted_at)
+
+  describe "user sign-in turned off" do
+    @describetag user_login: false
+
+    test "GET /config reports it" do
+      assert request(:get, "/config") |> json_body(200) == %{"user_login_enabled" => false}
+    end
+
+    test "register and login answer 403 user_login_disabled and write nothing" do
+      account = Factory.insert(:account)
+      before = Repo.aggregate(Account, :count)
+
+      for {path, params} <- [
+            {"/register",
+             %{"email" => "closed@example.org", "password" => "long-enough", "name" => "C"}},
+            {"/login", %{"email" => account.email, "password" => Factory.password()}}
+          ] do
+        assert request(:post, path, params) |> json_body(403) |> Map.get("error") ==
+                 "user_login_disabled"
+      end
+
+      assert Repo.aggregate(Account, :count) == before
+      assert Repo.aggregate(from(s in Session, where: s.account_id == ^account.id), :count) == 0
+    end
+  end
 
   describe "POST /register" do
     test "creates the account and answers a session" do

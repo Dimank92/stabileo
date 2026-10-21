@@ -1,5 +1,5 @@
 alias StabileoRepo.{DemoPassword, Repo}
-alias StabileoRepo.Schemas.Account
+alias StabileoRepo.Schemas.{Account, AdminAllowedEmail}
 
 demo_accounts = [
   %{email: "admin@stabileo.com", name: "Stabileo Admin", company: "Stabileo", job_title: "Staff", country: "AR", locale: "es"},
@@ -16,4 +16,8 @@ for attrs <- demo_accounts do
     |> Account.profile_changeset(attrs)
     |> Repo.update!()
   end
+end
+
+unless Repo.get_by(AdminAllowedEmail, email: "admin@stabileo.com") do
+  Repo.insert!(%AdminAllowedEmail{email: "admin@stabileo.com", is_active: true})
 end

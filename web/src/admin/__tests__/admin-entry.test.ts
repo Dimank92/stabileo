@@ -10,13 +10,16 @@ const CONFIG_PATH = join(WEB_ROOT, 'vite.config.ts');
 
 type LoadedConfig = {
   plugins?: unknown[];
+  define?: Record<string, string>;
   server?: { port?: number };
   build?: { outDir?: string; rollupOptions?: { input?: unknown } };
 };
 
-async function loadConfig(appType: string | undefined): Promise<LoadedConfig> {
+async function loadConfig(appType: string | undefined, inst = '0'): Promise<LoadedConfig> {
   if (appType === undefined) vi.stubEnv('VITE_APP_TYPE', '');
   else vi.stubEnv('VITE_APP_TYPE', appType);
+  vi.stubEnv('INST', inst);
+  vi.stubEnv('VITE_API_URL', '');
   vi.resetModules();
   const mod = (await import(/* @vite-ignore */ CONFIG_PATH)) as { default: LoadedConfig };
   return mod.default;
@@ -60,6 +63,64 @@ describe('the admin entry in vite.config.ts', () => {
     expect(config.build?.outDir).toBe('dist-admin');
     expect(config.server?.port).toBe(4001);
     expect(pluginNames(config)).toContain('admin-root');
+  });
+
+  it('every dev port and the dev API URL shift with the instance', async () => {
+    const app = await loadConfig(undefined, '2');
+    expect(app.server?.port).toBe(4020);
+    expect(app.define?.__STABILEO_DEV_API_URL__).toBe(JSON.stringify('http://localhost:4120'));
+
+    const admin = await loadConfig('admin', '2');
+    expect(admin.server?.port).toBe(4021);
+
+    const zero = await loadConfig(undefined, '0');
+    expect(zero.define?.__STABILEO_DEV_API_URL__).toBe(JSON.stringify('http://localhost:4100'));
+  });
+
+  it('an explicit VITE_API_URL wins over the instance default', async () => {
+    vi.stubEnv('VITE_API_URL', 'http://example.test:9999');
+    vi.stubEnv('INST', '3');
+    vi.stubEnv('VITE_APP_TYPE', '');
+    vi.resetModules();
+    const mod = (await import(/* @vite-ignore */ CONFIG_PATH)) as { default: LoadedConfig };
+    expect(mod.default.define?.__STABILEO_DEV_API_URL__).toBe(JSON.stringify('http://example.test:9999'));
+  });
+
+  it('the admin dev and preview servers serve admin.html for every admin client route', async () => {
+    const config = await loadConfig('admin');
+    const plugin = (config.plugins ?? []).flat(Infinity)
+      .find((p) => (p as { name?: string } | null)?.name === 'admin-root') as Record<string, unknown>;
+    type Middleware = (req: { url?: string }, res: unknown, next: () => void) => void;
+    const middlewares: Middleware[] = [];
+    const server = { middlewares: { use: (fn: Middleware) => void middlewares.push(fn) } };
+    (plugin.configureServer as (s: unknown) => void)(server);
+    (plugin.configurePreviewServer as (s: unknown) => void)(server);
+    expect(middlewares).toHaveLength(2);
+
+    const cases: [string, string][] = [
+      ['/', '/admin.html'],
+      ['/?page=2&q=ada', '/admin.html?page=2&q=ada'],
+      ['/settings', '/admin.html'],
+      ['/settings/', '/admin.html'],
+      ['/allowlist?q=grace&removed=1', '/admin.html?q=grace&removed=1'],
+      ['/oauth/callback?code=abc.def', '/admin.html?code=abc.def'],
+      ['/oauth/callback?oauth_error=email_not_allowed', '/admin.html?oauth_error=email_not_allowed'],
+      ['/src/admin/main.ts', '/src/admin/main.ts'],
+      ['/favicon.svg', '/favicon.svg'],
+      ['/oauth', '/oauth'],
+      ['/oauth/callback/extra', '/oauth/callback/extra'],
+      ['/@vite/client', '/@vite/client'],
+    ];
+    for (const use of middlewares) {
+      const out = cases.map(([url]) => {
+        const req = { url };
+        let called = 0;
+        use(req, {}, () => void called++);
+        expect(called).toBe(1);
+        return req.url;
+      });
+      expect(out).toEqual(cases.map(([, to]) => to));
+    }
   });
 
   it('admin.html loads the admin entry and nothing else', () => {

@@ -19,6 +19,10 @@ defmodule StabileoAuth.ConnCase do
   setup tags do
     pid = Sandbox.start_owner!(StabileoRepo.Repo, shared: not tags[:async])
     on_exit(fn -> Sandbox.stop_owner(pid) end)
+
+    unless tags[:user_login] == false,
+      do: {:ok, _} = StabileoRepo.Features.set_user_login_enabled(true)
+
     :ok
   end
 

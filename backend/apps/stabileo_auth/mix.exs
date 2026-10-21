@@ -31,6 +31,7 @@ defmodule StabileoAuth.MixProject do
       {:stabileo_utils, in_umbrella: true},
       {:phoenix, "~> 1.7"},
       {:joken, "~> 2.6"},
+      {:assent, "~> 0.3"},
       {:jason, "~> 1.4"}
     ]
   end

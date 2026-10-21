@@ -2,6 +2,8 @@ defmodule StabileoWeb.EndpointTest do
   use StabileoWeb.ConnCase, async: true
 
   test "a JSON sign-up goes through the endpoint into the auth router", %{conn: conn} do
+    {:ok, _} = StabileoRepo.Features.set_user_login_enabled(true)
+
     body =
       conn
       |> put_req_header("content-type", "application/json")

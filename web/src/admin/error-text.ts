@@ -10,7 +10,27 @@ const KNOWN_CODES = new Set([
   'not_admin',
   'account_disabled',
   'refresh_failed',
+  'cannot_remove_self',
+  'invalid_or_expired_code',
+  'validation_error',
 ]);
+
+export const OAUTH_ERROR_CODES = [
+  'provider_error',
+  'invalid_state',
+  'callback_failed',
+  'email_not_verified',
+  'domain_not_allowed',
+  'email_not_allowed',
+  'account_disabled',
+  'oauth_unavailable',
+] as const;
+
+export function oauthErrorText(code: string): string {
+  return (OAUTH_ERROR_CODES as readonly string[]).includes(code)
+    ? t(`admin.oauth.err.${code}`)
+    : t('admin.oauth.err.callback_failed');
+}
 
 export function adminErrorText(e: unknown): string {
   if (e instanceof ApiError) {

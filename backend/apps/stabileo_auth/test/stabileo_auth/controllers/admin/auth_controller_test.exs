@@ -2,7 +2,7 @@ defmodule StabileoAuth.Controllers.Admin.AuthControllerTest do
   use StabileoAuth.ConnCase, async: false
 
   setup do
-    %{admin: Factory.insert(:account, email: "admin@example.com", name: "Admin")}
+    %{admin: Factory.insert(:admin)}
   end
 
   describe "POST /auth/login" do
@@ -84,9 +84,7 @@ defmodule StabileoAuth.Controllers.Admin.AuthControllerTest do
 
     test "401 not_admin once the email leaves the allowlist", %{admin: admin} do
       token = admin_log_in(admin).access_token
-      previous = Application.get_env(:stabileo_auth, :admin_emails)
-      Application.put_env(:stabileo_auth, :admin_emails, [])
-      on_exit(fn -> Application.put_env(:stabileo_auth, :admin_emails, previous) end)
+      Repo.update_all(StabileoRepo.Schemas.AdminAllowedEmail, set: [is_active: false])
 
       assert admin_request(:get, "/auth/me", %{}, token) |> json_body(401) |> Map.get("error") ==
                "not_admin"

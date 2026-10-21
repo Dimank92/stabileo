@@ -3,7 +3,14 @@ defmodule StabileoAuth.Controllers.Admin.AuthController do
 
   action_fallback(StabileoUtils.FallbackController)
 
-  alias StabileoAuth.{AccountJSON, Admin}
+  alias StabileoAuth.{AccountJSON, Admin, AdminAccess, GoogleOAuth}
+
+  def config(conn, _params) do
+    json(conn, %{
+      password_login: AdminAccess.password_login?(),
+      google_login: GoogleOAuth.configured?()
+    })
+  end
 
   def login(conn, %{"email" => email, "password" => password}) do
     with {:ok, payload} <- Admin.login(email, password, metadata(conn)) do

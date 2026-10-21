@@ -1,5 +1,7 @@
+declare const __STABILEO_DEV_API_URL__: string;
+
 export const API_URL: string = (
-  import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:4100' : '')
+  import.meta.env.VITE_API_URL || (import.meta.env.DEV ? __STABILEO_DEV_API_URL__ : '')
 ).replace(/\/+$/, '');
 
 export type FieldErrors = Record<string, string[]>;

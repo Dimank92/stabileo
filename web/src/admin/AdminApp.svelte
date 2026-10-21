@@ -5,13 +5,21 @@
   import AdminLogin from './AdminLogin.svelte';
   import AdminHeader from './AdminHeader.svelte';
   import UsersPage from './UsersPage.svelte';
+  import SettingsPage from './SettingsPage.svelte';
+  import AllowlistPage from './AllowlistPage.svelte';
+  import OAuthCallback from './OAuthCallback.svelte';
+  import { adminRoute } from './admin-route.svelte';
 
   let booted = $state(false);
 
   onMount(() => {
-    void adminAuth.init().finally(() => {
+    const onPop = () => adminRoute.sync();
+    window.addEventListener('popstate', onPop);
+    if (adminRoute.isCallback) booted = true;
+    else void adminAuth.init().finally(() => {
       booted = true;
     });
+    return () => window.removeEventListener('popstate', onPop);
   });
 
   $effect(() => {
@@ -20,13 +28,21 @@
   });
 </script>
 
-{#if !booted}
+{#if adminRoute.isCallback}
+  <OAuthCallback />
+{:else if !booted}
   <div class="adm-boot" data-testid="admin-boot">{t('admin.loading')}</div>
 {:else if adminAuth.isAuthenticated}
   <div class="adm-shell">
     <AdminHeader />
     <main class="adm-main">
-      <UsersPage />
+      {#if adminRoute.page === 'settings'}
+        <SettingsPage />
+      {:else if adminRoute.page === 'allowlist'}
+        <AllowlistPage />
+      {:else}
+        <UsersPage />
+      {/if}
     </main>
   </div>
 {:else}

@@ -8,6 +8,7 @@ There is no tenancy yet. Every account sees only itself, so there are no organiz
 
 ## Features
 
+- Sign-in is behind the runtime flag `user_login_enabled` (`system_settings`, toggled from the admin site, off by default). While off, `/register` and `/login` answer 403 `user_login_disabled`; existing sessions keep working (refresh, `/me`, profile) until they expire or an admin forces them out
 - Self sign-up with email, password and name
 - Password login, refresh-token rotation, logout
 - Read and edit one's own profile
@@ -26,8 +27,9 @@ Prefix `/api/v1/auth`, router `StabileoAuth.Router`. Public routes run the `:api
 
 | Method | Path | Auth | Success | Errors |
 |--------|------|------|---------|--------|
-| `POST` | `/register` | public | `201 <session>` | 422 `validation_error` (email taken, short password, …) |
-| `POST` | `/login` | public | `200 <session>` | 401 `invalid_credentials`, 403 `account_disabled` |
+| `GET` | `/config` | public | `200 {user_login_enabled: bool}` | — |
+| `POST` | `/register` | public | `201 <session>` | 403 `user_login_disabled`, 422 `validation_error` (email taken, short password, …) |
+| `POST` | `/login` | public | `200 <session>` | 403 `user_login_disabled`, 401 `invalid_credentials`, 403 `account_disabled` |
 | `POST` | `/refresh` | public | `200 <session>` | 401 `refresh_failed` |
 | `DELETE` | `/logout` | public | `200 {message}` | never fails |
 | `GET` | `/me` | bearer | `200 {data: <account>}` | 401 |
@@ -96,6 +98,8 @@ Seeds create `demo@stabileo.com` / `stabileo-demo-password` (`StabileoRepo.DemoP
 
 | Scenario | Expected Result |
 |----------|-----------------|
+| `/register` or `/login` while `user_login_enabled` is off | 403 `user_login_disabled`, nothing written |
+| Refresh while `user_login_enabled` is off | 200: existing sessions keep working |
 | Register with valid data | 201, tokens, account with lowercased email; row in DB with Argon2 hash |
 | Register with taken email (any case) | 422, `details.email` = `["has already been taken"]` |
 | Register with short password / missing name / bad email | 422 with that field in `details` |

@@ -1,7 +1,25 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { adminAuth } from './admin-auth.svelte';
   import { adminErrorText, sessionEndedText } from './error-text';
+  import { adminApi, googleSignInUrl, type AdminAuthConfig } from '../lib/api/admin';
   import { t } from '../lib/i18n';
+
+  let config = $state<AdminAuthConfig | null>(null);
+  let configError = $state<string | null>(null);
+
+  async function loadConfig() {
+    configError = null;
+    try {
+      config = await adminApi.authConfig();
+    } catch (err) {
+      configError = adminErrorText(err);
+    }
+  }
+
+  onMount(() => {
+    void loadConfig();
+  });
 
   let email = $state('');
   let password = $state('');
@@ -27,7 +45,7 @@
 </script>
 
 <div class="adm-login-wrap">
-  <form class="adm-login" onsubmit={submit} novalidate data-testid="admin-login">
+  <div class="adm-login" data-testid="admin-login">
     <div class="adm-login-brand">
       <span class="adm-mark" aria-hidden="true"></span>
       <span class="adm-brand">{t('admin.brand')}</span>
@@ -40,27 +58,50 @@
       <p class="adm-notice" role="status" data-testid="admin-login-notice">{notice}</p>
     {/if}
 
-    <label class="adm-field">
-      <span class="adm-label">{t('admin.login.email')}</span>
-      <input type="email" bind:value={email} autocomplete="username" required data-testid="admin-login-email" />
-    </label>
+    {#if configError}
+      <p class="adm-error" role="alert" data-testid="admin-login-config-error">{configError}</p>
+      <button type="button" class="adm-submit" onclick={loadConfig}>{t('admin.users.retry')}</button>
+    {:else if !config}
+      <p class="adm-login-lede">{t('admin.loading')}</p>
+    {:else if !config.google_login && !config.password_login}
+      <p class="adm-notice" role="status" data-testid="admin-login-unconfigured">{t('admin.login.unconfigured')}</p>
+    {:else}
+      {#if config.google_login}
+        <a class="adm-submit adm-google" href={googleSignInUrl()} data-testid="admin-login-google">
+          {t('admin.login.google')}
+        </a>
+      {/if}
 
-    <label class="adm-field">
-      <span class="adm-label">{t('admin.login.password')}</span>
-      <input
-        type="password" bind:value={password} autocomplete="current-password" required
-        aria-invalid={!!error} data-testid="admin-login-password"
-      />
-    </label>
+      {#if config.google_login && config.password_login}
+        <div class="adm-or" aria-hidden="true"><span>{t('admin.login.or')}</span></div>
+      {/if}
 
-    {#if error}
-      <p class="adm-error" role="alert" data-testid="admin-login-error">{error}</p>
+      {#if config.password_login}
+        <form class="adm-login-form" onsubmit={submit} novalidate data-testid="admin-login-form">
+          <label class="adm-field">
+            <span class="adm-label">{t('admin.login.email')}</span>
+            <input type="email" bind:value={email} autocomplete="username" required data-testid="admin-login-email" />
+          </label>
+
+          <label class="adm-field">
+            <span class="adm-label">{t('admin.login.password')}</span>
+            <input
+              type="password" bind:value={password} autocomplete="current-password" required
+              aria-invalid={!!error} data-testid="admin-login-password"
+            />
+          </label>
+
+          {#if error}
+            <p class="adm-error" role="alert" data-testid="admin-login-error">{error}</p>
+          {/if}
+
+          <button type="submit" class="adm-submit" disabled={busy || !email.trim() || !password} data-testid="admin-login-submit">
+            {busy ? t('admin.login.working') : t('admin.login.submit')}
+          </button>
+        </form>
+      {/if}
     {/if}
-
-    <button type="submit" class="adm-submit" disabled={busy || !email.trim() || !password} data-testid="admin-login-submit">
-      {busy ? t('admin.login.working') : t('admin.login.submit')}
-    </button>
-  </form>
+  </div>
 </div>
 
 <style>
@@ -81,6 +122,26 @@
     border: 1px solid var(--st-hair-strong);
     border-radius: var(--st-radius-lg);
   }
+
+  .adm-login-form { display: flex; flex-direction: column; gap: 12px; }
+
+  .adm-google {
+    display: block;
+    text-align: center;
+    text-decoration: none;
+  }
+
+  .adm-or {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--st-text-2);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .adm-or::before, .adm-or::after { content: ''; flex: 1; border-top: 1px solid var(--st-hair); }
 
   .adm-login-brand { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 

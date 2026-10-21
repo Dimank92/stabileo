@@ -15,6 +15,14 @@ defmodule StabileoWeb.Endpoint do
   )
 
   plug(Plug.MethodOverride)
+
+  plug(Plug.Session,
+    store: :cookie,
+    key: "_stabileo_oauth",
+    signing_salt: "admin_oauth",
+    same_site: "Lax"
+  )
+
   plug(Plug.Head)
   plug(CORSPlug)
   plug(StabileoWeb.Router)

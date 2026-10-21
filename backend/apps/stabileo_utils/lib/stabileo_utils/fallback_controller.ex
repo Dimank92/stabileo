@@ -32,6 +32,14 @@ defmodule StabileoUtils.FallbackController do
     error(conn, :forbidden, "account_disabled", "Account is disabled")
   end
 
+  def call(conn, {:error, :user_login_disabled}) do
+    error(conn, :forbidden, "user_login_disabled", "Sign-in is currently disabled")
+  end
+
+  def call(conn, {:error, :cannot_remove_self}) do
+    error(conn, :unprocessable_entity, "cannot_remove_self", "You cannot remove your own email")
+  end
+
   def call(conn, {:error, :cannot_disable_self}) do
     error(
       conn,

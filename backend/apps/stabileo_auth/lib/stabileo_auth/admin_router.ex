@@ -11,13 +11,27 @@ defmodule StabileoAuth.AdminRouter do
     plug(StabileoRepo.Plugs.RequestMetadata)
   end
 
+  pipeline :oauth do
+    plug(:fetch_session)
+    plug(StabileoRepo.Plugs.RequestMetadata)
+  end
+
   pipeline :admin_authenticated do
     plug(StabileoAuth.Plugs.Authenticate, app: "admin")
   end
 
   scope "/auth", StabileoAuth.Controllers.Admin do
+    pipe_through(:oauth)
+
+    get("/google", OAuthController, :request)
+    get("/google/callback", OAuthController, :callback)
+  end
+
+  scope "/auth", StabileoAuth.Controllers.Admin do
     pipe_through(:api)
 
+    get("/config", AuthController, :config)
+    post("/oauth/exchange", OAuthController, :exchange)
     post("/login", AuthController, :login)
     post("/refresh", AuthController, :refresh)
     delete("/logout", AuthController, :logout)
@@ -33,5 +47,12 @@ defmodule StabileoAuth.AdminRouter do
     post("/users/:id/disable", UserController, :disable)
     post("/users/:id/enable", UserController, :enable)
     post("/users/:id/force-logout", UserController, :force_logout)
+
+    get("/settings", SettingsController, :show)
+    put("/settings", SettingsController, :update)
+
+    get("/allowed-emails", AllowedEmailController, :index)
+    post("/allowed-emails", AllowedEmailController, :create)
+    delete("/allowed-emails/:id", AllowedEmailController, :delete)
   end
 end

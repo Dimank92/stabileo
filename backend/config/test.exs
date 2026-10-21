@@ -23,7 +23,15 @@ config :stabileo_auth,
   access_token_ttl: 900,
   refresh_token_ttl: 604_800,
   admin_refresh_token_ttl: 14_400,
-  admin_emails: ["admin@example.com"]
+  admin_domains: ["example.com"],
+  admin_password_login: true,
+  admin_frontend_url: "http://localhost:4001",
+  google_strategy: StabileoAuth.GoogleStrategyStub
+
+config :stabileo_auth, :google_oauth,
+  client_id: "test-google-client-id",
+  client_secret: "test-google-client-secret",
+  redirect_uri: "http://localhost:4102/api/v1/admin/auth/google/callback"
 
 config :logger, level: :warning
 

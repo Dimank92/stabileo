@@ -5,6 +5,8 @@ defmodule StabileoAuth.Controllers.AuthController do
 
   @register_fields ~w(email password name locale)
 
+  def config(conn, _params), do: json(conn, StabileoAuth.config())
+
   def register(conn, params) do
     with {:ok, payload} <-
            StabileoAuth.register(Map.take(params, @register_fields), metadata(conn)) do

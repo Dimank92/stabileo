@@ -1,7 +1,22 @@
 <script lang="ts">
   import { adminAuth } from './admin-auth.svelte';
   import { adminUsers } from './admin-users.svelte';
+  import { adminSettings } from './admin-settings.svelte';
+  import { adminAllowlist } from './admin-allowlist.svelte';
+  import { adminRoute, PAGE_PATHS, type AdminPage } from './admin-route.svelte';
   import { t } from '../lib/i18n';
+
+  const NAV: { page: AdminPage; label: string }[] = [
+    { page: 'users', label: 'admin.nav.users' },
+    { page: 'settings', label: 'admin.nav.settings' },
+    { page: 'allowlist', label: 'admin.nav.allowlist' },
+  ];
+
+  function go(e: MouseEvent, page: AdminPage) {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    adminRoute.navigate(page);
+  }
 
   let busy = $state(false);
 
@@ -11,6 +26,8 @@
     try {
       await adminAuth.logout();
       adminUsers.reset();
+      adminSettings.reset();
+      adminAllowlist.reset();
     } finally {
       busy = false;
     }
@@ -24,6 +41,18 @@
       <span class="adm-brand">{t('admin.brand')}</span>
       <span class="adm-tag">{t('admin.brandTag')}</span>
     </div>
+    <nav class="adm-nav" aria-label={t('admin.nav.label')}>
+      {#each NAV as item (item.page)}
+        <a
+          href={PAGE_PATHS[item.page]}
+          class="adm-nav-link"
+          class:on={adminRoute.page === item.page}
+          aria-current={adminRoute.page === item.page ? 'page' : undefined}
+          onclick={(e) => go(e, item.page)}
+          data-testid={`admin-nav-${item.page}`}
+        >{t(item.label)}</a>
+      {/each}
+    </nav>
     <div class="adm-who">
       <span class="adm-who-label">{t('admin.signedInAs')}</span>
       <span class="adm-who-email" data-testid="admin-email">{adminAuth.account?.email}</span>
@@ -76,6 +105,21 @@
     color: var(--st-text-2);
   }
 
+  .adm-nav { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; overflow-x: auto; }
+
+  .adm-nav-link {
+    padding: 5px 10px;
+    border-radius: var(--st-radius);
+    color: var(--st-text-2);
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .adm-nav-link:hover { background: var(--st-surface-3); color: var(--st-text); }
+  .adm-nav-link.on { color: var(--st-text); box-shadow: inset 0 -2px 0 var(--st-accent); }
+
   .adm-who { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 0.78rem; }
   .adm-who-label { color: var(--st-text-2); }
 
@@ -103,5 +147,6 @@
 
   @media (max-width: 600px) {
     .adm-who-label { display: none; }
+    .adm-who-email { display: none; }
   }
 </style>

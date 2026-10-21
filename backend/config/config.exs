@@ -14,8 +14,6 @@ config :stabileo_web,
 config :stabileo_web, StabileoWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
-  # Bandit has an open HTTP/2 advisory (EEF-CVE-2026-105659) with no fixed release yet.
-  http: [http_2_options: [enabled: false]],
   render_errors: [
     formats: [json: StabileoWeb.ErrorJSON],
     layout: false

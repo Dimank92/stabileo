@@ -8,6 +8,8 @@ db_name =
     else: "stabileo_dev_#{instance}"
 
 backend_port = 4100 + instance * 10
+web_port = 4000 + instance * 10
+admin_port = 4001 + instance * 10
 
 config :stabileo_repo, StabileoRepo.Repo,
   username: System.get_env("PGUSER", "postgres"),
@@ -35,7 +37,14 @@ config :stabileo_auth,
   access_token_ttl: 900,
   refresh_token_ttl: 604_800,
   admin_refresh_token_ttl: 14_400,
-  admin_emails: ["admin@stabileo.com"]
+  admin_domains: ["lambdaclass.com", "ergodicgroup.com", "stabileo.com"],
+  admin_password_login: true,
+  admin_frontend_url: "http://localhost:#{admin_port}"
+
+config :stabileo_auth, :google_oauth,
+  client_id: System.get_env("GOOGLE_CLIENT_ID", ""),
+  client_secret: System.get_env("GOOGLE_CLIENT_SECRET", ""),
+  redirect_uri: "http://localhost:#{backend_port}/api/v1/admin/auth/google/callback"
 
 config :logger, :console, format: "[$level] $message\n"
 
@@ -44,4 +53,8 @@ config :phoenix, :stacktrace_depth, 20
 config :phoenix, :plug_init_mode, :runtime
 
 config :cors_plug,
-  origin: ["http://localhost:4000", "http://localhost:4001", "http://localhost:4173"]
+  origin: [
+    "http://localhost:#{web_port}",
+    "http://localhost:#{admin_port}",
+    "http://localhost:4173"
+  ]

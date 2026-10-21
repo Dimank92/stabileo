@@ -43,11 +43,21 @@ if config_env() == :prod do
     access_token_ttl: StabileoUtils.fetch_env_integer("ACCESS_TOKEN_TTL", 900),
     refresh_token_ttl: StabileoUtils.fetch_env_integer("REFRESH_TOKEN_TTL", 604_800),
     admin_refresh_token_ttl: StabileoUtils.fetch_env_integer("ADMIN_REFRESH_TOKEN_TTL", 14_400),
-    admin_emails:
-      "ADMIN_EMAILS"
-      |> StabileoUtils.fetch_env("")
+    admin_password_login: false,
+    admin_frontend_url:
+      StabileoUtils.fetch_env!("ADMIN_FRONTEND_URL", "The URL the admin site is served from."),
+    admin_domains:
+      "ADMIN_DOMAINS"
+      |> StabileoUtils.fetch_env("lambdaclass.com,ergodicgroup.com")
       |> String.split(",", trim: true)
       |> Enum.map(&String.trim/1)
+
+  config :stabileo_auth, :google_oauth,
+    client_id: StabileoUtils.fetch_env("GOOGLE_CLIENT_ID"),
+    client_secret: StabileoUtils.fetch_env("GOOGLE_CLIENT_SECRET"),
+    redirect_uri:
+      StabileoUtils.fetch_env!("API_URL", "The public URL of this backend.") <>
+        "/api/v1/admin/auth/google/callback"
 
   config :cors_plug,
     origin:

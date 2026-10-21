@@ -47,6 +47,7 @@ Schemas are centralized in `stabileo_repo`. Domain apps contain context modules 
 - **Kebab-case routes**: URL path segments use kebab-case (`/password-resets`). Route parameters (`:account_id`) stay snake_case.
 - Errors through `StabileoUtils.FallbackController`: `{"error": <code>, "message": <text>}`; changeset errors are `422 {"error": "validation_error", "message": "Validation failed", "details": {<field>: [<message>]}}`.
 
+- **Runtime settings** that admins flip live go in `system_settings` through `StabileoRepo.SystemSettings` / `StabileoRepo.Features`, not environment variables. `user_login_enabled` is the example: off by default, read on every sign-in.
 - **Admin routes** sit behind `plug(StabileoAuth.Plugs.Authenticate, app: "admin")`; product routes behind the default `app: "app"`. Tokens carry `app`, and each side rejects the other's.
 
 ### List Endpoints

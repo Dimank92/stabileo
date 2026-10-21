@@ -31,6 +31,10 @@ export interface LoginInput {
   password: string;
 }
 
+export interface AuthConfig {
+  user_login_enabled: boolean;
+}
+
 export type ProfileUpdate = Partial<{
   name: string;
   company: string | null;
@@ -42,6 +46,10 @@ export type ProfileUpdate = Partial<{
 const BASE = '/api/v1/auth';
 
 export const authApi = {
+  config(): Promise<AuthConfig> {
+    return request<AuthConfig>('GET', `${BASE}/config`);
+  },
+
   register(input: RegisterInput): Promise<Session> {
     return request<Session>('POST', `${BASE}/register`, { body: input });
   },

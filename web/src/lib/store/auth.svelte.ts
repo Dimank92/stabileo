@@ -25,6 +25,7 @@ function writeRefreshToken(token: string | null): void {
 
 let account = $state<Account | null>(null);
 let status = $state<AuthStatus>('anonymous');
+let userLoginEnabled = $state(false);
 let accessToken: string | null = null;
 let refreshing: Promise<boolean> | null = null;
 
@@ -65,6 +66,14 @@ function refreshSession(): Promise<boolean> {
 
 setAuthHooks({ accessToken: () => accessToken, refresh: refreshSession });
 
+async function loadConfig(): Promise<void> {
+  try {
+    userLoginEnabled = (await authApi.config()).user_login_enabled === true;
+  } catch {
+    userLoginEnabled = false;
+  }
+}
+
 async function authenticated<T>(call: () => Promise<T>): Promise<T> {
   try {
     return await call();
@@ -88,11 +97,14 @@ export const authStore = {
   get account() { return account; },
   get status() { return status; },
   get isAuthenticated() { return status === 'authenticated'; },
+  get userLoginEnabled() { return userLoginEnabled; },
+  get showAccountEntry() { return accounts() && (userLoginEnabled || account !== null); },
 
   async init(): Promise<void> {
-    if (!accounts() || status !== 'anonymous' || !readRefreshToken()) return;
-    status = 'loading';
-    const ok = await refreshSession();
+    if (!accounts()) return;
+    const restore = status === 'anonymous' && readRefreshToken() !== null;
+    if (restore) status = 'loading';
+    const [, ok] = await Promise.all([loadConfig(), restore ? refreshSession() : Promise.resolve(true)]);
     if (!ok && status === 'loading') status = account ? 'authenticated' : 'anonymous';
   },
 

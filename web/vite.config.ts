@@ -1,6 +1,6 @@
 import { defineConfig, type Plugin } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { copyFileSync, cpSync, existsSync } from 'fs';
+import { copyFileSync, cpSync, existsSync, readFileSync } from 'fs';
 import { execSync } from 'child_process';
 import { resolve } from 'path';
 
@@ -83,9 +83,32 @@ function adminPublicAssetsPlugin(): Plugin {
   };
 }
 
+/** This checkout's instance (`INST`, else the `.stabileo-inst` that `make inst.claim` writes); every dev port shifts by `INST * 10`. */
+function instance(): number {
+  let raw = process.env.INST;
+  if (raw === undefined) {
+    try {
+      raw = readFileSync(resolve(__dirname, '../.stabileo-inst'), 'utf8');
+    } catch {
+      raw = '0';
+    }
+  }
+  const n = Number.parseInt(raw.trim(), 10);
+  return Number.isInteger(n) && n >= 0 ? n : 0;
+}
+
+const INST = instance();
+const DEV_API_URL = process.env.VITE_API_URL || `http://localhost:${4100 + INST * 10}`;
+
+const ADMIN_CLIENT_ROUTES = ['/', '/settings', '/allowlist', '/oauth/callback'];
+
 function adminRootPlugin(): Plugin {
   const rewrite = (req: { url?: string }) => {
-    if (req.url === '/' || req.url?.startsWith('/?')) req.url = `/admin.html${req.url.slice(1)}`;
+    if (!req.url) return;
+    const cut = req.url.indexOf('?');
+    const path = cut === -1 ? req.url : req.url.slice(0, cut);
+    const normalized = path.length > 1 ? path.replace(/\/+$/, '') : path;
+    if (ADMIN_CLIENT_ROUTES.includes(normalized)) req.url = `/admin.html${cut === -1 ? '' : req.url.slice(cut)}`;
   };
   return {
     name: 'admin-root',
@@ -116,10 +139,13 @@ function buildCommit(): string {
 
 export default defineConfig({
   plugins: [wasmStubPlugin(), svelte(), ...(ADMIN ? [adminRootPlugin(), adminPublicAssetsPlugin()] : [])],
-  define: { __STABILEO_COMMIT__: JSON.stringify(buildCommit()) },
+  define: {
+    __STABILEO_COMMIT__: JSON.stringify(buildCommit()),
+    __STABILEO_DEV_API_URL__: JSON.stringify(DEV_API_URL),
+  },
   base: process.env.BASE_PATH || '/',
   server: {
-    port: ADMIN ? 4001 : 4000,
+    port: (ADMIN ? 4001 : 4000) + INST * 10,
   },
   worker: {
     format: 'es',

@@ -33,7 +33,8 @@ The solver stays in Rust (`engine/`) and runs in the browser as WASM. The backen
 - Access token: HS256 JWT, 15 min, stateless (`StabileoAuth.Tokens`)
 - Refresh token: JWT naming a `sessions` row; rotated on every refresh under a row lock (`StabileoAuth.Sessions.rotate_session/2`), revoked on logout and, for every other session, on password change
 - `StabileoAuth.Plugs.Authenticate` assigns `current_account` and `current_session_id`; a disabled account is a 401
-- Two apps: product (`app: "app"`) and admin site (`app: "admin"`). Tokens carry the app and each side rejects the other's. Admins are an email allowlist (`ADMIN_EMAILS`), re-checked on every request; admin refresh tokens live 4 hours. See `specs/services/admin.md`
+- Two apps: product (`app: "app"`) and admin site (`app: "admin"`). Tokens carry the app and each side rejects the other's. An admin is an email at an allowed Google Workspace domain (`ADMIN_DOMAINS`, default `lambdaclass.com`, `ergodicgroup.com`) that is on the `admin_allowed_emails` allowlist, both re-checked on every request. Admins sign in with Google (verified email, allowed `hd`); password sign-in is dev/test only. Admin refresh tokens live 4 hours. See `specs/services/admin.md`
+- Product sign-up and sign-in sit behind the runtime flag `user_login_enabled` (`StabileoRepo.Features`, `system_settings`), off by default and toggled from the admin site
 
 ## Concurrency invariants
 
@@ -47,12 +48,16 @@ Every new table answers in its PR: does any operation on it have a concurrency i
 | Table | Invariant |
 |-------|-----------|
 | `accounts` | One account per email: unique index on `email`, stored lowercased. Pinned by `account_test.exs` ("rejects a duplicate email regardless of case") |
+| `system_settings` | One value per key: unique index on `key`; writes upsert on it |
+| `admin_allowed_emails` | One row per email: unique index on `email`, stored lowercased; re-adding reactivates the row. Pinned by `admin_allowed_email_test.exs` ("rejects a duplicate email regardless of case") |
 | `sessions` | One rotation per refresh token: `rotate_session/2` locks the row and refuses a revoked one. The two-connection race is not reachable under the Ecto sandbox; pinned sequentially by `sessions_test.exs` ("a second rotation of the same session fails without minting another") |
 
 ## Configuration
 
 - Environment variables are read only in `config/runtime.exs`, through `StabileoUtils.fetch_env!/2` and friends (Credo `NoRawEnv` enforces it)
-- Production needs `DATABASE_URL`, `SECRET_KEY_BASE`, `JWT_SECRET`, `PHX_HOST`; optional `PORT`, `BIND_ADDRESS`, `POOL_SIZE`, `DATABASE_SSL`, `ACCESS_TOKEN_TTL`, `REFRESH_TOKEN_TTL`, `ADMIN_REFRESH_TOKEN_TTL`, `ADMIN_EMAILS` and `CORS_ALLOWED_ORIGINS` (both comma-separated)
+- Production needs `DATABASE_URL`, `SECRET_KEY_BASE`, `JWT_SECRET`, `PHX_HOST`, `API_URL` (the backend's public URL, for the Google callback) and `ADMIN_FRONTEND_URL`; Google admin sign-in needs `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Optional: `PORT`, `BIND_ADDRESS`, `POOL_SIZE`, `DATABASE_SSL`, `ACCESS_TOKEN_TTL`, `REFRESH_TOKEN_TTL`, `ADMIN_REFRESH_TOKEN_TTL`, and `ADMIN_DOMAINS` and `CORS_ALLOWED_ORIGINS` (both comma-separated; CORS must include the admin site's origin)
+- Runtime switches admins flip live go in `system_settings` (`StabileoRepo.SystemSettings`, `StabileoRepo.Features`), not environment variables
+- The first production admin: `bin/stabileo eval 'StabileoAuth.Release.allow_admin_email("you@lambdaclass.com")'`
 
 ## Not yet ported from scasaas
 

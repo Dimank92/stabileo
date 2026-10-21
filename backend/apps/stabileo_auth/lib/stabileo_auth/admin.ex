@@ -12,7 +12,14 @@ defmodule StabileoAuth.Admin do
 
   @sortable [:inserted_at, :last_sign_in_at, :email, :name]
 
+  @doc "Password sign-in, only where `config :stabileo_auth, :admin_password_login` is true."
   def login(email, password, metadata \\ %{}) do
+    if AdminAccess.password_login?(),
+      do: password_login(email, password, metadata),
+      else: {:error, :not_found}
+  end
+
+  defp password_login(email, password, metadata) do
     with {:ok, account} <- Accounts.authenticate(email, password),
          true <- AdminAccess.admin?(account) do
       StabileoAuth.sign_in(account, metadata, "admin")

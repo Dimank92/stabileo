@@ -8,6 +8,7 @@ const KNOWN_CODES = new Set([
   'refresh_failed',
   'network_error',
   'validation_error',
+  'user_login_disabled',
 ]);
 
 export function errorText(e: unknown): string {
@@ -23,6 +24,10 @@ export function fieldText(message: string): string {
   if (message === 'has already been taken') return t('account.field.taken');
   if (message === "can't be blank") return t('account.field.blank');
   if (message === 'has invalid format' || message === 'is invalid') return t('account.field.invalid');
+  if (message === 'must be a two-letter ISO code') return t('account.field.countryCode');
+  if (message === 'must have @ sign and no spaces') return t('account.field.email');
+  if (message === 'must be at an allowed domain') return t('account.field.domainNotAllowed');
+  if (message === 'is already allowed') return t('account.field.alreadyAllowed');
   const short = /^should be at least (\d+) character/.exec(message);
   if (short) return tp('account.field.tooShort', { count: short[1] });
   const long = /^should be at most (\d+) character/.exec(message);

@@ -128,32 +128,41 @@ describe('the auth store', () => {
   it('init restores a stored session through /refresh and rotates the stored token', async () => {
     storage.set('stabileo-refresh-token', 'refresh-0');
     const { authStore } = await load();
+    on('GET /config', () => json(200, { user_login_enabled: true }));
     on('POST /refresh', () => json(200, session(1)));
 
     const pending = authStore.init();
     expect(authStore.status).toBe('loading');
     await pending;
 
-    expect(seen).toEqual([{ route: 'POST /refresh', body: { refresh_token: 'refresh-0' }, auth: undefined }]);
+    expect(seen).toEqual([
+      { route: 'GET /config', body: undefined, auth: undefined },
+      { route: 'POST /refresh', body: { refresh_token: 'refresh-0' }, auth: undefined },
+    ]);
     expect(authStore.status).toBe('authenticated');
     expect(authStore.account).toEqual(ADA);
     expect(storage.get('stabileo-refresh-token')).toBe('refresh-1');
   });
 
-  it('init without a stored token makes no request', async () => {
+  it('init without a stored token only reads /config', async () => {
     const { authStore } = await load();
+    on('GET /config', () => json(200, { user_login_enabled: true }));
     await authStore.init();
-    expect(seen).toEqual([]);
+    expect(seen.map((s) => s.route)).toEqual(['GET /config']);
     expect(authStore.status).toBe('anonymous');
+    expect(authStore.userLoginEnabled).toBe(true);
   });
 
   it('init with the accounts flag off makes no request even with a stored token', async () => {
     storage.set('stabileo-refresh-token', 'refresh-0');
     storage.set('stabileo-feature-accounts', '0');
     const { authStore } = await load();
+    on('GET /config', () => json(200, { user_login_enabled: true }));
     await authStore.init();
     expect(seen).toEqual([]);
     expect(authStore.status).toBe('anonymous');
+    expect(authStore.userLoginEnabled).toBe(false);
+    expect(authStore.showAccountEntry).toBe(false);
   });
 
   it('init with a rejected refresh token forgets it', async () => {
@@ -306,6 +315,88 @@ describe('the auth store', () => {
 
     expect(authStore.status).toBe('authenticated');
     expect(authStore.account).toEqual(ADA);
+  });
+});
+
+describe('the runtime sign-in flag', () => {
+  it('hides the account entry while /config says sign-in is off', async () => {
+    const { authStore } = await load();
+    on('GET /config', () => json(200, { user_login_enabled: false }));
+
+    expect(authStore.showAccountEntry).toBe(false);
+    await authStore.init();
+
+    expect(seen.map((s) => s.route)).toEqual(['GET /config']);
+    expect(authStore.userLoginEnabled).toBe(false);
+    expect(authStore.showAccountEntry).toBe(false);
+  });
+
+  it('shows the account entry when /config says sign-in is on', async () => {
+    const { authStore } = await load();
+    on('GET /config', () => json(200, { user_login_enabled: true }));
+
+    await authStore.init();
+
+    expect(authStore.userLoginEnabled).toBe(true);
+    expect(authStore.showAccountEntry).toBe(true);
+    expect(authStore.account).toBeNull();
+  });
+
+  it('treats an unreachable /config as sign-in off', async () => {
+    const { authStore } = await load();
+    on('GET /config', () => { throw new TypeError('Failed to fetch'); });
+
+    await authStore.init();
+
+    expect(seen.map((s) => s.route)).toEqual(['GET /config']);
+    expect(authStore.userLoginEnabled).toBe(false);
+    expect(authStore.showAccountEntry).toBe(false);
+  });
+
+  it('treats a /config server error as sign-in off', async () => {
+    const { authStore } = await load();
+    on('GET /config', () => json(500, { error: 'internal_error', message: 'Boom' }));
+
+    await authStore.init();
+
+    expect(authStore.showAccountEntry).toBe(false);
+  });
+
+  it('restores a stored session while sign-in is off and keeps the entry for that user', async () => {
+    storage.set('stabileo-refresh-token', 'refresh-0');
+    const { authStore } = await load();
+    on('GET /config', () => json(200, { user_login_enabled: false }));
+    on('POST /refresh', () => json(200, session(1)));
+    on('DELETE /logout', () => json(200, { message: 'Logged out' }));
+
+    await authStore.init();
+
+    expect(seen.map((s) => s.route)).toEqual(['GET /config', 'POST /refresh']);
+    expect(authStore.userLoginEnabled).toBe(false);
+    expect(authStore.status).toBe('authenticated');
+    expect(authStore.account).toEqual(ADA);
+    expect(storage.get('stabileo-refresh-token')).toBe('refresh-1');
+    expect(authStore.showAccountEntry).toBe(true);
+
+    await authStore.logout();
+
+    expect(authStore.account).toBeNull();
+    expect(authStore.showAccountEntry).toBe(false);
+  });
+
+  it('a 403 user_login_disabled from /login or /register stays anonymous and keeps the code', async () => {
+    const { authStore } = await load();
+    const off = () => json(403, { error: 'user_login_disabled', message: 'User login is disabled' });
+    on('POST /login', off);
+    on('POST /register', off);
+
+    const login = await authStore.login({ email: 'ada@example.com', password: 'pw-pw-pw-pw' }).catch((e) => e);
+    const register = await authStore.register({ email: 'ada@example.com', password: 'pw-pw-pw-pw', name: 'Ada' }).catch((e) => e);
+
+    expect([login.status, login.code]).toEqual([403, 'user_login_disabled']);
+    expect([register.status, register.code]).toEqual([403, 'user_login_disabled']);
+    expect(authStore.status).toBe('anonymous');
+    expect(storage.size).toBe(0);
   });
 });
 

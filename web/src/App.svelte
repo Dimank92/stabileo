@@ -1436,7 +1436,7 @@
         />
       </div>
 
-      {#if accountsEnabled}
+      {#if authStore.showAccountEntry}
         <AccountButton />
       {/if}
 
