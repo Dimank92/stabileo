@@ -26,7 +26,7 @@ import type { DocumentModel } from '../engine/detailing/document-model';
 import type { DrawingInput } from '../sheets/compose';
 import type { SheetFormat } from '../sheets/formats';
 import { boxOf, planScale, type PlanAxis } from '../sheets/plans/plan-common';
-import { formworkPlan, type PlanBeam, type PlanColumn, type PlanSlab, type PlanWall } from '../sheets/plans/formwork-plan';
+import { formworkPlan, mergeCollinearBeams, type PlanBeam, type PlanColumn, type PlanSlab, type PlanWall } from '../sheets/plans/formwork-plan';
 import { columnSchedule, type ColumnLift, type ScheduleColumn } from '../sheets/plans/column-schedule';
 import { foundationPlan, type PlanFooting } from '../sheets/plans/foundation-plan';
 import { punchingPlan, type PunchingJoint } from '../sheets/plans/punching-plan';
@@ -156,13 +156,13 @@ function formwork(c: PlanContext, axes: PlanAxis[], levels: Array<{ name: string
     // pieces the slab's mesh cut it into are one beam on the plan.
     const named = memberNames(), spansDrawn = new Set<string>();
     const P = (id: number) => { const n = m.nodes.get(id)!; return { x: n.x, y: n.y, z: n.z ?? 0 }; };
-    const beams: PlanBeam[] = all.filter((f) => !isVertical(f) && isLevel(f) && Math.abs(f.a.z - lv.z) < TOL).flatMap((f) => {
+    const beams: PlanBeam[] = mergeCollinearBeams(all.filter((f) => !isVertical(f) && isLevel(f) && Math.abs(f.a.z - lv.z) < TOL).flatMap((f) => {
       const s = m.sections.get(f.sectionId);
       const sp = named.span(f.id);
       if (sp && spansDrawn.has(sp.key)) return [];
       if (sp) spansDrawn.add(sp.key);
       return [{ name: named.name(f.id), a: sp ? P(sp.start) : f.a, b: sp ? P(sp.end) : f.b, width: s?.b ?? 0.2, depth: s?.h ?? 0.5 }];
-    });
+    }));
     const slabs: PlanSlab[] = [], walls: PlanWall[] = [];
     for (const g of groups) {
       const ids = [...(g.members.quads ?? []).map((q) => m.quads.get(q)?.nodes), ...(g.members.plates ?? []).map((p) => m.plates.get(p)?.nodes)].flat().filter((n): n is number => n !== undefined);
