@@ -98,6 +98,17 @@ export async function parseIfc(data: ArrayBuffer, opts?: { wasmPath?: string }):
   };
   const lengthScale = lengthUnitScale();
 
+  /**
+   * A list entry's number. web-ifc gives a list's members as typed values ({ value }) in some files
+   * and as plain numbers in others (an IFC2X3 export's DirectionRatios came as [0, 0, 1]): read as
+   * typed values only, every direction was (0, 0, 0), every member zero length and every slab zero
+   * thick, and such a file imported nothing.
+   */
+  const entry = (x: any): number => {
+    const v = typeof x === 'number' ? x : x?.value;
+    const n = typeof v === 'string' ? parseFloat(v) : v;
+    return typeof n === 'number' && Number.isFinite(n) ? n : 0;
+  };
   const v3 = (ref: any, fallback?: V3): V3 | undefined => {
     if (!ref) return fallback;
     const o = api.GetLine(modelID, ref.value);
@@ -105,11 +116,11 @@ export async function parseIfc(data: ArrayBuffer, opts?: { wasmPath?: string }):
     // unitless (and normalized downstream) and stay raw.
     if (o?.Coordinates) {
       const c = o.Coordinates;
-      return [(c[0]?.value ?? 0) * lengthScale, (c[1]?.value ?? 0) * lengthScale, (c[2]?.value ?? 0) * lengthScale];
+      return [entry(c[0]) * lengthScale, entry(c[1]) * lengthScale, entry(c[2]) * lengthScale];
     }
     const c = o?.DirectionRatios;
     if (!c) return fallback;
-    return [c[0]?.value ?? 0, c[1]?.value ?? 0, c[2]?.value ?? 0];
+    return [entry(c[0]), entry(c[1]), entry(c[2])];
   };
   /** An IfcAxis2Placement3D line as a frame. */
   const frameOf = (ref: any): Frame => {
@@ -206,7 +217,12 @@ export async function parseIfc(data: ArrayBuffer, opts?: { wasmPath?: string }):
       // The first extruded solid, also when the body is a clipping of it.
       const item = extrusions(entity)[0];
       if (item) {
-        const solid = compose(world, frameOf(item.Position));
+        // The profile's own placement moves the section within the solid's plane: the axis runs
+        // through the profile's centre, not through the solid's origin (a file that puts the
+        // origin at a beam's top edge offsets its profile by half the depth).
+        const pr = item.SweptArea ? api.GetLine(modelID, item.SweptArea.value) : null;
+        const c = pr?.Position ? place2D(pr.Position).o : [0, 0];
+        const solid = compose(compose(world, frameOf(item.Position)), { r: IDENTITY.r, t: [c[0]!, c[1]!, 0] });
         const dir = v3(item.ExtrudedDirection, [0, 0, 1])!;
         const { start, end } = extrusionAxis(solid, dir, num(item.Depth) * lengthScale);
         return { start: { x: start[0], y: start[1], z: start[2] }, end: { x: end[0], y: end[1], z: end[2] } };
@@ -217,14 +233,28 @@ export async function parseIfc(data: ArrayBuffer, opts?: { wasmPath?: string }):
     }
   }
 
-  /** A rectangle's or a circle's own dimensions, m. */
-  function getProfileDims(entity: any): IfcMember['profileDims'] {
+  /**
+   * A rectangle's or a circle's own dimensions, m, and where the profile's x axis points in the
+   * world. A horizontal member whose profile has its x axis vertical has its depth along x: b and
+   * h are read the other way round. A column's profile x axis gives its rotation in plan.
+   */
+  function getProfileDims(entity: any): { dims: IfcMember['profileDims']; rollDeg?: number } {
+    const world = entity.ObjectPlacement ? worldPlacement(entity.ObjectPlacement.value) : IDENTITY;
     for (const item of extrusions(entity)) {
       const pr = api.GetLine(modelID, item.SweptArea.value);
-      if (pr?.XDim && pr?.YDim && !pr.WallThickness) return { shape: 'rect', b: num(pr.XDim) * lengthScale, h: num(pr.YDim) * lengthScale };
-      if (pr?.Radius && !pr.WallThickness) return { shape: 'circle', d: 2 * num(pr.Radius) * lengthScale };
+      const solid = compose(world, frameOf(item.Position));
+      const px = pr?.Position ? place2D(pr.Position).x : [1, 0];
+      const xw = rotate(solid, [px[0]!, px[1]!, 0]);
+      const along = rotate(solid, v3(item.ExtrudedDirection, [0, 0, 1])!);
+      const vertical = Math.abs(along[2]) / (Math.hypot(...along) || 1) > 0.99;
+      if (pr?.XDim && pr?.YDim && !pr.WallThickness) {
+        const X = num(pr.XDim) * lengthScale, Y = num(pr.YDim) * lengthScale;
+        if (vertical) return { dims: { shape: 'rect', b: X, h: Y }, rollDeg: (Math.atan2(xw[1], xw[0]) * 180) / Math.PI };
+        return { dims: Math.abs(xw[2]) > 0.9 ? { shape: 'rect', b: Y, h: X } : { shape: 'rect', b: X, h: Y } };
+      }
+      if (pr?.Radius && !pr.WallThickness) return { dims: { shape: 'circle', d: 2 * num(pr.Radius) * lengthScale } };
     }
-    return undefined;
+    return { dims: undefined };
   }
 
   // Helper: get profile name from entity
@@ -287,7 +317,7 @@ export async function parseIfc(data: ArrayBuffer, opts?: { wasmPath?: string }):
 
           const name = entity.Name?.value ?? `${memberType}_${nextId}`;
           const endpoints = getMemberEndpoints(entity);
-          const profileDims = getProfileDims(entity);
+          const { dims: profileDims, rollDeg } = getProfileDims(entity);
           // A profile with no name but a rectangle or a circle is named by its size, in mm.
           const mm = (v: number) => String(Math.round(v * 1000));
           const profileName = getProfileName(entity)
@@ -296,7 +326,7 @@ export async function parseIfc(data: ArrayBuffer, opts?: { wasmPath?: string }):
           if (endpoints) {
             const m: IfcMember = {
               id: nextId++, type: memberType, name, start: endpoints.start, end: endpoints.end, profileName,
-              ...(profileDims ? { profileDims } : {}), ifcClass: ifcClassName(type),
+              ...(profileDims ? { profileDims } : {}), ...(rollDeg !== undefined && Math.abs(rollDeg) > 1e-6 ? { rollDeg } : {}), ifcClass: ifcClassName(type),
               ...(entity.GlobalId?.value ? { globalId: String(entity.GlobalId.value) } : {}),
             };
             members.push(m);
@@ -379,7 +409,7 @@ export async function parseIfc(data: ArrayBuffer, opts?: { wasmPath?: string }):
         const name = entity.Name?.value ?? `${kind}_${nextId}`;
         const g = kind === 'slab' ? slabSurface(entity) : wallSurface(entity);
         if (!g) { warnings.push(tp('ifc.noSurface', { n: name })); continue; }
-        const sf: IfcSurface = { id: nextId++, type: kind, name, outline: g.outline.map(P), thickness: g.thickness, ifcClass: ifcClassName(type), ...(entity.GlobalId?.value ? { globalId: String(entity.GlobalId.value) } : {}) };
+        const sf: IfcSurface = { id: nextId++, type: kind, name, outline: g.outline.map(P), thickness: g.thickness, ifcClass: ifcClassName(type), ...(entity.GlobalId?.value ? { globalId: String(entity.GlobalId.value) } : {}), ...(entity.ObjectType?.value ? { objectType: String(entity.ObjectType.value) } : {}) };
         surfaces.push(sf);
         surfaceByExpressId.set(id, sf);
       }
