@@ -46,7 +46,66 @@ pub struct InfluenceLineInput {
 fn default_target_position() -> f64 { 0.5 }
 fn default_n_points() -> usize { 20 }
 
+/// Most sampled points per element. Each point is one solve, and the count
+/// comes from the caller.
+pub const MAX_INFLUENCE_POINTS_PER_ELEMENT: usize = 1_000;
+
+/// Refuse zero points per element (`k / 0` makes every ordinate NaN, returned
+/// as `Ok`) and counts beyond `MAX_INFLUENCE_POINTS_PER_ELEMENT`.
+fn check_n_points(n: usize) -> Result<(), String> {
+    if n == 0 || n > MAX_INFLUENCE_POINTS_PER_ELEMENT {
+        return Err(format!(
+            "nPointsPerElement must be between 1 and {MAX_INFLUENCE_POINTS_PER_ELEMENT}, got {n}"
+        ));
+    }
+    Ok(())
+}
+
 // ==================== Influence Line Computation ====================
+
+/// Reaction and element-force quantities of the 2D influence line.
+pub const IL_REACTIONS_2D: [&str; 5] = ["Rz", "Ry", "Rx", "My", "Mz"];
+pub const IL_FORCES_2D: [&str; 2] = ["V", "M"];
+/// Reaction and element-force quantities of the 3D influence line.
+pub const IL_REACTIONS_3D: [&str; 6] = ["Fx", "Fy", "Fz", "Mx", "My", "Mz"];
+pub const IL_FORCES_3D: [&str; 6] = ["Vy", "Vz", "N", "My_diag", "Mz_diag", "T"];
+
+/// Refuse an unknown quantity or a target it cannot be read at: these used to
+/// give an influence line of zeros, silently.
+#[allow(clippy::too_many_arguments)]
+fn check_il_target(
+    quantity: &str,
+    reactions: &[&str],
+    forces: &[&str],
+    node: Option<usize>,
+    element: Option<usize>,
+    node_exists: impl Fn(usize) -> bool,
+    node_supported: impl Fn(usize) -> bool,
+    element_exists: impl Fn(usize) -> bool,
+) -> Result<(), String> {
+    if reactions.contains(&quantity) {
+        let n = node.ok_or_else(|| format!("influence line of reaction '{quantity}' needs targetNodeId"))?;
+        if !node_exists(n) {
+            return Err(format!("influence line: target node {n} does not exist"));
+        }
+        if !node_supported(n) {
+            return Err(format!("influence line: target node {n} has no support, so no reaction '{quantity}'"));
+        }
+        Ok(())
+    } else if forces.contains(&quantity) {
+        let e = element.ok_or_else(|| format!("influence line of '{quantity}' needs targetElementId"))?;
+        if !element_exists(e) {
+            return Err(format!("influence line: target element {e} does not exist"));
+        }
+        Ok(())
+    } else {
+        Err(format!(
+            "unknown influence-line quantity '{quantity}'; accepted: {}, {}",
+            reactions.join(", "),
+            forces.join(", ")
+        ))
+    }
+}
 
 /// Compute influence line: move unit load P=1 (downward) across all elements.
 ///
@@ -61,6 +120,18 @@ fn default_n_points() -> usize { 20 }
 /// discontinuity set, not a nodal load, and the fixed-end contribution when
 /// the moving load sits on the target element needs separate treatment.
 pub fn compute_influence_line(input: &InfluenceLineInput) -> Result<InfluenceLineResult, String> {
+    check_n_points(input.n_points_per_element)?;
+    let s = &input.solver;
+    check_il_target(
+        &input.quantity,
+        &IL_REACTIONS_2D,
+        &IL_FORCES_2D,
+        input.target_node_id,
+        input.target_element_id,
+        |n| crate::ordered::values(&s.nodes).any(|x| x.id == n),
+        |n| crate::ordered::values(&s.supports).any(|x| x.node_id == n),
+        |e| crate::ordered::values(&s.elements).any(|x| x.id == e),
+    )?;
     if input.solver.nodes.len() < 2 {
         return Err("Need at least 2 nodes".into());
     }
@@ -73,31 +144,50 @@ pub fn compute_influence_line(input: &InfluenceLineInput) -> Result<InfluenceLin
 
     // Build base input (no loads)
     let base = SolverInput {
-        solver_options: None,
+        solver_options: None, masses: Default::default(),
         nodes: input.solver.nodes.clone(),
         materials: input.solver.materials.clone(),
         sections: input.solver.sections.clone(),
         elements: input.solver.elements.clone(),
-        supports: input.solver.supports.clone(),
+        // An influence ordinate is the response to the unit load alone.
+        // Prescribed support displacements are actions, not structure: kept,
+        // every ordinate carried the settlement's own (load-independent)
+        // effect — found by the metamorphic unit-scaling check.
+        supports: input.solver.supports.iter().map(|(k, s)| (k.clone(), SolverSupport { dx: None, dz: None, dry: None, ..s.clone() })).collect(),
         loads: Vec::new(),
-        constraints: vec![],
-        connectors: HashMap::new(),
+        // Constraints and connectors are part of the structure. They were
+        // left out, so an influence line was drawn for a different structure:
+        // a beam propped by a connector, or tied by a constraint, without them.
+        constraints: input.solver.constraints.clone(),
+        connectors: input.solver.connectors.clone(),
     };
 
     // Prepare once. A prepare failure is the model's, and it is returned: it
     // used to be `.ok()`-ed into an influence line of zeros, handed back as
     // `Ok` — a structure the solver refused (E ≤ 0, a collapsed shell)
     // presented as one that nothing loads. Per-point failures still yield 0.0.
-    let prepared = prepare_static_2d(&base)?;
+    // The prepared (factor-once) path has no constraint reduction: a model
+    // with constraints is solved point by point through `solve_2d`, which has.
+    let prepared = if base.constraints.is_empty() { Some(prepare_static_2d(&base)?) } else { None };
+    let solve_at = |loads: &[SolverLoad]| -> Result<AnalysisResults, String> {
+        match &prepared {
+            Some(p) => p.solve_loads(loads),
+            None => {
+                let mut with_loads = base.clone();
+                with_loads.loads = loads.to_vec();
+                crate::solver::linear::solve_2d(&with_loads)
+            }
+        }
+    };
 
     // Pre-compute node positions
-    let node_pos: HashMap<usize, (f64, f64)> = input.solver.nodes.values()
+    let node_pos: HashMap<usize, (f64, f64)> = crate::ordered::values(&input.solver.nodes)
         .map(|n| (n.id, (n.x, n.z)))
         .collect();
 
     let mut points = Vec::new();
 
-    for elem in input.solver.elements.values() {
+    for elem in crate::ordered::values(&input.solver.elements) {
         // A missing node is a caller error, not a crash. `prepare` above
         // validates and would already have refused it; this used to `unwrap`
         // on the `None` — panicking, which in WASM takes the whole module down
@@ -126,7 +216,7 @@ pub fn compute_influence_line(input: &InfluenceLineInput) -> Result<InfluenceLin
 
             let loads = influence_unit_loads_2d(elem, a, t, cos_theta, sin_theta);
 
-            let value = match prepared.solve_loads(&loads).ok() {
+            let value = match solve_at(&loads).ok() {
                 Some(result) => {
                     extract_value(&input.quantity, input.target_node_id, input.target_element_id, input.target_position, &result)
                 }
@@ -295,6 +385,18 @@ pub struct InfluenceLineInput3D {
 /// Müller-Breslau / adjoint formulation would need one solve per target
 /// quantity instead of one per sampled point.
 pub fn compute_influence_line_3d(input: &InfluenceLineInput3D) -> Result<InfluenceLineResult3D, String> {
+    check_n_points(input.n_points_per_element)?;
+    let s = &input.solver;
+    check_il_target(
+        &input.quantity,
+        &IL_REACTIONS_3D,
+        &IL_FORCES_3D,
+        input.target_node_id,
+        input.target_element_id,
+        |n| crate::ordered::values(&s.nodes).any(|x| x.id == n),
+        |n| crate::ordered::values(&s.supports).any(|x| x.node_id == n),
+        |e| crate::ordered::values(&s.elements).any(|x| x.id == e),
+    )?;
     if input.solver.nodes.len() < 2 {
         return Err("Need at least 2 nodes".into());
     }
@@ -307,18 +409,25 @@ pub fn compute_influence_line_3d(input: &InfluenceLineInput3D) -> Result<Influen
 
     let gravity_dir = match input.gravity_direction.as_deref() {
         Some("y") | Some("Y") => [0.0_f64, -1.0, 0.0],
-        _ => [0.0_f64, 0.0, -1.0], // default: gravity in -Z
+        None | Some("z") | Some("Z") => [0.0_f64, 0.0, -1.0], // default: gravity in -Z
+        Some(g) => return Err(format!("Influence line: unknown gravityDirection '{g}'; expected \"z\" or \"y\"")),
     };
 
     let base = SolverInput3D {
-        solver_options: None,
+        solver_options: None, masses: Default::default(),
         nodes: input.solver.nodes.clone(),
         materials: input.solver.materials.clone(),
         sections: input.solver.sections.clone(),
         elements: input.solver.elements.clone(),
-        supports: input.solver.supports.clone(),
+        // Settlements stripped, as in 2D: ordinates are unit-load responses.
+        supports: input
+            .solver
+            .supports
+            .iter()
+            .map(|(k, s)| (k.clone(), SolverSupport3D { dx: None, dy: None, dz: None, drx: None, dry: None, drz: None, ..s.clone() }))
+            .collect(),
         loads: Vec::new(),
-        constraints: vec![],
+        constraints: input.solver.constraints.clone(),
         left_hand: input.solver.left_hand,
         plates: input.solver.plates.clone(),
         quads: input.solver.quads.clone(),
@@ -326,22 +435,33 @@ pub fn compute_influence_line_3d(input: &InfluenceLineInput3D) -> Result<Influen
         solid_shells: input.solver.solid_shells.clone(),
         curved_shells: input.solver.curved_shells.clone(),
         curved_beams: input.solver.curved_beams.clone(),
-        connectors: HashMap::new(),
+        connectors: input.solver.connectors.clone(),
     };
 
     // Prepare once. A prepare failure is the model's, and it is returned: it
     // used to be `.ok()`-ed into an influence line of zeros, handed back as
     // `Ok` — a structure the solver refused (E ≤ 0, a collapsed shell)
     // presented as one that nothing loads. Per-point failures still yield 0.0.
-    let prepared = prepare_static_3d(&base)?;
+    // As in 2D: constraints are solved point by point through `solve_3d`.
+    let prepared = if base.constraints.is_empty() { Some(prepare_static_3d(&base)?) } else { None };
+    let solve_at = |loads: &[SolverLoad3D]| -> Result<AnalysisResults3D, String> {
+        match &prepared {
+            Some(p) => p.solve_loads(loads),
+            None => {
+                let mut with_loads = base.clone();
+                with_loads.loads = loads.to_vec();
+                crate::solver::linear::solve_3d(&with_loads)
+            }
+        }
+    };
 
-    let node_pos: HashMap<usize, (f64, f64, f64)> = input.solver.nodes.values()
+    let node_pos: HashMap<usize, (f64, f64, f64)> = crate::ordered::values(&input.solver.nodes)
         .map(|n| (n.id, (n.x, n.y, n.z)))
         .collect();
 
     let mut points = Vec::new();
 
-    for elem in input.solver.elements.values() {
+    for elem in crate::ordered::values(&input.solver.elements) {
         if elem.elem_type != "frame" && elem.elem_type != "beam" {
             continue; // only traverse frame elements
         }
@@ -383,7 +503,7 @@ pub fn compute_influence_line_3d(input: &InfluenceLineInput3D) -> Result<Influen
 
             let loads = influence_unit_loads_3d(elem.id, a, g_local_y, g_local_z);
 
-            let value = match prepared.solve_loads(&loads).ok() {
+            let value = match solve_at(&loads).ok() {
                 Some(result) => extract_value_3d(
                     &input.quantity,
                     input.target_node_id,

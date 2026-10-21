@@ -63,7 +63,7 @@ fn test_tension_only_bar_goes_slack() {
     // Element 1: (0,0)→(1,1), Element 2: (2,0)→(1,1)
     // Rightward force at apex: element 1 stretches (tension), element 2 shortens (compression)
     let solver = SolverInput {
-        solver_options: None,
+        solver_options: None, masses: Default::default(),
         nodes: hm(vec![
             (1, node(1, 0.0, 0.0)),
             (2, node(2, 2.0, 0.0)),
@@ -122,7 +122,7 @@ fn test_gap_closes_under_compression() {
     // Gap opens at 0.002m. Without gap: δ = 500/2000 = 0.25m >> 0.002.
     // With gap (k=5000): δ = 500/(2000+5000) = 0.071m >> 0.002.
     let solver = SolverInput {
-        solver_options: None,
+        solver_options: None, masses: Default::default(),
         nodes: hm(vec![
             (1, node(1, 0.0, 0.0)),
             (2, node(2, 1.0, 0.0)),
@@ -184,7 +184,7 @@ fn test_compression_only_element() {
     // V-shape with downward load pulls both bars in tension.
     // Element 2 is compression-only → deactivates.
     let solver = SolverInput {
-        solver_options: None,
+        solver_options: None, masses: Default::default(),
         nodes: hm(vec![
             (1, node(1, 0.0, 0.0)),
             (2, node(2, 2.0, 0.0)),
@@ -237,7 +237,7 @@ fn test_compression_only_element() {
 #[test]
 fn test_oscillation_damping() {
     let solver = SolverInput {
-        solver_options: None,
+        solver_options: None, masses: Default::default(),
         nodes: hm(vec![
             (1, node(1, 0.0, 0.0)),
             (2, node(2, 1.0, 0.0)),
@@ -295,7 +295,7 @@ fn test_oscillation_damping() {
 #[test]
 fn test_gap_friction_coulomb_limit() {
     let solver = SolverInput {
-        solver_options: None,
+        solver_options: None, masses: Default::default(),
         nodes: hm(vec![
             (1, node(1, 0.0, 0.0)),
             (2, node(2, 0.0, 0.5)),
@@ -367,7 +367,7 @@ fn test_multiple_gaps_mixed_states() {
     // Gap 1 small (0.001m), gap 2 large (0.5m).
     // Force pushes node 2 right → gap 1 closes, gap 2 stays open.
     let solver = SolverInput {
-        solver_options: None,
+        solver_options: None, masses: Default::default(),
         nodes: hm(vec![
             (1, node(1, 0.0, 0.0)),
             (2, node(2, 1.0, 0.0)),
@@ -433,7 +433,7 @@ fn test_multiple_gaps_mixed_states() {
 fn test_augmented_lagrangian_reduces_penetration() {
     let make_input = |al: Option<f64>| -> ContactInput {
         let solver = SolverInput {
-            solver_options: None,
+            solver_options: None, masses: Default::default(),
             nodes: hm(vec![
                 (1, node(1, 0.0, 0.0)),
                 (2, node(2, 1.0, 0.0)),
@@ -495,7 +495,7 @@ fn test_convergence_stable_problem() {
     // Horizontal cantilever 1→2→3 with tension load at tip.
     // Element 1 tension-only, element 2 normal. Both carry tension.
     let solver = SolverInput {
-        solver_options: None,
+        solver_options: None, masses: Default::default(),
         nodes: hm(vec![
             (1, node(1, 0.0, 0.0)),
             (2, node(2, 1.0, 0.0)),
@@ -557,9 +557,9 @@ fn test_convergence_stable_problem() {
 fn test_sparse_path_parity_with_dense() {
     // EA/L_total = 200*1000*0.01/24 = 83.333 kN/m; gap: g = 0.001 m, k = 5000 kN/m.
     // P = 500 kN closes the gap (open-state tip disp P*L/EA = 6.0 m >> g).
-    // Closed state (penalty adds k to K with no RHS offset):
-    // u = P/(EA/L + k) = 500/5083.333 = 0.098361 m > g -> stays closed,
-    // gap force = k*(u - g) = 486.8 kN.
+    // Closed state (the penalty acts from the moment of contact):
+    // u = (P + k*g)/(EA/L + k) = 505/5083.333 = 0.099344 m > g -> stays closed,
+    // gap force = k*(u - g) = 491.7 kN.
     let length = 24.0;
     let gap_open = 0.001;
     let gap_k = 5000.0;
@@ -591,7 +591,7 @@ fn test_sparse_path_parity_with_dense() {
                 SolverLoad::Nodal(SolverNodalLoad { node_id: tip, fx: load, fz: 0.0, my: 0.0 }),
             ],
             constraints: vec![],
-            connectors: HashMap::new(), solver_options: None,
+            connectors: HashMap::new(), solver_options: None, masses: Default::default(),
         };
 
         ContactInput {
@@ -632,7 +632,7 @@ fn test_sparse_path_parity_with_dense() {
 
     // Analytical tip displacement for the closed-gap state.
     let ea_l = 200.0 * 1000.0 * 0.01 / length;
-    let u_exact = load / (ea_l + gap_k);
+    let u_exact = (load + gap_k * gap_open) / (ea_l + gap_k);
     let u_dense = -dense.gap_status[0].displacement;
     let u_sparse = -sparse.gap_status[0].displacement;
     assert!(

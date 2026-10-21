@@ -70,7 +70,7 @@ fn sec() -> SolverSection {
 ///   Node 1 (fixed) ---[bar 1, L=1]--- Node 2 <gap> Node 3 ---[bar 2, L=1]--- Node 4 (fixed)
 fn bar_gap_bar(gap: f64, force: f64, k_gap: f64, al: Option<f64>, al_max_iter: Option<usize>) -> ContactInput {
     let solver = SolverInput {
-        solver_options: None,
+        solver_options: None, masses: Default::default(),
         nodes: hm(vec![
             (1, node(1, 0.0, 0.0)),
             (2, node(2, 1.0, 0.0)),
@@ -125,7 +125,7 @@ fn bar_gap_bar(gap: f64, force: f64, k_gap: f64, al: Option<f64>, al_max_iter: O
 /// Build the simple bar+gap+fixed-wall model.
 fn bar_gap_wall(gap: f64, force: f64, k_gap: f64) -> ContactInput {
     let solver = SolverInput {
-        solver_options: None,
+        solver_options: None, masses: Default::default(),
         nodes: hm(vec![
             (1, node(1, 0.0, 0.0)),
             (2, node(2, 1.0, 0.0)),
@@ -179,12 +179,13 @@ fn bar_gap_wall(gap: f64, force: f64, k_gap: f64) -> ContactInput {
 //
 // Both gap nodes free → penalty spring modifies stiffness matrix.
 //
-// After gap closes (no prestress term in penalty formulation):
-//   [k_bar + k_gap,    -k_gap     ] [u2]   [F]
-//   [   -k_gap,     k_bar + k_gap ] [u3] = [0]
+// After the gap closes, the penalty spring acts from the moment of contact
+// (its force is k_gap·(u2 − u3 − gap_0)), so the gap opening enters the
+// load as ±k_gap·gap_0:
+//   [k_bar + k_gap,    -k_gap     ] [u2]   [F + k_gap·gap_0]
+//   [   -k_gap,     k_bar + k_gap ] [u3] = [  -k_gap·gap_0 ]
 //
-//   u2 = (k_bar + k_gap) * F / D,  u3 = k_gap * F / D
-//   where D = (k_bar + k_gap)² - k_gap² = k_bar² + 2·k_bar·k_gap
+//   with D = (k_bar + k_gap)² - k_gap² = k_bar² + 2·k_bar·k_gap
 //
 //   Contact force = k_gap * (relative_disp + gap_0) = k_gap * (u3 - u2 + gap_0)
 //   Penetration = -(u3 - u2) - gap_0 = u2 - u3 - gap_0
@@ -203,10 +204,11 @@ fn benchmark_contact_gap_closure() {
     let gs = &result.gap_status[0];
     assert_eq!(gs.status, "closed", "Gap should be closed");
 
-    // Analytical solution (penalty without gap prestress)
+    // Analytical solution (penalty acting from the moment of contact)
     let det = k_bar * k_bar + 2.0 * k_bar * k_gap;
-    let u2_a = (k_bar + k_gap) * force / det;
-    let u3_a = k_gap * force / det;
+    let (f2, f3) = (force + k_gap * gap, -k_gap * gap);
+    let u2_a = ((k_bar + k_gap) * f2 + k_gap * f3) / det;
+    let u3_a = (k_gap * f2 + (k_bar + k_gap) * f3) / det;
     let rel_disp_a = u3_a - u2_a; // negative when gap closed
     let force_a = k_gap * (rel_disp_a + gap);
     let pen_a = -(rel_disp_a) - gap;
@@ -245,7 +247,7 @@ fn benchmark_contact_multi_pair() {
     let gap_b = 0.001;
 
     let solver = SolverInput {
-        solver_options: None,
+        solver_options: None, masses: Default::default(),
         nodes: hm(vec![
             (1, node(1, 0.0, 0.0)),
             (2, node(2, 1.0, 0.0)),
@@ -417,7 +419,7 @@ fn benchmark_contact_friction_limit() {
     let tangential_force = 100.0;
 
     let solver = SolverInput {
-        solver_options: None,
+        solver_options: None, masses: Default::default(),
         nodes: hm(vec![
             (1, node(1, 0.0, 0.0)),
             (2, node(2, 1.0, 0.0)),
@@ -527,6 +529,8 @@ fn benchmark_contact_3d_gap_closure() {
     let mut secs_map = HashMap::new();
     secs_map.insert("1".to_string(), dedaliano_engine::types::SolverSection3D {
         id: 1, name: None, a, iy, iz, j, cw: None, as_y: None, as_z: None,
+        shear_center_y: None,
+        shear_center_z: None,
     });
 
     let mut elems_map = HashMap::new();
@@ -568,7 +572,7 @@ fn benchmark_contact_3d_gap_closure() {
     });
 
     let solver_3d = dedaliano_engine::types::SolverInput3D {
-        solver_options: None,
+        solver_options: None, masses: Default::default(),
         nodes: nodes_map,
         materials: mats_map,
         sections: secs_map,

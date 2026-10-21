@@ -1,6 +1,6 @@
 .PHONY: help install-nix shell setup setup.run git.setup deps backend.run console routes \
-       lint.engine test.engine.gates test.engine.suite bench.engine \
-       web.deps typecheck.web test.web.unit test.web.build e2e.web.setup e2e.web.smoke e2e.web.slow e2e.web.visual \
+       lint.engine check.engine.acceptance-models test.engine.gates test.engine.metamorphic test.engine.suite bench.engine \
+       web.deps typecheck.web test.web.unit test.web.build test.web.determinism e2e.web.setup e2e.web.smoke e2e.web.slow e2e.web.visual \
        test.ci-scripts \
        test test.engine test.backend test.backend.file test.web test.ai-backend test.inventory \
        lint.backend format format.backend \
@@ -72,11 +72,13 @@ help:
 	@echo "CI-shaped targets (what each CI job runs):"
 	@echo "  make lint.engine          - Clippy over the engine"
 	@echo "  make test.engine.gates    - The named engine correctness gates"
+	@echo "  make test.engine.metamorphic - Metamorphic tests, in release"
 	@echo "  make test.engine.suite [SHARD=1/2] - Every engine test outside the gates"
 	@echo "  make bench.engine         - Criterion benchmarks (informational)"
 	@echo "  make typecheck.web        - tsc against its baseline + svelte-check gate"
 	@echo "  make test.web.unit [SHARD=1/2] - Vitest unit pass"
 	@echo "  make test.web.build       - Production build + build-pass tests"
+	@echo "  make test.web.determinism - WASM results bit-identical across Node and three browsers"
 	@echo "  make e2e.web.smoke [SHARD=1/5] - Playwright smoke suite"
 	@echo "  make e2e.web.slow / e2e.web.visual - The heavier Playwright suites"
 	@echo "  make lint.backend   - Format check and credo over the backend"
@@ -167,21 +169,31 @@ test.web:
 GATE_SHELL_BENCH = test(/benchmark_shell/) + test(/benchmark_beam_shell/) + test(/benchmark_plate/) + test(/benchmark_navier/) + test(/benchmark_scordelis/) + test(/benchmark_cantilever/) + test(/benchmark_pinched/) + test(/test_quad_thin_plate/)
 GATE_SHELL_ACCEPTANCE = test(/acceptance_.*shell/) + test(/acceptance_.*diaphragm/)
 GATE_CONSTRAINT_BENCH = test(/benchmark_.*constraint/)
-GATE_BINARIES = sparse_shell_gates solver_invariants solver_ci_coverage conditioning_adversarial kfull_overbuild_gates
+GATE_BINARIES = sparse_shell_gates solver_invariants solver_ci_coverage conditioning_adversarial kfull_overbuild_gates acceptance certify properties_2d properties_3d
 # Wall-clock gates run single-threaded, so elapsed time is CPU work, not contention.
 GATE_TIMED_BINARIES = perf_regression_gates perf_regression_advanced
-SUITE_FILTER = all() - test(harmonic_phase_breakdown) - test(harmonic_modal_vs_direct_timing) $(foreach b,$(GATE_TIMED_BINARIES),- binary($(b)) )- ($(GATE_SHELL_BENCH)) - ($(GATE_SHELL_ACCEPTANCE)) - $(GATE_CONSTRAINT_BENCH) $(foreach b,$(GATE_BINARIES),- binary($(b)) )
+# Metamorphic tests run apart, in release: unoptimised they outlast a suite shard.
+GATE_RELEASE_BINARIES = metamorphic
+SUITE_FILTER = all() - test(harmonic_phase_breakdown) - test(harmonic_modal_vs_direct_timing) $(foreach b,$(GATE_TIMED_BINARIES) $(GATE_RELEASE_BINARIES),- binary($(b)) )- ($(GATE_SHELL_BENCH)) - ($(GATE_SHELL_ACCEPTANCE)) - $(GATE_CONSTRAINT_BENCH) $(foreach b,$(GATE_BINARIES),- binary($(b)) )
 NEXTEST = cd engine && $(NIX_RUN) cargo nextest run --profile ci
 
 lint.engine:
 	cd engine && $(NIX_RUN) cargo clippy --lib -- -W clippy::all -A clippy::erasing_op
 
-test.engine.gates:
+# The acceptance models are generated (docs/verification/ACCEPTANCE.md); a hand edit fails here.
+check.engine.acceptance-models:
+	$(NIX_RUN) bash -c 'for g in engine/tests/acceptance/generators/*.py; do python3 -I "$$g"; done'
+	git diff --exit-code -- engine/tests/acceptance/models
+
+test.engine.gates: check.engine.acceptance-models
 	$(NEXTEST) -E '$(GATE_SHELL_BENCH)'
 	$(NEXTEST) -E '$(GATE_SHELL_ACCEPTANCE)'
 	$(NEXTEST) -E '$(GATE_CONSTRAINT_BENCH)'
 	$(foreach b,$(GATE_BINARIES),($(NEXTEST) --test $(b)) &&) true
 	$(foreach b,$(GATE_TIMED_BINARIES),($(NEXTEST) --test $(b) --test-threads 1) &&) true
+
+test.engine.metamorphic:
+	$(NEXTEST) --cargo-profile release $(foreach b,$(GATE_RELEASE_BINARIES),--test $(b))
 
 test.engine.suite:
 	$(NEXTEST) -E '$(SUITE_FILTER)' $(if $(SHARD),--partition count:$(SHARD))
@@ -202,6 +214,11 @@ test.web.unit:
 # The build prerenders the public pages in Chromium, so it needs the browser.
 test.web.build:
 	$(NIX_RUN) bash -c "cd web && npx playwright install chromium && npm run build && npx vitest run --project build"
+
+# The WASM must give bit-identical results in Node, Chromium, Firefox and WebKit
+# (docs/verification/TRUSTED_BASE.md). Needs make wasm and make web.deps first.
+test.web.determinism:
+	$(NIX_RUN) bash -c "cd web && npx playwright install chromium firefox webkit && node --test determinism/serve.test.mjs determinism/checks.test.mjs && node determinism/node-run.mjs && npx playwright test -c determinism/playwright.config.ts"
 
 e2e.web.setup:
 	$(NIX_RUN) bash -c "cd web && npx playwright install chromium"
@@ -266,8 +283,9 @@ web.setup:
 web.run: wasm
 	$(NIX_RUN) bash -c "cd web && npm install && VITE_API_URL=http://localhost:$(BACKEND_PORT) npm run dev -- --port $(WEB_PORT)"
 
+# Builds from the installed dependencies (make web.deps), so CI never resolves away from the lockfile.
 web.build: wasm
-	$(NIX_RUN) bash -c "cd web && npm install && npm run build"
+	$(NIX_RUN) bash -c "cd web && npm run build"
 
 admin.run:
 	$(NIX_RUN) bash -c "cd web && VITE_APP_TYPE=admin VITE_API_URL=http://localhost:$(BACKEND_PORT) npx vite --port $(ADMIN_PORT)"

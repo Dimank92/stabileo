@@ -1,5 +1,6 @@
 // Results store
 
+import { carryCertifyJob } from '../engine/certify-tags';
 import type { AnalysisResults, InfluenceLineResult, Section, Material } from './model.svelte';
 import type { ElementForces, FullEnvelope, ConstraintForce, SolverDiagnostic, SolveTimings } from '../engine/types';
 import { modelFindings } from '../engine/model-findings';
@@ -290,6 +291,12 @@ function createResultsStore() {
   // verificationStore can stamp a solve-generation counter without this store
   // importing verificationStore (mirrors modelStore's `_onMutation` wiring).
   let _onResultsPublish: (() => void) | null = null;
+  /** Told of every base static solve published (as the solver returned it) and of every clear; see `certificate.svelte.ts`. */
+  let _onStaticPublish: ((r: object | null, dim: '2d' | '3d') => void) | null = null;
+  /** Fired by every advanced-analysis publish, with its kind: the project's solve stamp records it. */
+  let _onAnalysisPublish: ((kind: 'pdelta' | 'modal' | 'buckling' | 'plastic' | 'spectral') => void) | null = null;
+  /** Told of every combination bundle published (as the solver returned it); see `certificate.svelte.ts`. */
+  let _onComboPublish: ((perCase: Map<number, object>, perCombo: Map<number, object>, dim: '2d' | '3d') => void) | null = null;
   /**
    * What a 3D result is put through before it is published: members of variable section back to
    * one member each (`engine/variable-members.ts`), whichever analysis produced it. Idempotent.
@@ -410,6 +417,9 @@ function createResultsStore() {
      *  its solve-generation counter — including a plain re-solve with no
      *  structural mutation (self-weight / axis-convention toggle). */
     _setOnResultsPublish(fn: () => void) { _onResultsPublish = fn; },
+    _setOnStaticPublish(fn: (r: object | null, dim: '2d' | '3d') => void) { _onStaticPublish = fn; },
+    _setOnAnalysisPublish(fn: (kind: 'pdelta' | 'modal' | 'buckling' | 'plastic' | 'spectral') => void) { _onAnalysisPublish = fn; },
+    _setOnComboPublish(fn: (perCase: Map<number, object>, perCombo: Map<number, object>, dim: '2d' | '3d') => void) { _onComboPublish = fn; },
     _setNormalise3D(r: (x: AnalysisResults3D) => AnalysisResults3D, e: (x: FullEnvelope3D) => FullEnvelope3D, adv?: Normalise3DAdvanced) {
       _normalise3D = r; _normaliseEnvelope3D = e; _normaliseAdvanced3D = adv ?? null;
     },
@@ -730,7 +740,8 @@ function createResultsStore() {
 
     get pdeltaResult() { return pdeltaResult; },
     setPDeltaResult(r: PDeltaResult) {
-      r = { ...r, results: drawn(r.results), ...(r.linearResults ? { linearResults: drawn(r.linearResults) } : {}) };
+      _onAnalysisPublish?.('pdelta');
+      r = carryCertifyJob(r, { ...r, results: drawn(r.results), ...(r.linearResults ? { linearResults: drawn(r.linearResults) } : {}) });
       hold();
       this.clearAdvanced();
       pdeltaResult = r;
@@ -747,6 +758,7 @@ function createResultsStore() {
      * stays as it was.
      */
     setPDeltaWithoutEquilibrium(r: PDeltaResult | PDeltaResult3D, is3D: boolean) {
+      _onAnalysisPublish?.('pdelta');
       hold();
       this.clearAdvanced();
       if (is3D) {
@@ -764,6 +776,7 @@ function createResultsStore() {
     get activeModeIndex() { return activeModeIndex; },
     set activeModeIndex(v: number) { activeModeIndex = v; },
     setModalResult(r: ModalResult) {
+      _onAnalysisPublish?.('modal');
       hold();
       this.clearAdvanced();
       staticUnder2D();
@@ -776,6 +789,7 @@ function createResultsStore() {
     get activeBucklingMode() { return activeBucklingMode; },
     set activeBucklingMode(v: number) { activeBucklingMode = v; },
     setBucklingResult(r: BucklingResult) {
+      _onAnalysisPublish?.('buckling');
       hold();
       this.clearAdvanced();
       staticUnder2D();
@@ -792,11 +806,12 @@ function createResultsStore() {
     get plasticStep() { return plasticStep; },
     set plasticStep(v: number) { plasticStep = v; },
     setPlasticResult(r: PlasticResult) {
-      r = {
+      _onAnalysisPublish?.('plastic');
+      r = carryCertifyJob(r, {
         ...r,
         steps: (r.steps ?? []).map((st) => ({ ...st, results: st.results && drawn(st.results) })),
         hinges: (r.hinges ?? []).map((h) => ((h as { kind?: string }).kind === 'axial' ? h : { ...h, moment: _signOf(h.elementId) * h.moment })),
-      };
+      });
       hold();
       this.clearAdvanced();
       plasticResult = r;
@@ -809,6 +824,7 @@ function createResultsStore() {
 
     get spectralResult() { return spectralResult; },
     setSpectralResult(r: SpectralResult) {
+      _onAnalysisPublish?.('spectral');
       // Spectral needs modal, so don't clear modal
       hold();
       pdeltaResult = null;
@@ -823,7 +839,8 @@ function createResultsStore() {
     // ─── 3D Advanced Analysis Results ─────────────────────────────
     get pdeltaResult3D() { return pdeltaResult3D; },
     setPDeltaResult3D(r: PDeltaResult3D) {
-      if (_normaliseAdvanced3D) r = _normaliseAdvanced3D.pdelta(r);
+      _onAnalysisPublish?.('pdelta');
+      if (_normaliseAdvanced3D) r = carryCertifyJob(r, _normaliseAdvanced3D.pdelta(r));
       hold();
       this.clearAdvanced();
       pdeltaResult3D = r;
@@ -837,7 +854,8 @@ function createResultsStore() {
 
     get modalResult3D() { return modalResult3D; },
     setModalResult3D(r: ModalResult3D) {
-      if (_normaliseAdvanced3D) r = _normaliseAdvanced3D.modes(r);
+      _onAnalysisPublish?.('modal');
+      if (_normaliseAdvanced3D) r = carryCertifyJob(r, _normaliseAdvanced3D.modes(r));
       hold();
       this.clearAdvanced();
       staticUnder3D();
@@ -854,6 +872,7 @@ function createResultsStore() {
 
     get bucklingResult3D() { return bucklingResult3D; },
     setBucklingResult3D(r: BucklingResult3D) {
+      _onAnalysisPublish?.('buckling');
       if (_normaliseAdvanced3D) r = _normaliseAdvanced3D.modes(r);
       hold();
       this.clearAdvanced();
@@ -870,6 +889,7 @@ function createResultsStore() {
 
     get spectralResult3D() { return spectralResult3D; },
     setSpectralResult3D(r: SpectralResult3D) {
+      _onAnalysisPublish?.('spectral');
       if (_normalise3D) r = { ...r, results: _normalise3D(r.results) };
       hold();
       this.clearAdvanced();
@@ -929,6 +949,7 @@ function createResultsStore() {
     },
 
     setResults(r: AnalysisResults, preserveDiagram = false) {
+      _onStaticPublish?.(r, '2d');
       r = drawn(r);
       results = r;
       singleResults = r; // Save base solve for "Cargas simples" option
@@ -964,6 +985,7 @@ function createResultsStore() {
     },
 
     setCombinationResults(pc: Map<number, AnalysisResults>, pco: Map<number, AnalysisResults>, env: FullEnvelope) {
+      _onComboPublish?.(pc, pco, '2d');
       pc = new Map([...pc].map(([k, v]) => [k, drawn(v)]));
       pco = new Map([...pco].map(([k, v]) => [k, drawn(v)]));
       env = envelopeToDrawnAxes(env, _signOf);
@@ -1018,6 +1040,7 @@ function createResultsStore() {
       }
       // The held view described the results this clear throws away.
       _held = null;
+      _onStaticPublish?.(null, '2d');
       results = null;
       singleResults = null;
       diagramType = 'none';
@@ -1118,6 +1141,7 @@ function createResultsStore() {
     get results3D() { return results3D; },
 
     setResults3D(r: AnalysisResults3D, preserveDiagram = false) {
+      _onStaticPublish?.(r, '3d');
       if (_normalise3D) r = _normalise3D(r);
       noteStructuralSolve();
       _onResultsPublish?.();
@@ -1156,6 +1180,7 @@ function createResultsStore() {
     },
 
     clear3D() {
+      _onStaticPublish?.(null, '3d');
       _held = null;
       results3D = null;
       singleResults3D = null;
@@ -1205,6 +1230,7 @@ function createResultsStore() {
     setGoverning3D(g: Map<number, GoverningPerElement3D>) { governing3D = g; },
 
     setCombinationResults3D(pc: Map<number, AnalysisResults3D>, pco: Map<number, AnalysisResults3D>, env: FullEnvelope3D, unstable: readonly number[] = []) {
+      _onComboPublish?.(pc, pco, '3d');
       if (_normalise3D) {
         const n = _normalise3D;
         pc = new Map([...pc].map(([k, r]) => [k, n(r)]));

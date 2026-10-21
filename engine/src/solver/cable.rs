@@ -169,6 +169,20 @@ pub fn solve_cable_2d(
     max_iter: usize,
     tolerance: f64,
 ) -> Result<CableAnalysisResult2D, String> {
+    let mut r = solve_cable_2d_inner(input, densities, max_iter, tolerance)?;
+    crate::known_issues::attach(&mut r.results.structured_diagnostics, crate::known_issues::for_2d(input, crate::known_issues::Analysis::Cable));
+    Ok(r)
+}
+
+fn solve_cable_2d_inner(
+    input: &SolverInput,
+    densities: &HashMap<String, f64>,
+    max_iter: usize,
+    tolerance: f64,
+) -> Result<CableAnalysisResult2D, String> {
+    // The same input checks as every other analysis (non-finite values,
+    // dangling ids, unknown support types, ambiguous shared supports).
+    linear::validate_input_2d(input)?;
     let dof_num = DofNumbering::build_2d(input);
 
     if dof_num.n_free == 0 {
@@ -179,11 +193,11 @@ pub fn solve_cable_2d(
     let nf = dof_num.n_free;
 
     // Build constraint system (if constraints present)
-    let cs = FreeConstraintSystem::build_2d(&input.constraints, &dof_num, &input.nodes);
+    let cs = FreeConstraintSystem::build_2d(&input, &dof_num)?;
     let ns = cs.as_ref().map_or(nf, |c| c.n_free_indep);
 
     // Identify cable elements
-    let has_cables = input.elements.values().any(|e| e.elem_type == "cable");
+    let has_cables = crate::ordered::values(&input.elements).any(|e| e.elem_type == "cable");
 
     if !has_cables {
         let results = linear::solve_2d(input)?;
@@ -197,17 +211,17 @@ pub fn solve_cable_2d(
 
     // Build O(1) lookup maps by id
     let node_by_id: HashMap<usize, &SolverNode> =
-        input.nodes.values().map(|n| (n.id, n)).collect();
+        crate::ordered::values(&input.nodes).map(|n| (n.id, n)).collect();
     let mat_by_id: HashMap<usize, &SolverMaterial> =
-        input.materials.values().map(|m| (m.id, m)).collect();
+        crate::ordered::values(&input.materials).map(|m| (m.id, m)).collect();
     let sec_by_id: HashMap<usize, &SolverSection> =
-        input.sections.values().map(|s| (s.id, s)).collect();
+        crate::ordered::values(&input.sections).map(|s| (s.id, s)).collect();
 
     // Precompute cable geometry
     let mut cables: Vec<CableGeom> = Vec::new();
     let mut cable_tensions: HashMap<usize, f64> = HashMap::new();
 
-    for elem in input.elements.values() {
+    for elem in crate::ordered::values(&input.elements) {
         if elem.elem_type != "cable" {
             continue;
         }
@@ -541,7 +555,7 @@ pub fn solve_cable_2d(
             let k_ff = extract_submatrix(&dense_asm.as_ref().unwrap().k, n, &free_idx, &free_idx);
             fcs.compute_constraint_forces(&k_ff, &u_f, &f_global[..nf])
         };
-        super::constraints::map_dof_forces_to_constraint_forces(&raw, &dof_num)
+        fcs.constraint_forces(&raw, &dof_num)
     } else {
         vec![]
     };
@@ -595,8 +609,20 @@ pub fn solve_cable_3d(
     max_iter: usize,
     tolerance: f64,
 ) -> Result<CableAnalysisResult3D, String> {
+    let mut r = solve_cable_3d_inner(input, densities, max_iter, tolerance)?;
+    crate::known_issues::attach(&mut r.results.structured_diagnostics, crate::known_issues::for_3d(input, crate::known_issues::Analysis::Cable));
+    Ok(r)
+}
+
+fn solve_cable_3d_inner(
+    input: &SolverInput3D,
+    densities: &HashMap<String, f64>,
+    max_iter: usize,
+    tolerance: f64,
+) -> Result<CableAnalysisResult3D, String> {
     // Expand curved beams before DOF numbering and assembly.
     let input = &super::linear::expand_curved_beams_3d(input);
+    linear::validate_input_3d(input)?;
     let dof_num = DofNumbering::build_3d(input);
 
     if dof_num.n_free == 0 {
@@ -607,10 +633,10 @@ pub fn solve_cable_3d(
     let nf = dof_num.n_free;
 
     // Build constraint system (if constraints present)
-    let cs = FreeConstraintSystem::build_3d(&input.constraints, &dof_num, &input.nodes);
+    let cs = FreeConstraintSystem::build_3d(&input, &dof_num)?;
     let ns = cs.as_ref().map_or(nf, |c| c.n_free_indep);
 
-    let has_cables = input.elements.values().any(|e| e.elem_type == "cable");
+    let has_cables = crate::ordered::values(&input.elements).any(|e| e.elem_type == "cable");
 
     if !has_cables {
         let results = linear::solve_3d(input)?;
@@ -624,16 +650,16 @@ pub fn solve_cable_3d(
 
     // Build O(1) lookup maps by id
     let node_by_id: HashMap<usize, &SolverNode3D> =
-        input.nodes.values().map(|n| (n.id, n)).collect();
+        crate::ordered::values(&input.nodes).map(|n| (n.id, n)).collect();
     let mat_by_id: HashMap<usize, &SolverMaterial> =
-        input.materials.values().map(|m| (m.id, m)).collect();
+        crate::ordered::values(&input.materials).map(|m| (m.id, m)).collect();
     let sec_by_id: HashMap<usize, &SolverSection3D> =
-        input.sections.values().map(|s| (s.id, s)).collect();
+        crate::ordered::values(&input.sections).map(|s| (s.id, s)).collect();
 
     let mut cables: Vec<CableGeom3D> = Vec::new();
     let mut cable_tensions: HashMap<usize, f64> = HashMap::new();
 
-    for elem in input.elements.values() {
+    for elem in crate::ordered::values(&input.elements) {
         if elem.elem_type != "cable" {
             continue;
         }
@@ -946,7 +972,7 @@ pub fn solve_cable_3d(
             let k_ff = extract_submatrix(&dense_asm.as_ref().unwrap().k, n, &free_idx, &free_idx);
             fcs.compute_constraint_forces(&k_ff, &u_f, &f_global[..nf])
         };
-        super::constraints::map_dof_forces_to_constraint_forces(&raw, &dof_num)
+        fcs.constraint_forces(&raw, &dof_num)
     } else {
         vec![]
     };

@@ -10,11 +10,11 @@ import { localizeEngineText } from '../i18n/engine-text';
 import { createSectionWeight } from '../section/weight';
 import { expandSemiRigid3D, SemiRigidError } from './expand-semi-rigid-3d';
 import { solvableModel, applyStiffnessModifiers, solveStiffnessFactors, hasNonlinearBehaviour, solveNonlinear3D, withZeroRows } from './member-behaviour';
-import { solvePDelta3DCorrected, amplification } from './pdelta-forces';
+import { amplification } from './pdelta-amplification';
 import { sectionShearAreas } from '../section/shear-areas';
 import { transverseSign } from './transverse-sign-2d';
 import { supportDofs3D } from './support-dofs-3d';
-import { solve as solveStructure, solve3D as solve3DEngine, setAdvancedGuards, combineResults, combineResults3D, computeEnvelope, computeEnvelope3D, solveMultiCase2D, solveMultiCase3D, input2DToWireObject, input3DToWireObject } from './wasm-solver';
+import { solve as solveStructure, solve3D as solve3DEngine, setAdvancedGuards, combineResults, combineResults3D, computeEnvelope, computeEnvelope3D, solveMultiCase2D, solveMultiCase3D, input2DToWireObject, input3DToWireObject, solvePDelta3D } from './wasm-solver';
 import { solverProperties } from '../section/state';
 import type { SolverInput, SolverSupport, FullEnvelope, AnalysisResults } from './types';
 import { stabiliseOrphanRotations3D, unheldNodalMoment3D, exactOrphanRotations3D } from './orphan-rotations-3d';
@@ -23,7 +23,7 @@ import { computeLocalAxes3D, memberRoll } from './local-axes-3d';
 import { distributedGlobalEnds, globalDistributedToSolver, transverseToNodes, memberFrame3D, takesNoBending as memberTakesNoBending, type MemberRef } from './member-loads';
 import { selfWeightFor, selfWeightSolverLoads } from './self-weight';
 import type { SelfWeightLoad } from './analysis-settings';
-import type { SolverInput3D, SolverLoad3D, AnalysisResults3D, FullEnvelope3D, Constraint3D, NonlinearReport } from './types-3d';
+import type { SolverInput3D, SolverSection3D, SolverLoad3D, AnalysisResults3D, FullEnvelope3D, Constraint3D, NonlinearReport } from './types-3d';
 import { analyzeKinematics, type KinematicResult } from './kinematic-2d';
 import {
   convertSurfaceLoad, convertThermalQuadLoad,
@@ -37,10 +37,9 @@ import { expandJoints3D, modelHasJoints3D, EMBED_XZ_DOF_PERMUTATION } from './ex
 import { expandShellOffsets, modelHasShellOffsets } from './shell-offsets';
 import { enrichComboShellStresses, envelopeShellStresses } from './shell-combos';
 import { axialShares, combineShares, giveBackAxialShares } from './axial-shares';
-import { withDiaphragmRotation } from './diaphragm-rotation';
 import { addSettlementCase, addSettlementCase2D, hasSettlement, withoutSettlement, SETTLEMENT_CASE_ID } from './settlement-case';
 import { memberThermalScale, thermalAlphaOf, ENGINE_ALPHA } from './thermal-alpha';
-import { pointToSolver, pointToEnds, PointLoadNeedsCut } from './member-point-loads';
+import { pointToSolver, pointToEnds, PointLoadNeedsCut, planePointLoad3D, pointWithCoupleToEnds } from './member-point-loads';
 import { prestressToSolver } from './prestress';
 import { hasCaseDisplacements, imposedOf, imposedUnsupported, supportsWithImposed, casesWithDisplacements } from './case-displacements';
 import { constraintsTo2D } from './constraint-2d-remap';
@@ -242,16 +241,6 @@ function buildSolverSupports2D(model: ModelData): Map<number, any> {
 
 // ─── 2D: validateAndSolve2D ───────────────────────────────────────
 
-function axialEquivalentLoads(qI: number, qJ: number, a: number, b: number, length: number): [number, number] {
-  // Integrate q(x) against the axial shape functions, 1-x/L and x/L.
-  // Signed first moments remain valid when q crosses zero or its resultant
-  // vanishes, unlike a centroid computed from absolute load magnitudes.
-  const span = b - a;
-  const total = (qI + qJ) * span / 2;
-  const fJ = (a * total + span * span * (qI + 2 * qJ) / 6) / length;
-  return [total - fJ, fJ];
-}
-
 /** Build only the solver loads array for a 2D input. Shared by
  *  validateAndSolve2D and the multi-case combo path so both produce
  *  identical per-case loads on the wire. */
@@ -264,6 +253,12 @@ function buildSolverLoads2D(model: ModelData, loads: Load[], includeSelfWeight: 
    * that is a different load — a vertical 10 kN/m on a 3:4 rafter gave 33 kN
    * of horizontal reaction — while P-Δ, buckling and the other analyses,
    * which used this decomposition, got it right.
+   *
+   * The part along an inclined member goes to the solver as a member load too — `px` for a
+   * point load, `axialDistributed` for a distributed one and the self-weight. As equivalent
+   * loads at the end nodes it moved the structure right, but the member saw no span load and
+   * carried a constant N, the average of its true end values: a 3-4-5 gable rafter under
+   * 10 kN/m read 41.7 kN at both ends instead of 56.7 at the base and 26.7 at the apex.
    */
   const solverLoads: SolverInput['loads'] = [];
   /*
@@ -324,22 +319,13 @@ function buildSolverLoads2D(model: ModelData, loads: Load[], includeSelfWeight: 
         const pPerp = fxGlobal * (-sinTheta) + fyGlobal * cosTheta;
         const pAxial = fxGlobal * cosTheta + fyGlobal * sinTheta;
 
-        if (Math.abs(pPerp) > 1e-10) {
-          solverLoads.push({ type: 'pointOnElement' as const, data: { elementId: d.elementId, a: d.a, p: pPerp } });
-        }
-        // The axial force and the moment given alongside it are local and unaffected by the angle.
+        // The axial force and the moment given alongside it are local and unaffected by the
+        // angle; the load's own axial part joins that axial force, at the load's point.
         const pointMy = d.my ?? d.mz;
-        if ((d.px !== undefined && d.px !== 0) || (pointMy !== undefined && pointMy !== 0)) {
-          solverLoads.push({ type: 'pointOnElement' as const, data: { elementId: d.elementId, a: d.a, p: 0, px: d.px, my: pointMy } });
-        }
-        if (Math.abs(pAxial) > 1e-10) {
-          const t = d.a / L;
-          const fI = pAxial * (1 - t);
-          const fJ = pAxial * t;
-          solverLoads.push(
-          { type: 'nodal' as const, data: { nodeId: elem.nodeI, fx: fI * cosTheta, fz: fI * sinTheta, my: 0 } },
-          { type: 'nodal' as const, data: { nodeId: elem.nodeJ, fx: fJ * cosTheta, fz: fJ * sinTheta, my: 0 } },
-          );
+        const px = (d.px ?? 0) + (Math.abs(pAxial) > 1e-10 ? pAxial : 0);
+        const p = Math.abs(pPerp) > 1e-10 ? pPerp : 0;
+        if (p !== 0 || px !== 0 || (pointMy !== undefined && pointMy !== 0)) {
+          solverLoads.push({ type: 'pointOnElement' as const, data: { elementId: d.elementId, a: d.a, p, ...(px !== 0 ? { px } : {}), ...(pointMy ? { my: pointMy } : {}) } });
         }
       }
     } else if (l.type === 'distributed') {
@@ -386,13 +372,7 @@ function buildSolverLoads2D(model: ModelData, loads: Load[], includeSelfWeight: 
           solverLoads.push({ type: 'distributed' as const, data: { elementId: d.elementId, qI: qIPerpLocal, qJ: qJPerpLocal, a: d.a, b: d.b } });
         }
         if (Math.abs(qIAxialLocal) > 1e-10 || Math.abs(qJAxialLocal) > 1e-10) {
-          const loadA = d.a ?? 0;
-          const loadB = d.b ?? L;
-          const [fI, fJ] = axialEquivalentLoads(qIAxialLocal, qJAxialLocal, loadA, loadB, L);
-          solverLoads.push(
-          { type: 'nodal' as const, data: { nodeId: elem.nodeI, fx: fI * cosTheta, fz: fI * sinTheta, my: 0 } },
-          { type: 'nodal' as const, data: { nodeId: elem.nodeJ, fx: fJ * cosTheta, fz: fJ * sinTheta, my: 0 } },
-          );
+          solverLoads.push({ type: 'axialDistributed' as const, data: { elementId: d.elementId, qI: qIAxialLocal, qJ: qJAxialLocal, a: d.a, b: d.b } });
         }
       }
     }
@@ -417,12 +397,7 @@ function buildSolverLoads2D(model: ModelData, loads: Load[], includeSelfWeight: 
       }
       const qTangent = -w * sinTheta;
       if (Math.abs(qTangent) > 1e-10) {
-        const Ft = qTangent * L / 2;
-        const fxNode = Ft * cosTheta, fzNode = Ft * sinTheta;
-        solverLoads.push(
-          { type: 'nodal' as const, data: { nodeId: elem.nodeI, fx: fxNode, fz: fzNode, my: 0 } },
-          { type: 'nodal' as const, data: { nodeId: elem.nodeJ, fx: fxNode, fz: fzNode, my: 0 } },
-        );
+        solverLoads.push({ type: 'axialDistributed' as const, data: { elementId: elem.id, qI: qTangent, qJ: qTangent } });
       }
     }
   }
@@ -957,6 +932,118 @@ function finalizeSolve2DResults(results: AnalysisResults, prep: Solve2DPreparati
   return results;
 }
 
+/**
+ * The wire input of every plain linear static solve this module returned, keyed by its result,
+ * so the certificate (`store/certificate.svelte.ts`) is computed for exactly what was solved.
+ * Results of any other analysis (non-linear, combinations, …) are never in it.
+ */
+const certifiableInputs = new WeakMap<object, CertifiableInput>();
+export interface CertifiableInput { dim: '2d' | '3d'; wire: () => Record<string, any> }
+
+function certifiable<R extends object>(results: R, dim: '2d' | '3d', wire: () => Record<string, any>): R {
+  certifiableInputs.set(results, { dim, wire });
+  return results;
+}
+
+/** The input a published linear static result was solved from, or null when it cannot be certified. */
+export function certifiableInputOf(results: object): CertifiableInput | null {
+  return certifiableInputs.get(results) ?? null;
+}
+
+/**
+ * The multi-case wire input behind every case and combination result one engine multi-case solve
+ * returned (`certify_multi_case_2d/3d` takes it as it is), with the engine names of each case and
+ * combination by id. Each result object is keyed to it; a result rebuilt afterwards (a settlement
+ * added, a spectral part superposed, helper nodes pruned…) is a new object, and is not certified.
+ */
+export interface CertifiableMultiCase {
+  dim: '2d' | '3d';
+  wire: () => Record<string, any>;
+  caseNames: Map<number, string>;
+  comboNames: Map<number, string>;
+}
+const certifiableMulti = new WeakMap<object, { input: CertifiableMultiCase; id: number }>();
+
+function invert<K, V>(m: Map<K, V>): Map<V, K> {
+  return new Map([...m].map(([k, v]) => [v, k]));
+}
+
+function certifiableMultiCase(perCase: Map<number, object>, perCombo: Map<number, object>, input: CertifiableMultiCase): void {
+  for (const [id, r] of perCase) if (input.caseNames.has(id)) certifiableMulti.set(r, { input, id });
+  for (const [id, r] of perCombo) if (input.comboNames.has(id)) certifiableMulti.set(r, { input, id });
+}
+
+/**
+ * What of a published combination bundle can be certified: the multi-case input, the cases and
+ * combinations (by id) that are still that solve's results, and whether the envelope is (every
+ * combination of it is, and every one is published). Null when none is.
+ */
+export function certifiableMultiCaseOf(
+  perCase: Map<number, object>,
+  perCombo: Map<number, object>,
+): { input: CertifiableMultiCase; cases: Set<number>; combos: Set<number>; envelope: boolean } | null {
+  let input: CertifiableMultiCase | null = null;
+  const own = (id: number, r: object) => {
+    const tag = certifiableMulti.get(r);
+    if (!tag || tag.id !== id) return false;
+    input ??= tag.input;
+    return tag.input === input;
+  };
+  const cases = new Set([...perCase].filter(([id, r]) => own(id, r)).map(([id]) => id));
+  const combos = new Set([...perCombo].filter(([id, r]) => own(id, r)).map(([id]) => id));
+  if (!input) return null;
+  const found: CertifiableMultiCase = input;
+  const envelope = combos.size > 0 && combos.size === perCombo.size && combos.size === found.comboNames.size;
+  return { input: found, cases, combos, envelope };
+}
+
+/**
+ * The single-solve input of an "all loads" result summed from the cases of one multi-case solve
+ * at `factors` (live-calc, linear models only): those cases' loads, scaled, on the same
+ * structure. Null unless every case summed is still that solve's own result.
+ */
+export function allLoadsInputOf(
+  perCase: Map<number, object>,
+  factors: ReadonlyArray<{ caseId: number; factor: number }>,
+): CertifiableInput | null {
+  let input: CertifiableMultiCase | null = null;
+  for (const f of factors) {
+    const r = perCase.get(f.caseId);
+    const tag = r ? certifiableMulti.get(r) : undefined;
+    if (!tag || tag.id !== f.caseId || !tag.input.caseNames.has(f.caseId) || (input && tag.input !== input)) return null;
+    input = tag.input;
+  }
+  if (!input || input.dim !== '3d') return null;
+  const found: CertifiableMultiCase = input;
+  return {
+    dim: '3d',
+    wire: () => {
+      const w = found.wire();
+      const byName = new Map<string, SolverLoad3D[]>(w.loadCases.map((c: { name: string; loads: SolverLoad3D[] }) => [c.name, c.loads]));
+      const loads = factors.flatMap((f) => (byName.get(found.caseNames.get(f.caseId)!) ?? []).map((l) => scaleSolverLoad(l, f.factor)));
+      return { ...w.solver, loads };
+    },
+  };
+}
+
+/*
+ * Inputs the discretization estimate may read but the certificate may not: the certificate
+ * bounds the solve it re-runs, and a sum of other solves is not that solve; the estimate is about
+ * the mesh, which they share.
+ */
+const estimableOnly = new WeakMap<object, CertifiableInput>();
+
+/** Tag a published "all loads" sum with the single solve it stands for (see `allLoadsInputOf`). */
+export function markAllLoads(result: object, perCase: Map<number, object>, factors: ReadonlyArray<{ caseId: number; factor: number }>): void {
+  const input = allLoadsInputOf(perCase, factors);
+  if (input) estimableOnly.set(result, input);
+}
+
+/** The input the discretization estimate of a published 3D result reads, or null. */
+export function estimableInputOf(results: object): CertifiableInput | null {
+  return certifiableInputOf(results) ?? estimableOnly.get(results) ?? null;
+}
+
 export function validateAndSolve2D(
   model: ModelData,
   includeSelfWeight = false,
@@ -970,7 +1057,7 @@ export function validateAndSolve2D(
     const results = solveStructure(prep.input);
     const dt = performance.now() - t0;
     console.log(`Estructura resuelta en ${dt.toFixed(1)} ms — ${model.nodes.size} nodos, ${model.elements.size} elementos`);
-    return finalizeSolve2DResults(results, prep);
+    return certifiable(finalizeSolve2DResults(results, prep), '2d', () => input2DToWireObject(prep.input));
   } catch (err: any) {
     console.error('Solver error:', err);
     return t('svc.solverError').replace('{n}', err.message);
@@ -1070,7 +1157,7 @@ export async function validateAndSolve2DAsync(
     }
     const dt = performance.now() - t0;
     console.log(`Estructura resuelta en ${dt.toFixed(1)} ms — ${model.nodes.size} nodos, ${model.elements.size} elementos`);
-    const finalResults = finalizeSolve2DResults(results, prep);
+    const finalResults = certifiable(finalizeSolve2DResults(results, prep), '2d', () => input2DToWireObject(prep.input));
     solveCacheSet(cacheKey, finalResults);
     return finalResults;
   } catch (err: any) {
@@ -1212,6 +1299,11 @@ function solveCombinations2DCore(
       const id = comboNameToId.get(cr.name);
       if (id != null) perCombo.set(id, cr.results);
     }
+    certifiableMultiCase(perCase, perCombo, {
+      dim: '2d',
+      wire: () => ({ solver: input2DToWireObject(baseInput), loadCases: mcLoadCases, combinations: mcCombinations }),
+      caseNames: invert(caseNameToId), comboNames: invert(comboNameToId),
+    });
 
     console.log(`[solveCombinations2D] WASM multi-case: ${tWasm.toFixed(0)} ms | Cases: ${perCase.size} | Combos: ${perCombo.size}`);
 
@@ -1337,10 +1429,13 @@ export function buildSolverLoads3D(
     if (l.type === 'nodal') {
       const vertical = get2DDisplayNodalLoadVertical(l.data);
       const moment = get2DDisplayNodalLoadMoment(l.data);
+      // Standing in X–Z the plane is a reflection of the drawn X–Y one, (x, y) → (x, 0, y): a
+      // counter-clockwise couple as drawn is about −Y there, as the reactions read (embedded My is
+      // the plane's with its sign turned). It went in as +Y, the mirror image of the load drawn.
       solverLoads.push({
         type: 'nodal',
         data: project2DToXZ
-          ? { nodeId: l.data.nodeId, fx: l.data.fx, fy: 0, fz: vertical, mx: 0, my: moment, mz: 0 }
+          ? { nodeId: l.data.nodeId, fx: l.data.fx, fy: 0, fz: vertical, mx: 0, my: -moment, mz: 0 }
           : { nodeId: l.data.nodeId, fx: l.data.fx, fy: vertical, fz: 0, mx: 0, my: 0, mz: moment },
       });
     } else if (l.type === 'nodal3d') {
@@ -1397,26 +1492,14 @@ export function buildSolverLoads3D(
       const projI = projectLoad(d.qI);
       const projJ = projectLoad(d.qJ);
 
-      if (Math.abs(projI.qY) > 1e-10 || Math.abs(projJ.qY) > 1e-10 ||
-          Math.abs(projI.qZ) > 1e-10 || Math.abs(projJ.qZ) > 1e-10) {
+      // Across the member and along it, one member load: the engine carries the axial part
+      // (qX) along the span, so N varies as the load says. As loads at the end nodes it left the
+      // member a constant N, the average of its true end values.
+      if ([projI.qY, projJ.qY, projI.qZ, projJ.qZ, projI.qAxial, projJ.qAxial].some((v) => Math.abs(v) > 1e-10)) {
         solverLoads.push({
           type: 'distributed',
-          data: { elementId: d.elementId, qYI: projI.qY, qYJ: projJ.qY, qZI: projI.qZ, qZJ: projJ.qZ, a: d.a, b: d.b },
+          data: { elementId: d.elementId, qXI: projI.qAxial, qXJ: projJ.qAxial, qYI: projI.qY, qYJ: projJ.qY, qZI: projI.qZ, qZJ: projJ.qZ, a: d.a, b: d.b },
         });
-      }
-
-      if (Math.abs(projI.qAxial) > 1e-10 || Math.abs(projJ.qAxial) > 1e-10) {
-        const dx3d = njSolver.x - niSolver.x;
-        const dy3d = njSolver.y - niSolver.y;
-        const dz3d = njSolver.z - niSolver.z;
-        const L3d = Math.sqrt(dx3d * dx3d + dy3d * dy3d + dz3d * dz3d);
-        const loadA = d.a ?? 0;
-        const loadB = d.b ?? L3d;
-        const [fI, fJ] = axialEquivalentLoads(projI.qAxial, projJ.qAxial, loadA, loadB, L3d);
-        solverLoads.push(
-          { type: 'nodal', data: { nodeId: elem.nodeI, fx: fI * axes.ex[0], fy: fI * axes.ex[1], fz: fI * axes.ex[2], mx: 0, my: 0, mz: 0 } },
-          { type: 'nodal', data: { nodeId: elem.nodeJ, fx: fJ * axes.ex[0], fy: fJ * axes.ex[1], fz: fJ * axes.ex[2], mx: 0, my: 0, mz: 0 } },
-        );
       }
     } else if (l.type === 'distributed3d') {
       // Local, global or projected, with its axial part: one reading for every consumer.
@@ -1426,67 +1509,19 @@ export function buildSolverLoads3D(
       const g = distributedGlobalEnds(d, m.axes, userLeftHand);
       solverLoads.push(...globalDistributedToSolver(m, g.gI, g.gJ, g.a, g.b));
     } else if (l.type === 'pointOnElement') {
+      // A plane point load in the space axes (`planePointLoad3D`), then as a space one: its
+      // couple, and its interior axial part, at the node the solve cut there.
       const d = l.data as PointLoadOnElement;
-      const angle = d.angle ?? 0;
-      const isGlobal = d.isGlobal ?? false;
-
       const elem = model.elements.get(d.elementId);
-      if (!elem) continue;
-      const ni = model.nodes.get(elem.nodeI);
-      const nj = model.nodes.get(elem.nodeJ);
-      if (!ni || !nj) continue;
+      const ni = elem && model.nodes.get(elem.nodeI), nj = elem && model.nodes.get(elem.nodeJ);
+      const m = refOf(d.elementId);
+      if (!elem || !ni || !nj || !m) continue;
       const niSolver = mapModelNodeToSolver3D(ni, project2DToXZ);
       const njSolver = mapModelNodeToSolver3D(nj, project2DToXZ);
-      const edx = njSolver.x - niSolver.x;
-      const edPlan = project2DToXZ ? (njSolver.z - niSolver.z) : (njSolver.y - niSolver.y);
-      const L2d = Math.sqrt(edx * edx + edPlan * edPlan);
-      if (L2d < 1e-10) continue;
-      const cosTheta = edx / L2d, sinTheta = edPlan / L2d;
-      const angleRad = angle * Math.PI / 180;
-
-      const elemLocalY2 = (elem.localYx !== undefined && elem.localYy !== undefined && elem.localYz !== undefined)
-        ? { x: elem.localYx, y: elem.localYy, z: elem.localYz } : undefined;
-      const secRot2 = model.sections.get(elem.sectionId)?.rotation ?? 0;
-      const axes = computeLocalAxes3D(niSolver, njSolver, elemLocalY2, (elem.rollAngle ?? 0) + secRot2, leftHand);
-
-      let dirX: number, dirY: number, dirZ: number;
-      if (isGlobal) {
-        dirX = Math.sin(angleRad);
-        dirY = project2DToXZ ? 0 : Math.cos(angleRad);
-        dirZ = project2DToXZ ? Math.cos(angleRad) : 0;
-      } else {
-        const perpFactor = (project2DToXZ ? transverseSign(edx, edPlan) : 1) * Math.cos(angleRad);
-        const axialFactor = Math.sin(angleRad);
-        dirX = perpFactor * (-sinTheta) + axialFactor * cosTheta;
-        dirY = project2DToXZ ? 0 : (perpFactor * cosTheta + axialFactor * sinTheta);
-        dirZ = project2DToXZ ? (perpFactor * cosTheta + axialFactor * sinTheta) : 0;
-      }
-
-      const projY = (dirX * axes.ey[0] + dirY * axes.ey[1] + dirZ * axes.ey[2]) * d.p;
-      const projZ = (dirX * axes.ez[0] + dirY * axes.ez[1] + dirZ * axes.ez[2]) * d.p;
-      // Plus the load's own axial component, which the space mapping used to drop.
-      const projAxial = (dirX * axes.ex[0] + dirY * axes.ex[1] + dirZ * axes.ex[2]) * d.p + (d.px ?? 0);
-
-      if (Math.abs(projY) > 1e-10 || Math.abs(projZ) > 1e-10) {
-        solverLoads.push({
-          type: 'pointOnElement',
-          data: { elementId: d.elementId, a: d.a, py: projY, pz: projZ },
-        });
-      }
-
-      if (Math.abs(projAxial) > 1e-10) {
-        const dx3d = njSolver.x - niSolver.x;
-        const dy3d = njSolver.y - niSolver.y;
-        const dz3d = njSolver.z - niSolver.z;
-        const L3d = Math.sqrt(dx3d * dx3d + dy3d * dy3d + dz3d * dz3d);
-        const tFrac = d.a / L3d;
-        const fI = projAxial * (1 - tFrac);
-        const fJ = projAxial * tFrac;
-        solverLoads.push(
-          { type: 'nodal', data: { nodeId: elem.nodeI, fx: fI * axes.ex[0], fy: fI * axes.ex[1], fz: fI * axes.ex[2], mx: 0, my: 0, mz: 0 } },
-          { type: 'nodal', data: { nodeId: elem.nodeJ, fx: fJ * axes.ex[0], fy: fJ * axes.ex[1], fz: fJ * axes.ex[2], mx: 0, my: 0, mz: 0 } },
-        );
-      }
+      const dPlan = project2DToXZ ? (njSolver.z - niSolver.z) : (njSolver.y - niSolver.y);
+      if (Math.hypot(njSolver.x - niSolver.x, dPlan) < 1e-10) continue;
+      const p3 = planePointLoad3D(d, njSolver.x - niSolver.x, dPlan, project2DToXZ);
+      solverLoads.push(...(axialMember(d.elementId) ? pointWithCoupleToEnds(m, p3, userLeftHand) : pointToSolver(m, p3, userLeftHand, opts.forcesOnly)));
     } else if (l.type === 'pointOnElement3d') {
       // Its force and moment, local or global; inside the span an axial part or a moment sits on
       // the node the solve cut there (`member-point-loads.ts`).
@@ -1586,10 +1621,80 @@ export function hasLoadCarrying3D(model: ModelData): boolean {
     || (model.connectors?.size ?? 0) > 0;
 }
 
+/**
+ * A section's torsional data for the engine: J, the shear-centre offset, and — for the buckling
+ * analysis only — Cw (#439).
+ *
+ * `J` comes from `solverProperties`: a tabulated or declared value, the exact one of a circle or
+ * tube, or Saint-Venant solved on the section's mesh. It used to fall back to `0.001·Iy` when
+ * none existed. That number was invented, and once the geometric stiffness carried the Wagner
+ * term (#434) it set a torsional buckling load GJ/r0² out of nothing — spurious low torsional
+ * modes, P-Δ instabilities. Now a section with no J is sent with `j: 0`, which the engine refuses
+ * on any member not released in torsion, and `torsionGap: 'j'` makes the web's own analyses say
+ * so by section and member first (`torsionGapRefusal` in `wasm-solver.ts`, `jRefusal3D`).
+ *
+ * Releasing those members in torsion instead, so the static solve could run, was tried and is
+ * wrong: a twist that only the unknown J resisted becomes a rotation nothing resists, the
+ * vanishing spring of `orphan-rotations-3d.ts` holds it, and a real mechanism (a roof truss free
+ * to roll about its chord) solved as a structure. Every 3D frame analysis depends on J.
+ *
+ * The shear centre (`shearCenterY/Z`, from the centroid, local y across the width and z up the
+ * depth — the frame `iy`/`iz` are in, and the section's rotation is the member's roll as for
+ * them) is read only by the geometric stiffness. A tee, channel or angle whose shear centre
+ * nothing placed gets `torsionGap: 'shearCentre'`.
+ *
+ * `Cw` is NOT sent as `cw`: the engine would number a warping DOF at every node of the model and
+ * tie the warping of every member meeting at a joint, in the static solve and modal analysis
+ * too. It rides along as the web-only `bucklingCw`, which `buckling-warping.ts` turns into `cw`
+ * for the buckling analysis alone.
+ */
+function torsionOf(props: ReturnType<typeof solverProperties>, planeModel = false): Pick<SolverSection3D, 'j' | 'shearCenterY' | 'shearCenterZ' | 'bucklingCw' | 'torsionGap'> {
+  const sc = props.shearCentre;
+  const known = props.j != null && Number.isFinite(props.j) && props.j > 0;
+  /*
+   * A plane model solved in 3D (project2DToXZ) has rx and rz restrained at every node (the
+   * supports' embedded restraints, and the out-of-plane DOFs added at every other node). A
+   * member's twist is its rotation along its own axis (c, 0, s) in the X–Z plane, c·rx + s·rz,
+   * so it is zero everywhere and J never enters the result. Plane sections have no J (it is not
+   * a 2D property): a nominal one stands in and nothing is flagged, so a plane model still
+   * solves in 3D mode. A real 3D model keeps j = 0 and the refusal by name.
+   */
+  if (planeModel && !known) return { j: 1 };
+  const out: Pick<SolverSection3D, 'j' | 'shearCenterY' | 'shearCenterZ' | 'bucklingCw' | 'torsionGap'> = {
+    j: known ? props.j! : 0,
+  };
+  if (sc && sc[0] !== 0) out.shearCenterY = sc[0];
+  if (sc && sc[1] !== 0) out.shearCenterZ = sc[1];
+  if (props.cw != null && Number.isFinite(props.cw) && props.cw > 0) out.bucklingCw = props.cw;
+  if (!(out.j > 0)) out.torsionGap = 'j';
+  else if (!sc) out.torsionGap = 'shearCentre';
+  return out;
+}
+
 /** A section's shear areas for the engine, when it has them. */
 function shearOf(s: Section): { asY?: number; asZ?: number } {
   const sa = sectionShearAreas(s);
   return sa ? { asY: sa.asY, asZ: sa.asZ } : {};
+}
+
+/**
+ * A 3D solver support without springs on the DOFs it restrains rigidly.
+ *
+ * The engine frees a DOF that has a positive spring even when its restraint
+ * flag is set (`DofNumbering::build_3d`). A support switched from spring to
+ * fixed kept its spring constants in the store, so the support drawn as fixed
+ * was solved as elastic (#488: 14 mm at a "fixed" end). What is drawn and
+ * checked as restrained is solved as restrained; this also repairs projects
+ * saved with such leftovers. Inclined supports restrain along their normal
+ * whatever the flags say, so they are left as they are.
+ */
+export function withoutSpringsOnRestrained<T extends Record<string, unknown>>(sup: T): T {
+  if (sup.isInclined) return sup;
+  const out: Record<string, unknown> = { ...sup };
+  for (const [flag, key] of [['rx', 'kx'], ['ry', 'ky'], ['rz', 'kz'], ['rrx', 'krx'], ['rry', 'kry'], ['rrz', 'krz']] as const) {
+    if (out[flag] === true) delete out[key];
+  }
+  return out as T;
 }
 
 export function buildSolverInput3D(
@@ -1631,20 +1736,7 @@ export function buildSolverInput3D(
           id: s.id, name: s.name, a: props.a,
           iy: inPlaneIy,
           iz: props.source === 'canonical' ? props.iz : outOfPlaneIz,
-          // `J` is NEVER taken from the polygon engine: it computes Routh's
-          // approximation, which is exact only for a circle or ellipse and
-          // measured 56.9 % low on a rectangle and 37.0 % high on an
-          // I-section. `solverProperties` returns an exact analytical value
-          // for circle/CHS, otherwise the authoritative or legacy one, and
-          // `null` when none exists. The `* 0.001` placeholder below is the
-          // pre-existing fabrication, retained only so 3D models without any
-          // J keep solving; it is tagged `unavailable` in the provenance so
-          // it is visible rather than silent, and Checkpoint 2C replaces it
-          // with a validated Saint-Venant constant. (No `?? s.j` here:
-          // solverProperties already returns a valid declared j, so the term
-          // would only fire for an INVALID one — null, NaN or negative — and
-          // passing that through would be worse than the placeholder.)
-          j: props.j ?? outOfPlaneIz * 0.001,
+          ...torsionOf(props, project2DToXZ),
           ...(model.analysis?.shearDeformation === 'none' ? {} : shearOf(s)),
         }];
       }
@@ -1660,9 +1752,7 @@ export function buildSolverInput3D(
         id: s.id, name: s.name, a: props.a,
         iy: aboutY,   // solver iy = Iy (about Y horizontal) → controls Z-displacement bending (w, θy)
         iz: aboutZ,   // solver iz = Iz (about Z vertical) → controls Y-displacement bending (v, θz)
-        // See the note on the projected branch above: J never comes from the
-        // polygon engine's Routh approximation.
-        j: props.j ?? aboutY * 0.001,
+        ...torsionOf(props, project2DToXZ),
         ...(model.analysis?.shearDeformation === 'none' ? {} : shearOf(s)),
       }];
     })),
@@ -1723,6 +1813,11 @@ export function buildSolverInput3D(
         const supportDz = s.dz ?? s.dy;
         const supportDry = s.dry ?? s.drz;
         const embedded2D = project2DToXZ && !s.dofRestraints && is2DSupportType(s.type);
+        // A plane support's prescribed rotation is the plane's θ, counter-clockwise as drawn; standing
+        // in X–Z that is a rotation about −Y (θy = −θ, docs/solver/assembly-constraints.md §2.3), as
+        // for a nodal couple in `buildSolverLoads3D`. It went in unchanged: the support turned the
+        // other way from the one the plane solve turns it.
+        const embeddedDry = supportDry === undefined ? undefined : -supportDry;
         /*
          * A plane support's springs are kx, ky (vertical) and kz (rotation);
          * a space support's are kx, ky, kz (translations) and krx, kry, krz.
@@ -1731,7 +1826,7 @@ export function buildSolverInput3D(
          * a raft on soil springs floated (7·10¹⁰ m, mat-foundation).
          */
         const plane = !s.dofRestraints && is2DSupportType(s.type);
-        return [s.nodeId, {
+        return [s.nodeId, withoutSpringsOnRestrained({
           nodeId: s.nodeId,
           ...dofs,
           kx: s.kx,
@@ -1744,11 +1839,11 @@ export function buildSolverInput3D(
           dy: embedded2D ? undefined : s.dy,
           dz: embedded2D ? supportDz : s.dz,
           drx: embedded2D ? undefined : s.drx,
-          dry: embedded2D ? supportDry : s.dry,
+          dry: embedded2D ? embeddedDry : s.dry,
           drz: embedded2D ? undefined : s.drz,
           normalX: s.normalX, normalY: s.normalY, normalZ: s.normalZ,
           isInclined: s.isInclined,
-        }] as [number, any];
+        })] as [number, any];
       }));
       // For embedded 2D models, restrain out-of-plane DOFs (uy, rx, rz) at ALL nodes.
       // Without this, hinges and trusses create out-of-plane mechanisms because the
@@ -1772,8 +1867,9 @@ export function buildSolverInput3D(
     // `curved` flag; both keyed by their own id, stresses return in quadStresses).
     quads: model.quads ? new Map(Array.from(model.quads.entries()).filter(([, q]) => !q.curved).map(([id, q]) => [id, { id: q.id, nodes: q.nodes, materialId: q.materialId, thickness: q.thickness }])) : new Map(),
     curvedShells: model.quads ? new Map(Array.from(model.quads.entries()).filter(([, q]) => q.curved).map(([id, q]) => [id, { id: q.id, nodes: q.nodes, materialId: q.materialId, thickness: q.thickness }])) : new Map(),
-    // A rigid diaphragm holds the rotation about its normal as well (`diaphragm-rotation.ts`).
-    constraints: withDiaphragmRotation(model.constraints ?? []),
+    // The engine's diaphragm ties each slave's rotation about the normal too (#342); the
+    // equalDOF this added for it would now tie the same DOF twice.
+    constraints: [...(model.constraints ?? [])],
     connectors: model.connectors,
     leftHand: false, // see buildSolverLoads3D: the analysis is always right-handed
   };
@@ -1866,11 +1962,11 @@ export function imposedRefusal(model: ModelData): string | null {
  * Validation + wire-input construction for a 3D solve (shared by the sync and
  * async solve paths). Returns the solver input, or an error string, or null.
  */
-function prepareSolve3D(model: ModelData, includeSelfWeight = false, leftHand = false): SolverInput3D | string | null {
+function prepareSolve3D(model: ModelData, includeSelfWeight = false, leftHand = false, countSolve = true): SolverInput3D | string | null {
   // Counts app-side structural-solve dispatches (the sync and worker paths both
   // route through here exactly once) so browser tests can assert that a
   // reinforcement-only edit triggers none. Not part of the solver.
-  noteStructuralSolve();
+  if (countSolve) noteStructuralSolve();
   // Checked on what the engine will see: inactive members and the nodes nothing holds are out.
   // A variable member is its pieces there; a refusal names the member and the model's nodes.
   const pieces = variableExpansionFor(model);
@@ -1969,7 +2065,31 @@ function prepareSolve3D(model: ModelData, includeSelfWeight = false, leftHand = 
   const input = buildSolveInput3D(model, includeSelfWeight, leftHand);
   if (!input) return t('svc.emptyModel');
   if (typeof input === 'string') return input;
-  return unheldMomentRefusal3D(input) ?? input;
+  return unheldMomentRefusal3D(input) ?? jRefusal3D(input) ?? input;
+}
+
+/**
+ * A frame member carrying torsion whose section has no torsion constant (`torsionOf`), refused
+ * with the section and members named. The engine refuses `j: 0` too, in its own words; this says
+ * what to do about it. A member released in torsion at an end needs no J and is not counted.
+ */
+export function jRefusal3D(input: SolverInput3D): string | null {
+  const bySection = new Map<number, number[]>();
+  for (const e of input.elements.values()) {
+    if (e.type !== 'frame' || e.releaseTStart || e.releaseTEnd) continue;
+    const s = input.sections.get(e.sectionId);
+    if (s?.torsionGap !== 'j') continue;
+    bySection.set(s.id, [...(bySection.get(s.id) ?? []), e.id]);
+  }
+  const first = bySection.entries().next();
+  if (first.done) return null;
+  const [sid, members] = first.value;
+  const name = input.sections.get(sid)?.name;
+  members.sort((a, b) => a - b);
+  return tp('svc.noTorsionConstant', {
+    section: name ? `${sid} (${name})` : String(sid),
+    members: members.slice(0, 8).join(', ') + (members.length > 8 ? ', …' : ''),
+  });
 }
 
 /**
@@ -2024,7 +2144,7 @@ export function advancedRefusal3D(input: SolverInput3D): string | null {
   addConstraintAdjacency(adj, input.constraints);
   const disconnected = connectivityRefusal(input.nodes.keys(), connected, adj, () => nodesOnMembersHint(input));
   if (disconnected) return disconnected;
-  const moment = unheldMomentRefusal3D(input);
+  const moment = unheldMomentRefusal3D(input) ?? jRefusal3D(input);
   if (moment) return moment;
   const solved = guardSolve3D(input);
   return 'error' in solved
@@ -2110,6 +2230,19 @@ function excitedMechanism3D(results: AnalysisResults3D): string | null {
   return codes.has('excessive_displacement') && codes.has('residual_high') ? t('svc.mechanism3d') : null;
 }
 
+/**
+ * The engine input a direct linear solve of `model` would take, without solving (and without
+ * counting a solve): what the provenance's engine hashes and the CLI reproduce are of when the
+ * base result on screen was put together from the case solves (live-calc's combination path).
+ * Null when the model is refused or solves nonlinearly.
+ */
+export function linearSolveInput3D(model: ModelData, includeSelfWeight = false, leftHand = false): CertifiableInput | null {
+  if (hasNonlinearBehaviour(model)) return null;
+  const input = prepareSolve3D(model, includeSelfWeight, leftHand, false);
+  if (input === null || typeof input === 'string') return null;
+  return { dim: '3d', wire: () => input3DToWireObject(input) };
+}
+
 export function validateAndSolve3D(model: ModelData, includeSelfWeight = false, leftHand = false): AnalysisResults3D | string | null {
   const input = prepareSolve3D(model, includeSelfWeight, leftHand);
   if (input === null || typeof input === 'string') return input;
@@ -2117,7 +2250,8 @@ export function validateAndSolve3D(model: ModelData, includeSelfWeight = false, 
   try {
     const t0 = performance.now();
     let results: AnalysisResults3D;
-    if (hasNonlinearBehaviour(model)) {
+    const nonlinear = hasNonlinearBehaviour(model);
+    if (nonlinear) {
       const r = solveNonlinear3D(solvableModel(model), input);
       results = { ...r.results, nonlinear: r.report };
     } else {
@@ -2127,7 +2261,8 @@ export function validateAndSolve3D(model: ModelData, includeSelfWeight = false, 
     console.log(`Estructura 3D resuelta en ${dt.toFixed(1)} ms — ${model.nodes.size} nodos, ${model.elements.size} elementos`);
     const mechanism = excitedMechanism3D(results);
     if (mechanism) return mechanism;
-    return finalizeSolve3DResults(results, model);
+    const finalResults = finalizeSolve3DResults(results, model);
+    return nonlinear ? finalResults : certifiable(finalResults, '3d', () => input3DToWireObject(input));
   } catch (err: any) {
     console.error('Solver 3D error:', err);
     return t('svc.solver3dError').replace('{n}', err.message);
@@ -2167,7 +2302,7 @@ export async function validateAndSolve3DAsync(model: ModelData, includeSelfWeigh
     console.log(`Estructura 3D resuelta en ${dt.toFixed(1)} ms — ${model.nodes.size} nodos, ${model.elements.size} elementos`);
     const mechanism = excitedMechanism3D(results);
     if (mechanism) return mechanism;
-    const finalResults = finalizeSolve3DResults(results, model);
+    const finalResults = certifiable(finalizeSolve3DResults(results, model), '3d', () => wire);
     solveCacheSet(cacheKey, finalResults);
     return finalResults;
   } catch (err: any) {
@@ -2444,6 +2579,13 @@ function solveCombinations3DCore(
       const id = comboNameToId.get(cr.name);
       if (id != null) perCombo.set(id, cr.results);
     }
+    // The axial shares given back below add the same load-only term to the exact and the computed
+    // forces, so the certificate's bounds on their difference stand.
+    certifiableMultiCase(perCase, perCombo, {
+      dim: '3d',
+      wire: () => ({ solver: input3DToWireObject(baseInput), loadCases: mcLoadCases, combinations: mcCombinations }),
+      caseNames: invert(caseNameToId), comboNames: invert(comboNameToId),
+    });
 
     // The axial part of member loads, given back to the members (`axial-shares.ts`): to each
     // case from its own loads, to each combination with its factors, and the envelope, which
@@ -2613,8 +2755,8 @@ function solveCombinations3DNonlinear(
  * Combinations solved with P-Delta, each on its own factored loads (`analysis.perCombination`).
  *
  * The cases stay linear, since a case on its own is a service picture and not a combination to
- * design for. A settlement goes into each combination once, with its loads. The member forces
- * carry the geometric part (`pdelta-forces.ts`), and whether a second-order equilibrium exists
+ * design for. A settlement goes into each combination once, with its loads. The engine's member
+ * forces carry the geometric part, (K + Kg)·u, and whether a second-order equilibrium exists
  * is read from the displacements rather than from the engine's flag (`direct-analysis.ts`).
  */
 function solveCombinations3DPDelta(
@@ -2664,7 +2806,7 @@ function solveCombinations3DPDelta(
       if (!on) return t('svc.emptyModel');
       if (typeof on === 'string') return on;
       const full = { ...on, loads };
-      const r = solvePDelta3DCorrected(full, 30, 1e-6, false);
+      const r = solvePDelta3D(full, 30, 1e-6);
       const amp = amplification(r);
       if (!amp.stable) { unstable.push(combo.id); continue; }
       const results: AnalysisResults3D = { ...r.results, secondOrder: { converged: !!r.converged, iterations: r.iterations ?? 0, stable: amp.stable, b2: amp.b2 } };
@@ -2880,6 +3022,24 @@ async function solveCombinations3DParallelCore(
     const envelope = computeEnvelope3D(allComboResults);
     if (!envelope) return t('svc.envelopeError3d');
     if (hasShells) enrichComboShellStresses(perCase, perCombo, envelope.maxAbsResults3D, combinations, model.plates ?? new Map());
+    /*
+     * Certified as the multi-case export would solve it: the same cases from the same wire input
+     * (the solve is deterministic), combined by the engine's own `combine_results_3d`, as the
+     * multi-case solve combines them.
+     */
+    certifiableMultiCase(perCase, perCombo, {
+      dim: '3d',
+      wire: () => ({
+        solver: baseWire,
+        loadCases: caseInputs.filter((c) => perCase.has(c.caseId)).map((c) => ({ name: `case#${c.caseId}`, loads: c.input.loads })),
+        combinations: combinations.filter((c) => perCombo.has(c.id)).map((c) => ({
+          name: `combo#${c.id}`,
+          factors: c.factors.filter((x) => perCase.has(x.caseId)).reduce<Record<string, number>>((f, x) => ({ ...f, [`case#${x.caseId}`]: (f[`case#${x.caseId}`] ?? 0) + x.factor }), {}),
+        })),
+      }),
+      caseNames: new Map([...perCase.keys()].map((id) => [id, `case#${id}`])),
+      comboNames: new Map(combinations.filter((c) => perCombo.has(c.id)).map((c) => [c.id, `combo#${c.id}`])),
+    });
 
     const tPost = performance.now() - t1;
     console.log(`[solveCombinations3D parallel] Solve: ${tSolve.toFixed(0)} ms | Combine+envelope: ${tPost.toFixed(0)} ms | Cases: ${perCase.size} | Combos: ${perCombo.size} | Workers: ${Math.min(caseInputs.length, navigator.hardwareConcurrency ?? 4)}`);

@@ -112,7 +112,9 @@ See `backend/CLAUDE.md` → "Test Guidelines".
 targets only — the same commands you run locally. A `changes` job filters by
 path, so engine, web, backend and AI-backend jobs run only when their files (or
 `flake.*`, `Makefile`, `ci.yml`) change. Engine CI targets: `lint.engine`,
-`test.engine.gates`, `test.engine.suite SHARD=i/2`. Web: `typecheck.web`,
-`test.web.unit SHARD=i/2`, `test.web.build`, `e2e.web.smoke SHARD=i/5`. Backend:
+`test.engine.gates` (also checks the acceptance models against their generators),
+`test.engine.metamorphic`, `test.engine.suite SHARD=i/2`. Web: `typecheck.web`,
+`test.web.unit SHARD=i/2`, `test.web.build`, `test.web.determinism` (WASM
+bit-identical in Node, Chromium, Firefox and WebKit), `e2e.web.smoke SHARD=i/5`. Backend:
 `lint.backend`, `test.backend`, plus migration safety and immutability checks.
 Dependabot opens security updates only.

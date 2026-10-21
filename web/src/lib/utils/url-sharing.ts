@@ -8,7 +8,8 @@ import { emptyDetailingStore } from '../engine/detailing/assembly';
 import { emptyGeotechnical } from '../model/geotechnical';
 import { defaultFootingMatPreferences } from '../model/footing';
 import LZString from 'lz-string';
-import { deflateSync, inflateSync } from 'fflate';
+import { deflateSync } from 'fflate';
+import { inflateBounded } from './bounded-inflate';
 import type { ModelSnapshot } from '../store/history.svelte';
 import type { DiagramType } from '../store/results.svelte';
 import { modelStore } from '../store/model.svelte';
@@ -16,7 +17,7 @@ import { viewVisibility } from '../store/view-state.svelte';
 import { NO_RELEASE, type Release } from '../store/model.svelte';
 import { uiStore } from '../store/ui.svelte';
 import { resultsStore } from '../store/results.svelte';
-import { noteAxisConventionMigrationIfNeeded, noteBasicSelfWeightRuleIfNeeded, statedSelfWeightCaseId } from '../store/file';
+import { onProjectOpened, noteBasicSelfWeightRuleIfNeeded, statedSelfWeightCaseId } from '../store/file';
 import { packJointDesigns, unpackJointDesigns } from '../connection/joint-share';
 import { CODE_HASH, readCodeFragment, codeShareUrl } from '../model/code/share';
 import { mergeCode } from '../model/code/apply';
@@ -116,6 +117,9 @@ const MAX_URL_SAFE = 16_000;
 // ─── v2 format prefix ─────────────────────────────────────────────────────
 // v2 compressed strings start with "2." so we can tell them apart from v1
 const V2_PREFIX = '2.';
+
+/** Longest legacy (v1, LZ-String) payload still decoded. See `decompressSnapshot`. */
+export const MAX_V1_LINK_CHARS = 20_000;
 
 // ─── ShareMeta defaults ───────────────────────────────────────────────────
 // Only non-default values are serialized → smaller payloads
@@ -243,6 +247,9 @@ function toCompact(snapshot: ModelSnapshot, meta?: ShareMeta): Record<string, un
   // self-describing and the migration note (see noteAxisConventionMigrationIfNeeded)
   // does not false-fire on URL load; absence still flags a genuine legacy model.
   if (snapshot.localAxisConvention) c.lx = snapshot.localAxisConvention;
+  // Which build last solved it (provenance/solve-stamp.ts): without it every opened link would
+  // read as solved with the oldest version and raise the re-check notice.
+  if (snapshot.solvedWith) c.sw = snapshot.solvedWith;
 
   // Nodes: [[id, x, y, z?], ...]  (z omitted when undefined/0 in 2D)
   c.n = snapshot.nodes.map(([, v]) => {
@@ -461,6 +468,7 @@ function fromCompact(c: Record<string, unknown>): ModelSnapshot {
     analysisMode: c.m as '2d' | '3d' | 'pro' | 'edu' | undefined,
     name: c.nm as string | undefined,
     localAxisConvention: c.lx as ModelSnapshot['localAxisConvention'],
+    ...(c.sw && typeof c.sw === 'object' ? { solvedWith: c.sw as ModelSnapshot['solvedWith'] } : {}),
 
     // Nodes
     nodes: (c.n as number[][]).map(a => [a[0], { id: a[0], x: a[1], y: a[2], ...(a[3] !== undefined ? { z: a[3] } : {}) }]),
@@ -648,7 +656,8 @@ function decompressV2(data: string): ModelSnapshot | null {
   try {
     const b64 = data.slice(V2_PREFIX.length);
     const deflated = base64urlToUint8(b64);
-    const bytes = inflateSync(deflated);
+    // Bounded: the payload is whatever the link's author put there (see bounded-inflate.ts).
+    const bytes = inflateBounded(deflated);
     const json = new TextDecoder().decode(bytes);
     const compact = JSON.parse(json);
     if (!Array.isArray(compact.ni)) return null;
@@ -677,6 +686,10 @@ export function decompressSnapshot(data: string): ModelSnapshot | null {
     return decompressV2(data);
   }
   // v1 (legacy LZ-String) — migrate hingeStart/hingeEnd → releaseI.mz/releaseJ.mz
+  // LZ-String's output can grow quadratically in its input and its decoder cannot be stopped
+  // part-way, so the input is capped instead. v1 links were written when the share notice fired
+  // at 2 000 characters; anything far beyond that was not written by the app.
+  if (data.length > MAX_V1_LINK_CHARS) return null;
   try {
     const json = LZString.decompressFromEncodedURIComponent(data);
     if (!json) return null;
@@ -936,7 +949,7 @@ export function loadFromURLHash(): 'data' | 'embed' | null {
   // Same pre-metadata convention note as a .ded open — a shared link is the most
   // common cross-machine entry point, so a legacy 3D model must not change axes
   // silently here. (New models carry the tag below, so this never false-fires.)
-  noteAxisConventionMigrationIfNeeded(snapshot, loadedMode);
+  onProjectOpened(snapshot, loadedMode);
 
   // Notify 3D viewport to restore camera from uiStore
   queueMicrotask(() => {
@@ -1004,7 +1017,7 @@ export function loadFromShareLink(url: string): boolean {
   // Same pre-metadata convention note as a .ded open — a shared link is the most
   // common cross-machine entry point, so a legacy 3D model must not change axes
   // silently here. (New models carry the tag below, so this never false-fires.)
-  noteAxisConventionMigrationIfNeeded(snapshot, loadedMode);
+  onProjectOpened(snapshot, loadedMode);
 
   // Notify 3D viewport to restore camera from uiStore
   queueMicrotask(() => {

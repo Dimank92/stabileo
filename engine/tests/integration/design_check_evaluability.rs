@@ -47,6 +47,10 @@ fn steel_member(fy: f64) -> SteelMemberData {
         e: 200e9,
         g: Some(77e9),
         depth: Some(0.348),
+        flange_slenderness: None,
+        compression_elements: None,
+        lcz: None,
+        load_position: None,
     }
 }
 
@@ -162,7 +166,8 @@ fn timber_nan_demand_does_not_panic() {
             element_id: 1,
             fb: 12e6, ft: 6e6, fc: 12e6, fv: 1e6,
             e: 10e9, e_min: Some(2e9),
-            b: 0.10, d: 0.30, le: 3.0, lu: None,
+            b: 0.10, d: 0.30, le: 3.0, lu: None, le_b: None,
+            le_bending: None,
             cd: None, cm: None, ct: None,
             cf_bending: None, cf_tension: None, cf_compression: None,
             cfu: None, ci: None, cr: None,
@@ -193,6 +198,8 @@ fn ec3_nan_slenderness_does_not_become_full_capacity() {
             weff_y: None,
             wpl_z: 125e-6, wel_z: 80.5e-6,
             weff_z: None,
+            e_n_y: None,
+            e_n_z: None,
             iy: 8356e-8, iz: 604e-8, it: 20.1e-8, iw: 126e-9,
             lcr_y: 4.0, lcr_z: 4.0, lb: 4.0,
             section_class: SectionClass::Class1,
@@ -200,7 +207,8 @@ fn ec3_nan_slenderness_does_not_become_full_capacity() {
             buckling_curve_z: BucklingCurve::B,
             buckling_curve_lt: BucklingCurve::B,
             gamma_m0: Some(1.0), gamma_m1: Some(1.0),
-            c1: None, av: None,
+            c1: None, av: None, interaction: None, geometry: None,
+            ltb: Some(Ec3LtbData { load_position: Some(Ec3LoadPosition::ShearCentre), ..Default::default() }),
         }],
         forces: vec![Ec3DesignForces {
             element_id: 1, n_ed: Some(-200e3), my_ed: Some(50e3), mz_ed: None, v_ed: None,
@@ -253,7 +261,7 @@ fn masonry_zero_capacity_does_not_pass() {
             fm: 0.0, fy: 420e6, em: None,
             b: 1.0, t: 0.20, d: 0.10,
             as_tension: 0.0,
-            h: 3.0, k: Some(1.0), an: None, av: None, s_stirrup: None,
+            h: 3.0, k: Some(1.0), an: None, av: None, s_stirrup: None, laterally_tied: None, gamma_g: None,
         }],
         forces: vec![MasonryDesignForces {
             element_id: 1, pu: Some(200e3), mu: Some(50e3), vu: Some(30e3),
@@ -276,7 +284,7 @@ fn foundation_missing_allowable_pressure_does_not_pass() {
             length: 2.0, width: 2.0, thickness: 0.5, depth: 1.0,
             q_allowable: 0.0,
             gamma_soil: 18_000.0, fc: 28e6,
-            col_length: 0.4, col_width: 0.4, d: None, mu_sliding: None,
+            col_length: 0.4, col_width: 0.4, d: None, mu_sliding: None, rho_w: None, neglect_size_effect: None,
         }],
         forces: vec![SpreadFootingForces {
             footing_id: 1, p: 500e3, mx: None, my: None, h: None,

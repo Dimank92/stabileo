@@ -17,11 +17,12 @@
  *
  * Pure, and kept out of the results store, which only calls it.
  */
+import { knownIssueMessage } from './known-issues';
 import type { SolverDiagnostic, StructuredDiagnostic } from './types';
 
 const MODEL_PHASES = new Set(['pre_solve', 'constraints']);
 /** Warnings that describe the model rather than the numerics of the solve. */
-const MODEL_CODES = new Set(['excessive_displacement']);
+const MODEL_CODES = new Set(['excessive_displacement', 'stiffness_not_positive_definite']);
 /** Warning-level notes about performance, not correctness. */
 const NOT_A_FINDING = new Set(['sparse_fill_ratio']);
 
@@ -60,7 +61,7 @@ function toSolverDiagnostic(d: StructuredDiagnostic, source: SolverDiagnostic['s
   return {
     severity: d.severity,
     code: d.code,
-    message: d.message,
+    message: knownIssueMessage(d),
     ...(shells ? (shells.length > 0 ? { shellKeys: shells } : {})
       : d.elementIds && d.elementIds.length > 0 ? { elementIds: d.elementIds } : {}),
     ...(d.nodeIds && d.nodeIds.length > 0 ? { nodeIds: d.nodeIds } : {}),

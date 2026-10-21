@@ -13,8 +13,10 @@ import { memberLengths } from '../../steel/unbraced-length';
 import type { AnalysisResults3D } from '../../types-3d';
 import type { LoadCombination, Element, Section, Material, Node, Support } from '../../../store/model.svelte';
 import { classifyElement } from '../../codes/argentina/cirsoc201';
-import type { CheckReading, MemberContext, OtherCode, OtherCodeRow, OtherCodeRun } from './types';
+import type { CheckReading, MemberContext, OtherCode, OtherCodeRow, OtherCodeRun, MemberCertificate, StationBound3D, DemandBound } from './types';
+import type { CertifiedMemberCheck } from '../../certificate-types';
 import { isDesignedMember, maskDemands } from '../behaviour-demands';
+import { isEngineUnavailable, engineFailureText } from '../../engine-unavailable';
 
 export interface RunModel {
   nodes: Map<number, Node>;
@@ -101,11 +103,21 @@ export function runOtherCode(code: OtherCode, contexts: MemberContext[]): OtherC
       else batch.push({ ctx: r.ctx, base: r.data, data: at.data, extra: [...r.flags, ...(at.unevaluated ?? [])] });
     }
     if (batch.length === 0) continue;
-    const results = code.run({
-      members: batch.map((r) => r.data),
-      forces: batch.map((r) => code.forces(r.ctx, r.ctx.demands[k]!, r.base)),
-    });
-    if (!results) return { code: code.id, rows: [...rows.values()], errorKey: 'otherCodes.error.engine' };
+    let results: unknown[];
+    try {
+      results = code.run({
+        members: batch.map((r) => r.data),
+        forces: batch.map((r) => code.forces(r.ctx, r.ctx.demands[k]!, r.base)),
+      });
+    } catch (err) {
+      // The engine's reason travels with the failure, and nothing of this run counts as checked:
+      // a member read in an earlier round was not read under this round's demand, so the rows
+      // it already has are withdrawn rather than shown as a verdict.
+      const errorKey = isEngineUnavailable(err) ? 'engine.unavailable' : 'otherCodes.error.engine';
+      const withdrawn: OtherCodeRow[] = [...rows.values()].map((r) => r.status === 'checked' ? { elementId: r.elementId, status: 'skipped', reasonKey: errorKey } : r);
+      for (const r of ready) if (!rows.has(r.ctx.elementId)) withdrawn.push({ elementId: r.ctx.elementId, status: 'skipped', reasonKey: errorKey });
+      return { code: code.id, rows: withdrawn.sort((a, b) => a.elementId - b.elementId), errorKey, errorMessage: engineFailureText(err) };
+    }
     // By id, once per round: a scan of the batch per result was quadratic in the members.
     const byId = new Map(batch.map((b) => [b.ctx.elementId, b]));
     for (const res of results as Array<Record<string, unknown>>) {
@@ -117,4 +129,80 @@ export function runOtherCode(code: OtherCode, contexts: MemberContext[]): OtherC
     }
   }
   return { code: code.id, rows: [...rows.values()].sort((a, b) => a.elementId - b.elementId) };
+}
+
+/**
+ * Certify the check `runOtherCode` made (docs/verification/CERTIFY.md, "Certified design checks"):
+ * the same members and governing demands, each force with its bound from the certified station
+ * bounds of its combination (`stationBound`, null when that combination is not certified), sent
+ * to the code's certified checker, which encloses every utilization in interval arithmetic.
+ * `call` runs the export (`runCertify`); rounds as in `runOtherCode`, a member's enclosure the
+ * hull over its rounds.
+ *
+ * A member whose demand settled without the engine (no steel on a face in tension), or one of
+ * whose combinations is not certified, is `uncertified` with why. Codes without a certified
+ * checker give an empty map.
+ */
+export async function certifyOtherCode(
+  code: OtherCode,
+  contexts: MemberContext[],
+  stationBound: (comboId: number, elementId: number) => StationBound3D | null,
+  call: (name: string, args: unknown[]) => Promise<unknown>,
+): Promise<Map<number, MemberCertificate>> {
+  const out = new Map<number, MemberCertificate>();
+  const cert = code.certify;
+  if (!cert) return out;
+  const acc = new Map<number, { lower: number; upper: number }>();
+  const refuse = (id: number, reason: string, combo?: string) => {
+    if (out.get(id)?.status !== 'uncertified') out.set(id, { status: 'uncertified', reason, ...(combo !== undefined ? { combo } : {}) });
+  };
+  const ready: Array<{ ctx: MemberContext; data: Record<string, unknown> }> = [];
+  for (const ctx of contexts) {
+    const m = code.member(ctx);
+    if ('skip' in m || ctx.demands.length === 0) continue;
+    ready.push({ ctx, data: m.data });
+  }
+  const rounds = ready.reduce((n, r) => Math.max(n, r.ctx.demands.length), 0);
+  for (let k = 0; k < rounds; k++) {
+    const members: Record<string, unknown>[] = [];
+    const demands: Array<{ forces: Record<string, unknown>; bound: DemandBound }> = [];
+    for (const r of ready) {
+      const id = r.ctx.elementId;
+      const d = r.ctx.demands[k];
+      if (!d || out.has(id)) continue;
+      let data = r.data;
+      if (code.at) {
+        const at = code.at(r.ctx, d, r.data);
+        if ('reading' in at) { refuse(id, 'otherCodes.cert.noEngineCheck'); continue; }
+        data = at.data;
+      }
+      const sb = stationBound(d.comboId, id);
+      if (!sb) { refuse(id, 'otherCodes.cert.comboUncertified', d.comboName); continue; }
+      members.push(data);
+      demands.push({ forces: code.forces(r.ctx, d, r.data), bound: cert.bound(r.ctx, d, r.data, sb) });
+    }
+    if (members.length === 0) continue;
+    let results: CertifiedMemberCheck[];
+    try {
+      results = (await call(cert.name, [JSON.stringify({ members, demands })])) as CertifiedMemberCheck[];
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      for (const m of members) refuse(Number((m as { elementId?: unknown }).elementId), reason);
+      continue;
+    }
+    for (const res of results ?? []) {
+      const id = Number(res.elementId);
+      if (out.has(id)) continue;
+      if (!res.certified) { refuse(id, res.reason ?? 'not certified'); continue; }
+      const prev = acc.get(id);
+      acc.set(id, prev
+        ? { lower: Math.max(prev.lower, res.utilizationLower), upper: Math.max(prev.upper, res.utilizationUpper) }
+        : { lower: res.utilizationLower, upper: res.utilizationUpper });
+    }
+  }
+  for (const [id, { lower, upper }] of acc) {
+    if (out.has(id)) continue;
+    out.set(id, { status: upper < 1 ? 'ok' : lower > 1 ? 'fail' : 'inconclusive', lower, upper });
+  }
+  return out;
 }

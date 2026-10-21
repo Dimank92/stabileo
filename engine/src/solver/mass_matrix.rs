@@ -2,6 +2,100 @@ use crate::types::*;
 use crate::linalg::*;
 use std::collections::HashMap;
 use super::dof::DofNumbering;
+use super::assembly::{rotate_inclined_free_block, InclinedTransformData, InclinedTransformData2D};
+
+// ==================== Mass beyond the densities ====================
+//
+// `SolverInput::masses` / `SolverInput3D::masses`: nodal (lumped) masses, mass
+// along members (t/m) and over shells (t/m²). Added mass along a member or a
+// shell is distributed exactly as the member's own mass is: the element mass
+// matrices are linear in ρ·A (ρ·t), so `ρ·A/1000 + m` gives the matrix of the
+// member with its density raised by `m·1000/A`. Nodal masses are diagonal
+// entries on the node's DOFs, assembled in global axes before any
+// inclined-support rotation and before any constraint reduction, so a mass on
+// a diaphragm's slave node reaches the master's rotation as m·r².
+
+/// Added mass per length, t/m, by element id.
+pub fn line_masses(line: &[LineMass]) -> HashMap<usize, f64> {
+    let mut m: HashMap<usize, f64> = HashMap::new();
+    for l in line {
+        *m.entry(l.element_id).or_insert(0.0) += l.mass_per_length;
+    }
+    m
+}
+
+/// Added mass per area, t/m², by (shell family, element id).
+fn area_masses(area: &[AreaMass]) -> HashMap<(String, usize), f64> {
+    let mut m: HashMap<(String, usize), f64> = HashMap::new();
+    for a in area {
+        *m.entry((a.kind.clone(), a.element_id)).or_insert(0.0) += a.mass_per_area;
+    }
+    m
+}
+
+/// Mass density of a shell in t/m³: its material's plus its added areal mass
+/// spread over its thickness.
+fn shell_density_t(densities: &HashMap<String, f64>, area: &HashMap<(String, usize), f64>,
+    kind: &str, id: usize, material_id: usize, thickness: f64) -> f64 {
+    let rho = densities.get(&material_id.to_string()).copied().unwrap_or(0.0) / 1000.0;
+    let added = area.get(&(kind.to_string(), id)).copied().unwrap_or(0.0);
+    if added > 0.0 && thickness > 0.0 { rho + added / thickness } else { rho }
+}
+
+/// Diagonal nodal-mass entries (global DOF, value) of a 2D model.
+pub fn nodal_mass_entries_2d(input: &SolverInput, dof_num: &DofNumbering) -> Vec<(usize, f64)> {
+    let mut out = Vec::new();
+    for nm in &input.masses.nodal {
+        for (local, v) in [(0usize, nm.mx()), (1, nm.mz()), (2, nm.rotary_inertia)] {
+            if v != 0.0 {
+                if let Some(d) = dof_num.global_dof(nm.node_id, local) {
+                    out.push((d, v));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Diagonal nodal-mass entries (global DOF, value) of a 3D model.
+pub fn nodal_mass_entries_3d(input: &SolverInput3D, dof_num: &DofNumbering) -> Vec<(usize, f64)> {
+    let mut out = Vec::new();
+    for nm in &input.masses.nodal {
+        let [mx, my, mz] = nm.translational();
+        for (local, v) in [(0usize, mx), (1, my), (2, mz), (3, nm.ixx), (4, nm.iyy), (5, nm.izz)] {
+            if v != 0.0 {
+                if let Some(d) = dof_num.global_dof(nm.node_id, local) {
+                    out.push((d, v));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Translational mass per global direction (X, Z) of a 2D model, t: members
+/// (density and added mass along them) plus nodal masses. Members weigh the
+/// same in every direction; a nodal mass may not.
+pub fn total_mass_by_direction_2d(input: &SolverInput, densities: &HashMap<String, f64>) -> [f64; 2] {
+    let m = compute_total_mass_elements(input, densities);
+    let mut t = [m, m];
+    for nm in &input.masses.nodal {
+        t[0] += nm.mx();
+        t[1] += nm.mz();
+    }
+    t
+}
+
+/// Translational mass per global direction (X, Y, Z) of a 3D model, t.
+pub fn total_mass_by_direction_3d(input: &SolverInput3D, densities: &HashMap<String, f64>) -> [f64; 3] {
+    let m = compute_total_mass_3d_elements(input, densities);
+    let mut t = [m, m, m];
+    for nm in &input.masses.nodal {
+        let tr = nm.translational();
+        for k in 0..3 { t[k] += tr[k]; }
+    }
+    t
+}
 
 /// Assemble consistent mass matrix for 2D structure.
 /// densities: materialId → density in kg/m³
@@ -13,16 +107,18 @@ pub fn assemble_mass_matrix_2d(
     let n = dof_num.n_total;
     let mut m_global = vec![0.0; n * n];
 
-    let node_by_id: HashMap<usize, &SolverNode> = input.nodes.values().map(|n| (n.id, n)).collect();
-    let section_by_id: HashMap<usize, &SolverSection> = input.sections.values().map(|s| (s.id, s)).collect();
+    let node_by_id: HashMap<usize, &SolverNode> = crate::ordered::values(&input.nodes).map(|n| (n.id, n)).collect();
+    let section_by_id: HashMap<usize, &SolverSection> = crate::ordered::values(&input.sections).map(|s| (s.id, s)).collect();
+    let line = line_masses(&input.masses.line);
 
-    for elem in input.elements.values() {
+    for elem in crate::ordered::values(&input.elements) {
         let node_i = node_by_id[&elem.node_i];
         let node_j = node_by_id[&elem.node_j];
         let sec = section_by_id[&elem.section_id];
 
         let density = densities.get(&elem.material_id.to_string()).copied().unwrap_or(0.0);
-        if density <= 0.0 {
+        let added = line.get(&elem.id).copied().unwrap_or(0.0);
+        if density <= 0.0 && added <= 0.0 {
             continue;
         }
 
@@ -34,7 +130,7 @@ pub fn assemble_mass_matrix_2d(
 
         // rho*A in consistent units: density is kg/m³, A is m²
         // Mass = rho*A*L in kg. Convert to kN·s²/m (tonnes): divide by 1000
-        let rho_a = density * sec.a / 1000.0; // tonnes/m
+        let rho_a = density * sec.a / 1000.0 + added; // tonnes/m
 
         if elem.elem_type == "truss" || elem.elem_type == "cable" {
             // Consistent truss mass: rhoAL/6 * [[2,1],[1,2]] per direction
@@ -65,12 +161,16 @@ pub fn assemble_mass_matrix_2d(
         }
     }
 
+    for (d, v) in nodal_mass_entries_2d(input, dof_num) {
+        m_global[d * n + d] += v;
+    }
+
     m_global
 }
 
 /// Consistent mass matrix for 2D frame element (6×6 local).
 /// rho_a: mass per unit length (tonnes/m = kN·s²/m²)
-fn frame_consistent_mass(rho_a: f64, l: f64, hinge_start: bool, hinge_end: bool) -> Vec<f64> {
+pub fn frame_consistent_mass(rho_a: f64, l: f64, hinge_start: bool, hinge_end: bool) -> Vec<f64> {
     let m = rho_a * l / 420.0;
     let mut mat = vec![0.0; 36];
 
@@ -116,7 +216,7 @@ fn frame_consistent_mass(rho_a: f64, l: f64, hinge_start: bool, hinge_end: bool)
 }
 
 /// Consistent mass matrix for 2D truss element (4×4 global).
-fn truss_consistent_mass(rho_a: f64, l: f64) -> [f64; 16] {
+pub fn truss_consistent_mass(rho_a: f64, l: f64) -> [f64; 16] {
     let m = rho_a * l / 6.0;
     let mut mat = [0.0; 16];
     // [[2,0,1,0],[0,2,0,1],[1,0,2,0],[0,1,0,2]] * m
@@ -139,13 +239,50 @@ pub fn assemble_mass_matrix_2d_sparse(
     dof_num: &DofNumbering,
     densities: &HashMap<String, f64>,
 ) -> CscMatrix {
-    let nf = dof_num.n_free;
+    assemble_mass_matrix_2d_sparse_impl(input, dof_num, densities, &[], dof_num.n_free)
+}
+
+/// `assemble_mass_matrix_2d_sparse` in the inclined-support frames K was
+/// assembled in, so K and M share one basis (free block).
+pub fn assemble_mass_matrix_2d_sparse_inclined(
+    input: &SolverInput,
+    dof_num: &DofNumbering,
+    densities: &HashMap<String, f64>,
+    inclined: &[InclinedTransformData2D],
+) -> CscMatrix {
+    assemble_mass_matrix_2d_sparse_impl(input, dof_num, densities, inclined, dof_num.n_free)
+}
+
+/// `assemble_mass_matrix_2d_sparse` (global axes) over the DOFs numbered below
+/// `nf`: the free block, or with `n_total` the whole matrix (the restrained
+/// DOFs' rows are what couples a ground motion's support translations to the
+/// free DOFs).
+pub fn assemble_mass_matrix_2d_sparse_block(
+    input: &SolverInput,
+    dof_num: &DofNumbering,
+    densities: &HashMap<String, f64>,
+    nf: usize,
+) -> CscMatrix {
+    assemble_mass_matrix_2d_sparse_impl(input, dof_num, densities, &[], nf)
+}
+
+/// The block below `nf`, in the inclined frames `inclined` when not empty.
+fn assemble_mass_matrix_2d_sparse_impl(
+    input: &SolverInput,
+    dof_num: &DofNumbering,
+    densities: &HashMap<String, f64>,
+    inclined: &[InclinedTransformData2D],
+    nf: usize,
+) -> CscMatrix {
+    // With inclined supports, keep every DOF until the rotation is applied.
+    let keep = if inclined.is_empty() { nf } else { dof_num.n_total };
     let mut rows: Vec<usize> = Vec::new();
     let mut cols: Vec<usize> = Vec::new();
     let mut vals: Vec<f64> = Vec::new();
 
-    let node_by_id: HashMap<usize, &SolverNode> = input.nodes.values().map(|n| (n.id, n)).collect();
-    let section_by_id: HashMap<usize, &SolverSection> = input.sections.values().map(|s| (s.id, s)).collect();
+    let node_by_id: HashMap<usize, &SolverNode> = crate::ordered::values(&input.nodes).map(|n| (n.id, n)).collect();
+    let section_by_id: HashMap<usize, &SolverSection> = crate::ordered::values(&input.sections).map(|s| (s.id, s)).collect();
+    let line = line_masses(&input.masses.line);
 
     // Scatter one lower-triangle entry (i >= j of the symmetric element matrix).
     macro_rules! scatter {
@@ -153,7 +290,7 @@ pub fn assemble_mass_matrix_2d_sparse(
             let gi = $dofs[$i];
             let gj = $dofs[$j];
             let v = $v;
-            if gi < nf && gj < nf && v.abs() > 1e-30 {
+            if gi < keep && gj < keep && v.abs() > 1e-30 {
                 rows.push(gi);
                 cols.push(gj);
                 vals.push(v);
@@ -161,13 +298,14 @@ pub fn assemble_mass_matrix_2d_sparse(
         }};
     }
 
-    for elem in input.elements.values() {
+    for elem in crate::ordered::values(&input.elements) {
         let node_i = node_by_id[&elem.node_i];
         let node_j = node_by_id[&elem.node_j];
         let sec = section_by_id[&elem.section_id];
 
         let density = densities.get(&elem.material_id.to_string()).copied().unwrap_or(0.0);
-        if density <= 0.0 {
+        let added = line.get(&elem.id).copied().unwrap_or(0.0);
+        if density <= 0.0 && added <= 0.0 {
             continue;
         }
 
@@ -177,7 +315,7 @@ pub fn assemble_mass_matrix_2d_sparse(
         let cos = dx / l;
         let sin = dy / l;
 
-        let rho_a = density * sec.a / 1000.0; // tonnes/m
+        let rho_a = density * sec.a / 1000.0 + added; // tonnes/m
 
         if elem.elem_type == "truss" || elem.elem_type == "cable" {
             let m_local = truss_consistent_mass(rho_a, l);
@@ -207,6 +345,13 @@ pub fn assemble_mass_matrix_2d_sparse(
         }
     }
 
+    for (d, v) in nodal_mass_entries_2d(input, dof_num) {
+        scatter!([d], 0, 0, v);
+    }
+
+    if !inclined.is_empty() {
+        rotate_inclined_free_block(&mut rows, &mut cols, &mut vals, inclined, nf);
+    }
     CscMatrix::from_triplets(nf, &rows, &cols, &vals)
 }
 
@@ -220,25 +365,28 @@ pub fn assemble_mass_matrix_3d(
     let mut m_global = vec![0.0; n * n];
     let left_hand = input.left_hand.unwrap_or(false);
 
-    let node_by_id: HashMap<usize, &SolverNode3D> = input.nodes.values().map(|n| (n.id, n)).collect();
-    let section_by_id: HashMap<usize, &SolverSection3D> = input.sections.values().map(|s| (s.id, s)).collect();
+    let node_by_id: HashMap<usize, &SolverNode3D> = crate::ordered::values(&input.nodes).map(|n| (n.id, n)).collect();
+    let section_by_id: HashMap<usize, &SolverSection3D> = crate::ordered::values(&input.sections).map(|s| (s.id, s)).collect();
+    let line = line_masses(&input.masses.line);
+    let area = area_masses(&input.masses.area);
 
     /// Maps 12-DOF element indices to 14-DOF positions, skipping warping DOFs 6 and 13.
     const DOF_MAP_12_TO_14: [usize; 12] = [0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12];
 
-    for elem in input.elements.values() {
+    for elem in crate::ordered::values(&input.elements) {
         let node_i = node_by_id[&elem.node_i];
         let node_j = node_by_id[&elem.node_j];
         let sec = section_by_id[&elem.section_id];
 
         let density = densities.get(&elem.material_id.to_string()).copied().unwrap_or(0.0);
-        if density <= 0.0 { continue; }
+        let added = line.get(&elem.id).copied().unwrap_or(0.0);
+        if density <= 0.0 && added <= 0.0 { continue; }
 
         let dx = node_j.x - node_i.x;
         let dy = node_j.y - node_i.y;
         let dz = node_j.z - node_i.z;
         let l = (dx * dx + dy * dy + dz * dz).sqrt();
-        let rho_a = density * sec.a / 1000.0; // tonnes/m
+        let rho_a = density * sec.a / 1000.0 + added; // tonnes/m
 
         if elem.elem_type == "truss" || elem.elem_type == "cable" {
             // 3D truss: M = ρAL/6 * [[2I₃, I₃],[I₃, 2I₃]]
@@ -263,8 +411,21 @@ pub fn assemble_mass_matrix_3d(
                 elem.roll_angle, left_hand,
             );
 
-            if dof_num.dofs_per_node >= 7 {
-                // Warping model: embed 12×12 mass into 14-DOF space
+            let has_cw = sec.cw.is_some_and(|cw| cw > 0.0);
+            if has_cw && dof_num.dofs_per_node >= 7 {
+                // Warping member: 14×14 consistent mass, cubic twist as in its stiffness.
+                let m14 = frame_consistent_mass_3d_warping(rho_a, sec.a, sec.iy, sec.iz, sec.cw.unwrap(), l,
+                    crate::element::Hinge3D::from_elem(elem));
+                let t = crate::element::frame_transform_3d_warping(&ex, &ey, &ez);
+                let m_glob = transform_stiffness(&m14, &t, 14);
+                let elem_dofs = dof_num.element_dofs(elem.node_i, elem.node_j);
+                for i in 0..14 {
+                    for j in 0..14 {
+                        m_global[elem_dofs[i] * n + elem_dofs[j]] += m_glob[i * 14 + j];
+                    }
+                }
+            } else if dof_num.dofs_per_node >= 7 {
+                // Non-warping member in a warping model: embed 12×12 mass into 14-DOF space
                 let t = crate::element::frame_transform_3d(&ex, &ey, &ez);
                 let m_glob = transform_stiffness(&m_local, &t, 12);
                 let elem_dofs = dof_num.element_dofs(elem.node_i, elem.node_j);
@@ -274,20 +435,6 @@ pub fn assemble_mass_matrix_3d(
                         let gi = elem_dofs[DOF_MAP_12_TO_14[i]];
                         let gj = elem_dofs[DOF_MAP_12_TO_14[j]];
                         m_global[gi * n + gj] += m_glob[i * 12 + j];
-                    }
-                }
-
-                // Warping mass: lumped polar mass moment at warping DOFs.
-                // For thin-walled open sections, warping inertia ≈ ρ*(Iy+Iz)*L/2 per node.
-                // This is approximate but includes warping participation in modal analysis.
-                if let Some(cw) = sec.cw {
-                    if cw > 0.0 {
-                        let ip = sec.iy + sec.iz; // polar second moment (approx)
-                        let m_warp = density * ip * l / (2.0 * 1000.0); // tonnes·m
-                        let w_dof_i = elem_dofs[6];   // warping DOF node I
-                        let w_dof_j = elem_dofs[13];  // warping DOF node J
-                        m_global[w_dof_i * n + w_dof_i] += m_warp;
-                        m_global[w_dof_j * n + w_dof_j] += m_warp;
                     }
                 }
             } else {
@@ -306,9 +453,9 @@ pub fn assemble_mass_matrix_3d(
     }
 
     // Assemble plate element masses
-    for plate in input.plates.values() {
-        let density = densities.get(&plate.material_id.to_string()).copied().unwrap_or(0.0);
-        if density <= 0.0 { continue; }
+    for plate in crate::ordered::values(&input.plates) {
+        let rho_t = shell_density_t(densities, &area, "plate", plate.id, plate.material_id, plate.thickness);
+        if rho_t <= 0.0 { continue; }
 
         let node_1 = node_by_id[&plate.nodes[0]];
         let node_2 = node_by_id[&plate.nodes[1]];
@@ -321,7 +468,7 @@ pub fn assemble_mass_matrix_3d(
         ];
 
         // density is in kg/m³, divide by 1000 to get tonnes/m³ (consistent with kN units)
-        let m_local = crate::element::plate::plate_consistent_mass(&coords, density / 1000.0, plate.thickness);
+        let m_local = crate::element::plate::plate_consistent_mass(&coords, rho_t, plate.thickness);
 
         // Plate mass is lumped (diagonal), no rotation needed — assemble directly
         let mut plate_dofs = Vec::with_capacity(18);
@@ -342,9 +489,9 @@ pub fn assemble_mass_matrix_3d(
     }
 
     // Assemble quad (MITC4 shell) element masses
-    for quad in input.quads.values() {
-        let density = densities.get(&quad.material_id.to_string()).copied().unwrap_or(0.0);
-        if density <= 0.0 { continue; }
+    for quad in crate::ordered::values(&input.quads) {
+        let rho_t = shell_density_t(densities, &area, "quad", quad.id, quad.material_id, quad.thickness);
+        if rho_t <= 0.0 { continue; }
 
         let n0 = node_by_id[&quad.nodes[0]];
         let n1 = node_by_id[&quad.nodes[1]];
@@ -358,7 +505,13 @@ pub fn assemble_mass_matrix_3d(
         ];
 
         // density is in kg/m³, divide by 1000 to get tonnes/m³ (consistent with kN units)
-        let m_local = crate::element::quad::quad_consistent_mass(&coords, density / 1000.0, quad.thickness);
+        // Local mass to global: the translational blocks are isotropic, but the rotary
+        // block diag(ρt³/12, ρt³/12, 0) is about the LOCAL axes and must be rotated with
+        // the element. Scattered as local, a wall got inertia about its own normal (the
+        // drilling rotation) and none about one in-plane axis (SH-4, docs/solver/shells.md).
+        let m_local = transform_stiffness(
+            &crate::element::quad::quad_consistent_mass(&coords, rho_t, quad.thickness),
+            &crate::element::quad::quad_transform_3d(&coords), 24);
 
         let quad_dofs = dof_num.quad_element_dofs(&quad.nodes);
         for i in 0..24 {
@@ -372,9 +525,9 @@ pub fn assemble_mass_matrix_3d(
     }
 
     // Assemble quad9 (MITC9 shell) element masses
-    for quad9 in input.quad9s.values() {
-        let density = densities.get(&quad9.material_id.to_string()).copied().unwrap_or(0.0);
-        if density <= 0.0 { continue; }
+    for quad9 in crate::ordered::values(&input.quad9s) {
+        let rho_t = shell_density_t(densities, &area, "quad9", quad9.id, quad9.material_id, quad9.thickness);
+        if rho_t <= 0.0 { continue; }
 
         let mut coords = [[0.0f64; 3]; 9];
         for (i, &nid) in quad9.nodes.iter().enumerate() {
@@ -382,7 +535,10 @@ pub fn assemble_mass_matrix_3d(
             coords[i] = [nd.x, nd.y, nd.z];
         }
 
-        let m_local = crate::element::quad9::quad9_consistent_mass(&coords, density / 1000.0, quad9.thickness);
+        // Rotated to global, see the quad above (SH-4).
+        let m_local = transform_stiffness(
+            &crate::element::quad9::quad9_consistent_mass(&coords, rho_t, quad9.thickness),
+            &crate::element::quad9::quad9_transform_3d(&coords), 54);
 
         let q9_dofs = dof_num.quad9_element_dofs(&quad9.nodes);
         for i in 0..54 {
@@ -396,7 +552,7 @@ pub fn assemble_mass_matrix_3d(
     }
 
     // Assemble solid-shell element masses
-    for ss in input.solid_shells.values() {
+    for ss in crate::ordered::values(&input.solid_shells) {
         let density = densities.get(&ss.material_id.to_string()).copied().unwrap_or(0.0);
         if density <= 0.0 { continue; }
 
@@ -421,9 +577,9 @@ pub fn assemble_mass_matrix_3d(
     }
 
     // Assemble curved shell element masses
-    for cs in input.curved_shells.values() {
-        let density = densities.get(&cs.material_id.to_string()).copied().unwrap_or(0.0);
-        if density <= 0.0 { continue; }
+    for cs in crate::ordered::values(&input.curved_shells) {
+        let rho_t = shell_density_t(densities, &area, "curvedShell", cs.id, cs.material_id, cs.thickness);
+        if rho_t <= 0.0 { continue; }
 
         let mut coords = [[0.0f64; 3]; 4];
         for (i, &nid) in cs.nodes.iter().enumerate() {
@@ -432,7 +588,7 @@ pub fn assemble_mass_matrix_3d(
         }
         let dirs = cs.normals.unwrap_or_else(|| crate::element::curved_shell::compute_element_directors(&coords));
 
-        let m_local = crate::element::curved_shell::curved_shell_consistent_mass(&coords, &dirs, density / 1000.0, cs.thickness);
+        let m_local = crate::element::curved_shell::curved_shell_consistent_mass(&coords, &dirs, rho_t, cs.thickness);
 
         let cs_dofs = dof_num.quad_element_dofs(&cs.nodes);
         for i in 0..24 {
@@ -445,6 +601,10 @@ pub fn assemble_mass_matrix_3d(
         }
     }
 
+    for (d, v) in nodal_mass_entries_3d(input, dof_num) {
+        m_global[d * n + d] += v;
+    }
+
     m_global
 }
 
@@ -452,21 +612,59 @@ pub fn assemble_mass_matrix_3d(
 /// (lower triangle) over the free DOFs only (nf×nf block; free DOFs are
 /// numbered first). Same element contributions as `assemble_mass_matrix_3d`:
 /// frame/truss elements, plates, quads, quad9s, solid shells, curved shells,
-/// and warping-DOF lumped masses.
+/// and the consistent torsion-warping mass of warping members.
 pub fn assemble_mass_matrix_3d_sparse(
     input: &SolverInput3D,
     dof_num: &DofNumbering,
     densities: &HashMap<String, f64>,
 ) -> CscMatrix {
-    let nf = dof_num.n_free;
+    assemble_mass_matrix_3d_sparse_impl(input, dof_num, densities, &[], dof_num.n_free)
+}
+
+/// `assemble_mass_matrix_3d_sparse` in the inclined-support frames K was
+/// assembled in, so K and M share one basis (free block).
+pub fn assemble_mass_matrix_3d_sparse_inclined(
+    input: &SolverInput3D,
+    dof_num: &DofNumbering,
+    densities: &HashMap<String, f64>,
+    inclined: &[InclinedTransformData],
+) -> CscMatrix {
+    assemble_mass_matrix_3d_sparse_impl(input, dof_num, densities, inclined, dof_num.n_free)
+}
+
+/// `assemble_mass_matrix_3d_sparse` (global axes) over the DOFs numbered below
+/// `nf`: the free block, or with `n_total` the whole matrix (the restrained
+/// DOFs' rows are what couples a ground motion's support translations to the
+/// free DOFs).
+pub fn assemble_mass_matrix_3d_sparse_block(
+    input: &SolverInput3D,
+    dof_num: &DofNumbering,
+    densities: &HashMap<String, f64>,
+    nf: usize,
+) -> CscMatrix {
+    assemble_mass_matrix_3d_sparse_impl(input, dof_num, densities, &[], nf)
+}
+
+/// The block below `nf`, in the inclined frames `inclined` when not empty.
+fn assemble_mass_matrix_3d_sparse_impl(
+    input: &SolverInput3D,
+    dof_num: &DofNumbering,
+    densities: &HashMap<String, f64>,
+    inclined: &[InclinedTransformData],
+    nf: usize,
+) -> CscMatrix {
+    // With inclined supports, keep every DOF until the rotation is applied.
+    let keep = if inclined.is_empty() { nf } else { dof_num.n_total };
     let left_hand = input.left_hand.unwrap_or(false);
 
     let mut rows: Vec<usize> = Vec::new();
     let mut cols: Vec<usize> = Vec::new();
     let mut vals: Vec<f64> = Vec::new();
 
-    let node_by_id: HashMap<usize, &SolverNode3D> = input.nodes.values().map(|n| (n.id, n)).collect();
-    let section_by_id: HashMap<usize, &SolverSection3D> = input.sections.values().map(|s| (s.id, s)).collect();
+    let node_by_id: HashMap<usize, &SolverNode3D> = crate::ordered::values(&input.nodes).map(|n| (n.id, n)).collect();
+    let section_by_id: HashMap<usize, &SolverSection3D> = crate::ordered::values(&input.sections).map(|s| (s.id, s)).collect();
+    let line = line_masses(&input.masses.line);
+    let area = area_masses(&input.masses.area);
 
     /// Maps 12-DOF element indices to 14-DOF positions, skipping warping DOFs 6 and 13.
     const DOF_MAP_12_TO_14: [usize; 12] = [0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12];
@@ -477,7 +675,7 @@ pub fn assemble_mass_matrix_3d_sparse(
             let gi = $dofs[$i];
             let gj = $dofs[$j];
             let v = $v;
-            if gi < nf && gj < nf && v.abs() > 1e-30 {
+            if gi < keep && gj < keep && v.abs() > 1e-30 {
                 rows.push(gi);
                 cols.push(gj);
                 vals.push(v);
@@ -485,19 +683,20 @@ pub fn assemble_mass_matrix_3d_sparse(
         }};
     }
 
-    for elem in input.elements.values() {
+    for elem in crate::ordered::values(&input.elements) {
         let node_i = node_by_id[&elem.node_i];
         let node_j = node_by_id[&elem.node_j];
         let sec = section_by_id[&elem.section_id];
 
         let density = densities.get(&elem.material_id.to_string()).copied().unwrap_or(0.0);
-        if density <= 0.0 { continue; }
+        let added = line.get(&elem.id).copied().unwrap_or(0.0);
+        if density <= 0.0 && added <= 0.0 { continue; }
 
         let dx = node_j.x - node_i.x;
         let dy = node_j.y - node_i.y;
         let dz = node_j.z - node_i.z;
         let l = (dx * dx + dy * dy + dz * dz).sqrt();
-        let rho_a = density * sec.a / 1000.0; // tonnes/m
+        let rho_a = density * sec.a / 1000.0 + added; // tonnes/m
 
         if elem.elem_type == "truss" || elem.elem_type == "cable" {
             // 3D truss: M = ρAL/6 * [[2I₃, I₃],[I₃, 2I₃]]
@@ -522,8 +721,21 @@ pub fn assemble_mass_matrix_3d_sparse(
                 elem.roll_angle, left_hand,
             );
 
-            if dof_num.dofs_per_node >= 7 {
-                // Warping model: embed 12×12 mass into 14-DOF space
+            let has_cw = sec.cw.is_some_and(|cw| cw > 0.0);
+            if has_cw && dof_num.dofs_per_node >= 7 {
+                // Warping member: 14×14 consistent mass, cubic twist as in its stiffness.
+                let m14 = frame_consistent_mass_3d_warping(rho_a, sec.a, sec.iy, sec.iz, sec.cw.unwrap(), l,
+                    crate::element::Hinge3D::from_elem(elem));
+                let t = crate::element::frame_transform_3d_warping(&ex, &ey, &ez);
+                let m_glob = transform_stiffness(&m14, &t, 14);
+                let elem_dofs = dof_num.element_dofs(elem.node_i, elem.node_j);
+                for i in 0..14 {
+                    for j in 0..=i {
+                        scatter!(elem_dofs, i, j, m_glob[i * 14 + j]);
+                    }
+                }
+            } else if dof_num.dofs_per_node >= 7 {
+                // Non-warping member in a warping model: embed 12×12 mass into 14-DOF space
                 let t = crate::element::frame_transform_3d(&ex, &ey, &ez);
                 let m_glob = transform_stiffness(&m_local, &t, 12);
                 let elem_dofs = dof_num.element_dofs(elem.node_i, elem.node_j);
@@ -533,16 +745,6 @@ pub fn assemble_mass_matrix_3d_sparse(
                         let gi14 = DOF_MAP_12_TO_14[i];
                         let gj14 = DOF_MAP_12_TO_14[j];
                         scatter!(elem_dofs, gi14, gj14, m_glob[i * 12 + j]);
-                    }
-                }
-
-                // Warping mass: lumped polar mass moment at warping DOFs (diagonal).
-                if let Some(cw) = sec.cw {
-                    if cw > 0.0 {
-                        let ip = sec.iy + sec.iz; // polar second moment (approx)
-                        let m_warp = density * ip * l / (2.0 * 1000.0); // tonnes·m
-                        scatter!(elem_dofs, 6, 6, m_warp);   // warping DOF node I
-                        scatter!(elem_dofs, 13, 13, m_warp); // warping DOF node J
                     }
                 }
             } else {
@@ -561,9 +763,9 @@ pub fn assemble_mass_matrix_3d_sparse(
     }
 
     // Assemble plate element masses (lumped/diagonal 18×18, no rotation needed)
-    for plate in input.plates.values() {
-        let density = densities.get(&plate.material_id.to_string()).copied().unwrap_or(0.0);
-        if density <= 0.0 { continue; }
+    for plate in crate::ordered::values(&input.plates) {
+        let rho_t = shell_density_t(densities, &area, "plate", plate.id, plate.material_id, plate.thickness);
+        if rho_t <= 0.0 { continue; }
 
         let node_1 = node_by_id[&plate.nodes[0]];
         let node_2 = node_by_id[&plate.nodes[1]];
@@ -575,7 +777,7 @@ pub fn assemble_mass_matrix_3d_sparse(
             [node_3.x, node_3.y, node_3.z],
         ];
 
-        let m_local = crate::element::plate::plate_consistent_mass(&coords, density / 1000.0, plate.thickness);
+        let m_local = crate::element::plate::plate_consistent_mass(&coords, rho_t, plate.thickness);
 
         let mut plate_dofs = Vec::with_capacity(18);
         for &node_id in &plate.nodes {
@@ -592,9 +794,9 @@ pub fn assemble_mass_matrix_3d_sparse(
     }
 
     // Assemble quad (MITC4 shell) element masses
-    for quad in input.quads.values() {
-        let density = densities.get(&quad.material_id.to_string()).copied().unwrap_or(0.0);
-        if density <= 0.0 { continue; }
+    for quad in crate::ordered::values(&input.quads) {
+        let rho_t = shell_density_t(densities, &area, "quad", quad.id, quad.material_id, quad.thickness);
+        if rho_t <= 0.0 { continue; }
 
         let n0 = node_by_id[&quad.nodes[0]];
         let n1 = node_by_id[&quad.nodes[1]];
@@ -607,7 +809,13 @@ pub fn assemble_mass_matrix_3d_sparse(
             [n3.x, n3.y, n3.z],
         ];
 
-        let m_local = crate::element::quad::quad_consistent_mass(&coords, density / 1000.0, quad.thickness);
+        // Local mass to global: the translational blocks are isotropic, but the rotary
+        // block diag(ρt³/12, ρt³/12, 0) is about the LOCAL axes and must be rotated with
+        // the element. Scattered as local, a wall got inertia about its own normal (the
+        // drilling rotation) and none about one in-plane axis (SH-4, docs/solver/shells.md).
+        let m_local = transform_stiffness(
+            &crate::element::quad::quad_consistent_mass(&coords, rho_t, quad.thickness),
+            &crate::element::quad::quad_transform_3d(&coords), 24);
 
         let quad_dofs = dof_num.quad_element_dofs(&quad.nodes);
         for i in 0..24 {
@@ -618,9 +826,9 @@ pub fn assemble_mass_matrix_3d_sparse(
     }
 
     // Assemble quad9 (MITC9 shell) element masses
-    for quad9 in input.quad9s.values() {
-        let density = densities.get(&quad9.material_id.to_string()).copied().unwrap_or(0.0);
-        if density <= 0.0 { continue; }
+    for quad9 in crate::ordered::values(&input.quad9s) {
+        let rho_t = shell_density_t(densities, &area, "quad9", quad9.id, quad9.material_id, quad9.thickness);
+        if rho_t <= 0.0 { continue; }
 
         let mut coords = [[0.0f64; 3]; 9];
         for (i, &nid) in quad9.nodes.iter().enumerate() {
@@ -628,7 +836,10 @@ pub fn assemble_mass_matrix_3d_sparse(
             coords[i] = [nd.x, nd.y, nd.z];
         }
 
-        let m_local = crate::element::quad9::quad9_consistent_mass(&coords, density / 1000.0, quad9.thickness);
+        // Rotated to global, see the quad above (SH-4).
+        let m_local = transform_stiffness(
+            &crate::element::quad9::quad9_consistent_mass(&coords, rho_t, quad9.thickness),
+            &crate::element::quad9::quad9_transform_3d(&coords), 54);
 
         let q9_dofs = dof_num.quad9_element_dofs(&quad9.nodes);
         for i in 0..54 {
@@ -639,7 +850,7 @@ pub fn assemble_mass_matrix_3d_sparse(
     }
 
     // Assemble solid-shell element masses
-    for ss in input.solid_shells.values() {
+    for ss in crate::ordered::values(&input.solid_shells) {
         let density = densities.get(&ss.material_id.to_string()).copied().unwrap_or(0.0);
         if density <= 0.0 { continue; }
 
@@ -660,9 +871,9 @@ pub fn assemble_mass_matrix_3d_sparse(
     }
 
     // Assemble curved shell element masses
-    for cs in input.curved_shells.values() {
-        let density = densities.get(&cs.material_id.to_string()).copied().unwrap_or(0.0);
-        if density <= 0.0 { continue; }
+    for cs in crate::ordered::values(&input.curved_shells) {
+        let rho_t = shell_density_t(densities, &area, "curvedShell", cs.id, cs.material_id, cs.thickness);
+        if rho_t <= 0.0 { continue; }
 
         let mut coords = [[0.0f64; 3]; 4];
         for (i, &nid) in cs.nodes.iter().enumerate() {
@@ -671,7 +882,7 @@ pub fn assemble_mass_matrix_3d_sparse(
         }
         let dirs = cs.normals.unwrap_or_else(|| crate::element::curved_shell::compute_element_directors(&coords));
 
-        let m_local = crate::element::curved_shell::curved_shell_consistent_mass(&coords, &dirs, density / 1000.0, cs.thickness);
+        let m_local = crate::element::curved_shell::curved_shell_consistent_mass(&coords, &dirs, rho_t, cs.thickness);
 
         let cs_dofs = dof_num.quad_element_dofs(&cs.nodes);
         for i in 0..24 {
@@ -681,11 +892,18 @@ pub fn assemble_mass_matrix_3d_sparse(
         }
     }
 
+    for (d, v) in nodal_mass_entries_3d(input, dof_num) {
+        scatter!([d], 0, 0, v);
+    }
+
+    if !inclined.is_empty() {
+        rotate_inclined_free_block(&mut rows, &mut cols, &mut vals, inclined, nf);
+    }
     CscMatrix::from_triplets(nf, &rows, &cols, &vals)
 }
 
 /// Consistent mass matrix for 3D frame element (12×12 local).
-fn frame_consistent_mass_3d(rho_a: f64, a: f64, iy: f64, iz: f64, l: f64,
+pub fn frame_consistent_mass_3d(rho_a: f64, a: f64, iy: f64, iz: f64, l: f64,
     hinge: crate::element::Hinge3D) -> Vec<f64> {
     let mut mat = vec![0.0; 144];
 
@@ -764,31 +982,86 @@ fn frame_consistent_mass_3d(rho_a: f64, a: f64, iy: f64, iz: f64, l: f64,
     mat
 }
 
-/// Compute total mass of 3D structure (in tonnes = kN·s²/m).
+/// Consistent mass of a warping frame member (14×14 local, DOFs as in
+/// `frame_local_stiffness_3d_warping`). The twist is the cubic Hermite
+/// interpolant of [θx1, φ'1, θx2, φ'2], as in the stiffness, so the torsion
+/// block is the kinetic energy ½∫ρ(Ip·θ̇x² + Cw·θ̇x'²) dx over it:
+/// ρIp·L/420·[156, 22L, 54, −13L; …] + ρCw/(30L)·[36, 3L, −36, 3L; …],
+/// with Ip ≈ Iy + Iz as in the 12×12. The rest is `frame_consistent_mass_3d`;
+/// with any release the member is lumped, translations only, as there.
+/// (The warping DOFs used to get a lumped ρ·Ip·L/2 each — a rotation's inertia
+/// on a rate-of-twist DOF — beside the 12×12's linear-twist torsion mass.)
+pub fn frame_consistent_mass_3d_warping(rho_a: f64, a: f64, iy: f64, iz: f64, cw: f64, l: f64,
+    hinge: crate::element::Hinge3D) -> Vec<f64> {
+    const MAP: [usize; 12] = [0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12];
+    let m12 = frame_consistent_mass_3d(rho_a, a, iy, iz, l, hinge);
+    let mut mat = vec![0.0; 196];
+    for i in 0..12 {
+        for j in 0..12 {
+            mat[MAP[i] * 14 + MAP[j]] = m12[i * 12 + j];
+        }
+    }
+    let lumped = hinge.release_my_start || hinge.release_my_end
+        || hinge.release_mz_start || hinge.release_mz_end
+        || hinge.release_t_start || hinge.release_t_end;
+    if lumped {
+        return mat;
+    }
+    let mi = rho_a * (iy + iz) / a * l / 420.0;
+    let mc = rho_a * cw / a / (30.0 * l);
+    let l2 = l * l;
+    let hermite = [[156.0, 22.0 * l, 54.0, -13.0 * l], [22.0 * l, 4.0 * l2, 13.0 * l, -3.0 * l2],
+                   [54.0, 13.0 * l, 156.0, -22.0 * l], [-13.0 * l, -3.0 * l2, -22.0 * l, 4.0 * l2]];
+    let slope = [[36.0, 3.0 * l, -36.0, 3.0 * l], [3.0 * l, 4.0 * l2, -3.0 * l, -l2],
+                 [-36.0, -3.0 * l, 36.0, -3.0 * l], [3.0 * l, -l2, -3.0 * l, 4.0 * l2]];
+    let idx = [3, 6, 10, 13];
+    for a in 0..4 {
+        for b in 0..4 {
+            mat[idx[a] * 14 + idx[b]] = mi * hermite[a][b] + mc * slope[a][b];
+        }
+    }
+    mat
+}
+
+/// Total mass of a 3D structure, t (= kN·s²/m): the largest of its
+/// translational masses per direction (`total_mass_by_direction_3d`), which
+/// is the mass of the structure when no nodal mass is directional.
 pub fn compute_total_mass_3d(
     input: &SolverInput3D,
     densities: &HashMap<String, f64>,
 ) -> f64 {
-    let node_by_id: HashMap<usize, &SolverNode3D> = input.nodes.values().map(|n| (n.id, n)).collect();
-    let section_by_id: HashMap<usize, &SolverSection3D> = input.sections.values().map(|s| (s.id, s)).collect();
+    total_mass_by_direction_3d(input, densities).into_iter().fold(0.0, f64::max)
+}
+
+/// Mass of a 3D structure's members and shells, t: densities and added line
+/// and area masses, no nodal masses.
+fn compute_total_mass_3d_elements(
+    input: &SolverInput3D,
+    densities: &HashMap<String, f64>,
+) -> f64 {
+    let node_by_id: HashMap<usize, &SolverNode3D> = crate::ordered::values(&input.nodes).map(|n| (n.id, n)).collect();
+    let section_by_id: HashMap<usize, &SolverSection3D> = crate::ordered::values(&input.sections).map(|s| (s.id, s)).collect();
+    let line = line_masses(&input.masses.line);
+    let area = area_masses(&input.masses.area);
 
     let mut total = 0.0;
-    for elem in input.elements.values() {
+    for elem in crate::ordered::values(&input.elements) {
         let sec = section_by_id[&elem.section_id];
         let node_i = node_by_id[&elem.node_i];
         let node_j = node_by_id[&elem.node_j];
         let density = densities.get(&elem.material_id.to_string()).copied().unwrap_or(0.0);
+        let added = line.get(&elem.id).copied().unwrap_or(0.0);
         let dx = node_j.x - node_i.x;
         let dy = node_j.y - node_i.y;
         let dz = node_j.z - node_i.z;
         let l = (dx * dx + dy * dy + dz * dz).sqrt();
-        total += density * sec.a * l / 1000.0;
+        total += (density * sec.a / 1000.0 + added) * l;
     }
 
     // Add plate masses
-    for plate in input.plates.values() {
-        let density = densities.get(&plate.material_id.to_string()).copied().unwrap_or(0.0);
-        if density <= 0.0 { continue; }
+    for plate in crate::ordered::values(&input.plates) {
+        let rho_t = shell_density_t(densities, &area, "plate", plate.id, plate.material_id, plate.thickness);
+        if rho_t <= 0.0 { continue; }
 
         let node_1 = node_by_id[&plate.nodes[0]];
         let node_2 = node_by_id[&plate.nodes[1]];
@@ -802,13 +1075,13 @@ pub fn compute_total_mass_3d(
             v1[0] * v2[1] - v1[1] * v2[0],
         ];
         let area = (cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2]).sqrt() / 2.0;
-        total += density * area * plate.thickness / 1000.0;
+        total += rho_t * area * plate.thickness;
     }
 
     // Add quad (MITC4 shell) element masses
-    for quad in input.quads.values() {
-        let density = densities.get(&quad.material_id.to_string()).copied().unwrap_or(0.0);
-        if density <= 0.0 { continue; }
+    for quad in crate::ordered::values(&input.quads) {
+        let rho_t = shell_density_t(densities, &area, "quad", quad.id, quad.material_id, quad.thickness);
+        if rho_t <= 0.0 { continue; }
 
         let n0 = node_by_id[&quad.nodes[0]];
         let n1 = node_by_id[&quad.nodes[1]];
@@ -834,13 +1107,13 @@ pub fn compute_total_mass_3d(
         ];
         let a2 = (c2[0] * c2[0] + c2[1] * c2[1] + c2[2] * c2[2]).sqrt() / 2.0;
 
-        total += density * (a1 + a2) * quad.thickness / 1000.0;
+        total += rho_t * (a1 + a2) * quad.thickness;
     }
 
     // Add quad9 (MITC9 shell) element masses
-    for quad9 in input.quad9s.values() {
-        let density = densities.get(&quad9.material_id.to_string()).copied().unwrap_or(0.0);
-        if density <= 0.0 { continue; }
+    for quad9 in crate::ordered::values(&input.quad9s) {
+        let rho_t = shell_density_t(densities, &area, "quad9", quad9.id, quad9.material_id, quad9.thickness);
+        if rho_t <= 0.0 { continue; }
 
         let n0 = node_by_id[&quad9.nodes[0]];
         let n1 = node_by_id[&quad9.nodes[1]];
@@ -865,11 +1138,11 @@ pub fn compute_total_mass_3d(
         ];
         let a2 = (c2[0] * c2[0] + c2[1] * c2[1] + c2[2] * c2[2]).sqrt() / 2.0;
 
-        total += density * (a1 + a2) * quad9.thickness / 1000.0;
+        total += rho_t * (a1 + a2) * quad9.thickness;
     }
 
     // Add solid-shell element masses (volumetric — no thickness field)
-    for ss in input.solid_shells.values() {
+    for ss in crate::ordered::values(&input.solid_shells) {
         let density = densities.get(&ss.material_id.to_string()).copied().unwrap_or(0.0);
         if density <= 0.0 { continue; }
 
@@ -883,9 +1156,9 @@ pub fn compute_total_mass_3d(
     }
 
     // Add curved shell element masses
-    for cs in input.curved_shells.values() {
-        let density = densities.get(&cs.material_id.to_string()).copied().unwrap_or(0.0);
-        if density <= 0.0 { continue; }
+    for cs in crate::ordered::values(&input.curved_shells) {
+        let rho_t = shell_density_t(densities, &area, "curvedShell", cs.id, cs.material_id, cs.thickness);
+        if rho_t <= 0.0 { continue; }
 
         let n0 = node_by_id[&cs.nodes[0]];
         let n1 = node_by_id[&cs.nodes[1]];
@@ -910,30 +1183,81 @@ pub fn compute_total_mass_3d(
         ];
         let a2 = (c2[0] * c2[0] + c2[1] * c2[1] + c2[2] * c2[2]).sqrt() / 2.0;
 
-        total += density * (a1 + a2) * cs.thickness / 1000.0;
+        total += rho_t * (a1 + a2) * cs.thickness;
     }
 
     total
 }
 
-/// Compute total mass of structure (in tonnes = kN·s²/m).
+/// Total mass of a 2D structure, t (= kN·s²/m): the larger of its
+/// translational masses per direction (`total_mass_by_direction_2d`).
 pub fn compute_total_mass(
     input: &SolverInput,
     densities: &HashMap<String, f64>,
 ) -> f64 {
-    let node_by_id: HashMap<usize, &SolverNode> = input.nodes.values().map(|n| (n.id, n)).collect();
-    let section_by_id: HashMap<usize, &SolverSection> = input.sections.values().map(|s| (s.id, s)).collect();
+    let [x, z] = total_mass_by_direction_2d(input, densities);
+    x.max(z)
+}
+
+/// Mass of a 2D structure's members, t: densities and added line masses.
+fn compute_total_mass_elements(
+    input: &SolverInput,
+    densities: &HashMap<String, f64>,
+) -> f64 {
+    let node_by_id: HashMap<usize, &SolverNode> = crate::ordered::values(&input.nodes).map(|n| (n.id, n)).collect();
+    let section_by_id: HashMap<usize, &SolverSection> = crate::ordered::values(&input.sections).map(|s| (s.id, s)).collect();
+    let line = line_masses(&input.masses.line);
 
     let mut total = 0.0;
-    for elem in input.elements.values() {
+    for elem in crate::ordered::values(&input.elements) {
         let sec = section_by_id[&elem.section_id];
         let node_i = node_by_id[&elem.node_i];
         let node_j = node_by_id[&elem.node_j];
         let density = densities.get(&elem.material_id.to_string()).copied().unwrap_or(0.0);
+        let added = line.get(&elem.id).copied().unwrap_or(0.0);
         let dx = node_j.x - node_i.x;
         let dy = node_j.z - node_i.z;
         let l = (dx * dx + dy * dy).sqrt();
-        total += density * sec.a * l / 1000.0; // tonnes
+        total += (density * sec.a / 1000.0 + added) * l; // tonnes
     }
     total
 }
+
+/// (M·r)_f for the rigid-body translation r along `local_dof` of EVERY node,
+/// restrained ones included: the relative-motion load is −(M·r)_f·a_g, and with
+/// a consistent mass the free DOFs are coupled to the supports' translations
+/// (M_fr·r_r). M_ff·r_f alone missed that part of the inertia — half of it on a
+/// bar on two supports. `m_ff` is the free block in the inclined-support frames
+/// `its` (K's basis); `m_full` assembles the whole mass in global axes and is
+/// only built when some restrained DOF moves with the ground. With
+/// T the inclined rotation, (T·M·Tᵀ)(T·r) = T·(M·r): the full product is taken
+/// in global axes and then rotated, so at an inclined roller only the
+/// tangential component of the inertia is a free load.
+///
+/// Time history, modal participation (Γ, effective masses) and therefore the
+/// response spectrum all take their ground-motion load from here, so the three
+/// agree on what a uniform support acceleration does to the structure.
+pub(crate) fn ground_influence<T: super::assembly::InclinedFrame, M: std::borrow::Borrow<CscMatrix>>(
+    dof_num: &DofNumbering,
+    local_dof: usize,
+    its: &[T],
+    m_ff: &CscMatrix,
+    m_full: impl FnOnce() -> M,
+) -> Vec<f64> {
+    let nf = dof_num.n_free;
+    let mut r = vec![0.0; dof_num.n_total];
+    for &node_id in &dof_num.node_order {
+        if let Some(&d) = dof_num.map.get(&(node_id, local_dof)) {
+            r[d] = 1.0;
+        }
+    }
+    let mut r_rot = r.clone();
+    for it in its {
+        it.rotate(&mut r_rot);
+    }
+    if r_rot[nf..].iter().all(|&x| x == 0.0) {
+        return m_ff.sym_mat_vec(&r_rot[..nf]);
+    }
+    super::assembly::to_inclined_free(m_full().borrow().sym_mat_vec(&r), its, nf)
+}
+

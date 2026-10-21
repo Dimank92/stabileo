@@ -140,7 +140,7 @@ fn test_full_solve_to_station_extraction_3d() {
 
     // sign_convention present
     assert_eq!(&result.sign_convention.axial, "positive = tension");
-    assert_eq!(&result.sign_convention.torsion, "positive = right-hand rule about local x");
+    assert!(result.sign_convention.torsion.contains("negative (-x) face"), "{}", result.sign_convention.torsion);
 }
 
 /// Biaxial bending: load in both Y and Z directions. Verify all 6 force components
@@ -559,6 +559,14 @@ fn test_full_pipeline_solve_to_steel_check_3d() {
             e: E,
             g: None,
             depth: Some(0.203),
+            flange_slenderness: None,
+            // W200x46: bf = 203, tf = 11.0, tw = 7.2, h ≈ 161 mm (E7).
+            compression_elements: Some(vec![
+                AiscElement { kind: AiscElementKind::RolledFlange, b: 0.1015, t: 0.011, count: Some(4.0), kc: None },
+                AiscElement { kind: AiscElementKind::Web, b: 0.161, t: 0.0072, count: None, kc: None },
+            ]),
+            lcz: None,
+            load_position: None,
         }],
         forces: demands,
     };

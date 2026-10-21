@@ -224,7 +224,7 @@ pub fn solve_pdelta_2d(input: &SolverInput, max_iter: usize, tolerance: f64) -> 
     if dof_num.n_free == 0 {
         return Err("No free DOFs".into());
     }
-    let cs = FreeConstraintSystem::build_2d(&input.constraints, &dof_num, &input.nodes);
+    let cs = FreeConstraintSystem::build_2d(&input, &dof_num)?;
     solve_pdelta_2d_on(input, &dof_num, cs, dof_num.n_total >= SPARSE_THRESHOLD, max_iter, tolerance)
 }
 
@@ -349,14 +349,14 @@ pub fn solve_pdelta_2d_on(
 
     let constraint_forces = cs.as_ref().map_or_else(Vec::new, |cs| {
         let raw = tangent.free_block(n, nf).constraint_forces(cs, &state.u[..nf], &tangent.rhs(n, nf, f, &state.u));
-        super::constraints::map_dof_forces_to_constraint_forces(&raw, dof_num)
+        cs.constraint_forces(&raw, dof_num)
     });
 
     Ok(PDeltaResult {
         results: AnalysisResults {
             displacements: build_displacements_2d(dof_num, &u_global),
             reactions,
-            element_forces: compute_internal_forces_2d(input, dof_num, &u_global),
+            element_forces: second_order_forces_2d(input, dof_num, &u_global),
             constraint_forces,
             // The model's diagnostics belong to the model, not to the path that
             // analysed it: the linear pass above already ran the pre-solve gates
@@ -376,6 +376,45 @@ pub fn solve_pdelta_2d_on(
         b2_factor: max_ratio,
         linear_results,
     })
+}
+
+/// End forces of the members P-Delta solved, (K_e + Kg_e(N))·u_e − FEF: the
+/// elastic recovery plus each frame member's geometric end forces. The
+/// reactions are taken from K + Kg; with the elastic part alone the end forces
+/// balanced neither the joints nor the reactions (a free cantilever tip
+/// reported a moment). Trusses report only N, which Kg does not change.
+fn second_order_forces_2d(input: &SolverInput, dof_num: &DofNumbering, u: &[f64]) -> Vec<ElementForces> {
+    let mut forces = compute_internal_forces_2d(input, dof_num, u);
+    for (id, g) in super::geometric_stiffness::frame_geometric_end_forces_2d(input, dof_num, u) {
+        if let Some(f) = forces.iter_mut().find(|f| f.element_id == id) {
+            // n_start = −f_I,x, v_start = f_I,y, m_start = f_I,θ; the end ones negated.
+            f.v_start += g[1];
+            f.m_start += g[2];
+            f.v_end -= g[4];
+            f.m_end -= g[5];
+        }
+    }
+    forces
+}
+
+/// 3D counterpart of `second_order_forces_2d`.
+fn second_order_forces_3d(input: &SolverInput3D, dof_num: &DofNumbering, u: &[f64]) -> Vec<ElementForces3D> {
+    let mut forces = compute_internal_forces_3d(input, dof_num, u);
+    for (id, g) in super::geometric_stiffness::frame_geometric_end_forces_3d(input, dof_num, u) {
+        if let Some(f) = forces.iter_mut().find(|f| f.element_id == id) {
+            f.vy_start += g[1];
+            f.vz_start += g[2];
+            f.mx_start += g[3];
+            f.my_start += g[4];
+            f.mz_start += g[5];
+            f.vy_end -= g[7];
+            f.vz_end -= g[8];
+            f.mx_end -= g[9];
+            f.my_end -= g[10];
+            f.mz_end -= g[11];
+        }
+    }
+    forces
 }
 
 /// P-Delta analysis result for 3D structures.
@@ -519,10 +558,13 @@ impl PDeltaSystem3D {
 /// Solve 3D P-Delta with sparse assembly for large models, including constrained models
 /// whose reduced system is small. The storage decision follows the full assembly size.
 pub fn solve_pdelta_3d(input: &SolverInput3D, max_iter: usize, tolerance: f64) -> Result<PDeltaResult3D, String> {
+    // Shell geometric stiffness reads the membrane force from the strain;
+    // only the quad subtracts the free thermal strain from it.
+    super::feature_gates::refuse_3d(input, "P-Delta analysis", &[super::feature_gates::Feature::ShellThermalNonQuad])?;
     let input = &super::linear::expand_curved_beams_3d(input);
     let dof_num = DofNumbering::build_3d(input);
     if dof_num.n_free == 0 { return Err("No free DOFs".into()); }
-    let cs = FreeConstraintSystem::build_3d(&input.constraints, &dof_num, &input.nodes);
+    let cs = FreeConstraintSystem::build_3d(&input, &dof_num)?;
     solve_pdelta_3d_on(input, &dof_num, cs, dof_num.n_total >= SPARSE_THRESHOLD, max_iter, tolerance)
 }
 
@@ -563,12 +605,12 @@ fn solve_pdelta_3d_on(input: &SolverInput3D, dof_num: &DofNumbering, cs: Option<
     reactions.sort_by_key(|r| r.node_id);
     let constraint_forces = cs.as_ref().map_or_else(Vec::new, |cs| {
         let raw = tangent.free_block(n, nf).constraint_forces(cs, &state.u[..nf], &tangent.rhs(n, nf, f, &state.u));
-        super::constraints::map_dof_forces_to_constraint_forces(&raw, dof_num)
+        cs.constraint_forces(&raw, dof_num)
     });
     Ok(PDeltaResult3D {
         results: AnalysisResults3D {
             displacements: build_displacements_3d(dof_num, &u_global), reactions,
-            element_forces: compute_internal_forces_3d(input, dof_num, &u_global),
+            element_forces: second_order_forces_3d(input, dof_num, &u_global),
             plate_stresses: compute_plate_stresses(input, dof_num, &u_global, None),
             quad_stresses: compute_quad_stresses(input, dof_num, &u_global, None), quad_nodal_stresses: vec![], constraint_forces,
             diagnostics: linear_results.diagnostics.clone(),
@@ -636,10 +678,10 @@ mod tests {
         let mut materials = HashMap::new();
         materials.insert("1".into(), SolverMaterial { id: 1, e: 200_000.0, nu: 0.3 });
         let mut sections = HashMap::new();
-        sections.insert("1".into(), SolverSection3D { id: 1, name: None, a: 0.012, iy: 1.5e-4, iz: 1.5e-4, j: 2.0e-6, cw: None, as_y: None, as_z: None });
-        sections.insert("2".into(), SolverSection3D { id: 2, name: None, a: 0.008, iy: 2.5e-4, iz: 1.0e-5, j: 1.0e-6, cw: None, as_y: None, as_z: None });
+        sections.insert("1".into(), SolverSection3D { id: 1, name: None, a: 0.012, iy: 1.5e-4, iz: 1.5e-4, j: 2.0e-6, cw: None, as_y: None, as_z: None, shear_center_y: None, shear_center_z: None });
+        sections.insert("2".into(), SolverSection3D { id: 2, name: None, a: 0.008, iy: 2.5e-4, iz: 1.0e-5, j: 1.0e-6, cw: None, as_y: None, as_z: None, shear_center_y: None, shear_center_z: None });
         SolverInput3D {
-            solver_options: None,
+            solver_options: None, masses: Default::default(),
             nodes, materials, sections, elements, supports, loads, constraints, left_hand: None,
             plates: HashMap::new(), quads: HashMap::new(), quad9s: HashMap::new(),
             solid_shells: HashMap::new(), curved_shells: HashMap::new(), curved_beams: vec![], connectors: HashMap::new(),
@@ -648,7 +690,7 @@ mod tests {
 
     fn both(input: &SolverInput3D) -> (PDeltaResult3D, PDeltaResult3D) {
         let dof_num = DofNumbering::build_3d(input);
-        let cs = || FreeConstraintSystem::build_3d(&input.constraints, &dof_num, &input.nodes);
+        let cs = || FreeConstraintSystem::build_3d(input, &dof_num).unwrap();
         (
             solve_pdelta_3d_on(input, &dof_num, cs(), false, 30, 1e-8).unwrap(),
             solve_pdelta_3d_on(input, &dof_num, cs(), true, 30, 1e-8).unwrap(),
@@ -787,11 +829,11 @@ mod tests {
         let mut input = building(1, 1, false);
         input.nodes = (0..=4).map(|k| ((k + 1).to_string(), SolverNode3D { id: k + 1, x: 0.0, y: 0.0, z: k as f64 })).collect();
         input.elements = (1..=4).map(|k| {
-            let mut e = input.elements.values().next().unwrap().clone();
+            let mut e = crate::ordered::values(&input.elements).next().unwrap().clone();
             e.id = k; e.node_i = k; e.node_j = k + 1; e.section_id = 1;
             (k.to_string(), e)
         }).collect();
-        let fixed = input.supports.values().next().unwrap().clone();
+        let fixed = crate::ordered::values(&input.supports).next().unwrap().clone();
         input.supports = HashMap::from([("1".into(), SolverSupport3D { node_id: 1, ..fixed })]);
         input.loads = vec![SolverLoad3D::Nodal(SolverNodalLoad3D { node_id: 5, fx: 0.5, fy: 0.0, fz: -p, mx: 0.0, my: 0.0, mz: 0.0, bw: None })];
         input

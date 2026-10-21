@@ -23,16 +23,32 @@ fn corot_local_y_ref(
     xi: f64, yi: f64, zi: f64, xj: f64, yj: f64, zj: f64,
     lyx: Option<f64>, lyy: Option<f64>, lyz: Option<f64>,
 ) -> (Option<f64>, Option<f64>, Option<f64>) {
-    if lyx.is_some() {
-        return (lyx, lyy, lyz);
-    }
     let (dx, dy, dz) = (xj - xi, yj - yi, zj - zi);
     let l = (dx * dx + dy * dy + dz * dz).sqrt();
     if l < 1e-15 {
-        return (None, None, None);
+        return (lyx, lyy, lyz);
     }
-    let r = default_ey_ref(&[dx / l, dy / l, dz / l]);
-    (Some(r[0]), Some(r[1]), Some(r[2]))
+    /*
+     * Anchor to the initial frame's own local y (before roll and handedness,
+     * which `compute_local_axes_3d` applies again). An explicit local y nearly
+     * parallel to the member was passed through as is, and the parallel-vector
+     * fallback then picked its reference from each configuration separately:
+     * the deformed frame turned against the initial one and the iteration
+     * "converged" to 3.5 times the lateral deflection.
+     */
+    let (_, ey, _) = compute_local_axes_3d(xi, yi, zi, xj, yj, zj, lyx, lyy, lyz, None, false);
+    (Some(ey[0]), Some(ey[1]), Some(ey[2]))
+}
+
+/// Rigid rotation of a member chord from its initial direction (dx0, dz0) to
+/// its current one (dxn, dzn), in (−π, π]. Taken as atan2(d0 × dn, d0 · dn),
+/// not as the difference of the two absolute angles: for a member drawn along
+/// −X the absolute angle sits on atan2's ±π cut, and the smallest deflection
+/// made the difference jump by 2π — the member then reported a 2π end
+/// rotation and the solve failed or returned a wrong state (found by the
+/// metamorphic member-reversal check).
+pub(crate) fn chord_rotation(dx0: f64, dz0: f64, dxn: f64, dzn: f64) -> f64 {
+    (dx0 * dzn - dz0 * dxn).atan2(dx0 * dxn + dz0 * dzn)
 }
 
 /// Solve a 2D frame using co-rotational large displacement analysis.
@@ -70,6 +86,15 @@ pub fn solve_corotational_2d(
     // naming a node that does not exist panicked instead of returning an
     // error. In WASM that ends the module, not the call.
     super::linear::validate_input_2d(input)?;
+    // The tangent has no prescribed-displacement term.
+    // Temperature enters as fixed-end forces held in the global frame, so a
+    // heated member that rotates is pushed by its own (fictitious) thermal
+    // axial force: 12% on the tip rotation of a heated, bent cantilever.
+    super::feature_gates::refuse_2d(input, "Corotational analysis", &[
+        super::feature_gates::Feature::PrescribedDisplacements,
+        super::feature_gates::Feature::ThermalLoads,
+    ])?;
+    crate::element::connector::refuse_for_corotational_2d(input, "Corotational analysis")?;
 
     let dof_num = DofNumbering::build_2d(input);
 
@@ -81,18 +106,22 @@ pub fn solve_corotational_2d(
     let nf = dof_num.n_free;
 
     // Build constraint system (if constraints present)
-    let cs = FreeConstraintSystem::build_2d(&input.constraints, &dof_num, &input.nodes);
+    let cs = FreeConstraintSystem::build_2d(&input, &dof_num)?;
     let ns = cs.as_ref().map_or(nf, |c| c.n_free_indep);
 
     // Get the full external load vector from linear assembly (reference load)
     let asm = assembly::assemble_2d(input, &dof_num);
     let f_total = asm.f.clone();
+    let art = assembly::artificial_stiffness_entries(&asm);
 
     // Global displacement vector (starts at zero)
     let mut u_full = vec![0.0; n];
 
     let mut total_iterations = 0;
     let mut converged = true;
+    // The state and load factor of the last converged increment.
+    let mut u_converged = u_full.clone();
+    let mut converged_factor = 0.0f64;
 
     // Sparse symbolic factorization cache (ns >= SPARSE_THRESHOLD only): the
     // tangent's sparsity pattern is constant within a solve call, so the
@@ -140,7 +169,7 @@ pub fn solve_corotational_2d(
                     &mut trip_rows, &mut trip_cols, &mut trip_vals,
                 );
                 add_spring_contributions(
-                    input, &dof_num, &u_geom, &mut f_int,
+                    input, &dof_num, &u_geom, &mut f_int, &art,
                     &mut |gi, gj, v| {
                         if gi >= gj {
                             trip_rows.push(gi);
@@ -161,7 +190,7 @@ pub fn solve_corotational_2d(
                 k_t = vec![0.0; n * n];
                 assemble_corotational(input, &dof_num, &u_geom, &mut f_int, &mut k_t);
                 add_spring_contributions(
-                    input, &dof_num, &u_geom, &mut f_int,
+                    input, &dof_num, &u_geom, &mut f_int, &art,
                     &mut |gi, gj, v| k_t[gi * n + gj] += v,
                 );
 
@@ -289,24 +318,82 @@ pub fn solve_corotational_2d(
         }
 
         if !nr_converged {
+            // Report the last converged increment, not the iterate given up on.
             converged = false;
+            u_full.copy_from_slice(&u_converged);
             break;
         }
+        u_converged.copy_from_slice(&u_full);
+        converged_factor = load_factor;
     }
 
     // Find max displacement magnitude
     let max_displacement = compute_max_displacement(&dof_num, &u_full);
 
-    // Build final results using existing infrastructure
-    let results = build_final_results(input, &dof_num, &u_full, &cs)?;
+    // Results of the last converged state, under the loads it carries.
+    let scaled;
+    let at_state = if converged_factor < 1.0 {
+        scaled = scaled_loads_2d(input, converged_factor);
+        &scaled
+    } else {
+        input
+    };
+    let results = build_final_results(at_state, &dof_num, &u_full, &cs)?;
 
     Ok(CorotationalResult {
         results,
         iterations: total_iterations,
         converged,
         load_increments: n_increments,
+        load_factor: converged_factor,
         max_displacement,
     })
+}
+
+/// The model under `factor` times its loads: the state an unconverged solve
+/// reports is the last converged increment, and its reactions and member
+/// forces are those of the load that increment carries.
+fn scaled_loads_2d(input: &SolverInput, factor: f64) -> SolverInput {
+    let mut m = input.clone();
+    for l in m.loads.iter_mut() {
+        match l {
+            SolverLoad::Nodal(n) => { n.fx *= factor; n.fz *= factor; n.my *= factor; }
+            SolverLoad::Distributed(d) => { d.q_i *= factor; d.q_j *= factor; }
+            SolverLoad::AxialDistributed(d) => { d.q_i *= factor; d.q_j *= factor; }
+            SolverLoad::PointOnElement(p) => {
+                p.p *= factor;
+                p.px = p.px.map(|v| v * factor);
+                p.my = p.my.map(|v| v * factor);
+            }
+            // Refused at the entry point.
+            SolverLoad::Thermal(_) => {}
+        }
+    }
+    m
+}
+
+/// 3D twin of [`scaled_loads_2d`] (shell, thermal and bimoment loads are
+/// refused at the entry point).
+fn scaled_loads_3d(input: &SolverInput3D, factor: f64) -> SolverInput3D {
+    let mut m = input.clone();
+    for l in m.loads.iter_mut() {
+        match l {
+            SolverLoad3D::Nodal(n) => {
+                for v in [&mut n.fx, &mut n.fy, &mut n.fz, &mut n.mx, &mut n.my, &mut n.mz] {
+                    *v *= factor;
+                }
+                n.bw = n.bw.map(|v| v * factor);
+            }
+            SolverLoad3D::Distributed(d) => {
+                for v in [&mut d.q_xi, &mut d.q_xj, &mut d.q_yi, &mut d.q_yj, &mut d.q_zi, &mut d.q_zj] {
+                    *v *= factor;
+                }
+            }
+            SolverLoad3D::PointOnElement(p) => { p.py *= factor; p.pz *= factor; }
+            _ => {}
+        }
+    }
+    m
 }
 
 /// Public entry point for co-rotational assembly (used by arc-length solver).
@@ -320,6 +407,22 @@ pub fn assemble_corotational_public(
     assemble_corotational(input, dof_num, u_full, f_int, k_t);
 }
 
+/// G·As of a section with a shear area (kN), `None` for an Euler–Bernoulli one.
+fn shear_rigidity_2d(mat: &SolverMaterial, sec: &SolverSection) -> Option<f64> {
+    let e = mat.e * 1000.0;
+    sec.as_y.filter(|&s| s > 0.0).map(|s| e / (2.0 * (1.0 + mat.nu)) * s)
+}
+
+/// Timoshenko shear parameter φ = 12EI/(G·As·L²), 0 without a shear area.
+///
+/// The co-rotational element is the linear element in a frame that follows
+/// the chord, so it takes the same φ the linear solver does; it used to pass
+/// 0, which solved a member with a shear area as Euler–Bernoulli (22% stiff
+/// on a deep cantilever) while the linear solve of the same model did not.
+fn timoshenko_phi(e: f64, iz: f64, g_as: Option<f64>, l: f64) -> f64 {
+    g_as.map_or(0.0, |g_as| 12.0 * e * iz / (g_as * l * l))
+}
+
 /// Assemble co-rotational internal forces and tangent stiffness for all elements.
 fn assemble_corotational(
     input: &SolverInput,
@@ -331,14 +434,14 @@ fn assemble_corotational(
     let n = dof_num.n_total;
 
     let node_by_id: std::collections::HashMap<usize, &SolverNode> =
-        input.nodes.values().map(|n| (n.id, n)).collect();
+        crate::ordered::values(&input.nodes).map(|n| (n.id, n)).collect();
     let mat_by_id: std::collections::HashMap<usize, &SolverMaterial> =
-        input.materials.values().map(|m| (m.id, m)).collect();
+        crate::ordered::values(&input.materials).map(|m| (m.id, m)).collect();
     let sec_by_id: std::collections::HashMap<usize, &SolverSection> =
-        input.sections.values().map(|s| (s.id, s)).collect();
+        crate::ordered::values(&input.sections).map(|s| (s.id, s)).collect();
 
     let mut scatter = |gi: usize, gj: usize, v: f64| k_t[gi * n + gj] += v;
-    for elem in input.elements.values() {
+    for elem in crate::ordered::values(&input.elements) {
         let node_i = node_by_id[&elem.node_i];
         let node_j = node_by_id[&elem.node_j];
         let mat = mat_by_id[&elem.material_id];
@@ -353,7 +456,7 @@ fn assemble_corotational(
             );
         } else {
             assemble_frame_corotational(
-                dof_num, elem, node_i, node_j, e, sec.a, sec.iz,
+                dof_num, elem, node_i, node_j, e, sec.a, sec.iz, shear_rigidity_2d(mat, sec),
                 u_full, f_int, &mut scatter,
             );
         }
@@ -376,11 +479,11 @@ pub(crate) fn assemble_corotational_triplets_2d(
     trip_vals: &mut Vec<f64>,
 ) {
     let node_by_id: std::collections::HashMap<usize, &SolverNode> =
-        input.nodes.values().map(|n| (n.id, n)).collect();
+        crate::ordered::values(&input.nodes).map(|n| (n.id, n)).collect();
     let mat_by_id: std::collections::HashMap<usize, &SolverMaterial> =
-        input.materials.values().map(|m| (m.id, m)).collect();
+        crate::ordered::values(&input.materials).map(|m| (m.id, m)).collect();
     let sec_by_id: std::collections::HashMap<usize, &SolverSection> =
-        input.sections.values().map(|s| (s.id, s)).collect();
+        crate::ordered::values(&input.sections).map(|s| (s.id, s)).collect();
 
     let mut scatter = |gi: usize, gj: usize, v: f64| {
         if gi >= gj {
@@ -389,7 +492,7 @@ pub(crate) fn assemble_corotational_triplets_2d(
             trip_vals.push(v);
         }
     };
-    for elem in input.elements.values() {
+    for elem in crate::ordered::values(&input.elements) {
         let node_i = node_by_id[&elem.node_i];
         let node_j = node_by_id[&elem.node_j];
         let mat = mat_by_id[&elem.material_id];
@@ -404,7 +507,7 @@ pub(crate) fn assemble_corotational_triplets_2d(
             );
         } else {
             assemble_frame_corotational(
-                dof_num, elem, node_i, node_j, e, sec.a, sec.iz,
+                dof_num, elem, node_i, node_j, e, sec.a, sec.iz, shear_rigidity_2d(mat, sec),
                 u_full, f_int, &mut scatter,
             );
         }
@@ -435,9 +538,11 @@ fn assemble_truss_corotational(
     let u_xj = dof_num.global_dof(elem.node_j, 0).map(|d| u_full[d]).unwrap_or(0.0);
     let u_yj = dof_num.global_dof(elem.node_j, 1).map(|d| u_full[d]).unwrap_or(0.0);
 
-    let dx_n = (node_j.x + u_xj) - (node_i.x + u_xi);
-    let dy_n = (node_j.z + u_yj) - (node_i.z + u_yi);
+    // Initial chord + relative displacement (see the 3D element).
+    let dx_n = (node_j.x - node_i.x) + (u_xj - u_xi);
+    let dy_n = (node_j.z - node_i.z) + (u_yj - u_yi);
     let l_n = (dx_n * dx_n + dy_n * dy_n).sqrt();
+    let elong = elongation(&[dx0, dy0], &[u_xj - u_xi, u_yj - u_yi], l0, l_n);
 
     if l_n < 1e-15 {
         return;
@@ -446,7 +551,7 @@ fn assemble_truss_corotational(
     let c = dx_n / l_n;
     let s = dy_n / l_n;
 
-    let d_axial = l_n - l0;
+    let d_axial = elong;
     let axial_force = e * a / l0 * d_axial;
 
     // Internal force: f = N * r, where r = [-c, -s, c, s]
@@ -496,6 +601,7 @@ fn assemble_frame_corotational(
     e: f64,
     a: f64,
     iz: f64,
+    g_as: Option<f64>,
     u_full: &[f64],
     f_int: &mut [f64],
     scatter: &mut impl FnMut(usize, usize, f64),
@@ -503,30 +609,33 @@ fn assemble_frame_corotational(
     let dx0 = node_j.x - node_i.x;
     let dy0 = node_j.z - node_i.z;
     let l0 = (dx0 * dx0 + dy0 * dy0).sqrt();
-    let alpha_0 = dy0.atan2(dx0);
 
     let elem_dofs = dof_num.element_dofs(elem.node_i, elem.node_j);
     let u_elem: Vec<f64> = elem_dofs.iter().map(|&d| u_full[d]).collect();
 
     // Deformed geometry
-    let dx_n = (node_j.x + u_elem[3]) - (node_i.x + u_elem[0]);
-    let dy_n = (node_j.z + u_elem[4]) - (node_i.z + u_elem[1]);
+    // Initial chord + relative displacement (see the 3D element).
+    let dx_n = (node_j.x - node_i.x) + (u_elem[3] - u_elem[0]);
+    let dy_n = (node_j.z - node_i.z) + (u_elem[4] - u_elem[1]);
     let l_n = (dx_n * dx_n + dy_n * dy_n).sqrt();
+    let elong = elongation(&[dx0, dy0], &[u_elem[3] - u_elem[0], u_elem[4] - u_elem[1]], l0, l_n);
 
     if l_n < 1e-15 {
         return;
     }
 
-    let alpha_n = dy_n.atan2(dx_n);
     let c = dx_n / l_n;
     let s = dy_n / l_n;
 
-    let beta = alpha_n - alpha_0;
+    let beta = chord_rotation(dx0, dy0, dx_n, dy_n);
 
-    // Natural deformations
-    let d_axial = l_n - l0;
-    let theta_i = u_elem[2] - beta;
-    let theta_j = u_elem[5] - beta;
+    // Natural deformations. The deformational rotations are wrapped to
+    // (−π, π] (`wrap_angle`): β is a difference of two atan2 values and jumps
+    // by 2π where the chord crosses the branch cut, and the nodal rotations
+    // are total angles that may exceed π.
+    let d_axial = elong;
+    let theta_i = wrap_angle(u_elem[2] - beta);
+    let theta_j = wrap_angle(u_elem[5] - beta);
 
     // B matrix (3x6): derivative of natural deformations w.r.t. global DOFs
     // Row 0: d(d_axial)/d(u) = [-c, -s, 0, c, s, 0]
@@ -547,7 +656,7 @@ fn assemble_frame_corotational(
     // d_local = [0, 0, theta_i, d_axial, 0, theta_j]. (Mapping d_axial as
     // [+d_axial at i, -d_axial at j] instead would make the local elongation
     // u_j - u_i = -2*d_axial and quadruple the effective axial stiffness.)
-    let k_local = frame_local_stiffness_2d(e, a, iz, l0, elem.hinge_start, elem.hinge_end, 0.0);
+    let k_local = frame_local_stiffness_2d(e, a, iz, l0, elem.hinge_start, elem.hinge_end, timoshenko_phi(e, iz, g_as, l0));
 
     let p_mat: [[f64; 3]; 6] = [
         [0.0, 0.0, 0.0],
@@ -647,6 +756,21 @@ fn assemble_frame_corotational(
     }
 }
 
+/// An angle reduced to (−π, π]: the deformational end rotation θ − β of a
+/// 2D co-rotational member (Crisfield vol. 1 §7.3 takes it as atan2 of its
+/// sine and cosine for the same reason).
+///
+/// θ − β was used as is. β = atan2(chord) − atan2(initial chord) jumps by 2π
+/// when the chord crosses the negative x axis, so a member drawn right to left
+/// (α0 = π) whose chord turned counterclockwise by any amount got 2π of
+/// "bending": a cantilever fixed at its right end and loaded downward did not
+/// converge, and a member turned rigidly by more than π carried forces.
+fn wrap_angle(a: f64) -> f64 {
+    let two_pi = 2.0 * std::f64::consts::PI;
+    let r = a - two_pi * (a / two_pi).round();
+    if r <= -std::f64::consts::PI { r + two_pi } else { r }
+}
+
 /// Subtract fixed-end forces (FEF) from element loads in local coordinates.
 fn subtract_element_fef(
     input: &SolverInput,
@@ -675,9 +799,9 @@ fn subtract_element_fef(
                 let is_full = (a_dist.abs() < 1e-12) && ((b_dist - l).abs() < 1e-12);
 
                 let mut fef = if is_full {
-                    fef_distributed_2d(dl.q_i, dl.q_j, l)
+                    fef_distributed_2d(dl.q_i, dl.q_j, l, phi)
                 } else {
-                    fef_partial_distributed_2d(dl.q_i, dl.q_j, a_dist, b_dist, l)
+                    fef_partial_distributed_2d(dl.q_i, dl.q_j, a_dist, b_dist, l, phi)
                 };
                 adjust_fef_for_hinges(&mut fef, l, elem.hinge_start, elem.hinge_end, phi);
 
@@ -688,7 +812,7 @@ fn subtract_element_fef(
             SolverLoad::PointOnElement(pl) if pl.element_id == elem.id => {
                 let px = pl.px.unwrap_or(0.0);
                 let mz = pl.my.unwrap_or(0.0);
-                let mut fef = fef_point_load_2d(pl.p, px, mz, pl.a, l);
+                let mut fef = fef_point_load_2d(pl.p, px, mz, pl.a, l, phi);
                 adjust_fef_for_hinges(&mut fef, l, elem.hinge_start, elem.hinge_end, phi);
 
                 for i in 0..6 {
@@ -712,51 +836,41 @@ fn subtract_element_fef(
                     f_local[i] -= fef[i];
                 }
             }
+            SolverLoad::AxialDistributed(al) if al.element_id == elem.id => {
+                let fef = crate::element::fef_axial_distributed_2d(al.q_i, al.q_j, al.a.unwrap_or(0.0), al.b.unwrap_or(l), l);
+                for i in 0..6 {
+                    f_local[i] -= fef[i];
+                }
+            }
             _ => {}
         }
     }
 }
 
-/// Add spring stiffness and internal forces from springs.
-/// `scatter` receives the diagonal stiffness entries (see the element
-/// assemblers for the dense/triplet split).
-fn add_spring_contributions(
+/// Add the stiffness and internal forces of everything that is not a member:
+/// support springs, connectors (co-rotational, see `element::connector`) and
+/// the linear assembler's artificial stiffness `art` on DOFs nothing else
+/// holds (`assembly::artificial_stiffness_entries`). `scatter` receives every
+/// entry, off-diagonal ones included (see the element assemblers for the
+/// dense/triplet split). `u_full` holds true global displacements.
+pub(crate) fn add_spring_contributions(
     input: &SolverInput,
     dof_num: &DofNumbering,
     u_full: &[f64],
     f_int: &mut [f64],
+    art: &[(usize, f64)],
     scatter: &mut impl FnMut(usize, usize, f64),
 ) {
-    for sup in input.supports.values() {
-        if sup.support_type != "spring" {
-            continue;
-        }
-
-        if let Some(kx) = sup.kx {
-            if kx > 0.0 {
-                if let Some(&d) = dof_num.map.get(&(sup.node_id, 0)) {
-                    scatter(d, d, kx);
-                    f_int[d] += kx * u_full[d];
-                }
-            }
-        }
-        if let Some(ky) = sup.ky {
-            if ky > 0.0 {
-                if let Some(&d) = dof_num.map.get(&(sup.node_id, 1)) {
-                    scatter(d, d, ky);
-                    f_int[d] += ky * u_full[d];
-                }
-            }
-        }
-        if let Some(kz) = sup.kz {
-            if kz > 0.0 && dof_num.dofs_per_node >= 3 {
-                if let Some(&d) = dof_num.map.get(&(sup.node_id, 2)) {
-                    scatter(d, d, kz);
-                    f_int[d] += kz * u_full[d];
-                }
-            }
-        }
+    // Shared with the linear assembler (angle, rotational springs on any support).
+    for (i, j, k) in super::assembly::support_spring_entries_2d(input, dof_num) {
+        scatter(i, j, k);
+        f_int[i] += k * u_full[j];
     }
+    for &(d, k) in art {
+        scatter(d, d, k);
+        f_int[d] += k * u_full[d];
+    }
+    crate::element::connector::corotational_connectors_2d(input, dof_num, u_full, f_int, scatter);
 }
 
 /// Solve the free-DOF system K_ff * x = r using dense Cholesky with LU fallback.
@@ -845,6 +959,7 @@ fn build_final_results(
 
     // Reactions: co-rotational internal forces at restrained DOFs minus external loads
     let asm = assembly::assemble_2d(input, dof_num);
+    let art = assembly::artificial_stiffness_entries(&asm);
     let nr = n - nf;
     let f_r: Vec<f64> = (nf..n).map(|i| asm.f[i]).collect();
 
@@ -869,7 +984,7 @@ fn build_final_results(
     if cs.is_some() {
         assemble_corotational(input, dof_num, &u_geom, &mut f_int_corot, &mut k_dummy);
         add_spring_contributions(
-            input, dof_num, &u_geom, &mut f_int_corot,
+            input, dof_num, &u_geom, &mut f_int_corot, &art,
             &mut |gi, gj, v| k_dummy[gi * n + gj] += v,
         );
 
@@ -886,7 +1001,7 @@ fn build_final_results(
             input, dof_num, &u_geom, &mut f_int_corot, &mut tr, &mut tc, &mut tv,
         );
         add_spring_contributions(
-            input, dof_num, &u_geom, &mut f_int_corot,
+            input, dof_num, &u_geom, &mut f_int_corot, &art,
             &mut |d, _, v| {
                 tr.push(d);
                 tc.push(d);
@@ -923,7 +1038,7 @@ fn build_final_results(
             }
         }
         let raw = fcs.compute_constraint_forces(&k_ff, &u_full[..nf], &asm.f[..nf]);
-        super::constraints::map_dof_forces_to_constraint_forces(&raw, dof_num)
+        fcs.constraint_forces(&raw, dof_num)
     } else {
         vec![]
     };
@@ -950,13 +1065,13 @@ pub fn compute_corotational_forces(
     let mut forces = Vec::new();
 
     let node_by_id: std::collections::HashMap<usize, &SolverNode> =
-        input.nodes.values().map(|n| (n.id, n)).collect();
+        crate::ordered::values(&input.nodes).map(|n| (n.id, n)).collect();
     let mat_by_id: std::collections::HashMap<usize, &SolverMaterial> =
-        input.materials.values().map(|m| (m.id, m)).collect();
+        crate::ordered::values(&input.materials).map(|m| (m.id, m)).collect();
     let sec_by_id: std::collections::HashMap<usize, &SolverSection> =
-        input.sections.values().map(|s| (s.id, s)).collect();
+        crate::ordered::values(&input.sections).map(|s| (s.id, s)).collect();
 
-    for elem in input.elements.values() {
+    for elem in crate::ordered::values(&input.elements) {
         let node_i = node_by_id[&elem.node_i];
         let node_j = node_by_id[&elem.node_j];
         let mat = mat_by_id[&elem.material_id];
@@ -974,17 +1089,47 @@ pub fn compute_corotational_forces(
             let u_xj = dof_num.global_dof(elem.node_j, 0).map(|d| u_full[d]).unwrap_or(0.0);
             let u_yj = dof_num.global_dof(elem.node_j, 1).map(|d| u_full[d]).unwrap_or(0.0);
 
-            let dx_n = (node_j.x + u_xj) - (node_i.x + u_xi);
-            let dy_n = (node_j.z + u_yj) - (node_i.z + u_yi);
+            // Initial chord + relative displacement (see the 3D element).
+            let dx_n = (node_j.x - node_i.x) + (u_xj - u_xi);
+            let dy_n = (node_j.z - node_i.z) + (u_yj - u_yi);
             let l_n = (dx_n * dx_n + dy_n * dy_n).sqrt();
+            let elong = elongation(&[dx0, dy0], &[u_xj - u_xi, u_yj - u_yi], l0, l_n);
 
-            let d_axial = l_n - l0;
+            let d_axial = elong;
             let n_axial = e * sec.a / l0 * d_axial;
+
+            // Loads along the bar: their consistent end loads make N vary along it, as the linear
+            // recovery has it (n_start = EAδ/L + f_i, n_end = EAδ/L − f_j), and the diagram reads
+            // the span load itself. Without them a bar under an axial span load reported a
+            // constant N, even in the small-displacement limit.
+            let (mut f_i, mut f_j) = (0.0, 0.0);
+            let mut axial_loads_info = Vec::new();
+            let mut truss_point_loads = Vec::new();
+            for load in &input.loads {
+                match load {
+                    SolverLoad::PointOnElement(pl) if pl.element_id == elem.id => {
+                        let px = pl.px.unwrap_or(0.0);
+                        if px != 0.0 {
+                            f_i += px * (1.0 - pl.a / l0);
+                            f_j += px * pl.a / l0;
+                            truss_point_loads.push(PointLoadInfo { a: pl.a, p: 0.0, px: Some(px), my: None });
+                        }
+                    }
+                    SolverLoad::AxialDistributed(al) if al.element_id == elem.id => {
+                        let (a, b) = (al.a.unwrap_or(0.0), al.b.unwrap_or(l0));
+                        let [fa, fb] = crate::element::axial_distributed_fef(al.q_i, al.q_j, a, b, l0);
+                        f_i += fa;
+                        f_j += fb;
+                        axial_loads_info.push(DistributedLoadInfo { q_i: al.q_i, q_j: al.q_j, a, b });
+                    }
+                    _ => {}
+                }
+            }
 
             forces.push(ElementForces {
                 element_id: elem.id,
-                n_start: n_axial,
-                n_end: n_axial,
+                n_start: n_axial + f_i,
+                n_end: n_axial - f_j,
                 v_start: 0.0,
                 v_end: 0.0,
                 m_start: 0.0,
@@ -992,8 +1137,8 @@ pub fn compute_corotational_forces(
                 length: l_n,
                 q_i: 0.0,
                 q_j: 0.0,
-                point_loads: Vec::new(),
-                distributed_loads: Vec::new(),
+                point_loads: truss_point_loads,
+                distributed_loads: Vec::new(), distributed_loads_x: axial_loads_info,
                 hinge_start: false,
                 hinge_end: false,
             });
@@ -1001,26 +1146,26 @@ pub fn compute_corotational_forces(
             let dx0 = node_j.x - node_i.x;
             let dy0 = node_j.z - node_i.z;
             let l0 = (dx0 * dx0 + dy0 * dy0).sqrt();
-            let alpha_0 = dy0.atan2(dx0);
 
             let elem_dofs = dof_num.element_dofs(elem.node_i, elem.node_j);
             let u_elem: Vec<f64> = elem_dofs.iter().map(|&d| u_full[d]).collect();
 
-            let dx_n = (node_j.x + u_elem[3]) - (node_i.x + u_elem[0]);
-            let dy_n = (node_j.z + u_elem[4]) - (node_i.z + u_elem[1]);
+            // Initial chord + relative displacement (see the 3D element).
+            let dx_n = (node_j.x - node_i.x) + (u_elem[3] - u_elem[0]);
+            let dy_n = (node_j.z - node_i.z) + (u_elem[4] - u_elem[1]);
             let l_n = (dx_n * dx_n + dy_n * dy_n).sqrt();
-            let alpha_n = dy_n.atan2(dx_n);
-
-            let beta = alpha_n - alpha_0;
-            let d_axial = l_n - l0;
-            let theta_i_local = u_elem[2] - beta;
-            let theta_j_local = u_elem[5] - beta;
+            let elong = elongation(&[dx0, dy0], &[u_elem[3] - u_elem[0], u_elem[4] - u_elem[1]], l0, l_n);
+            let beta = chord_rotation(dx0, dy0, dx_n, dy_n);
+            let d_axial = elong;
+            let theta_i_local = wrap_angle(u_elem[2] - beta);
+            let theta_j_local = wrap_angle(u_elem[5] - beta);
 
             // Co-rotational local deformation: node i at origin, node j displaced axially
             let d_local = [0.0, 0.0, theta_i_local, d_axial, 0.0, theta_j_local];
 
             let k_local = frame_local_stiffness_2d(
-                e, sec.a, sec.iz, l0, elem.hinge_start, elem.hinge_end, 0.0,
+                e, sec.a, sec.iz, l0, elem.hinge_start, elem.hinge_end,
+                timoshenko_phi(e, sec.iz, shear_rigidity_2d(mat, sec), l0),
             );
 
             // f_local = K_local * d_local
@@ -1038,6 +1183,7 @@ pub fn compute_corotational_forces(
             let (mut total_qi, mut total_qj) = (0.0, 0.0);
             let mut point_loads_info = Vec::new();
             let mut dist_loads_info = Vec::new();
+            let mut axial_loads_info = Vec::new();
 
             for load in &input.loads {
                 match load {
@@ -1064,6 +1210,14 @@ pub fn compute_corotational_forces(
                             my: pl.my,
                         });
                     }
+                    SolverLoad::AxialDistributed(al) if al.element_id == elem.id => {
+                        axial_loads_info.push(DistributedLoadInfo {
+                            q_i: al.q_i,
+                            q_j: al.q_j,
+                            a: al.a.unwrap_or(0.0),
+                            b: al.b.unwrap_or(l0),
+                        });
+                    }
                     _ => {}
                 }
             }
@@ -1082,6 +1236,7 @@ pub fn compute_corotational_forces(
                 q_j: total_qj,
                 point_loads: point_loads_info,
                 distributed_loads: dist_loads_info,
+                distributed_loads_x: axial_loads_info,
                 hinge_start: elem.hinge_start,
                 hinge_end: elem.hinge_end,
             });
@@ -1140,8 +1295,33 @@ pub fn solve_corotational_3d(
         return Err("Corotational 3D solver does not support shell elements. \
             Use the linear solver for models with plates, quads, or shells.".into());
     }
+    // The co-rotational element carries the Wagner term of a doubly symmetric
+    // section (internal torque and tangent) but not the shear-centre coupling of
+    // a monosymmetric one: refused rather than missing its flexural-torsional
+    // instability without a word.
+    // Only the sections of frame members: the catalogue may hold unused ones, and a truss has
+    // no flexural-torsional coupling to miss.
+    let frame_sections: std::collections::HashSet<usize> =
+        crate::ordered::values(&input.elements).filter(|e| e.elem_type == "frame").map(|e| e.section_id).collect();
+    if let Some(sec) = crate::ordered::values(&input.sections).filter(|s| frame_sections.contains(&s.id)).find(|s| {
+        s.shear_center_y.is_some_and(|v| v != 0.0) || s.shear_center_z.is_some_and(|v| v != 0.0)
+    }) {
+        return Err(format!(
+            "Corotational 3D solver does not model a shear-centre offset (section {}): \
+             flexural-torsional coupling is not included. Use linear buckling or P-Delta.",
+            sec.id
+        ));
+    }
 
     // Expand curved beams before DOF numbering and assembly.
+    // As in 2D: no prescribed-displacement term, and
+    // temperature as fixed global forces.
+    super::feature_gates::refuse_3d(input, "Corotational analysis", &[
+        super::feature_gates::Feature::PrescribedDisplacements, super::feature_gates::Feature::ThermalLoads,
+        // The 3D co-rotational element has no warping DOF.
+        super::feature_gates::Feature::Warping,
+    ])?;
+    crate::element::connector::refuse_for_corotational_3d(input, "Corotational analysis")?;
     let input = &super::linear::expand_curved_beams_3d(input);
     let dof_num = DofNumbering::build_3d(input);
 
@@ -1154,7 +1334,7 @@ pub fn solve_corotational_3d(
     let left_hand = input.left_hand.unwrap_or(false);
 
     // Build constraint system (if constraints present)
-    let cs = FreeConstraintSystem::build_3d(&input.constraints, &dof_num, &input.nodes);
+    let cs = FreeConstraintSystem::build_3d(&input, &dof_num)?;
     let ns = cs.as_ref().map_or(nf, |c| c.n_free_indep);
 
     // Reference load vector from linear assembly
@@ -1164,6 +1344,9 @@ pub fn solve_corotational_3d(
     let mut u_full = vec![0.0; n];
     let mut total_iterations = 0;
     let mut converged = true;
+    // The state and load factor of the last converged increment.
+    let mut u_converged = u_full.clone();
+    let mut converged_factor = 0.0f64;
 
     // See solve_corotational_2d: sparse symbolic factorization cache for the
     // ns >= SPARSE_THRESHOLD path (pattern is constant within a solve call).
@@ -1336,19 +1519,31 @@ pub fn solve_corotational_3d(
         }
 
         if !nr_converged {
+            // Report the last converged increment, not the iterate given up on.
             converged = false;
+            u_full.copy_from_slice(&u_converged);
             break;
         }
+        u_converged.copy_from_slice(&u_full);
+        converged_factor = load_factor;
     }
 
     let max_displacement = compute_max_displacement_3d(&dof_num, &u_full);
-    let results = build_final_results_3d(input, &dof_num, &u_full, left_hand, &cs, pre_solve_diags)?;
+    let scaled;
+    let at_state = if converged_factor < 1.0 {
+        scaled = scaled_loads_3d(input, converged_factor);
+        &scaled
+    } else {
+        input
+    };
+    let results = build_final_results_3d(at_state, &dof_num, &u_full, left_hand, &cs, pre_solve_diags)?;
 
     Ok(CorotationalResult3D {
         results,
         iterations: total_iterations,
         converged,
         load_increments: n_increments,
+        load_factor: converged_factor,
         max_displacement,
     })
 }
@@ -1401,13 +1596,13 @@ fn assemble_corotational_3d_impl(
     left_hand: bool,
 ) {
     let node_by_id: std::collections::HashMap<usize, &SolverNode3D> =
-        input.nodes.values().map(|n| (n.id, n)).collect();
+        crate::ordered::values(&input.nodes).map(|n| (n.id, n)).collect();
     let mat_by_id: std::collections::HashMap<usize, &SolverMaterial> =
-        input.materials.values().map(|m| (m.id, m)).collect();
+        crate::ordered::values(&input.materials).map(|m| (m.id, m)).collect();
     let sec_by_id: std::collections::HashMap<usize, &SolverSection3D> =
-        input.sections.values().map(|s| (s.id, s)).collect();
+        crate::ordered::values(&input.sections).map(|s| (s.id, s)).collect();
 
-    for elem in input.elements.values() {
+    for elem in crate::ordered::values(&input.elements) {
         let node_i = node_by_id[&elem.node_i];
         let node_j = node_by_id[&elem.node_j];
         let mat = mat_by_id[&elem.material_id];
@@ -1486,13 +1681,14 @@ fn assemble_truss_corotational_3d(
     let dy_n = dy0 + u_yj - u_yi;
     let dz_n = dz0 + u_zj - u_zi;
     let l_n = (dx_n * dx_n + dy_n * dy_n + dz_n * dz_n).sqrt();
+    let elong = elongation(&[dx0, dy0, dz0], &[u_xj - u_xi, u_yj - u_yi, u_zj - u_zi], l0, l_n);
 
     if l_n < 1e-15 {
         return;
     }
 
     let r = [dx_n / l_n, dy_n / l_n, dz_n / l_n];
-    let axial_force = e * a / l0 * (l_n - l0);
+    let axial_force = e * a / l0 * elong;
 
     // Internal force: f = N * [-r, r]
     let signs: [f64; 6] = [-1.0, -1.0, -1.0, 1.0, 1.0, 1.0];
@@ -1556,17 +1752,17 @@ fn assemble_frame_corotational_3d(
     let u_elem: Vec<f64> = elem_dofs.iter().map(|&d| u_full[d]).collect();
 
     // Deformed node positions
-    let xi_def = node_i.x + u_elem[0];
-    let yi_def = node_i.y + u_elem[1];
-    let zi_def = node_i.z + u_elem[2];
-    let xj_def = node_j.x + u_elem[6];
-    let yj_def = node_j.y + u_elem[7];
-    let zj_def = node_j.z + u_elem[8];
-
-    let dx_n = xj_def - xi_def;
-    let dy_n = yj_def - yi_def;
-    let dz_n = zj_def - zi_def;
+    // Current chord from the initial chord plus the relative displacement,
+    // never as a difference of absolute deformed positions: x + u rounds u to
+    // ulp(x), which for a model 400 m from the origin (let alone in survey
+    // coordinates) put a residual floor above the convergence tolerance and
+    // the solve never converged (found by the metamorphic rotation check:
+    // the same building translated 400 m failed).
+    let dx_n = dx0 + (u_elem[6] - u_elem[0]);
+    let dy_n = dy0 + (u_elem[7] - u_elem[1]);
+    let dz_n = dz0 + (u_elem[8] - u_elem[2]);
     let l_n = (dx_n * dx_n + dy_n * dy_n + dz_n * dz_n).sqrt();
+    let elong = elongation(&[dx0, dy0, dz0], &[u_elem[6] - u_elem[0], u_elem[7] - u_elem[1], u_elem[8] - u_elem[2]], l0, l_n);
 
     if l_n < 1e-15 {
         return;
@@ -1587,12 +1783,10 @@ fn assemble_frame_corotational_3d(
         elem.roll_angle, left_hand,
     );
 
-    // Corotated local axes (from deformed geometry, same reference)
-    let (ex_n, ey_n, ez_n) = compute_local_axes_3d(
-        xi_def, yi_def, zi_def,
-        xj_def, yj_def, zj_def,
-        ref_yx, ref_yy, ref_yz,
-        elem.roll_angle, left_hand,
+    // Corotated local axes: chord, and the twist carried by the end nodes.
+    let (ex_n, ey_n, ez_n) = corotated_axes_3d(
+        [dx_n / l_n, dy_n / l_n, dz_n / l_n], (&ex_0, &ey_0, &ez_0),
+        [u_elem[3], u_elem[4], u_elem[5]], [u_elem[9], u_elem[10], u_elem[11]],
     );
 
     // Rigid body rotation: R_rigid = R_n * R_0^T
@@ -1610,10 +1804,8 @@ fn assemble_frame_corotational_3d(
         }
     }
 
-    // Extract rigid body rotation angles (small angle: β ≈ axial of skew(R_rigid - I))
-    let beta_x = (r_rigid[2][1] - r_rigid[1][2]) / 2.0;
-    let beta_y = (r_rigid[0][2] - r_rigid[2][0]) / 2.0;
-    let beta_z = (r_rigid[1][0] - r_rigid[0][1]) / 2.0;
+    // Rigid-body rotation vector of the chord frame (exact, see `rotation_vector`).
+    let [beta_x, beta_y, beta_z] = rotation_vector(&r_rigid);
 
     // Project global rotations to corotated frame and subtract rigid body rotation
     let theta_i_global = [u_elem[3], u_elem[4], u_elem[5]];
@@ -1631,9 +1823,16 @@ fn assemble_frame_corotational_3d(
 
     let theta_i_local = project(&theta_i_global);
     let theta_j_local = project(&theta_j_global);
+    // β is the axial vector of R_n·R_0ᵀ, a rotation in GLOBAL axes: it has to
+    // be taken to the corotated frame before it is subtracted from the
+    // (projected) nodal rotations. Subtracted as it was, it was right only
+    // where the member's local axes happen to coincide with the global ones
+    // (a member along +X); a column (local y = −Y) converged to itself folded
+    // in half, u_z = −2L, and reported convergence.
+    let [beta_x, beta_y, beta_z] = project(&[beta_x, beta_y, beta_z]);
 
     // Natural deformations (rigid body removed)
-    let d_axial = l_n - l0;
+    let d_axial = elong;
     let d_nat = [
         0.0, 0.0, 0.0,                                                          // u_i, v_i, w_i
         theta_i_local[0] - beta_x, theta_i_local[1] - beta_y, theta_i_local[2] - beta_z, // θx_i, θy_i, θz_i
@@ -1654,6 +1853,12 @@ fn assemble_frame_corotational_3d(
             f_local[i] += k_local[i * 12 + jj] * d_nat[jj];
         }
     }
+    current_length_shears(&mut f_local, l0, l_n);
+
+    // Wagner torque (see `add_wagner_torque`); the tangent below carries the same term.
+    let kg_sec = wagner_section(a, iy, iz);
+    let axial_p = -f_local[0]; // Tension positive
+    add_wagner_torque(&mut f_local, &d_nat, elem, &kg_sec, l_n);
 
     // Corotated transformation matrix
     let t_n = frame_transform_3d(&ex_n, &ey_n, &ez_n);
@@ -1679,9 +1884,10 @@ fn assemble_frame_corotational_3d(
     // Tangent stiffness: T_n^T * K_local * T_n
     let k_glob = transform_stiffness(&k_local, &t_n, 12);
 
-    // Geometric stiffness (Przemieniecki formula)
-    let axial_p = -f_local[0]; // Tension positive
-    let k_geo_local = frame_geo_stiffness_3d_local(axial_p, l_n);
+    // Geometric stiffness (Przemieniecki formula, plus the Wagner term above)
+    // Condensed for the end releases: a released end rotation belongs to no
+    // one, and the uncondensed matrix put −4·P·L/30 on it.
+    let k_geo_local = super::geometric_stiffness::frame_kg_local_3d(axial_p, l_n, &Hinge3D::from_elem(elem), &kg_sec);
     let k_geo_global = transform_stiffness(&k_geo_local, &t_n, 12);
 
     // Scatter to global
@@ -1701,50 +1907,114 @@ fn assemble_frame_corotational_3d(
     }
 }
 
-/// Przemieniecki geometric stiffness for a 3D frame element in local coordinates.
+/// Elongation L − L0 of a chord `d0` displaced by `du` (end j minus end i),
+/// with `l_n` = |d0 + du|, computed without the cancellation of L − L0.
 ///
-/// Local DOF order: [u, v, w, θx, θy, θz] per node (12 total).
-/// P > 0 = tension.
-fn frame_geo_stiffness_3d_local(p: f64, l: f64) -> Vec<f64> {
-    let mut kg = vec![0.0; 144];
-    if l < 1e-15 || p.abs() < 1e-20 {
-        return kg;
-    }
-    let coeff = p / (30.0 * l);
-
-    // Y-bending plane: DOFs 1(v_i), 5(θz_i), 7(v_j), 11(θz_j)
-    let y_dofs = [1, 5, 7, 11];
-    let l2 = l * l;
-    #[rustfmt::skip]
-    let y_vals: [[f64; 4]; 4] = [
-        [ 36.0,    3.0*l,  -36.0,    3.0*l ],
-        [  3.0*l,  4.0*l2,  -3.0*l, -l2    ],
-        [-36.0,   -3.0*l,   36.0,   -3.0*l ],
-        [  3.0*l, -l2,      -3.0*l,  4.0*l2],
-    ];
-
-    // Z-bending plane: DOFs 2(w_i), 4(θy_i), 8(w_j), 10(θy_j)
-    let z_dofs = [2, 4, 8, 10];
-    #[rustfmt::skip]
-    let z_vals: [[f64; 4]; 4] = [
-        [ 36.0,   -3.0*l,  -36.0,   -3.0*l ],
-        [ -3.0*l,  4.0*l2,   3.0*l, -l2     ],
-        [-36.0,    3.0*l,   36.0,    3.0*l  ],
-        [ -3.0*l, -l2,       3.0*l,  4.0*l2 ],
-    ];
-
-    for i in 0..4 {
-        for jj in 0..4 {
-            kg[y_dofs[i] * 12 + y_dofs[jj]] += coeff * y_vals[i][jj];
-            kg[z_dofs[i] * 12 + z_dofs[jj]] += coeff * z_vals[i][jj];
-        }
-    }
-
-    kg
+/// Taken as the difference of two lengths, the elongation carried a rounding
+/// error of order ε·L0, so the axial force a residual of order ε·EA: under a
+/// small load (a 0.001 kN tip load on a 3 m cantilever) Newton could never
+/// reach the tolerance, and once an unconverged solve stopped returning its
+/// last iterate the answer was gone. (2·d0·du + du·du)/(L + L0) is exact.
+pub(crate) fn elongation(d0: &[f64], du: &[f64], l0: f64, l_n: f64) -> f64 {
+    let num: f64 = d0.iter().zip(du).map(|(a, b)| (2.0 * a + b) * b).sum();
+    let den = l_n + l0;
+    if den > 0.0 { num / den } else { 0.0 }
 }
 
-/// Add spring stiffness and internal forces from springs (3D).
-/// `scatter` receives the diagonal stiffness entries (see the 2D twin).
+/// Rotate `v` by the rotation vector `theta` (Rodrigues).
+fn rotate_by(theta: [f64; 3], v: &[f64; 3]) -> [f64; 3] {
+    let t = (theta[0] * theta[0] + theta[1] * theta[1] + theta[2] * theta[2]).sqrt();
+    if t < 1e-300 {
+        return *v;
+    }
+    let k = [theta[0] / t, theta[1] / t, theta[2] / t];
+    let (c, s) = (t.cos(), t.sin());
+    let kv = k[0] * v[0] + k[1] * v[1] + k[2] * v[2];
+    let kxv = [k[1] * v[2] - k[2] * v[1], k[2] * v[0] - k[0] * v[2], k[0] * v[1] - k[1] * v[0]];
+    [0, 1, 2].map(|m| v[m] * c + kxv[m] * s + k[m] * kv * (1.0 - c))
+}
+
+/// The corotated frame of a 3D member: the initial frame turned by the mean
+/// of the two end rotations, then by the smallest rotation that takes its x
+/// axis onto the deformed chord `ex_n`.
+///
+/// The frame used to be rebuilt from the deformed chord and the initial
+/// reference vector alone. That is right only while the member bends in a
+/// plane containing or normal to the reference; otherwise the rebuilt frame
+/// twists about the chord by an amount of the order of the square of the
+/// rigid rotation, and the twist was read as torsion. A portal frame standing
+/// in a vertical plane at 53° to X, loaded in its plane, moved out of it.
+/// For rotations about one axis (any planar frame) this frame is exact.
+fn corotated_axes_3d(
+    ex_n: [f64; 3],
+    (ex_0, ey_0, ez_0): (&[f64; 3], &[f64; 3], &[f64; 3]),
+    theta_i: [f64; 3],
+    theta_j: [f64; 3],
+) -> ([f64; 3], [f64; 3], [f64; 3]) {
+    let mean = [0, 1, 2].map(|m| 0.5 * (theta_i[m] + theta_j[m]));
+    let e1 = rotate_by(mean, ex_0);
+    let e2 = rotate_by(mean, ey_0);
+    let e3 = rotate_by(mean, ez_0);
+    // Smallest rotation taking e1 onto ex_n.
+    let k = [e1[1] * ex_n[2] - e1[2] * ex_n[1], e1[2] * ex_n[0] - e1[0] * ex_n[2], e1[0] * ex_n[1] - e1[1] * ex_n[0]];
+    let sin = (k[0] * k[0] + k[1] * k[1] + k[2] * k[2]).sqrt();
+    let cos = e1[0] * ex_n[0] + e1[1] * ex_n[1] + e1[2] * ex_n[2];
+    let angle = sin.atan2(cos);
+    let phi = if sin > 1e-300 { [0, 1, 2].map(|m| k[m] / sin * angle) } else { [0.0; 3] };
+    (ex_n, rotate_by(phi, &e2), rotate_by(phi, &e3))
+}
+
+/// End shears in equilibrium with the end moments on the CURRENT chord.
+///
+/// With only rotations and the elongation in `d_nat`, every row of K·d gives
+/// shears V = (M_i + M_j)/L0, for any release or shear area. The member's end
+/// forces have to balance on the deformed chord, L_n: the 2D element does this
+/// through its B matrix, the 3D one did not, and left an out-of-balance of the
+/// order of the axial strain in every member.
+fn current_length_shears(f_local: &mut [f64; 12], l0: f64, l_n: f64) {
+    let r = l0 / l_n;
+    for k in [1, 2, 7, 8] {
+        f_local[k] *= r;
+    }
+}
+
+/// Rotation vector (axis × angle) of a rotation matrix: the logarithmic map.
+///
+/// The rigid rotation of a member's chord frame used to be taken as the axial
+/// vector of the skew part of R, which is sin(θ)·axis, not θ·axis: 1% short at
+/// 0.25 rad and 36% at 90°. The natural end rotations, nodal rotation minus
+/// rigid rotation, then carried the difference as spurious bending. A portal
+/// whose beam is pinned at both ends, swaying 0.5 m on a 3 m column, settled
+/// 1.5% further than the same frame in the 2D solver (which uses atan2), and
+/// at twice the load did not converge at all.
+fn rotation_vector(r: &[[f64; 3]; 3]) -> [f64; 3] {
+    let skew = [
+        (r[2][1] - r[1][2]) / 2.0,
+        (r[0][2] - r[2][0]) / 2.0,
+        (r[1][0] - r[0][1]) / 2.0,
+    ];
+    let sin = (skew[0] * skew[0] + skew[1] * skew[1] + skew[2] * skew[2]).sqrt();
+    let cos = ((r[0][0] + r[1][1] + r[2][2] - 1.0) / 2.0).clamp(-1.0, 1.0);
+    let angle = sin.atan2(cos);
+    if sin < 1e-12 {
+        if cos > 0.0 {
+            return skew; // identity: θ ≈ skew to machine precision
+        }
+        // θ = π: R = 2·a·aᵀ − I, the axis from the largest diagonal.
+        let k = (0..3).max_by(|&a, &b| r[a][a].partial_cmp(&r[b][b]).unwrap()).unwrap();
+        let ak = ((r[k][k] + 1.0) / 2.0).max(0.0).sqrt();
+        let mut axis = [0.0; 3];
+        for m in 0..3 {
+            axis[m] = if m == k { ak } else { (r[k][m] + r[m][k]) / (4.0 * ak) };
+        }
+        return [axis[0] * angle, axis[1] * angle, axis[2] * angle];
+    }
+    let f = angle / sin;
+    [skew[0] * f, skew[1] * f, skew[2] * f]
+}
+
+/// Add spring and connector stiffness and internal forces (3D); `scatter`
+/// receives every entry, off-diagonal ones included (see the 2D twin).
 fn add_spring_contributions_3d(
     input: &SolverInput3D,
     dof_num: &DofNumbering,
@@ -1752,7 +2022,7 @@ fn add_spring_contributions_3d(
     f_int: &mut [f64],
     scatter: &mut impl FnMut(usize, usize, f64),
 ) {
-    for sup in input.supports.values() {
+    for sup in crate::ordered::values(&input.supports) {
         let springs: [(usize, Option<f64>); 6] = [
             (0, sup.kx), (1, sup.ky), (2, sup.kz),
             (3, sup.krx), (4, sup.kry), (5, sup.krz),
@@ -1768,6 +2038,7 @@ fn add_spring_contributions_3d(
             }
         }
     }
+    crate::element::connector::corotational_connectors_3d(input, dof_num, u_full, f_int, scatter);
 }
 
 /// Maximum translational displacement magnitude for 3D.
@@ -1868,7 +2139,7 @@ fn build_final_results_3d(
             }
         }
         let raw = fcs.compute_constraint_forces(&k_ff, &u_full[..nf], &asm.f[..nf]);
-        super::constraints::map_dof_forces_to_constraint_forces(&raw, dof_num)
+        fcs.constraint_forces(&raw, dof_num)
     } else {
         vec![]
     };
@@ -1894,7 +2165,74 @@ fn build_final_results_3d(
 }
 
 /// Compute element internal forces using co-rotational natural deformations (3D).
+/// Member end forces of the deformed state (3D): the co-rotational elastic
+/// forces K·d_nat plus the fixed-end forces of the member loads, with the
+/// load data the diagrams draw from.
+///
+/// The member loads were left out: a fixed-ended beam under a uniform load
+/// reported end moments qL²/12 short and end shears qL/2 short, with no load
+/// on the diagram, while the displacements were right. The fixed-end part is
+/// the linear solver's own, at zero displacement.
 fn compute_corotational_forces_3d(
+    input: &SolverInput3D,
+    dof_num: &DofNumbering,
+    u_full: &[f64],
+    left_hand: bool,
+) -> Vec<ElementForces3D> {
+    let zero = vec![0.0; dof_num.n_total];
+    let fixed_end: std::collections::HashMap<usize, ElementForces3D> =
+        super::linear::compute_internal_forces_3d(input, dof_num, &zero)
+            .into_iter()
+            .map(|f| (f.element_id, f))
+            .collect();
+    elastic_corotational_forces_3d(input, dof_num, u_full, left_hand)
+        .into_iter()
+        .map(|el| match fixed_end.get(&el.element_id) {
+            Some(fe) => ElementForces3D {
+                length: el.length,
+                n_start: fe.n_start + el.n_start, n_end: fe.n_end + el.n_end,
+                vy_start: fe.vy_start + el.vy_start, vy_end: fe.vy_end + el.vy_end,
+                vz_start: fe.vz_start + el.vz_start, vz_end: fe.vz_end + el.vz_end,
+                mx_start: fe.mx_start + el.mx_start, mx_end: fe.mx_end + el.mx_end,
+                my_start: fe.my_start + el.my_start, my_end: fe.my_end + el.my_end,
+                mz_start: fe.mz_start + el.mz_start, mz_end: fe.mz_end + el.mz_end,
+                ..fe.clone()
+            },
+            None => el,
+        })
+        .collect()
+}
+
+/// The section data of the co-rotational Wagner term: doubly symmetric,
+/// r0² = (Iy + Iz)/A (shear-centre offsets are refused by `solve_corotational_3d`).
+fn wagner_section(a: f64, iy: f64, iz: f64) -> super::geometric_stiffness::KgSection {
+    super::geometric_stiffness::KgSection { r0_sq: if a > 0.0 { (iy + iz) / a } else { 0.0 }, y0: 0.0, z0: 0.0 }
+}
+
+/// Adds the Wagner torque P·r0²·θ' to the local end forces `f_local` (12, local axes,
+/// the axial force read from f_local[0] = −N): the axial stress on fibres helixed by
+/// the twist, which makes a compressed member lose torsional stiffness. Applied in the
+/// residual (`assemble_frame_corotational_3d`) and in the force recovery
+/// (`elastic_corotational_forces_3d`) alike, so the reported torques are the ones in
+/// equilibrium. A torsion release removes it, as it removes GJ.
+fn add_wagner_torque(
+    f_local: &mut [f64; 12],
+    d_nat: &[f64; 12],
+    elem: &SolverElement3D,
+    sec: &super::geometric_stiffness::KgSection,
+    l_n: f64,
+) {
+    if elem.release_t_start || elem.release_t_end {
+        return;
+    }
+    let axial_p = -f_local[0]; // Tension positive
+    let tw = axial_p * sec.r0_sq / l_n * (d_nat[9] - d_nat[3]);
+    f_local[3] -= tw;
+    f_local[9] += tw;
+}
+
+/// The co-rotational elastic part of the member end forces, K·d_nat (3D).
+fn elastic_corotational_forces_3d(
     input: &SolverInput3D,
     dof_num: &DofNumbering,
     u_full: &[f64],
@@ -1903,13 +2241,13 @@ fn compute_corotational_forces_3d(
     let mut forces = Vec::new();
 
     let node_by_id: std::collections::HashMap<usize, &SolverNode3D> =
-        input.nodes.values().map(|n| (n.id, n)).collect();
+        crate::ordered::values(&input.nodes).map(|n| (n.id, n)).collect();
     let mat_by_id: std::collections::HashMap<usize, &SolverMaterial> =
-        input.materials.values().map(|m| (m.id, m)).collect();
+        crate::ordered::values(&input.materials).map(|m| (m.id, m)).collect();
     let sec_by_id: std::collections::HashMap<usize, &SolverSection3D> =
-        input.sections.values().map(|s| (s.id, s)).collect();
+        crate::ordered::values(&input.sections).map(|s| (s.id, s)).collect();
 
-    for elem in input.elements.values() {
+    for elem in crate::ordered::values(&input.elements) {
         let node_i = node_by_id[&elem.node_i];
         let node_j = node_by_id[&elem.node_j];
         let mat = mat_by_id[&elem.material_id];
@@ -1935,7 +2273,8 @@ fn compute_corotational_forces_3d(
             let dy_n = dy0 + uj[1] - ui[1];
             let dz_n = dz0 + uj[2] - ui[2];
             let l_n = (dx_n * dx_n + dy_n * dy_n + dz_n * dz_n).sqrt();
-            let n_axial = e * sec.a / l0 * (l_n - l0);
+            let elong = elongation(&[dx0, dy0, dz0], &[uj[0] - ui[0], uj[1] - ui[1], uj[2] - ui[2]], l0, l_n);
+            let n_axial = e * sec.a / l0 * elong;
 
             forces.push(ElementForces3D {
                 element_id: elem.id, length: l_n,
@@ -1975,17 +2314,17 @@ fn compute_corotational_forces_3d(
             elem_dofs.iter().take(12).map(|&d| u_full[d]).collect()
         };
 
-        let xi_def = node_i.x + u_elem_12[0];
-        let yi_def = node_i.y + u_elem_12[1];
-        let zi_def = node_i.z + u_elem_12[2];
-        let xj_def = node_j.x + u_elem_12[6];
-        let yj_def = node_j.y + u_elem_12[7];
-        let zj_def = node_j.z + u_elem_12[8];
-
-        let dx_n = xj_def - xi_def;
-        let dy_n = yj_def - yi_def;
-        let dz_n = zj_def - zi_def;
+        // Current chord from the initial chord plus the relative displacement,
+        // never as a difference of absolute deformed positions: x + u rounds u to
+        // ulp(x), which for a model 400 m from the origin (let alone in survey
+        // coordinates) put a residual floor above the convergence tolerance and
+        // the solve never converged (found by the metamorphic rotation check:
+        // the same building translated 400 m failed).
+        let dx_n = dx0 + (u_elem_12[6] - u_elem_12[0]);
+        let dy_n = dy0 + (u_elem_12[7] - u_elem_12[1]);
+        let dz_n = dz0 + (u_elem_12[8] - u_elem_12[2]);
         let l_n = (dx_n * dx_n + dy_n * dy_n + dz_n * dz_n).sqrt();
+        let elong = elongation(&[dx0, dy0, dz0], &[u_elem_12[6] - u_elem_12[0], u_elem_12[7] - u_elem_12[1], u_elem_12[8] - u_elem_12[2]], l0, l_n);
 
         if l_n < 1e-15 {
             continue;
@@ -2001,11 +2340,9 @@ fn compute_corotational_forces_3d(
             ref_yx, ref_yy, ref_yz,
             elem.roll_angle, left_hand,
         );
-        let (ex_n, ey_n, ez_n) = compute_local_axes_3d(
-            xi_def, yi_def, zi_def,
-            xj_def, yj_def, zj_def,
-            ref_yx, ref_yy, ref_yz,
-            elem.roll_angle, left_hand,
+        let (ex_n, ey_n, ez_n) = corotated_axes_3d(
+            [dx_n / l_n, dy_n / l_n, dz_n / l_n], (&ex_0, &ey_0, &ez_0),
+            [u_elem_12[3], u_elem_12[4], u_elem_12[5]], [u_elem_12[9], u_elem_12[10], u_elem_12[11]],
         );
 
         // Rigid body rotation
@@ -2019,9 +2356,7 @@ fn compute_corotational_forces_3d(
                 }
             }
         }
-        let beta_x = (r_rigid[2][1] - r_rigid[1][2]) / 2.0;
-        let beta_y = (r_rigid[0][2] - r_rigid[2][0]) / 2.0;
-        let beta_z = (r_rigid[1][0] - r_rigid[0][1]) / 2.0;
+        let [beta_x, beta_y, beta_z] = rotation_vector(&r_rigid);
 
         let project = |v: &[f64; 3]| -> [f64; 3] {
             [
@@ -2035,8 +2370,10 @@ fn compute_corotational_forces_3d(
         let theta_j = [u_elem_12[9], u_elem_12[10], u_elem_12[11]];
         let ti = project(&theta_i);
         let tj = project(&theta_j);
+        // β to the corotated frame, as in `assemble_frame_corotational_3d`.
+        let [beta_x, beta_y, beta_z] = project(&[beta_x, beta_y, beta_z]);
 
-        let d_axial = l_n - l0;
+        let d_axial = elong;
         let d_nat = [
             0.0, 0.0, 0.0,
             ti[0] - beta_x, ti[1] - beta_y, ti[2] - beta_z,
@@ -2065,6 +2402,10 @@ fn compute_corotational_forces_3d(
                 f_local[i] += k_local[i * 12 + jj] * d_nat[jj];
             }
         }
+        current_length_shears(&mut f_local, l0, l_n);
+        // The same Wagner torque the residual carries, so the reported member
+        // torques balance the applied torques and the reactions.
+        add_wagner_torque(&mut f_local, &d_nat, elem, &wagner_section(sec.a, sec.iy, sec.iz), l_n);
 
         // Sign convention: match linear solver output
         forces.push(ElementForces3D {
@@ -2147,7 +2488,7 @@ mod tests {
             }),
         ];
 
-        SolverInput { solver_options: None, nodes, materials, sections, elements, supports, loads, constraints: vec![] , connectors: HashMap::new() }
+        SolverInput { solver_options: None, masses: Default::default(), nodes, materials, sections, elements, supports, loads, constraints: vec![] , connectors: HashMap::new() }
     }
 
     #[test]
@@ -2243,7 +2584,7 @@ mod tests {
             }),
         ];
 
-        let input = SolverInput { solver_options: None, nodes, materials, sections, elements, supports, loads, constraints: vec![] , connectors: HashMap::new() };
+        let input = SolverInput { solver_options: None, masses: Default::default(), nodes, materials, sections, elements, supports, loads, constraints: vec![] , connectors: HashMap::new() };
         let corot = solve_corotational_2d(&input, 50, 1e-8, 1, false).unwrap();
 
         assert!(corot.converged);
@@ -2292,7 +2633,7 @@ mod tests {
         });
 
         let input = SolverInput {
-            solver_options: None,
+            solver_options: None, masses: Default::default(),
             nodes, materials, sections, elements, supports,
             loads: vec![],
             constraints: vec![],
@@ -2346,7 +2687,7 @@ mod tests {
             }),
         ];
 
-        let input = SolverInput { solver_options: None, nodes, materials, sections, elements, supports, loads, constraints: vec![] , connectors: HashMap::new() };
+        let input = SolverInput { solver_options: None, masses: Default::default(), nodes, materials, sections, elements, supports, loads, constraints: vec![] , connectors: HashMap::new() };
         let corot = solve_corotational_2d(&input, 100, 1e-6, 5, false).unwrap();
         assert!(corot.converged, "Two-element frame should converge");
         assert_eq!(corot.results.element_forces.len(), 2);
@@ -2389,7 +2730,7 @@ mod tests {
             }),
         ];
 
-        let input = SolverInput { nodes, materials, sections, elements, supports, loads, constraints: vec![] , connectors: HashMap::new(), solver_options: None };
+        let input = SolverInput { nodes, materials, sections, elements, supports, loads, constraints: vec![] , connectors: HashMap::new(), solver_options: None, masses: Default::default() };
         let corot = solve_corotational_2d(&input, 50, 1e-8, 1, false).unwrap();
         assert!(corot.converged);
 

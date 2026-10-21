@@ -1,5 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
+  import { engineStatus } from '../../lib/store/engine-status.svelte';
+  import { isWasmReady } from '../../lib/engine/wasm-solver';
   import { proNav } from '../../lib/store/pro-nav.svelte';
   import { modelStore, uiStore } from '../../lib/store';
   import { t, tp } from '../../lib/i18n';
@@ -44,7 +46,6 @@
   import { roofGeometry } from '../../lib/engine/loads/snow-loads';
   import { regulationsStore } from '../../lib/store/regulations.svelte';
   import { allOptionsForRole, bindingLabel, optionIsAvailable, optionLabel } from '../../lib/codes/roles';
-  import { messageIdentity } from '../../lib/codes/message';
   /*
    * Seismic comes from INPRES-CIRSOC 103 Parte I (2018) now.
    *
@@ -164,7 +165,12 @@
   let seismicDirectionZ = $state(start.seismicDirectionZ);
 
   /** The spectrum, live, so the panel can show what the zone and site imply. */
-  const spectrumPreview = $derived(designSpectrum({ zone: seismicZone, site: siteClass }));
+  const spectrumPreview = $derived(
+    // The spectrum is the engine's: until it is loaded the code spectrum is refused, by name.
+    (engineStatus.ready || isWasmReady())
+      ? designSpectrum({ zone: seismicZone, site: siteClass })
+      : { blocked: { key: 'engine.unavailable' }, refs: [] },
+  );
   const behaviourEntry = $derived(findBehaviour(systemKey));
   const effectiveR = $derived(elasticDesign ? R_ELASTIC : behaviourEntry?.r ?? null);
 
@@ -709,7 +715,7 @@
                   <div class="al-error" data-testid="al-case-warnings" role="alert">
                     <strong>{t('autoLoad.caseWarnings')}</strong>
                     <ul class="al-list">
-                      {#each delta.warnings as w (messageIdentity(w))}<li>{te(w)}</li>{/each}
+                      {#each identifyMessages(delta.warnings) as w (w.id)}<li>{te(w.message)}</li>{/each}
                     </ul>
                   </div>
                 {/if}
@@ -764,13 +770,13 @@
               {#if plan.assumptions.length > 0}
                 <div class="al-warn" data-testid="al-assumptions">
                   <strong>{t('autoLoad.assumptions')}</strong>
-                  <ul class="al-list">{#each plan.assumptions as a (messageIdentity(a))}<li>{te(a)}</li>{/each}</ul>
+                  <ul class="al-list">{#each identifyMessages(plan.assumptions) as a (a.id)}<li>{te(a.message)}</li>{/each}</ul>
                 </div>
               {/if}
               {#if plan.unsupportedKeys.length > 0}
                 <div class="al-warn" data-testid="al-unsupported">
                   <strong>{t('autoLoad.notCovered')}</strong>
-                  <ul class="al-list">{#each plan.unsupportedKeys as u (messageIdentity(u))}<li>{te(u)}</li>{/each}</ul>
+                  <ul class="al-list">{#each identifyMessages(plan.unsupportedKeys) as u (u.id)}<li>{te(u.message)}</li>{/each}</ul>
                 </div>
               {/if}
               <details data-testid="al-derivation">

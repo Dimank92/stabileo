@@ -9,6 +9,7 @@
   import LandingProCalc from './landing/LandingProCalc.svelte';
   import LandingProDesign from './landing/LandingProDesign.svelte';
   import LandingAi from './landing/LandingAi.svelte';
+  import LandingVerification from './landing/LandingVerification.svelte';
   import LandingEducation from './landing/LandingEducation.svelte';
   import LandingBlog from './landing/LandingBlog.svelte';
   import LandingFooter from './landing/LandingFooter.svelte';
@@ -95,6 +96,8 @@
     for (const el of landingEl.querySelectorAll('.reveal')) observer.observe(el);
 
     const onMessage = (e: MessageEvent) => {
+      // Same origin only: any page that frames or opened this one can post to it.
+      if (e.origin !== window.location.origin) return;
       if (e.data === 'stabileo-enter-app') enterApp();
     };
     window.addEventListener('message', onMessage);
@@ -160,6 +163,7 @@
   <LandingProCalc />
   <LandingProDesign />
   <LandingAi />
+  <LandingVerification />
   <LandingEducation />
   <LandingPricing />
   <LandingBlog />

@@ -18,11 +18,113 @@ pub struct AssemblyResult {
     pub diagnostics: Vec<crate::types::AssemblyDiagnostic>, // Element quality warnings
 }
 
+/// The artificial stiffness the linear assembler put on DOFs nothing else
+/// holds (the rotation of a node that only trusses, or only members hinged
+/// there, reach), as (DOF, stiffness) pairs for the nonlinear solvers.
+///
+/// Their tangents are assembled from the members alone and had none: the
+/// rotation of a truss-only node in a frame left the tangent singular, so
+/// co-rotational, arc-length, displacement-control, material- and
+/// fiber-nonlinear analyses refused a model the linear solver answers.
+pub fn artificial_stiffness_entries(asm: &AssemblyResult) -> Vec<(usize, f64)> {
+    let k = if asm.max_diag_k > 0.0 { asm.max_diag_k * 1e-10 } else { 1e-6 };
+    asm.artificial_dofs.iter().map(|&d| (d, k)).collect()
+}
+
+/// Free rotation DOFs (θx, θy, θz) that no element, spring or connector
+/// stiffens: the rotations of a node reached only by solid shells (whose
+/// nodes carry translations alone), trusses, or members released there.
+///
+/// K is a sum of positive semi-definite contributions, so a zero diagonal
+/// means a zero row and column: the DOF is decoupled from the rest of the
+/// model and its stiffness does not change any other DOF's answer. Each gets
+/// the same artificial stiffness the warping DOFs and the 2D orphan guard
+/// get, instead of leaving K singular (a solid-shell model meshed together
+/// with frames or shells was refused as "a mechanism" on every path). A load
+/// on such a DOF would be lost; `validate_loads_3d` and the linear solver
+/// refuse that.
+///
+/// Nodes a constraint references are left out: there a rotation without
+/// element stiffness may be tied to another node's (an eccentric arm, an
+/// EqualDOF), and once the constraint is imposed an artificial spring on it
+/// would become a real spring to ground on the structure. If such a tied
+/// rotation has no stiffness anywhere the model stays singular and is refused.
+pub(crate) fn orphan_rotation_dofs_3d(input: &SolverInput3D, dof_num: &DofNumbering, diag: impl Fn(usize) -> f64, max_diag: f64) -> Vec<usize> {
+    let mut out = Vec::new();
+    if dof_num.dofs_per_node < 6 {
+        return out;
+    }
+    let mut tied: std::collections::HashSet<usize> = std::collections::HashSet::new();
+    for c in &input.constraints {
+        match c {
+            Constraint::RigidLink(r) => { tied.insert(r.master_node); tied.insert(r.slave_node); }
+            Constraint::Diaphragm(d) => { tied.insert(d.master_node); tied.extend(d.slave_nodes.iter().copied()); }
+            Constraint::LinearMPC(m) => tied.extend(m.terms.iter().map(|t| t.node_id)),
+            Constraint::EqualDOF(e) => { tied.insert(e.master_node); tied.insert(e.slave_node); }
+            Constraint::EccentricConnection(e) => { tied.insert(e.master_node); tied.insert(e.slave_node); }
+        }
+    }
+    // Relative to the largest ROTATIONAL diagonal (same units, F·L): against
+    // the overall maximum — a translational stiffness, F/L — a real but
+    // small rotational stiffness fell under the threshold in a model in
+    // millimetres with one stiff member, was taken for an orphan and locked
+    // by the artificial spring (found by the metamorphic unit-scaling check).
+    // K is positive semi-definite, so a zero diagonal means a zero row.
+    let max_rot = dof_num
+        .node_order
+        .iter()
+        .flat_map(|&nid| (3..6).filter_map(move |l| dof_num.map.get(&(nid, l)).copied()))
+        .fold(0.0f64, |m, d| m.max(diag(d).abs()));
+    let _ = max_diag;
+    let tol = if max_rot > 0.0 { max_rot * 1e-12 } else { 1e-14 };
+    for &node_id in &dof_num.node_order {
+        if tied.contains(&node_id) {
+            continue;
+        }
+        for local in 3..6 {
+            if let Some(&d) = dof_num.map.get(&(node_id, local)) {
+                if d < dof_num.n_free && diag(d).abs() <= tol {
+                    out.push(d);
+                }
+            }
+        }
+    }
+    out
+}
+
 /// Data needed to reverse the inclined support rotation after solving (3D).
 pub struct InclinedTransformData {
     pub node_id: usize,
     pub dofs: [usize; 3],        // Global DOF indices for ux, uy, uz
     pub r: [[f64; 3]; 3],        // Rotation matrix (rows = local axes)
+}
+
+/// 2D nodes whose rotation a constraint ties to other DOFs. An artificial
+/// rotational spring on such a node is not inert: once the constraint is
+/// imposed it becomes a real spring on the structure (a rigid-link mechanism
+/// was held by it, so whether it counted as a mechanism depended on the
+/// units — found by the metamorphic checks). The 3D assembler already leaves
+/// constraint nodes out (`orphan_rotation_dofs_3d`).
+pub(crate) fn rotation_tied_nodes_2d(input: &SolverInput) -> std::collections::HashSet<usize> {
+    let mut tied = std::collections::HashSet::new();
+    for c in &input.constraints {
+        match c {
+            Constraint::RigidLink(r) => {
+                tied.insert(r.master_node);
+                if r.dofs.contains(&2) { tied.insert(r.slave_node); }
+            }
+            Constraint::Diaphragm(d) => { tied.insert(d.master_node); }
+            Constraint::EqualDOF(e) => {
+                if e.dofs.contains(&2) { tied.extend([e.master_node, e.slave_node]); }
+            }
+            Constraint::EccentricConnection(e) => {
+                tied.insert(e.master_node);
+                if !e.releases.get(2).copied().unwrap_or(false) { tied.insert(e.slave_node); }
+            }
+            Constraint::LinearMPC(m) => tied.extend(m.terms.iter().filter(|t| t.dof == 2).map(|t| t.node_id)),
+        }
+    }
+    tied
 }
 
 /// Data needed to reverse the 2D inclined support rotation after solving.
@@ -239,14 +341,14 @@ pub fn assemble_stiffness_2d(input: &SolverInput, dof_num: &DofNumbering) -> Sti
 
     // Pre-build O(1) lookup maps
     let node_map: std::collections::HashMap<usize, &SolverNode> =
-        input.nodes.values().map(|n| (n.id, n)).collect();
+        crate::ordered::values(&input.nodes).map(|n| (n.id, n)).collect();
     let mat_map: std::collections::HashMap<usize, &SolverMaterial> =
-        input.materials.values().map(|m| (m.id, m)).collect();
+        crate::ordered::values(&input.materials).map(|m| (m.id, m)).collect();
     let sec_map: std::collections::HashMap<usize, &SolverSection> =
-        input.sections.values().map(|s| (s.id, s)).collect();
+        crate::ordered::values(&input.sections).map(|s| (s.id, s)).collect();
 
     // Assemble element stiffness matrices
-    for elem in input.elements.values() {
+    for elem in crate::ordered::values(&input.elements) {
         let node_i = node_map[&elem.node_i];
         let node_j = node_map[&elem.node_j];
         let mat = mat_map[&elem.material_id];
@@ -301,13 +403,11 @@ pub fn assemble_stiffness_2d(input: &SolverInput, dof_num: &DofNumbering) -> Sti
 
     // Assemble connector elements
     if !input.connectors.is_empty() {
-        crate::element::connector::assemble_connectors_2d(
-            &input.connectors, &input.nodes, dof_num, &mut k_global, n,
-        );
+        crate::element::connector::assemble_connectors_2d(input, dof_num, &mut k_global, n);
     }
 
     // Add spring stiffness (with rotation support for springs with angle)
-    for sup in input.supports.values() {
+    for sup in crate::ordered::values(&input.supports) {
         let kx_val = sup.kx.unwrap_or(0.0);
         let ky_val = sup.ky.unwrap_or(0.0);  // ky maps to vertical (uz) in 2D
         let kz_val = sup.kz.unwrap_or(0.0);  // rotational spring
@@ -392,7 +492,7 @@ pub fn assemble_stiffness_2d(input: &SolverInput, dof_num: &DofNumbering) -> Sti
 
         let mut node_hinge_count: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
         let mut node_frame_count: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
-        for elem in input.elements.values() {
+        for elem in crate::ordered::values(&input.elements) {
             if elem.elem_type != "frame" { continue; }
             *node_frame_count.entry(elem.node_i).or_insert(0) += 1;
             *node_frame_count.entry(elem.node_j).or_insert(0) += 1;
@@ -406,8 +506,8 @@ pub fn assemble_stiffness_2d(input: &SolverInput, dof_num: &DofNumbering) -> Sti
 
         // Nodes with rotational restraint from supports
         let mut rot_restrained: std::collections::HashSet<usize> = std::collections::HashSet::new();
-        for sup in input.supports.values() {
-            if sup.support_type == "fixed" || sup.support_type == "guidedX" || sup.support_type == "guidedY" {
+        for sup in crate::ordered::values(&input.supports) {
+            if matches!(sup.support_type.as_str(), "fixed" | "guidedX" | "guidedY" | "guidedZ") {
                 rot_restrained.insert(sup.node_id);
             }
             if sup.support_type == "spring" {
@@ -416,8 +516,10 @@ pub fn assemble_stiffness_2d(input: &SolverInput, dof_num: &DofNumbering) -> Sti
                 }
             }
         }
+        let tied = rotation_tied_nodes_2d(input);
+        rot_restrained.extend(tied.iter().copied());
 
-        for (&node_id, &hinges) in &node_hinge_count {
+        for (&node_id, &hinges) in crate::ordered::entries(&node_hinge_count) {
             let frames = *node_frame_count.get(&node_id).unwrap_or(&0);
             if hinges >= frames && frames >= 1 && !rot_restrained.contains(&node_id) {
                 if let Some(&idx) = dof_num.map.get(&(node_id, 2)) {
@@ -436,25 +538,21 @@ pub fn assemble_stiffness_2d(input: &SolverInput, dof_num: &DofNumbering) -> Sti
         // DOFs all-zero) still surfaces as a singular-matrix error.
         let nf = dof_num.n_free;
         let already: std::collections::HashSet<usize> = artificial_dofs.iter().copied().collect();
-        let orphan_tol = if max_diag > 0.0 { max_diag * 1e-12 } else { 1e-14 };
         let mut idx_to_local: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
-        for (&(_, ld), &idx) in &dof_num.map {
-            if idx < nf {
+        for (&(node, ld), &idx) in &dof_num.map {
+            if idx < nf && !tied.contains(&node) {
                 idx_to_local.insert(idx, ld);
             }
         }
+        // Against the largest rotational diagonal (same units), not the
+        // overall maximum: see `orphan_rotation_dofs_3d`. K is positive
+        // semi-definite, so a zero diagonal is a zero row.
+        let max_rot = dof_num.map.iter().filter(|(&(_, ld), _)| ld == 2).fold(0.0f64, |m, (_, &d)| m.max(k_global[d * n + d].abs()));
+        let orphan_tol = if max_rot > 0.0 { max_rot * 1e-12 } else { 1e-14 };
         for i in 0..nf {
             if already.contains(&i) { continue; }
             if idx_to_local.get(&i).copied() != Some(2) { continue; }
-            let mut all_zero = true;
-            for j in 0..n {
-                if k_global[i * n + j].abs() > orphan_tol
-                    || k_global[j * n + i].abs() > orphan_tol
-                {
-                    all_zero = false;
-                    break;
-                }
-            }
+            let all_zero = k_global[i * n + i].abs() <= orphan_tol;
             if all_zero {
                 k_global[i * n + i] += artificial_k;
                 artificial_dofs.push(i);
@@ -465,7 +563,7 @@ pub fn assemble_stiffness_2d(input: &SolverInput, dof_num: &DofNumbering) -> Sti
     // Apply 2D inclined support transformations (stiffness only; the force
     // vector rotation happens in `assemble_load_vector_2d`)
     let mut inclined_transforms_2d = Vec::new();
-    for sup in input.supports.values() {
+    for sup in crate::ordered::values(&input.supports) {
         if sup.support_type == "inclinedRoller" {
             if let Some(theta) = sup.angle {
                 // Only apply transform for non-trivial angles
@@ -499,9 +597,33 @@ pub fn assemble_stiffness_2d(input: &SolverInput, dof_num: &DofNumbering) -> Sti
 }
 
 /// A member load on a 2D truss bar, at its nodes: the bar's simply-supported reactions (lever
-/// rule), statically exact, since a truss carries nothing transverse. One function for the
-/// dense load vector and the sparse assembly's, which kept its own truss branch and still
-/// dropped these loads (the 2D time history reads that one).
+/// rule), statically exact, since a truss carries nothing transverse. Read by
+/// `assemble_load_vector_2d`, which every 2D path (dense and sparse) builds its loads with.
+/// The loads on a 2D truss or cable bar into the global load vector: thermal as its
+/// free-expansion end forces, member loads by the lever rule (`truss_member_load_2d`).
+/// Shared by the linear assembly and staged construction, which used to drop every
+/// member load on a bar.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn assemble_truss_loads_2d(
+    loads: &[&SolverLoad], elem_id: usize, l: f64, cos: f64, sin: f64, e: f64, area: f64,
+    truss_dofs: &[usize; 4], f_global: &mut [f64],
+) {
+    for load in loads {
+        match load {
+            SolverLoad::Thermal(tl) if tl.element_id == elem_id => {
+                // Convention matches fef_thermal_2d: node I gets -fx, node J gets +fx (local axial).
+                let alpha = 12e-6; // Steel default
+                let fx = e * area * alpha * tl.dt_uniform;
+                f_global[truss_dofs[0]] += -fx * cos;
+                f_global[truss_dofs[1]] += -fx * sin;
+                f_global[truss_dofs[2]] += fx * cos;
+                f_global[truss_dofs[3]] += fx * sin;
+            }
+            _ => truss_member_load_2d(load, elem_id, l, cos, sin, truss_dofs, f_global),
+        }
+    }
+}
+
 fn truss_member_load_2d(
     load: &SolverLoad, elem_id: usize, l: f64, cos: f64, sin: f64,
     truss_dofs: &[usize; 4], f_global: &mut [f64],
@@ -549,6 +671,13 @@ fn truss_member_load_2d(
             f_global[truss_dofs[2]] += cos * nj;
             f_global[truss_dofs[3]] += sin * nj;
         }
+        SolverLoad::AxialDistributed(al) if al.element_id == elem_id => {
+            let [ni, nj] = crate::element::axial_distributed_fef(al.q_i, al.q_j, al.a.unwrap_or(0.0), al.b.unwrap_or(l), l);
+            f_global[truss_dofs[0]] += cos * ni;
+            f_global[truss_dofs[1]] += sin * ni;
+            f_global[truss_dofs[2]] += cos * nj;
+            f_global[truss_dofs[3]] += sin * nj;
+        }
         _ => {}
     }
 }
@@ -567,11 +696,11 @@ pub fn assemble_load_vector_2d(
 
     // Pre-build O(1) lookup maps
     let node_map: std::collections::HashMap<usize, &SolverNode> =
-        input.nodes.values().map(|n| (n.id, n)).collect();
+        crate::ordered::values(&input.nodes).map(|n| (n.id, n)).collect();
     let mat_map: std::collections::HashMap<usize, &SolverMaterial> =
-        input.materials.values().map(|m| (m.id, m)).collect();
+        crate::ordered::values(&input.materials).map(|m| (m.id, m)).collect();
     let sec_map: std::collections::HashMap<usize, &SolverSection> =
-        input.sections.values().map(|s| (s.id, s)).collect();
+        crate::ordered::values(&input.sections).map(|s| (s.id, s)).collect();
 
     // Group element-bound loads by element id so each element only scans its own
     // loads instead of the full load list (O(E_loaded × L) → O(L)).
@@ -581,12 +710,13 @@ pub fn assemble_load_vector_2d(
             SolverLoad::Distributed(dl) => { loads_by_elem.entry(dl.element_id).or_default().push(load); }
             SolverLoad::PointOnElement(pl) => { loads_by_elem.entry(pl.element_id).or_default().push(load); }
             SolverLoad::Thermal(tl) => { loads_by_elem.entry(tl.element_id).or_default().push(load); }
+            SolverLoad::AxialDistributed(al) => { loads_by_elem.entry(al.element_id).or_default().push(load); }
             _ => {}
         }
     }
 
     // Assemble element loads (FEF) — same element iteration order as assemble_stiffness_2d
-    for elem in input.elements.values() {
+    for elem in crate::ordered::values(&input.elements) {
         let elem_loads = match loads_by_elem.get(&elem.id) {
             Some(v) => v,
             None => continue,
@@ -614,19 +744,7 @@ pub fn assemble_load_vector_2d(
                 dof_num.global_dof(elem.node_j, 0).unwrap(),
                 dof_num.global_dof(elem.node_j, 1).unwrap(),
             ];
-            for load in elem_loads {
-                match load {
-                    SolverLoad::Thermal(tl) if tl.element_id == elem.id => {
-                        let alpha = 12e-6; // Steel default
-                        let fx = e * sec.a * alpha * tl.dt_uniform;
-                        f_global[truss_dofs[0]] += -fx * cos;  // node I, x
-                        f_global[truss_dofs[1]] += -fx * sin;  // node I, z
-                        f_global[truss_dofs[2]] +=  fx * cos;  // node J, x
-                        f_global[truss_dofs[3]] +=  fx * sin;  // node J, z
-                    }
-                    _ => truss_member_load_2d(load, elem.id, l, cos, sin, &truss_dofs, &mut f_global),
-                }
-            }
+            assemble_truss_loads_2d(elem_loads, elem.id, l, cos, sin, e, sec.a, &truss_dofs, &mut f_global);
         } else {
             let t = frame_transform_2d(cos, sin);
             let elem_dofs = dof_num.element_dofs(elem.node_i, elem.node_j);
@@ -704,10 +822,10 @@ pub fn assemble_element_loads_2d(
                 let is_full = (a.abs() < 1e-12) && ((b - l).abs() < 1e-12);
 
                 let mut fef = if is_full {
-                    let f = fef_distributed_2d(dl.q_i, dl.q_j, l);
+                    let f = fef_distributed_2d(dl.q_i, dl.q_j, l, phi);
                     f
                 } else {
-                    fef_partial_distributed_2d(dl.q_i, dl.q_j, a, b, l)
+                    fef_partial_distributed_2d(dl.q_i, dl.q_j, a, b, l, phi)
                 };
 
                 // Adjust for hinges
@@ -722,7 +840,7 @@ pub fn assemble_element_loads_2d(
             SolverLoad::PointOnElement(pl) if pl.element_id == elem.id => {
                 let px = pl.px.unwrap_or(0.0);
                 let mz = pl.my.unwrap_or(0.0);
-                let mut fef = fef_point_load_2d(pl.p, px, mz, pl.a, l);
+                let mut fef = fef_point_load_2d(pl.p, px, mz, pl.a, l, phi);
 
                 adjust_fef_for_hinges(&mut fef, l, elem.hinge_start, elem.hinge_end, phi);
 
@@ -741,6 +859,13 @@ pub fn assemble_element_loads_2d(
 
                 adjust_fef_for_hinges(&mut fef, l, elem.hinge_start, elem.hinge_end, phi);
 
+                let fef_global = transform_force(&fef, t, 6);
+                for (i, &dof) in elem_dofs.iter().enumerate() {
+                    f_global[dof] += fef_global[i];
+                }
+            }
+            SolverLoad::AxialDistributed(al) if al.element_id == elem.id => {
+                let fef = crate::element::fef_axial_distributed_2d(al.q_i, al.q_j, al.a.unwrap_or(0.0), al.b.unwrap_or(l), l);
                 let fef_global = transform_force(&fef, t, 6);
                 for (i, &dof) in elem_dofs.iter().enumerate() {
                     f_global[dof] += fef_global[i];
@@ -769,14 +894,14 @@ pub fn assemble_stiffness_3d(input: &SolverInput3D, dof_num: &DofNumbering) -> S
 
     // Pre-build O(1) lookup maps
     let node_map: std::collections::HashMap<usize, &SolverNode3D> =
-        input.nodes.values().map(|n| (n.id, n)).collect();
+        crate::ordered::values(&input.nodes).map(|n| (n.id, n)).collect();
     let mat_map: std::collections::HashMap<usize, &SolverMaterial> =
-        input.materials.values().map(|m| (m.id, m)).collect();
+        crate::ordered::values(&input.materials).map(|m| (m.id, m)).collect();
     let sec_map: std::collections::HashMap<usize, &SolverSection3D> =
-        input.sections.values().map(|s| (s.id, s)).collect();
+        crate::ordered::values(&input.sections).map(|s| (s.id, s)).collect();
 
     // Sort elements for deterministic assembly (HashMap iteration order is randomized)
-    let mut sorted_dense_elems: Vec<&SolverElement3D> = input.elements.values().collect();
+    let mut sorted_dense_elems: Vec<&SolverElement3D> = crate::ordered::values(&input.elements).collect();
     sorted_dense_elems.sort_by_key(|e| e.id);
     for elem in sorted_dense_elems {
         let node_i = node_map[&elem.node_i];
@@ -874,7 +999,7 @@ pub fn assemble_stiffness_3d(input: &SolverInput3D, dof_num: &DofNumbering) -> S
     }
 
     // Assemble plate element stiffness matrices (sorted for determinism)
-    let mut sorted_dense_plates: Vec<&SolverPlateElement> = input.plates.values().collect();
+    let mut sorted_dense_plates: Vec<&SolverPlateElement> = crate::ordered::values(&input.plates).collect();
     sorted_dense_plates.sort_by_key(|p| p.id);
     for plate in sorted_dense_plates {
         let mat = mat_map[&plate.material_id];
@@ -904,7 +1029,7 @@ pub fn assemble_stiffness_3d(input: &SolverInput3D, dof_num: &DofNumbering) -> S
     }
 
     // Assemble quad (MITC4 shell) element stiffness matrices (sorted for determinism)
-    let mut sorted_dense_quads: Vec<&SolverQuadElement> = input.quads.values().collect();
+    let mut sorted_dense_quads: Vec<&SolverQuadElement> = crate::ordered::values(&input.quads).collect();
     sorted_dense_quads.sort_by_key(|q| q.id);
     for quad in sorted_dense_quads {
         let mat = mat_map[&quad.material_id];
@@ -936,7 +1061,7 @@ pub fn assemble_stiffness_3d(input: &SolverInput3D, dof_num: &DofNumbering) -> S
     }
 
     // Assemble quad9 (MITC9 shell) element stiffness matrices (sorted for determinism)
-    let mut sorted_dense_q9s: Vec<&SolverQuad9Element> = input.quad9s.values().collect();
+    let mut sorted_dense_q9s: Vec<&SolverQuad9Element> = crate::ordered::values(&input.quad9s).collect();
     sorted_dense_q9s.sort_by_key(|q| q.id);
     for quad9 in sorted_dense_q9s {
         let mat = mat_map[&quad9.material_id];
@@ -956,7 +1081,7 @@ pub fn assemble_stiffness_3d(input: &SolverInput3D, dof_num: &DofNumbering) -> S
     }
 
     // Assemble solid-shell element stiffness matrices (sorted for determinism)
-    let mut sorted_dense_ss: Vec<&SolverSolidShellElement> = input.solid_shells.values().collect();
+    let mut sorted_dense_ss: Vec<&SolverSolidShellElement> = crate::ordered::values(&input.solid_shells).collect();
     sorted_dense_ss.sort_by_key(|s| s.id);
     for ss in sorted_dense_ss {
         let mat = mat_map[&ss.material_id];
@@ -974,7 +1099,7 @@ pub fn assemble_stiffness_3d(input: &SolverInput3D, dof_num: &DofNumbering) -> S
     }
 
     // Assemble curved shell element stiffness matrices (degenerated continuum, sorted for determinism)
-    let mut sorted_dense_cs: Vec<&SolverCurvedShellElement> = input.curved_shells.values().collect();
+    let mut sorted_dense_cs: Vec<&SolverCurvedShellElement> = crate::ordered::values(&input.curved_shells).collect();
     sorted_dense_cs.sort_by_key(|c| c.id);
     for cs in sorted_dense_cs {
         let mat = mat_map[&cs.material_id];
@@ -995,13 +1120,11 @@ pub fn assemble_stiffness_3d(input: &SolverInput3D, dof_num: &DofNumbering) -> S
 
     // Assemble 3D connector elements
     if !input.connectors.is_empty() {
-        crate::element::connector::assemble_connectors_3d(
-            &input.connectors, &input.nodes, dof_num, &mut k_global, n,
-        );
+        crate::element::connector::assemble_connectors_3d(input, dof_num, &mut k_global, n);
     }
 
     // Add 3D spring stiffness
-    for sup in input.supports.values() {
+    for sup in crate::ordered::values(&input.supports) {
         let springs = [sup.kx, sup.ky, sup.kz, sup.krx, sup.kry, sup.krz];
         for (i, ks) in springs.iter().enumerate() {
             if let Some(k) = ks {
@@ -1032,6 +1155,13 @@ pub fn assemble_stiffness_3d(input: &SolverInput3D, dof_num: &DofNumbering) -> S
     // Add artificial stiffness at warping DOFs for nodes with no warping stiffness.
     // This prevents a singular matrix when some elements lack warping.
     let mut artificial_dofs_3d = Vec::new();
+    {
+        let artificial_k = if max_diag > 0.0 { max_diag * 1e-10 } else { 1e-6 };
+        for d in orphan_rotation_dofs_3d(input, dof_num, |d| k_global[d * n + d], max_diag) {
+            k_global[d * n + d] += artificial_k;
+            artificial_dofs_3d.push(d);
+        }
+    }
     if dof_num.dofs_per_node >= 7 {
         let artificial_k = if max_diag > 0.0 { max_diag * 1e-10 } else { 1e-6 };
         for &node_id in &dof_num.node_order {
@@ -1047,7 +1177,7 @@ pub fn assemble_stiffness_3d(input: &SolverInput3D, dof_num: &DofNumbering) -> S
     // Apply inclined support transformations (stiffness only; the force
     // vector rotation happens in `assemble_load_vector_3d_dense`)
     let mut inclined_transforms = Vec::new();
-    for sup in input.supports.values() {
+    for sup in crate::ordered::values(&input.supports) {
         if sup.is_inclined.unwrap_or(false) {
             if let (Some(nx), Some(ny), Some(nz)) = (sup.normal_x, sup.normal_y, sup.normal_z) {
                 let n_len = (nx * nx + ny * ny + nz * nz).sqrt();
@@ -1074,7 +1204,7 @@ pub fn assemble_stiffness_3d(input: &SolverInput3D, dof_num: &DofNumbering) -> S
     // Element quality diagnostics
     let mut diagnostics = Vec::new();
 
-    for plate in input.plates.values() {
+    for plate in crate::ordered::values(&input.plates) {
         let n0 = node_map[&plate.nodes[0]];
         let n1 = node_map[&plate.nodes[1]];
         let n2 = node_map[&plate.nodes[2]];
@@ -1106,7 +1236,7 @@ pub fn assemble_stiffness_3d(input: &SolverInput3D, dof_num: &DofNumbering) -> S
         }
     }
 
-    for quad in input.quads.values() {
+    for quad in crate::ordered::values(&input.quads) {
         let qn0 = node_map[&quad.nodes[0]];
         let qn1 = node_map[&quad.nodes[1]];
         let qn2 = node_map[&quad.nodes[2]];
@@ -1172,7 +1302,7 @@ pub fn assemble_stiffness_3d(input: &SolverInput3D, dof_num: &DofNumbering) -> S
     }
 
     // Quad9 diagnostics (dense path)
-    for q9 in input.quad9s.values() {
+    for q9 in crate::ordered::values(&input.quad9s) {
         let coords = quad9_coords(&node_map, q9);
         let (_, _, has_neg_j) = crate::element::quad9::quad9_check_jacobian(&coords);
         if has_neg_j {
@@ -1307,14 +1437,14 @@ fn assemble_frame_loads_3d(
     }
 
     let node_map: std::collections::HashMap<usize, &SolverNode3D> =
-        input.nodes.values().map(|n| (n.id, n)).collect();
+        crate::ordered::values(&input.nodes).map(|n| (n.id, n)).collect();
     let mat_map: std::collections::HashMap<usize, &SolverMaterial> =
-        input.materials.values().map(|m| (m.id, m)).collect();
+        crate::ordered::values(&input.materials).map(|m| (m.id, m)).collect();
     let sec_map: std::collections::HashMap<usize, &SolverSection3D> =
-        input.sections.values().map(|s| (s.id, s)).collect();
+        crate::ordered::values(&input.sections).map(|s| (s.id, s)).collect();
     let left_hand = input.left_hand.unwrap_or(false);
 
-    let mut sorted_elems: Vec<&SolverElement3D> = input.elements.values().collect();
+    let mut sorted_elems: Vec<&SolverElement3D> = crate::ordered::values(&input.elements).collect();
     sorted_elems.sort_by_key(|e| e.id);
     for elem in sorted_elems {
         if !loaded_elems.contains(&elem.id) { continue; }
@@ -1387,13 +1517,13 @@ pub fn assemble_load_vector_3d_dense(
 
     // Pre-build O(1) lookup maps
     let node_map: std::collections::HashMap<usize, &SolverNode3D> =
-        input.nodes.values().map(|n| (n.id, n)).collect();
+        crate::ordered::values(&input.nodes).map(|n| (n.id, n)).collect();
     let mat_map: std::collections::HashMap<usize, &SolverMaterial> =
-        input.materials.values().map(|m| (m.id, m)).collect();
+        crate::ordered::values(&input.materials).map(|m| (m.id, m)).collect();
     let plate_map: std::collections::HashMap<usize, &SolverPlateElement> =
-        input.plates.values().map(|p| (p.id, p)).collect();
+        crate::ordered::values(&input.plates).map(|p| (p.id, p)).collect();
     let quad_map: std::collections::HashMap<usize, &SolverQuadElement> =
-        input.quads.values().map(|q| (q.id, q)).collect();
+        crate::ordered::values(&input.quads).map(|q| (q.id, q)).collect();
 
     // Frame/truss element loads (FEF + thermal)
     assemble_frame_loads_3d(input, loads, dof_num, &mut f_global);
@@ -1576,7 +1706,7 @@ pub fn assemble_load_vector_3d_dense(
 
     // Quad9 (MITC9) load dispatch — dense path
     let quad9_map: std::collections::HashMap<usize, &SolverQuad9Element> =
-        input.quad9s.values().map(|q| (q.id, q)).collect();
+        crate::ordered::values(&input.quad9s).map(|q| (q.id, q)).collect();
     for load in loads {
         if let SolverLoad3D::Quad9Pressure(pl) = load {
             if let Some(&q9) = quad9_map.get(&pl.element_id) {
@@ -1632,7 +1762,7 @@ pub fn assemble_load_vector_3d_dense(
 
     // Solid-shell load dispatch — dense path
     let ss_map: std::collections::HashMap<usize, &SolverSolidShellElement> =
-        input.solid_shells.values().map(|s| (s.id, s)).collect();
+        crate::ordered::values(&input.solid_shells).map(|s| (s.id, s)).collect();
     for load in loads {
         if let SolverLoad3D::SolidShellPressure(pl) = load {
             if let Some(&ss) = ss_map.get(&pl.element_id) {
@@ -1660,7 +1790,7 @@ pub fn assemble_load_vector_3d_dense(
 
     // Curved shell load dispatch — dense path
     let cs_map: std::collections::HashMap<usize, &SolverCurvedShellElement> =
-        input.curved_shells.values().map(|s| (s.id, s)).collect();
+        crate::ordered::values(&input.curved_shells).map(|s| (s.id, s)).collect();
     for load in loads {
         if let SolverLoad3D::CurvedShellPressure(pl) = load {
             if let Some(&cs) = cs_map.get(&pl.element_id) {
@@ -1761,9 +1891,9 @@ fn assemble_element_loads_3d(
                 let is_full = (a.abs() < 1e-12) && ((b - l).abs() < 1e-12);
 
                 let mut fef = if is_full {
-                    fef_distributed_3d(dl.q_yi, dl.q_yj, dl.q_zi, dl.q_zj, l)
+                    fef_distributed_3d(dl.q_yi, dl.q_yj, dl.q_zi, dl.q_zj, l, phi_y, phi_z)
                 } else {
-                    fef_partial_distributed_3d(dl.q_yi, dl.q_yj, dl.q_zi, dl.q_zj, a, b, l)
+                    fef_partial_distributed_3d(dl.q_yi, dl.q_yj, dl.q_zi, dl.q_zj, a, b, l, phi_y, phi_z)
                 };
                 let axial = crate::element::axial_distributed_fef(dl.q_xi, dl.q_xj, dl.a.unwrap_or(0.0), dl.b.unwrap_or(l), l);
                 fef[0] = axial[0];
@@ -1775,20 +1905,7 @@ fn assemble_element_loads_3d(
                 }
             }
             SolverLoad3D::PointOnElement(pl) if pl.element_id == elem.id => {
-                // Y-direction point load
-                let fef_y = fef_point_load_2d(pl.py, 0.0, 0.0, pl.a, l);
-                let mut fef = [0.0; 12];
-                fef[1] = fef_y[1];   // fy_i
-                fef[5] = fef_y[2];   // mz_i
-                fef[7] = fef_y[4];   // fy_j
-                fef[11] = fef_y[5];  // mz_j
-
-                // Z-direction point load
-                let fef_z = fef_point_load_2d(pl.pz, 0.0, 0.0, pl.a, l);
-                fef[2] = fef_z[1];    // fz_i
-                fef[4] = -fef_z[2];   // my_i (negated for θy convention)
-                fef[8] = fef_z[4];    // fz_j
-                fef[10] = -fef_z[5];  // my_j
+                let mut fef = fef_point_load_3d(pl.py, pl.pz, pl.a, l, phi_y, phi_z);
 
                 adjust_fef_for_hinges_3d(&mut fef, l, Hinge3D::from_elem(elem), phi_y, phi_z);
                 let fef_global = transform_force(&fef, t, 12);
@@ -1837,9 +1954,9 @@ fn assemble_element_loads_3d_warping(
                 let is_full = (a.abs() < 1e-12) && ((b - l).abs() < 1e-12);
 
                 let mut fef12 = if is_full {
-                    fef_distributed_3d(dl.q_yi, dl.q_yj, dl.q_zi, dl.q_zj, l)
+                    fef_distributed_3d(dl.q_yi, dl.q_yj, dl.q_zi, dl.q_zj, l, phi_y, phi_z)
                 } else {
-                    fef_partial_distributed_3d(dl.q_yi, dl.q_yj, dl.q_zi, dl.q_zj, a, b, l)
+                    fef_partial_distributed_3d(dl.q_yi, dl.q_yj, dl.q_zi, dl.q_zj, a, b, l, phi_y, phi_z)
                 };
                 let axial = crate::element::axial_distributed_fef(dl.q_xi, dl.q_xj, dl.a.unwrap_or(0.0), dl.b.unwrap_or(l), l);
                 fef12[0] = axial[0];
@@ -1852,13 +1969,7 @@ fn assemble_element_loads_3d_warping(
                 }
             }
             SolverLoad3D::PointOnElement(pl) if pl.element_id == elem.id => {
-                let fef_y = fef_point_load_2d(pl.py, 0.0, 0.0, pl.a, l);
-                let mut fef12 = [0.0; 12];
-                fef12[1] = fef_y[1]; fef12[5] = fef_y[2];
-                fef12[7] = fef_y[4]; fef12[11] = fef_y[5];
-                let fef_z = fef_point_load_2d(pl.pz, 0.0, 0.0, pl.a, l);
-                fef12[2] = fef_z[1]; fef12[4] = -fef_z[2];
-                fef12[8] = fef_z[4]; fef12[10] = -fef_z[5];
+                let mut fef12 = fef_point_load_3d(pl.py, pl.pz, pl.a, l, phi_y, phi_z);
                 adjust_fef_for_hinges_3d(&mut fef12, l, Hinge3D::from_elem(elem), phi_y, phi_z);
                 let fef14 = expand_fef_12_to_14(&fef12);
                 let fef_global = transform_force(&fef14, t14, 14);
@@ -1908,9 +2019,9 @@ fn assemble_element_loads_3d_mapped(
                 let is_full = (a.abs() < 1e-12) && ((b - l).abs() < 1e-12);
 
                 let mut fef = if is_full {
-                    fef_distributed_3d(dl.q_yi, dl.q_yj, dl.q_zi, dl.q_zj, l)
+                    fef_distributed_3d(dl.q_yi, dl.q_yj, dl.q_zi, dl.q_zj, l, phi_y, phi_z)
                 } else {
-                    fef_partial_distributed_3d(dl.q_yi, dl.q_yj, dl.q_zi, dl.q_zj, a, b, l)
+                    fef_partial_distributed_3d(dl.q_yi, dl.q_yj, dl.q_zi, dl.q_zj, a, b, l, phi_y, phi_z)
                 };
                 let axial = crate::element::axial_distributed_fef(dl.q_xi, dl.q_xj, dl.a.unwrap_or(0.0), dl.b.unwrap_or(l), l);
                 fef[0] = axial[0];
@@ -1922,13 +2033,7 @@ fn assemble_element_loads_3d_mapped(
                 }
             }
             SolverLoad3D::PointOnElement(pl) if pl.element_id == elem.id => {
-                let fef_y = fef_point_load_2d(pl.py, 0.0, 0.0, pl.a, l);
-                let mut fef = [0.0; 12];
-                fef[1] = fef_y[1]; fef[5] = fef_y[2];
-                fef[7] = fef_y[4]; fef[11] = fef_y[5];
-                let fef_z = fef_point_load_2d(pl.pz, 0.0, 0.0, pl.a, l);
-                fef[2] = fef_z[1]; fef[4] = -fef_z[2];
-                fef[8] = fef_z[4]; fef[10] = -fef_z[5];
+                let mut fef = fef_point_load_3d(pl.py, pl.pz, pl.a, l, phi_y, phi_z);
                 adjust_fef_for_hinges_3d(&mut fef, l, Hinge3D::from_elem(elem), phi_y, phi_z);
                 let fef_global = transform_force(&fef, t12, 12);
                 for i in 0..12 {
@@ -1964,6 +2069,8 @@ pub struct SparseAssemblyResult {
     pub f: Vec<f64>,       // n_total force vector (same as dense)
     pub max_diag_k: f64,
     pub artificial_dofs: Vec<usize>,
+    /// Inclined-roller rotations applied to K and f (see `assemble_stiffness_2d`).
+    pub inclined_transforms_2d: Vec<InclinedTransformData2D>,
 }
 
 /// Sparse 3D assembly result with full-K for reactions and inclined support data.
@@ -1984,232 +2091,25 @@ pub fn assemble_sparse_2d(input: &SolverInput, dof_num: &DofNumbering) -> Sparse
 
 /// Sparse 2D assembly with optional full-K (all DOFs) alongside the free block.
 ///
-/// Triplets are collected unfiltered (the free×free filter is applied when
-/// building k_ff); with `build_k_full` the full n×n matrix is kept too.
+/// The stiffness is `sparse_assembly::assemble_stiffness_sparse_2d` (the
+/// linear static path, entry for entry the dense `assemble_stiffness_2d`:
+/// rotated spring blocks, springs on restrained DOFs in K_rr, the orphan
+/// rotation guard and inclined-roller rotations) and the force vector
+/// `assemble_load_vector_2d`. A hand-copied assembler used to live here and
+/// had drifted from both. K, f and the returned K_ff are in the inclined
+/// frames listed in `inclined_transforms_2d`; callers rotate displacements
+/// back with `reverse_inclined_transform_2d`.
 pub fn assemble_sparse_2d_ex(input: &SolverInput, dof_num: &DofNumbering, build_k_full: bool) -> SparseAssemblyResult {
-    let n = dof_num.n_total;
-    let nf = dof_num.n_free;
-    let mut f_global = vec![0.0; n];
-
-    let mut trip_rows = Vec::new();
-    let mut trip_cols = Vec::new();
-    let mut trip_vals = Vec::new();
-    let mut max_diag = 0.0f64;
-    let mut diag_vals = vec![0.0f64; nf];
-
-    // Pre-build O(1) lookup maps
-    let node_map: std::collections::HashMap<usize, &SolverNode> =
-        input.nodes.values().map(|n| (n.id, n)).collect();
-    let mat_map: std::collections::HashMap<usize, &SolverMaterial> =
-        input.materials.values().map(|m| (m.id, m)).collect();
-    let sec_map: std::collections::HashMap<usize, &SolverSection> =
-        input.sections.values().map(|s| (s.id, s)).collect();
-
-    for elem in input.elements.values() {
-        let node_i = node_map[&elem.node_i];
-        let node_j = node_map[&elem.node_j];
-        let mat = mat_map[&elem.material_id];
-        let sec = sec_map[&elem.section_id];
-
-        let dx = node_j.x - node_i.x;
-        let dy = node_j.z - node_i.z;
-        let l = (dx * dx + dy * dy).sqrt();
-        let cos = dx / l;
-        let sin = dy / l;
-        let e = mat.e * 1000.0;
-
-        if elem.elem_type == "truss" || elem.elem_type == "cable" {
-            let k_elem = truss_global_stiffness_2d(e, sec.a, l, cos, sin);
-            let truss_dofs = [
-                dof_num.global_dof(elem.node_i, 0).unwrap(),
-                dof_num.global_dof(elem.node_i, 1).unwrap(),
-                dof_num.global_dof(elem.node_j, 0).unwrap(),
-                dof_num.global_dof(elem.node_j, 1).unwrap(),
-            ];
-            for i in 0..4 {
-                for j in 0..4 {
-                    let gi = truss_dofs[i];
-                    let gj = truss_dofs[j];
-                    if gi >= gj {
-                        trip_rows.push(gi);
-                        trip_cols.push(gj);
-                        trip_vals.push(k_elem[i * 4 + j]);
-                    }
-                }
-                if truss_dofs[i] < nf { diag_vals[truss_dofs[i]] += k_elem[i * 4 + i]; }
-            }
-
-            // Assemble thermal FEF and member loads for 2D truss elements (sparse path)
-            for load in &input.loads {
-                if let SolverLoad::Thermal(tl) = load {
-                    if tl.element_id == elem.id {
-                        let alpha = 12e-6;
-                        let fx = e * sec.a * alpha * tl.dt_uniform;
-                        f_global[truss_dofs[0]] += -fx * cos;
-                        f_global[truss_dofs[1]] += -fx * sin;
-                        f_global[truss_dofs[2]] +=  fx * cos;
-                        f_global[truss_dofs[3]] +=  fx * sin;
-                    }
-                } else {
-                    truss_member_load_2d(load, elem.id, l, cos, sin, &truss_dofs, &mut f_global);
-                }
-            }
-        } else {
-            // Timoshenko shear parameter, matching the dense path (and the
-            // FEF builder below, which already computes phi from as_y —
-            // passing 0.0 here paired Euler-Bernoulli stiffness with
-            // Timoshenko fixed-end forces).
-            let phi = if let Some(as_y) = sec.as_y {
-                let g = e / (2.0 * (1.0 + mat.nu));
-                12.0 * e * sec.iz / (g * as_y * l * l)
-            } else {
-                0.0
-            };
-            let k_local = frame_local_stiffness_2d(e, sec.a, sec.iz, l, elem.hinge_start, elem.hinge_end, phi);
-            let t = frame_transform_2d(cos, sin);
-            let k_glob = transform_stiffness(&k_local, &t, 6);
-            let elem_dofs = dof_num.element_dofs(elem.node_i, elem.node_j);
-            let ndof = elem_dofs.len();
-
-            for i in 0..ndof {
-                for j in 0..ndof {
-                    let gi = elem_dofs[i];
-                    let gj = elem_dofs[j];
-                    if gi >= gj {
-                        trip_rows.push(gi);
-                        trip_cols.push(gj);
-                        trip_vals.push(k_glob[i * ndof + j]);
-                    }
-                }
-                if elem_dofs[i] < nf { diag_vals[elem_dofs[i]] += k_glob[i * ndof + i]; }
-            }
-
-            let load_refs: Vec<&SolverLoad> = input.loads.iter().collect();
-            assemble_element_loads_2d(&load_refs, elem, &t, l, e, mat.nu, sec, &elem_dofs, &mut f_global);
-        }
+    let stiff = super::sparse_assembly::assemble_stiffness_sparse_2d(input, dof_num);
+    let f = assemble_load_vector_2d(input, &input.loads, dof_num, &stiff.inclined_transforms_2d);
+    SparseAssemblyResult {
+        k_ff: stiff.k_ff,
+        k_full: if build_k_full { Some(stiff.k_full) } else { None },
+        f,
+        max_diag_k: stiff.max_diag_k,
+        artificial_dofs: stiff.artificial_dofs,
+        inclined_transforms_2d: stiff.inclined_transforms_2d,
     }
-
-    // Connector elements (sparse path)
-    for conn in input.connectors.values() {
-        let node_map_2d: std::collections::HashMap<usize, &SolverNode> =
-            input.nodes.values().map(|nd| (nd.id, nd)).collect();
-        let ni = match node_map_2d.get(&conn.node_i) { Some(n) => n, None => continue };
-        let nj = match node_map_2d.get(&conn.node_j) { Some(n) => n, None => continue };
-        let dx = nj.x - ni.x;
-        let dy = nj.z - ni.z;
-        let l = (dx * dx + dy * dy).sqrt();
-        let (cos, sin) = if l > 1e-15 { (dx / l, dy / l) } else { (1.0, 0.0) };
-        let ke = crate::element::connector::connector_stiffness_2d(
-            conn.k_axial, conn.k_shear, conn.k_moment, cos, sin,
-        );
-        let dofs = dof_num.element_dofs(conn.node_i, conn.node_j);
-        let ndof = dofs.len();
-        for i in 0..ndof {
-            for j in 0..ndof {
-                let gi = dofs[i];
-                let gj = dofs[j];
-                if gi >= gj {
-                    trip_rows.push(gi);
-                    trip_cols.push(gj);
-                    trip_vals.push(ke[i * 6 + j]);
-                }
-            }
-            if dofs[i] < nf { diag_vals[dofs[i]] += ke[i * 6 + i]; }
-        }
-    }
-
-    // Nodal loads
-    for load in &input.loads {
-        if let SolverLoad::Nodal(nl) = load {
-            if let Some(&d) = dof_num.map.get(&(nl.node_id, 0)) { f_global[d] += nl.fx; }
-            if let Some(&d) = dof_num.map.get(&(nl.node_id, 1)) { f_global[d] += nl.fz; }
-            if dof_num.dofs_per_node >= 3 {
-                if let Some(&d) = dof_num.map.get(&(nl.node_id, 2)) { f_global[d] += nl.my; }
-            }
-        }
-    }
-
-    // Spring stiffness
-    for sup in input.supports.values() {
-        if let Some(kx) = sup.kx {
-            if kx > 0.0 {
-                if let Some(&d) = dof_num.map.get(&(sup.node_id, 0)) {
-                    if d < nf { trip_rows.push(d); trip_cols.push(d); trip_vals.push(kx); diag_vals[d] += kx; }
-                }
-            }
-        }
-        if let Some(ky) = sup.ky {
-            if ky > 0.0 {
-                if let Some(&d) = dof_num.map.get(&(sup.node_id, 1)) {
-                    if d < nf { trip_rows.push(d); trip_cols.push(d); trip_vals.push(ky); diag_vals[d] += ky; }
-                }
-            }
-        }
-        if let Some(kz) = sup.kz {
-            if kz > 0.0 && dof_num.dofs_per_node >= 3 {
-                if let Some(&d) = dof_num.map.get(&(sup.node_id, 2)) {
-                    if d < nf { trip_rows.push(d); trip_cols.push(d); trip_vals.push(kz); diag_vals[d] += kz; }
-                }
-            }
-        }
-    }
-
-    for d in &diag_vals[..nf] { max_diag = max_diag.max(d.abs()); }
-
-    // Artificial rotational stiffness
-    let mut artificial_dofs = Vec::new();
-    if dof_num.dofs_per_node >= 3 {
-        let artificial_k = if max_diag > 0.0 { max_diag * 1e-10 } else { 1e-6 };
-        let mut node_hinge_count: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
-        let mut node_frame_count: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
-        for elem in input.elements.values() {
-            if elem.elem_type != "frame" { continue; }
-            *node_frame_count.entry(elem.node_i).or_insert(0) += 1;
-            *node_frame_count.entry(elem.node_j).or_insert(0) += 1;
-            if elem.hinge_start { *node_hinge_count.entry(elem.node_i).or_insert(0) += 1; }
-            if elem.hinge_end { *node_hinge_count.entry(elem.node_j).or_insert(0) += 1; }
-        }
-        let mut rot_restrained: std::collections::HashSet<usize> = std::collections::HashSet::new();
-        for sup in input.supports.values() {
-            if sup.support_type == "fixed" || sup.support_type == "guidedX" || sup.support_type == "guidedY" { rot_restrained.insert(sup.node_id); }
-            if sup.support_type == "spring" && sup.kz.unwrap_or(0.0) > 0.0 { rot_restrained.insert(sup.node_id); }
-        }
-        for (&node_id, &hinges) in &node_hinge_count {
-            let frames = *node_frame_count.get(&node_id).unwrap_or(&0);
-            if hinges >= frames && frames >= 1 && !rot_restrained.contains(&node_id) {
-                if let Some(&idx) = dof_num.map.get(&(node_id, 2)) {
-                    if idx < nf {
-                        trip_rows.push(idx); trip_cols.push(idx); trip_vals.push(artificial_k);
-                        artificial_dofs.push(idx);
-                    }
-                }
-            }
-        }
-    }
-
-    let k_full = if build_k_full {
-        Some(CscMatrix::from_triplets(n, &trip_rows, &trip_cols, &trip_vals))
-    } else {
-        None
-    };
-    // The triplets cover all DOFs; k_ff keeps only the free×free block.
-    let (ff_rows, ff_cols, ff_vals): (Vec<usize>, Vec<usize>, Vec<f64>) = if n == nf {
-        (trip_rows, trip_cols, trip_vals)
-    } else {
-        let mut fr = Vec::new();
-        let mut fc = Vec::new();
-        let mut fv = Vec::new();
-        for t in 0..trip_rows.len() {
-            if trip_rows[t] < nf && trip_cols[t] < nf {
-                fr.push(trip_rows[t]);
-                fc.push(trip_cols[t]);
-                fv.push(trip_vals[t]);
-            }
-        }
-        (fr, fc, fv)
-    };
-    let k_ff = CscMatrix::from_triplets(nf, &ff_rows, &ff_cols, &ff_vals);
-    SparseAssemblyResult { k_ff, k_full, f: f_global, max_diag_k: max_diag, artificial_dofs }
 }
 
 /// Apply inclined support rotation to COO triplets and force vector.
@@ -2228,6 +2128,99 @@ pub fn rotate_inclined_f_triplets(f_global: &mut [f64], dofs: &[usize; 3], r: &[
     for a in 0..3 {
         f_global[dofs[a]] = r[a][0] * fv[0] + r[a][1] * fv[1] + r[a][2] * fv[2];
     }
+}
+
+/// One inclined-support rotation, plane (`InclinedTransformData2D`) or
+/// spatial (`InclinedTransformData`). The stiffness assemblers rotate K into
+/// these frames; every analysis that builds a matrix or vector beside K (mass,
+/// geometric stiffness, influence vectors, load histories) rotates it the same
+/// way, and rotates its results back, through this trait.
+pub(crate) trait InclinedFrame {
+    /// `v[dofs] = R·v[dofs]`: global axes to the support frame.
+    fn rotate(&self, v: &mut [f64]);
+    /// `v[dofs] = Rᵀ·v[dofs]`: support frame to global axes.
+    fn reverse(&self, v: &mut [f64]);
+    /// `R·K·Rᵀ` on the support DOFs of a symmetric matrix given as triplets.
+    fn rotate_triplets(&self, rows: &mut Vec<usize>, cols: &mut Vec<usize>, vals: &mut Vec<f64>);
+    /// `R·K·Rᵀ` on the support DOFs of a dense row-major n×n matrix.
+    fn rotate_dense(&self, k: &mut [f64], n: usize);
+}
+
+impl InclinedFrame for InclinedTransformData2D {
+    fn rotate(&self, v: &mut [f64]) { rotate_inclined_f_2d(v, &self.dofs, &self.r) }
+    fn reverse(&self, v: &mut [f64]) { reverse_inclined_transform_2d(v, &self.dofs, &self.r) }
+    fn rotate_triplets(&self, rows: &mut Vec<usize>, cols: &mut Vec<usize>, vals: &mut Vec<f64>) {
+        apply_inclined_transform_triplets_2d(rows, cols, vals, &self.dofs, &self.r)
+    }
+    fn rotate_dense(&self, k: &mut [f64], n: usize) { rotate_inclined_k_2d(k, n, &self.dofs, &self.r) }
+}
+
+impl InclinedFrame for InclinedTransformData {
+    fn rotate(&self, v: &mut [f64]) { rotate_inclined_f_3d(v, &self.dofs, &self.r) }
+    fn reverse(&self, v: &mut [f64]) { reverse_inclined_transform(v, &self.dofs, &self.r) }
+    fn rotate_triplets(&self, rows: &mut Vec<usize>, cols: &mut Vec<usize>, vals: &mut Vec<f64>) {
+        apply_inclined_transform_triplets_k(rows, cols, vals, &self.dofs, &self.r)
+    }
+    fn rotate_dense(&self, k: &mut [f64], n: usize) { rotate_inclined_k_3d(k, n, &self.dofs, &self.r) }
+}
+
+/// Rotate a symmetric matrix given as triplets over all DOFs (each unordered
+/// pair once, either triangle) into the inclined-support frames, then keep
+/// only the free×free block. This is what the sparse stiffness assemblers do
+/// to K, for the matrices built beside it (mass, geometric stiffness): the
+/// rotated free block needs the restrained normal DOF's row, so the rotation
+/// has to happen before the free filter.
+pub(crate) fn rotate_inclined_free_block<T: InclinedFrame>(
+    trip_rows: &mut Vec<usize>, trip_cols: &mut Vec<usize>, trip_vals: &mut Vec<f64>,
+    its: &[T], nf: usize,
+) {
+    for it in its {
+        it.rotate_triplets(trip_rows, trip_cols, trip_vals);
+    }
+    let mut w = 0;
+    for r in 0..trip_rows.len() {
+        if trip_rows[r] < nf && trip_cols[r] < nf && trip_vals[r] != 0.0 {
+            trip_rows[w] = trip_rows[r];
+            trip_cols[w] = trip_cols[r];
+            trip_vals[w] = trip_vals[r];
+            w += 1;
+        }
+    }
+    trip_rows.truncate(w);
+    trip_cols.truncate(w);
+    trip_vals.truncate(w);
+}
+
+/// Rotate a dense all-DOF n×n matrix (a dense mass) into the inclined-support
+/// frames, as the dense stiffness assemblers do to K. Extract the free block
+/// afterwards.
+pub(crate) fn rotate_inclined_dense<T: InclinedFrame>(m: &mut [f64], n: usize, its: &[T]) {
+    for it in its {
+        it.rotate_dense(m, n);
+    }
+}
+
+/// A global-axes vector over all DOFs (an influence vector, a force record)
+/// to the free DOFs of the inclined-support frames: rotated, then cut to `nf`
+/// (at a support only the tangential components are free).
+pub(crate) fn to_inclined_free<T: InclinedFrame>(mut v: Vec<f64>, its: &[T], nf: usize) -> Vec<f64> {
+    for it in its {
+        it.rotate(&mut v);
+    }
+    v.truncate(nf);
+    v
+}
+
+/// A free-DOF vector in the inclined-support frames (a mode shape, a state)
+/// to an all-DOF vector in global axes: restrained DOFs zero, supports
+/// rotated back.
+pub(crate) fn to_global<T: InclinedFrame>(v_free: &[f64], n: usize, its: &[T]) -> Vec<f64> {
+    let mut g = vec![0.0; n];
+    g[..v_free.len()].copy_from_slice(v_free);
+    for it in its {
+        it.reverse(&mut g);
+    }
+    g
 }
 
 /// K-only 2D inclined support rotation on stiffness triplets (zeros originals,
@@ -2275,7 +2268,7 @@ pub(crate) fn apply_inclined_transform_triplets_2d(
         }
     }
     // Cross-row: K'[i, dofs[a]] = sum_b K[i, dofs[b]] * R[a][b]
-    for (&i, v2) in &cross_row {
+    for (&i, v2) in crate::ordered::entries(&cross_row) {
         for a in 0..2 {
             let s: f64 = (0..2).map(|b| v2[b] * r[a][b]).sum();
             if s.abs() > 1e-30 {
@@ -2284,7 +2277,7 @@ pub(crate) fn apply_inclined_transform_triplets_2d(
         }
     }
     // Cross-col: K'[dofs[a], j] = sum_b R[a][b] * K[dofs[b], j]
-    for (&j, v2) in &cross_col {
+    for (&j, v2) in crate::ordered::entries(&cross_col) {
         for a in 0..2 {
             let s: f64 = (0..2).map(|b| r[a][b] * v2[b]).sum();
             if s.abs() > 1e-30 {
@@ -2338,7 +2331,7 @@ pub(crate) fn apply_inclined_transform_triplets_k(
         }
     }
     // Cross-row: K'[i, dofs[a]] = sum_b K[i, dofs[b]] * R[a][b]
-    for (&i, v3) in &cross_row {
+    for (&i, v3) in crate::ordered::entries(&cross_row) {
         for a in 0..3 {
             let s: f64 = (0..3).map(|b| v3[b] * r[a][b]).sum();
             if s.abs() > 1e-30 {
@@ -2347,7 +2340,7 @@ pub(crate) fn apply_inclined_transform_triplets_k(
         }
     }
     // Cross-col: K'[dofs[a], j] = sum_b R[a][b] * K[dofs[b], j]
-    for (&j, v3) in &cross_col {
+    for (&j, v3) in crate::ordered::entries(&cross_col) {
         for a in 0..3 {
             let s: f64 = (0..3).map(|b| r[a][b] * v3[b]).sum();
             if s.abs() > 1e-30 {
@@ -2379,15 +2372,17 @@ pub fn assemble_stiffness_sparse_3d(input: &SolverInput3D, dof_num: &DofNumberin
     let mut trip_cols = Vec::new();
     let mut trip_vals = Vec::new();
     let mut max_diag = 0.0f64;
-    let mut diag_vals = vec![0.0f64; nf];
+    // Diagonal over ALL DOFs, as the dense assembler takes its maximum: the
+    // artificial warping stiffness and `max_diag_k` must not depend on the path.
+    let mut diag_vals = vec![0.0f64; n];
 
     // Pre-build O(1) lookup maps
     let node_map: std::collections::HashMap<usize, &SolverNode3D> =
-        input.nodes.values().map(|n| (n.id, n)).collect();
+        crate::ordered::values(&input.nodes).map(|n| (n.id, n)).collect();
     let mat_map: std::collections::HashMap<usize, &SolverMaterial> =
-        input.materials.values().map(|m| (m.id, m)).collect();
+        crate::ordered::values(&input.materials).map(|m| (m.id, m)).collect();
     let sec_map: std::collections::HashMap<usize, &SolverSection3D> =
-        input.sections.values().map(|s| (s.id, s)).collect();
+        crate::ordered::values(&input.sections).map(|s| (s.id, s)).collect();
 
     // Helper: scatter element stiffness into triplets (full K, lower triangle)
     macro_rules! scatter {
@@ -2400,13 +2395,13 @@ pub fn assemble_stiffness_sparse_3d(input: &SolverInput3D, dof_num: &DofNumberin
                         trip_rows.push(gi); trip_cols.push(gj); trip_vals.push($k_glob[i * $ndof + j]);
                     }
                 }
-                if gi < nf { diag_vals[gi] += $k_glob[i * $ndof + i]; }
+                diag_vals[gi] += $k_glob[i * $ndof + i];
             }
         };
     }
 
     // Frame and truss elements (sorted by ID for deterministic assembly)
-    let mut sorted_elems: Vec<&SolverElement3D> = input.elements.values().collect();
+    let mut sorted_elems: Vec<&SolverElement3D> = crate::ordered::values(&input.elements).collect();
     sorted_elems.sort_by_key(|e| e.id);
     for elem in sorted_elems {
         let node_i = node_map[&elem.node_i];
@@ -2439,7 +2434,7 @@ pub fn assemble_stiffness_sparse_3d(input: &SolverInput3D, dof_num: &DofNumberin
                                     let val = sign * ea_l * dir[i] * dir[j];
                                     trip_rows.push(da); trip_cols.push(db); trip_vals.push(val);
                                 }
-                                if da == db && da < nf { diag_vals[da] += sign * ea_l * dir[i] * dir[j]; }
+                                if da == db { diag_vals[da] += sign * ea_l * dir[i] * dir[j]; }
                             }
                         }
                     }
@@ -2487,7 +2482,7 @@ pub fn assemble_stiffness_sparse_3d(input: &SolverInput3D, dof_num: &DofNumberin
                             trip_rows.push(gi); trip_cols.push(gj); trip_vals.push(k_glob[i * 12 + j]);
                         }
                     }
-                    if gi < nf { diag_vals[gi] += k_glob[i * 12 + i]; }
+                    diag_vals[gi] += k_glob[i * 12 + i];
                 }
             } else {
                 let k_local = frame_local_stiffness_3d(e, sec.a, sec.iy, sec.iz, sec.j, l, g,
@@ -2501,37 +2496,17 @@ pub fn assemble_stiffness_sparse_3d(input: &SolverInput3D, dof_num: &DofNumberin
         }
     }
 
-    // Connector elements (sorted by ID for deterministic assembly)
-    let mut sorted_conns: Vec<&crate::types::ConnectorElement> = input.connectors.values().collect();
-    sorted_conns.sort_by_key(|c| c.id);
-    for conn in sorted_conns {
-        let ni = match node_map.get(&conn.node_i) { Some(n) => n, None => continue };
-        let nj_node = match node_map.get(&conn.node_j) { Some(n) => n, None => continue };
-        let dx = nj_node.x - ni.x;
-        let dy = nj_node.y - ni.y;
-        let dz = nj_node.z - ni.z;
-        let l = (dx * dx + dy * dy + dz * dz).sqrt();
-        let dir = if l > 1e-15 { [dx / l, dy / l, dz / l] } else { [1.0, 0.0, 0.0] };
-        let ke = crate::element::connector::connector_stiffness_3d(
-            conn.k_axial, conn.k_shear, conn.k_shear_z,
-            conn.k_moment, conn.k_bend_y, conn.k_bend_z, dir,
-        );
-        let dofs = dof_num.element_dofs(conn.node_i, conn.node_j);
-        let ndof = dofs.len();
-        for i in 0..ndof {
-            let gi = dofs[i];
-            for j in 0..ndof {
-                let gj = dofs[j];
-                if gi >= gj {
-                    trip_rows.push(gi); trip_cols.push(gj); trip_vals.push(ke[i * 12 + j]);
-                }
-            }
-            if gi < nf { diag_vals[gi] += ke[i * 12 + i]; }
+    // Connector elements (in id order, for deterministic assembly)
+    for (gi, gj, v) in crate::element::connector::connector_entries_3d(input, dof_num) {
+        if gi >= gj {
+            trip_rows.push(gi); trip_cols.push(gj); trip_vals.push(v);
         }
+        // Diagonal over all DOFs (see `diag_vals`).
+        if gi == gj { diag_vals[gi] += v; }
     }
 
     // Plate elements (DKT+CST, 18 DOFs per element, sorted for determinism)
-    let mut sorted_plates: Vec<&SolverPlateElement> = input.plates.values().collect();
+    let mut sorted_plates: Vec<&SolverPlateElement> = crate::ordered::values(&input.plates).collect();
     sorted_plates.sort_by_key(|p| p.id);
     for plate in sorted_plates {
         let mat = mat_map[&plate.material_id];
@@ -2550,7 +2525,7 @@ pub fn assemble_stiffness_sparse_3d(input: &SolverInput3D, dof_num: &DofNumberin
     }
 
     // Quad elements (MITC4 shell, 24 DOFs per element, sorted for determinism)
-    let mut sorted_quads: Vec<&SolverQuadElement> = input.quads.values().collect();
+    let mut sorted_quads: Vec<&SolverQuadElement> = crate::ordered::values(&input.quads).collect();
     sorted_quads.sort_by_key(|q| q.id);
     for quad in sorted_quads {
         let mat = mat_map[&quad.material_id];
@@ -2570,7 +2545,7 @@ pub fn assemble_stiffness_sparse_3d(input: &SolverInput3D, dof_num: &DofNumberin
     }
 
     // Quad9 elements (MITC9 shell, 54 DOFs per element, sorted for determinism)
-    let mut sorted_q9s: Vec<&SolverQuad9Element> = input.quad9s.values().collect();
+    let mut sorted_q9s: Vec<&SolverQuad9Element> = crate::ordered::values(&input.quad9s).collect();
     sorted_q9s.sort_by_key(|q| q.id);
     for q9 in sorted_q9s {
         let mat = mat_map[&q9.material_id];
@@ -2586,7 +2561,7 @@ pub fn assemble_stiffness_sparse_3d(input: &SolverInput3D, dof_num: &DofNumberin
     }
 
     // Solid-shell elements (8 nodes × 3 DOFs = 24 DOFs per element, sorted for determinism)
-    let mut sorted_ss: Vec<&SolverSolidShellElement> = input.solid_shells.values().collect();
+    let mut sorted_ss: Vec<&SolverSolidShellElement> = crate::ordered::values(&input.solid_shells).collect();
     sorted_ss.sort_by_key(|s| s.id);
     for ss in sorted_ss {
         let mat = mat_map[&ss.material_id];
@@ -2600,7 +2575,7 @@ pub fn assemble_stiffness_sparse_3d(input: &SolverInput3D, dof_num: &DofNumberin
     }
 
     // Curved shell elements (degenerated continuum, 4 nodes × 6 DOFs = 24 DOFs, sorted for determinism)
-    let mut sorted_cs: Vec<&SolverCurvedShellElement> = input.curved_shells.values().collect();
+    let mut sorted_cs: Vec<&SolverCurvedShellElement> = crate::ordered::values(&input.curved_shells).collect();
     sorted_cs.sort_by_key(|c| c.id);
     for cs in sorted_cs {
         let mat = mat_map[&cs.material_id];
@@ -2615,14 +2590,14 @@ pub fn assemble_stiffness_sparse_3d(input: &SolverInput3D, dof_num: &DofNumberin
     }
 
     // Spring stiffness
-    for sup in input.supports.values() {
+    for sup in crate::ordered::values(&input.supports) {
         let springs = [sup.kx, sup.ky, sup.kz, sup.krx, sup.kry, sup.krz];
         for (i, ks) in springs.iter().enumerate() {
             if let Some(k) = ks {
                 if *k > 0.0 && i < dof_num.dofs_per_node {
                     if let Some(&d) = dof_num.map.get(&(sup.node_id, i)) {
                         trip_rows.push(d); trip_cols.push(d); trip_vals.push(*k);
-                        if d < nf { diag_vals[d] += *k; }
+                        diag_vals[d] += *k;
                     }
                 }
             }
@@ -2632,17 +2607,24 @@ pub fn assemble_stiffness_sparse_3d(input: &SolverInput3D, dof_num: &DofNumberin
                 if kw > 0.0 {
                     if let Some(&d) = dof_num.map.get(&(sup.node_id, 6)) {
                         trip_rows.push(d); trip_cols.push(d); trip_vals.push(kw);
-                        if d < nf { diag_vals[d] += kw; }
+                        diag_vals[d] += kw;
                     }
                 }
             }
         }
     }
 
-    for d in &diag_vals[..nf] { max_diag = max_diag.max(d.abs()); }
+    for d in &diag_vals { max_diag = max_diag.max(d.abs()); }
 
     // Artificial stiffness at floating warping DOFs
     let mut artificial_dofs_3d = Vec::new();
+    {
+        let artificial_k = if max_diag > 0.0 { max_diag * 1e-10 } else { 1e-6 };
+        for d in orphan_rotation_dofs_3d(input, dof_num, |d| diag_vals[d], max_diag) {
+            trip_rows.push(d); trip_cols.push(d); trip_vals.push(artificial_k);
+            artificial_dofs_3d.push(d);
+        }
+    }
     if dof_num.dofs_per_node >= 7 {
         let artificial_k = if max_diag > 0.0 { max_diag * 1e-10 } else { 1e-6 };
         for &node_id in &dof_num.node_order {
@@ -2658,7 +2640,7 @@ pub fn assemble_stiffness_sparse_3d(input: &SolverInput3D, dof_num: &DofNumberin
     // Inclined support transforms (applied to triplets before CSC conversion;
     // the force vector rotation happens in `assemble_load_vector_3d_sparse`)
     let mut inclined_transforms = Vec::new();
-    for sup in input.supports.values() {
+    for sup in crate::ordered::values(&input.supports) {
         if sup.is_inclined.unwrap_or(false) {
             if let (Some(nx), Some(ny), Some(nz)) = (sup.normal_x, sup.normal_y, sup.normal_z) {
                 let n_len = (nx * nx + ny * ny + nz * nz).sqrt();
@@ -2699,7 +2681,7 @@ pub fn assemble_stiffness_sparse_3d(input: &SolverInput3D, dof_num: &DofNumberin
 
     // Element quality diagnostics
     let mut diagnostics = Vec::new();
-    for plate in input.plates.values() {
+    for plate in crate::ordered::values(&input.plates) {
         let n0 = node_map[&plate.nodes[0]];
         let n1 = node_map[&plate.nodes[1]];
         let n2 = node_map[&plate.nodes[2]];
@@ -2720,7 +2702,7 @@ pub fn assemble_stiffness_sparse_3d(input: &SolverInput3D, dof_num: &DofNumberin
             });
         }
     }
-    for quad in input.quads.values() {
+    for quad in crate::ordered::values(&input.quads) {
         let qn0 = node_map[&quad.nodes[0]];
         let qn1 = node_map[&quad.nodes[1]];
         let qn2 = node_map[&quad.nodes[2]];
@@ -2766,7 +2748,7 @@ pub fn assemble_stiffness_sparse_3d(input: &SolverInput3D, dof_num: &DofNumberin
     }
 
     // Quad9 diagnostics (sparse path)
-    for q9 in input.quad9s.values() {
+    for q9 in crate::ordered::values(&input.quad9s) {
         let coords = quad9_coords(&node_map, q9);
         let (_, _, has_neg_j) = crate::element::quad9::quad9_check_jacobian(&coords);
         if has_neg_j {
@@ -2819,19 +2801,19 @@ pub fn assemble_load_vector_3d_sparse(
 
     // Pre-build O(1) lookup maps
     let node_map: std::collections::HashMap<usize, &SolverNode3D> =
-        input.nodes.values().map(|n| (n.id, n)).collect();
+        crate::ordered::values(&input.nodes).map(|n| (n.id, n)).collect();
     let mat_map: std::collections::HashMap<usize, &SolverMaterial> =
-        input.materials.values().map(|m| (m.id, m)).collect();
+        crate::ordered::values(&input.materials).map(|m| (m.id, m)).collect();
     let plate_map: std::collections::HashMap<usize, &SolverPlateElement> =
-        input.plates.values().map(|p| (p.id, p)).collect();
+        crate::ordered::values(&input.plates).map(|p| (p.id, p)).collect();
     let quad_map: std::collections::HashMap<usize, &SolverQuadElement> =
-        input.quads.values().map(|q| (q.id, q)).collect();
+        crate::ordered::values(&input.quads).map(|q| (q.id, q)).collect();
     let quad9_map: std::collections::HashMap<usize, &crate::types::SolverQuad9Element> =
-        input.quad9s.values().map(|q| (q.id, q)).collect();
+        crate::ordered::values(&input.quad9s).map(|q| (q.id, q)).collect();
     let solid_shell_map: std::collections::HashMap<usize, &crate::types::SolverSolidShellElement> =
-        input.solid_shells.values().map(|s| (s.id, s)).collect();
+        crate::ordered::values(&input.solid_shells).map(|s| (s.id, s)).collect();
     let curved_shell_map: std::collections::HashMap<usize, &crate::types::SolverCurvedShellElement> =
-        input.curved_shells.values().map(|s| (s.id, s)).collect();
+        crate::ordered::values(&input.curved_shells).map(|s| (s.id, s)).collect();
 
     // Frame/truss element loads (FEF + thermal)
     assemble_frame_loads_3d(input, loads, dof_num, &mut f_global);
@@ -3167,7 +3149,7 @@ mod tests {
         SolverInput {
             nodes, materials, sections, elements, supports,
             loads: vec![], constraints: vec![], connectors: HashMap::new(),
-            solver_options: None,
+            solver_options: None, masses: Default::default(),
         }
     }
 
@@ -3208,4 +3190,77 @@ mod tests {
             }
         }
     }
+}
+
+/// The support springs of a 2D model as global stiffness entries `(i, j, k)`
+/// over all DOFs — exactly what `assemble_2d` adds to K: `kx`/`ky` rotated by
+/// the support's `angle` on a `"spring"` support (Kxx = kx·c² + ky·s²,
+/// Kxz = (kx − ky)·s·c), axis-aligned otherwise, and the rotational `kz` on any
+/// support type.
+///
+/// The nonlinear solvers build their own tangents, and each carried a copy of
+/// the spring loop that had drifted from this one: the angle was dropped
+/// (corotational, material- and fiber-nonlinear, arc length), and a
+/// rotational spring on a pinned support was dropped wherever the copy
+/// skipped non-`"spring"` supports. One definition keeps them with the linear
+/// solver.
+pub fn support_spring_entries_2d(input: &SolverInput, dof_num: &DofNumbering) -> Vec<(usize, usize, f64)> {
+    let mut out = Vec::new();
+    let mut sups: Vec<&SolverSupport> = crate::ordered::values(&input.supports).collect();
+    sups.sort_by_key(|s| s.id);
+    for sup in sups {
+        let kx = sup.kx.unwrap_or(0.0);
+        let ky = sup.ky.unwrap_or(0.0);
+        let kz = sup.kz.unwrap_or(0.0);
+        let dx = dof_num.map.get(&(sup.node_id, 0)).copied();
+        let dz = dof_num.map.get(&(sup.node_id, 1)).copied();
+        let angle = sup.angle.filter(|a| sup.support_type == "spring" && a.abs() > 1e-15 && (kx > 0.0 || ky > 0.0));
+        match (angle, dx, dz) {
+            (Some(angle), Some(dx), Some(dz)) => {
+                let (s, c) = angle.sin_cos();
+                let k_xz = (kx - ky) * s * c;
+                out.push((dx, dx, kx * c * c + ky * s * s));
+                out.push((dz, dz, kx * s * s + ky * c * c));
+                out.push((dx, dz, k_xz));
+                out.push((dz, dx, k_xz));
+            }
+            (Some(_), _, _) => {}
+            (None, _, _) => {
+                if kx > 0.0 {
+                    if let Some(d) = dx { out.push((d, d, kx)); }
+                }
+                if ky > 0.0 {
+                    if let Some(d) = dz { out.push((d, d, ky)); }
+                }
+            }
+        }
+        if kz > 0.0 && dof_num.dofs_per_node >= 3 {
+            if let Some(&d) = dof_num.map.get(&(sup.node_id, 2)) {
+                out.push((d, d, kz));
+            }
+        }
+    }
+    out
+}
+
+/// The support springs of a 3D model as diagonal stiffness entries `(i, i, k)`
+/// over all DOFs — what `assemble_3d` adds: `kx..krz` on their DOFs and `kw`
+/// on the warping DOF. For the nonlinear solvers that build their own
+/// tangents (see `support_spring_entries_2d`).
+pub fn support_spring_entries_3d(input: &SolverInput3D, dof_num: &DofNumbering) -> Vec<(usize, usize, f64)> {
+    let mut out = Vec::new();
+    let mut sups: Vec<&SolverSupport3D> = crate::ordered::values(&input.supports).collect();
+    sups.sort_by_key(|s| s.node_id);
+    for sup in sups {
+        let ks = [sup.kx, sup.ky, sup.kz, sup.krx, sup.kry, sup.krz, sup.kw];
+        for (local, k) in ks.into_iter().enumerate() {
+            let k = k.unwrap_or(0.0);
+            if k > 0.0 && local < dof_num.dofs_per_node {
+                if let Some(&d) = dof_num.map.get(&(sup.node_id, local)) {
+                    out.push((d, d, k));
+                }
+            }
+        }
+    }
+    out
 }

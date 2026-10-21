@@ -63,6 +63,10 @@ pub struct ElementForces {
     pub q_j: f64,
     pub point_loads: Vec<PointLoadInfo>,
     pub distributed_loads: Vec<DistributedLoadInfo>,
+    /// The axial span loads (positive toward J), as in `ElementForces3D`: N between the ends
+    /// is not linear under a trapezoidal or partial one.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub distributed_loads_x: Vec<DistributedLoadInfo>,
     #[serde(default)]
     pub hinge_start: bool,
     #[serde(default)]
@@ -178,6 +182,10 @@ pub enum DiagnosticCode {
     CholeskyFailedLuFallback,
     /// Post-solve displacement exceeds sanity threshold — likely mechanism or instability.
     ExcessiveDisplacement,
+    /// The factored stiffness matrix is singular or indefinite (Cholesky failed,
+    /// needed a diagonal shift, or produced a round-off pivot); results were
+    /// still returned and may be meaningless.
+    StiffnessNotPositiveDefinite,
 
     // ---- Conditioning ----
     /// Diagonal ratio > 1e8 (moderate conditioning concern).
@@ -234,6 +242,11 @@ pub enum DiagnosticCode {
     CircularConstraint,
     /// DOF is both constrained and restrained by a support.
     OverConstrainedDof,
+
+    // ---- Containment ----
+    /// A known issue that can make this result wrong, contained until it is fixed
+    /// (`known_issues.rs`): the finding id in `phase`, the issue number in `value`.
+    KnownIssue,
 }
 
 /// A structured diagnostic with enum code, severity, optional element/node
@@ -356,8 +369,9 @@ impl From<&StructuredDiagnostic> for SolverDiagnostic {
             DiagnosticCode::HighDiagonalRatio | DiagnosticCode::ExtremelyHighDiagonalRatio | DiagnosticCode::NearZeroDiagonal => "conditioning",
             DiagnosticCode::ResidualOk | DiagnosticCode::ResidualHigh | DiagnosticCode::EquilibriumOk | DiagnosticCode::EquilibriumViolation => "residual",
             DiagnosticCode::HighAspectRatio | DiagnosticCode::NegativeJacobian | DiagnosticCode::HighWarping | DiagnosticCode::PoorJacobianRatio | DiagnosticCode::SmallMinAngle => "element_quality",
-            DiagnosticCode::NoFreeDofs | DiagnosticCode::LocalMechanism | DiagnosticCode::SingularMatrix | DiagnosticCode::DisconnectedNode | DiagnosticCode::NearDuplicateNodes | DiagnosticCode::InstabilityRisk | DiagnosticCode::ShellDistortion | DiagnosticCode::SuspiciousLocalAxis | DiagnosticCode::ExcessiveDisplacement => "model_quality",
+            DiagnosticCode::NoFreeDofs | DiagnosticCode::LocalMechanism | DiagnosticCode::SingularMatrix | DiagnosticCode::DisconnectedNode | DiagnosticCode::NearDuplicateNodes | DiagnosticCode::InstabilityRisk | DiagnosticCode::ShellDistortion | DiagnosticCode::SuspiciousLocalAxis | DiagnosticCode::ExcessiveDisplacement | DiagnosticCode::StiffnessNotPositiveDefinite => "model_quality",
             DiagnosticCode::ConflictingConstraints | DiagnosticCode::CircularConstraint | DiagnosticCode::OverConstrainedDof => "constraints",
+            DiagnosticCode::KnownIssue => "known_issue",
         };
         let severity = match sd.severity {
             Severity::Info => "info",
@@ -813,6 +827,10 @@ pub struct CorotationalResult {
     pub iterations: usize,
     pub converged: bool,
     pub load_increments: usize,
+    /// Fraction of the load carried by the reported state: 1 when converged,
+    /// else that of the last converged increment (0 if none converged).
+    #[serde(default)]
+    pub load_factor: f64,
     pub max_displacement: f64,
 }
 
@@ -824,6 +842,10 @@ pub struct CorotationalResult3D {
     pub iterations: usize,
     pub converged: bool,
     pub load_increments: usize,
+    /// Fraction of the load carried by the reported state: 1 when converged,
+    /// else that of the last converged increment (0 if none converged).
+    #[serde(default)]
+    pub load_factor: f64,
     pub max_displacement: f64,
 }
 

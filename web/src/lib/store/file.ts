@@ -283,9 +283,10 @@ export function deserializeProject(text: string): boolean {
   const snapshot = d.snapshot as Record<string, unknown> | undefined;
   if (!snapshot) return false;
   if (d.version === '1.0') migrateSnapshotV1ToV2(snapshot);
-  if (!validateDedalFile({ ...d, version: DEDAL_FILE_VERSION })) return false;
+  if (!isValidDedalFile({ ...d, version: DEDAL_FILE_VERSION })) return false;
 
   const data = d as unknown as DedalFile;
+  forgetSessionDemandRevisions(data.snapshot);
   historyStore.pushState();
   modelStore.restore(data.snapshot);
   // Adopted separately from `restore()`, which is also the undo path — see project-provenance.ts.
@@ -312,8 +313,19 @@ export function deserializeProject(text: string): boolean {
   validateAxisSafety(data);
   resultsStore.clear(); // stale results dropped — the model must be re-solved
   resultsStore.forgetView();
-  noteAxisConventionMigrationIfNeeded(data.snapshot, data.analysisMode);
+  onProjectOpened(data.snapshot, uiStore.analysisMode);
   return true;
+}
+
+/**
+ * What every load path does once a stored project is the one on screen: the one-time notes about
+ * conventions it was saved under, and the re-check of results it was last solved with
+ * (`recheck.svelte.ts`). Shared by `.ded` open, tab activation, autosave restore and share links,
+ * so no entry point opens an old project in silence.
+ */
+export function onProjectOpened(snap: ModelSnapshot | undefined, analysisMode: string | undefined): void {
+  noteAxisConventionMigrationIfNeeded(snap, analysisMode);
+  if (snap) recheckStore.openProject(snap as never, analysisMode);
 }
 
 /**
@@ -354,6 +366,81 @@ export function noteBasicSelfWeightRuleIfNeeded(statesCase: boolean, analysisMod
   const dead = modelStore.model.loadCases.filter((c) => c.type === 'D');
   if (dead.length < 2) return;
   uiStore.toast(t('selfWeight.migratedMany').replaceAll('{case}', dead[0]!.name).replaceAll('{n}', String(dead.length)), 'info');
+}
+
+/**
+ * `validateDedalFile`, but a payload malformed enough to make the checks themselves throw
+ * (a `null` where an element record should be) is refused like any other invalid file rather
+ * than escaping as a TypeError from the middle of a load.
+ */
+function isValidDedalFile(data: unknown): data is DedalFile {
+  try {
+    return validateDedalFile(data);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Mark every detailing assembly in a snapshot as generated against unknown demands.
+ *
+ * `demandRevision` is a counter of THIS session's solves (`verificationStore.demandRevision`,
+ * starting at 0), and an assembly is "current" when its stamp equals the counter. A stamp read
+ * back from a file, an autosave or a stored session was minted by another session, so equality
+ * with this session's counter is a coincidence — or, for a crafted file, a choice: a project whose
+ * assemblies say `0` opened in a fresh tab passed the staleness gate (and the CAD export behind
+ * it) without anything having been solved. -1 is the value the migration already uses for
+ * "unknown", and the counter never takes it, so the bars read as stale until the model is
+ * solved and detailing regenerated in this session.
+ *
+ * Applied at the load boundaries only. `modelStore.restore()` is also the undo path, where the
+ * stamps were minted by this session and must be kept.
+ */
+export function forgetSessionDemandRevisions(snapshot: unknown): void {
+  const det = (snapshot as { detailing?: { assemblies?: unknown } } | null | undefined)?.detailing;
+  if (!det || !Array.isArray(det.assemblies)) return;
+  for (const a of det.assemblies) {
+    if (a && typeof a === 'object') (a as { demandRevision: number }).demandRevision = -1;
+  }
+}
+
+const SESSION_TAB_MODES = new Set(['2d', '3d', 'pro', 'edu']);
+
+/**
+ * Validate a stored session (a session `.ded` or the localStorage workspace) before any of it
+ * reaches the stores, and stamp it as foreign to this session.
+ *
+ * A single-tab `.ded` has always gone through `validateDedalFile`; a session went straight to
+ * `restoreSession`, so the same file wrapped in `{type:'session', tabs:[…]}` skipped every
+ * structural and referential check. Each tab's snapshot now passes the project gate, and the
+ * undo/redo stacks — also snapshots, restored on Ctrl+Z — are dropped if any entry would not.
+ * Returns null when any tab is refused: half a session is not what was saved.
+ */
+export function acceptSessionTabs(rawTabs: unknown): TabState[] | null {
+  if (!Array.isArray(rawTabs) || rawTabs.length === 0) return null;
+  const tabs: TabState[] = [];
+  for (const raw of rawTabs) {
+    if (!raw || typeof raw !== 'object') return null;
+    const tab = raw as TabState;
+    if (typeof tab.id !== 'string' || typeof tab.name !== 'string') return null;
+    if (!SESSION_TAB_MODES.has(tab.analysisMode)) return null;
+    const asFile = (snapshot: unknown) => ({ version: DEDAL_FILE_VERSION, name: tab.name, snapshot });
+    if (!isValidDedalFile(asFile(tab.modelSnapshot))) return null;
+    const stacksOk = [tab.undoStack, tab.redoStack].every(
+      (stack) => Array.isArray(stack) && stack.every((snap) => isValidDedalFile(asFile(snap))),
+    );
+    if (!stacksOk) {
+      tab.undoStack = [];
+      tab.redoStack = [];
+      tab.undoKinds = [];
+      tab.redoKinds = [];
+    }
+    for (const snap of [tab.modelSnapshot, ...tab.undoStack, ...tab.redoStack]) {
+      forgetSessionDemandRevisions(snap);
+    }
+    tabs.push(tab);
+  }
+  return tabs;
 }
 
 function validateDedalFile(data: unknown): data is DedalFile {
@@ -486,9 +573,11 @@ export async function loadFile(file: File): Promise<{ type: 'tab' | 'session'; c
   }
 
   if (isSessionFile(data)) {
-    // Session file: restore all tabs
-    tabManager.restoreSession(data.tabs, data.activeTabId);
-    return { type: 'session', count: data.tabs.length };
+    // Session file: restore all tabs — through the same gate a single-tab file passes.
+    const tabs = acceptSessionTabs(data.tabs);
+    if (!tabs) throw new Error(t('file.invalidFormat'));
+    tabManager.restoreSession(tabs, typeof data.activeTabId === 'string' ? data.activeTabId : '');
+    return { type: 'session', count: tabs.length };
   } else if (deserializeProject(text)) {
     askAboutOverlapsInModel();
     return { type: 'tab', count: 1 };
@@ -503,7 +592,7 @@ export async function loadFile(file: File): Promise<{ type: 'tab' | 'session'; c
  * The results as CSV. With `solveError` (the solve run for this export failed) and no results,
  * the file is its header and the reason, so the download still says what happened.
  */
-export function exportResultsCSV(solveError?: string): string {
+export function exportResultsCSV(solveError?: string, record?: ResultProvenance): string {
   const is3D = uiStore.is3DWorkspace;
   const r3d = resultsStore.results3D;
   const r2d = resultsStore.results;
@@ -514,6 +603,9 @@ export function exportResultsCSV(solveError?: string): string {
   lines.push(`# Stabileo — ${t('file.csvResults')} ${is3D ? '3D' : '2D'}`);
   lines.push(`# ${t('file.csvProject')}: ${modelStore.model.name}`);
   lines.push(`# ${t('file.csvDate')}: ${new Date().toLocaleString()}`);
+  // Which build produced these numbers from which model and settings (`provenance/result-provenance.ts`).
+  // The status row comes first and says STALE when the results predate registered changes.
+  for (const [k, v] of provenanceTextLines(record ?? currentResultProvenance(), provenanceLabels())) lines.push(`# ${k}: ${v}`);
   lines.push('');
   if (!r3d && !r2d) {
     lines.push(`# ${t('excel.solveFailed')}`);
@@ -573,8 +665,30 @@ export function exportResultsCSV(solveError?: string): string {
   return lines.join('\n');
 }
 
-export function downloadResultsCSV(solveError?: string): void {
-  const csv = exportResultsCSV(solveError);
+/**
+ * The results CSV with its provenance prepared as every export prepares it: engine hashes awaited
+ * (off the main thread), record bound to the state the export started on. Null, said to the
+ * reader, when the project moved meanwhile.
+ */
+export async function prepareResultsCSV(solveError?: string): Promise<string | null> {
+  let record: ResultProvenance;
+  try {
+    record = await provenanceForExport(captureProvenanceToken());
+  } catch (e) {
+    if (e instanceof ExportChangedError) { uiStore.toast(e.message, 'error'); return null; }
+    throw e;
+  }
+  return exportResultsCSV(solveError, record);
+}
+
+/**
+ * Download the results CSV. Async like every export that prints provenance: the record is
+ * prepared with the engine hashes awaited (off the main thread) and bound to the state the export
+ * started on (`provenanceForExport`); if the project moved meanwhile, nothing is written, and the
+ * reader is told.
+ */
+export async function downloadResultsCSV(solveError?: string): Promise<void> {
+  const csv = await prepareResultsCSV(solveError);
   if (!csv) return;
   const safeName = modelStore.model.name.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ _-]/g, '').trim() || t('file.defaultResults');
   downloadText(csv, `${safeName}_${t('file.defaultResults')}.csv`, 'text/csv');
@@ -583,23 +697,28 @@ export function downloadResultsCSV(solveError?: string): void {
 // ─── Export PNG ─────────────────────────────────────────────────
 
 /** A PNG given as a data URL, saved under the project's name. */
-export function downloadDataUrlPNG(dataUrl: string): void {
+export function downloadDataUrlPNG(dataUrl: string, embed?: (png: Uint8Array) => Uint8Array): void {
   const safeName = modelStore.model.name.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ _-]/g, '').trim() || t('file.defaultStructure');
   const bin = atob(dataUrl.split(',')[1] ?? '');
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  downloadBlob(new Blob([bytes], { type: 'image/png' }), `${safeName}.png`);
+  downloadBlob(new Blob([(embed ? embed(bytes) : bytes) as BlobPart], { type: 'image/png' }), `${safeName}.png`);
 }
 
-export function downloadCanvasPNG(canvas: HTMLCanvasElement): void {
+export function downloadCanvasPNG(canvas: HTMLCanvasElement, embed?: (png: Uint8Array) => Uint8Array): void {
   canvas.toBlob((blob) => {
     if (!blob) return;
     const safeName = modelStore.model.name.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ _-]/g, '').trim() || t('file.defaultStructure');
-    downloadBlob(blob, `${safeName}.png`);
+    if (!embed) { downloadBlob(blob, `${safeName}.png`); return; }
+    void blob.arrayBuffer().then((b) => downloadBlob(new Blob([embed(new Uint8Array(b)) as BlobPart], { type: 'image/png' }), `${safeName}.png`));
   }, 'image/png');
 }
 
 import { hydrateProjectProvenance } from './project-provenance';
+import { recheckStore } from './recheck.svelte';
+import { currentResultProvenance, provenanceLabels, captureProvenanceToken, provenanceForExport, ExportChangedError } from './result-provenance';
+import type { ResultProvenance } from '../provenance/result-provenance';
+import { provenanceTextLines } from '../provenance/result-provenance';
 import { askAboutOverlapsInModel } from '../model/edit/connection-questions';
 import { viewVisibility } from './view-state.svelte';
 
@@ -654,7 +773,9 @@ export function acceptAutosavePayload(raw: unknown): DedalFile | null {
     migrateSnapshotV1ToV2(data.snapshot as Record<string, unknown>);
     data.version = DEDAL_FILE_VERSION;
   }
-  if (!validateDedalFile(data)) return null;
+  if (!isValidDedalFile(data)) return null;
+  // An autosave is read back by a later page load — a different session (see the helper).
+  forgetSessionDemandRevisions(data.snapshot);
   return data as unknown as DedalFile;
 }
 
@@ -822,7 +943,11 @@ export function loadWorkspaceFromLocalStorage(): DedalSessionFile | null {
     if (!raw) return null;
     const data = JSON.parse(raw);
     if (!isSessionFile(data)) return null;
-    return data;
+    // localStorage is shared by everything served from this origin and survives the session
+    // that wrote it: read back through the same gate as a session file.
+    const tabs = acceptSessionTabs(data.tabs);
+    if (!tabs) return null;
+    return { ...data, tabs };
   } catch {
     return null;
   }

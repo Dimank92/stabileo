@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { downloadResultText } from '../../lib/export/provenance-attach';
   import { resultCaseName } from '../../lib/engine/settlement-case';
   import { untrack } from 'svelte';
   import { activeQuantity, activeRepresentation, representationsFor, showQuantityAs } from '../../lib/store/result-view';
@@ -6,12 +7,14 @@
   import { modelStore, uiStore, resultsStore } from '../../lib/store';
   import ProResultScopes from './ProResultScopes.svelte';
   import ProNonlinearReport from './ProNonlinearReport.svelte';
+  import CertificateStatus from '../CertificateStatus.svelte';
+  import DiscretizationStatus from '../DiscretizationStatus.svelte';
+  import { certificateStore, formatBound } from '../../lib/store/certificate.svelte';
   import ProResultTableModes, { type TableMode } from './ProResultTableModes.svelte';
   import ProDeflectionTable from './ProDeflectionTable.svelte';
   import ProStoryDriftTable from './ProStoryDriftTable.svelte';
   import { deformedView } from '../../lib/store/deformed-view.svelte';
-  import { downloadText } from '../../lib/store/file';
-  import { t } from '../../lib/i18n';
+    import { t } from '../../lib/i18n';
   // The raw forces report is one more answer to "which output am I reading", which is the
   // question this tab's strip already asks. It is NOT in Documentos: §5 keeps raw solver
   // results and reinforcement design as two documents.
@@ -311,7 +314,7 @@
 
   function exportQueryCsv() {
     const csv = rowsToCsv(filteredRows, exportMeta);
-    downloadText(csv, `stabileo-query-${queryComponent}-${exportMeta.sourceKind}.csv`, 'text/csv;charset=utf-8;');
+    void downloadResultText(csv, `stabileo-query-${queryComponent}-${exportMeta.sourceKind}.csv`, 'text/csv;charset=utf-8;');
   }
 
 
@@ -390,6 +393,13 @@
    */
   const DIAGRAM_KINDS = ['axial', 'momentY', 'momentZ', 'shearY', 'shearZ', 'torsion'];
 </script>
+
+<!-- The certified bound on a shell resultant's error (`store/certificate.svelte.ts`), when there is one. -->
+{#snippet shellPm(type: string, id: number, k: 'sigmaXx' | 'sigmaYy' | 'tauXy' | 'mx' | 'my' | 'mxy')}
+  {@const b = certificateStore.shellBound(type === 'Plate' ? 'plate' : 'quad', id)}
+  {#if b}<span class="cert-pm" title={t('certificate.shellTooltip')}> ± {formatBound(b[k])}</span>{/if}
+{/snippet}
+
 
 <div class="pro-res">
   <div class="pro-res-header">
@@ -585,6 +595,8 @@
 
     <ProResultScopes />
     <ProNonlinearReport />
+    <CertificateStatus />
+    <DiscretizationStatus />
 
     <!-- View mode selector -->
     {#if hasCombinations}
@@ -894,9 +906,9 @@
                   <tr class:selected={uiStore.selectedShells.has(r.key)} onclick={() => { uiStore.selectMode = 'shells'; uiStore.selectShell(r.key, false); }} style="cursor:pointer">
                     <td class="col-id">{r.id}</td>
                     <td class="col-type">{r.type}</td>
-                    <td class="col-num" class:gov={shellGov.sigmaXx === r.key}>{fmtNum(r.sigmaXx)}</td>
-                    <td class="col-num" class:gov={shellGov.sigmaYy === r.key}>{fmtNum(r.sigmaYy)}</td>
-                    <td class="col-num" class:gov={shellGov.tauXy === r.key}>{fmtNum(r.tauXy)}</td>
+                    <td class="col-num" class:gov={shellGov.sigmaXx === r.key}>{fmtNum(r.sigmaXx)}{@render shellPm(r.type, r.id, 'sigmaXx')}</td>
+                    <td class="col-num" class:gov={shellGov.sigmaYy === r.key}>{fmtNum(r.sigmaYy)}{@render shellPm(r.type, r.id, 'sigmaYy')}</td>
+                    <td class="col-num" class:gov={shellGov.tauXy === r.key}>{fmtNum(r.tauXy)}{@render shellPm(r.type, r.id, 'tauXy')}</td>
                     <td class="col-num" class:gov={shellGov.sigma1 === r.key}>{fmtNum(r.sigma1)}</td>
                     <td class="col-num" class:gov={shellGov.sigma2 === r.key}>{fmtNum(r.sigma2)}</td>
                     <td class="col-num col-max" class:gov={shellGov.vonMises === r.key}>{fmtNum(r.vonMises)}</td>
@@ -924,9 +936,9 @@
                   <tr class:selected={uiStore.selectedShells.has(r.key)} onclick={() => { uiStore.selectMode = 'shells'; uiStore.selectShell(r.key, false); }} style="cursor:pointer">
                     <td class="col-id">{r.id}</td>
                     <td class="col-type">{r.type}</td>
-                    <td class="col-num" class:gov={shellGov.mx === r.key}>{fmtNum(r.mx)}</td>
-                    <td class="col-num" class:gov={shellGov.my === r.key}>{fmtNum(r.my)}</td>
-                    <td class="col-num" class:gov={shellGov.mxy === r.key}>{fmtNum(r.mxy)}</td>
+                    <td class="col-num" class:gov={shellGov.mx === r.key}>{fmtNum(r.mx)}{@render shellPm(r.type, r.id, 'mx')}</td>
+                    <td class="col-num" class:gov={shellGov.my === r.key}>{fmtNum(r.my)}{@render shellPm(r.type, r.id, 'my')}</td>
+                    <td class="col-num" class:gov={shellGov.mxy === r.key}>{fmtNum(r.mxy)}{@render shellPm(r.type, r.id, 'mxy')}</td>
                   </tr>
                 {/each}
               </tbody>
@@ -1480,4 +1492,5 @@
     border: 1px solid var(--st-hair-strong); border-radius: 3px; cursor: pointer;
   }
   .pro-res-hint { margin: 2px 8px 6px; font-size: 0.62rem; color: var(--st-text-3); }
+  .cert-pm { opacity: 0.7; font-size: 0.85em; cursor: help; white-space: nowrap; }
 </style>
