@@ -1651,6 +1651,8 @@ const es: Record<string, string> = {
   'ifc.meshSize': 'Tamaño de malla (m):',
   'ifc.declare': 'Declararlos como elementos',
   'ifc.storeysAsLevels': 'Los {n} pisos del archivo como niveles',
+  'ifc.analytical': 'Armar el modelo de cálculo: columnas y vigas a los niveles, vigas a las columnas y una losa por planta',
+  'ifc.fixBases': 'Empotrar el pie de las columnas y muros más bajos',
   'ifc.shells': 'Láminas',
   'ifc.physical': 'Elementos',
   'ifc.importedBuilding': 'IFC importado: {e} barras, {s} láminas, {p} elementos',

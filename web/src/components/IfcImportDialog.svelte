@@ -2,7 +2,9 @@
   import { modelStore, uiStore, resultsStore } from '../lib/store';
   import type { IfcMember, IfcMappingResult, IfcStorey, IfcSurface } from '../lib/ifc/ifc-mapper';
   import { t, tp } from '../lib/i18n';
-  import { buildIfcFragment, classesIn, connectShells, storeyLevels, type ClassChoice, type IfcBuilding } from '../lib/ifc/ifc-physical';
+  import { buildIfcFragment, chosenParts, classesIn, connectShells, fixBases, storeyLevels, type ClassChoice, type IfcBuilding } from '../lib/ifc/ifc-physical';
+  import { analyticalFromIfc, type FloorRegion } from '../lib/ifc/ifc-analytical';
+  import { meshFloors } from '../lib/ifc/ifc-floors';
   import { insertFragment } from '../lib/model/edit/transformed-copy';
   import { IDENTITY } from '../lib/model/edit/affine';
   import { placementStore } from '../lib/store/placement.svelte';
@@ -21,9 +23,17 @@
   let meshSize = $state(1);
   let declareElements = $state(true);
   let storeysAsLevels = $state(true);
+  let fixFeet = $state(true);
+  /**
+   * Read the file as a model of calculation (`ifc-analytical.ts`): columns and beams to the levels,
+   * beams to the columns with their eccentricity as insertion, a slab per floor with its system.
+   * Off, the members are welded where the file places them.
+   */
+  let analytical = $state(true);
+  let floors = $state<FloorRegion[]>([]);
   const BAR_CHOICES: ClassChoice[] = ['column', 'beam', 'brace', 'ignore'];
   const SURFACE_CHOICES: ClassChoice[] = ['slab', 'wall', 'ignore'];
-  const canImport = $derived(!!building && building.bars + building.shells > 0);
+  const canImport = $derived(!!building && building.bars + building.shells + floors.length > 0);
   let snapTolerance = $state(0.01);
   /** IfcMember — braces, purlins, struts — as truss members, or as frames. */
   let membersAsTruss = $state(true);
@@ -84,9 +94,16 @@
       return;
     }
     try {
-      building = buildIfcFragment(members, surfaces, {
-        snapTolerance, membersAsTruss, choices, meshSize, declare: declareElements, levels: levelsFor(replace),
-      });
+      const levels = levelsFor(replace);
+      if (analytical && levels.length > 0) {
+        const parts = chosenParts(members, surfaces, choices);
+        const an = analyticalFromIfc(parts.members, parts.surfaces, levels);
+        floors = an.floors;
+        building = buildIfcFragment(an.members, an.walls, { snapTolerance, membersAsTruss, choices, meshSize, declare: declareElements, levels });
+      } else {
+        floors = [];
+        building = buildIfcFragment(members, surfaces, { snapTolerance, membersAsTruss, choices, meshSize, declare: declareElements, levels });
+      }
       error = null;
     } catch (e: any) {
       error = e.message || t('ifc.mapError');
@@ -118,6 +135,8 @@
       if (storeysAsLevels && storeys.length > 0) modelStore.setGrid({ axes: [], levels: storeyLevels(storeys) });
       const r = insertFragment(b.fragment, [{ A: IDENTITY, t: [0, 0, 0] }]);
       connectShells(r.quads, r.plates);
+      if (floors.length) meshFloors(floors, { meshSize, declare: declareElements });
+      if (fixFeet) fixBases();
     });
     resultsStore.clear();
     // IFC is imported in PRO and stays there. Setting the mode to '3d' here used to switch the
@@ -205,6 +224,10 @@
                 {#if storeys.length > 0}
                   <label class="ifc-field"><input type="checkbox" bind:checked={storeysAsLevels} onchange={() => remapModel()} /> {tp('ifc.storeysAsLevels', { n: storeys.length })}</label>
                 {/if}
+                {#if storeys.length > 0 && storeysAsLevels}
+                  <label class="ifc-field"><input type="checkbox" bind:checked={analytical} onchange={() => remapModel()} data-testid="ifc-analytical" /> {t('ifc.analytical')}</label>
+                {/if}
+                <label class="ifc-field"><input type="checkbox" bind:checked={fixFeet} data-testid="ifc-fix-bases" /> {t('ifc.fixBases')}</label>
               </div>
             </div>
           {/if}

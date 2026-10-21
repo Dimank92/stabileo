@@ -1658,6 +1658,8 @@ const en: Record<string, string> = {
   'ifc.meshSize': 'Mesh size (m):',
   'ifc.declare': 'Declare them as elements',
   'ifc.storeysAsLevels': 'The file’s {n} stories as levels',
+  'ifc.analytical': 'Build the analysis model: columns and beams to the levels, beams to the columns and one slab per floor',
+  'ifc.fixBases': 'Fix the feet of the lowest columns and walls',
   'ifc.shells': 'Shells',
   'ifc.physical': 'Elements',
   'ifc.importedBuilding': 'IFC imported: {e} bars, {s} shells, {p} elements',

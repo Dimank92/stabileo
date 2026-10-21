@@ -3506,6 +3506,8 @@ const pt: Translations = {
   'ifc.meshSize': 'Tamanho da malha (m):',
   'ifc.declare': 'Declará-los como elementos',
   'ifc.storeysAsLevels': 'Os {n} pavimentos do arquivo como níveis',
+  'ifc.analytical': 'Montar o modelo de cálculo: pilares e vigas nos níveis, vigas nos pilares e uma laje por pavimento',
+  'ifc.fixBases': 'Engastar o pé dos pilares e paredes mais baixos',
   'ifc.shells': 'Cascas',
   'ifc.physical': 'Elementos',
   'ifc.importedBuilding': 'IFC importado: {e} barras, {s} cascas, {p} elementos',
