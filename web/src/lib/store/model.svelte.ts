@@ -839,6 +839,26 @@ export type Load =
   | { type: 'prestress3d'; data: PrestressLoad3D }
   | { type: 'displacement3d'; data: NodeDisplacement3D };
 
+/**
+ * What each type of load stands on, by the number it carries: a node (`nodeId`), a member
+ * (`elementId`) or a shell (`quadId`, a plate's with `on: 'plate'`). One table for whatever
+ * deletes, renumbers or checks what a load names, so a new type of load says here where it sits.
+ * Each delete kept its own list, and the lists written before tendons and imposed displacements
+ * left those on a number the next member or node drawn would take.
+ */
+export const LOAD_TARGET: Record<Load['type'], 'node' | 'member' | 'shell'> = {
+  nodal: 'node', nodal3d: 'node', displacement3d: 'node',
+  distributed: 'member', pointOnElement: 'member', thermal: 'member',
+  distributed3d: 'member', pointOnElement3d: 'member', prestress3d: 'member',
+  surface3d: 'shell', thermalQuad3d: 'shell',
+};
+/** The node a load stands on; undefined for one on a member or a shell. */
+export const loadNodeId = (l: Load): number | undefined =>
+  LOAD_TARGET[l.type] === 'node' ? (l.data as { nodeId: number }).nodeId : undefined;
+/** The member a load stands on; undefined for one on a node or a shell. */
+export const loadMemberId = (l: Load): number | undefined =>
+  LOAD_TARGET[l.type] === 'member' ? (l.data as { elementId: number }).elementId : undefined;
+
 export type LoadCaseType = string;
 
 export interface LoadCase {
@@ -1397,7 +1417,20 @@ function createModelStore() {
     connector: 1,
     footing: 1,
     soilProfile: 1,
+    spectrum: 1,
   });
+
+  /**
+   * The first spectrum number no spectrum and no spectral case uses. A spectrum's number is never
+   * given again: a case on a deleted one (an older file, a spectrum set without `addUserSpectrum`)
+   * would otherwise solve on whatever spectrum took it.
+   */
+  function firstUnusedSpectrumId(): number {
+    let max = 0;
+    for (const s of model.dynamics?.spectra ?? []) max = Math.max(max, s.id);
+    for (const c of model.loadCases) if (c.spectral?.source.kind === 'user') max = Math.max(max, c.spectral.source.spectrumId);
+    return max + 1;
+  }
 
 
 
@@ -2476,6 +2509,9 @@ function createModelStore() {
         ?? (Math.max(0, ...model.footings.keys()) + 1);
       nextId.soilProfile = s.nextId.soilProfile
         ?? (Math.max(0, ...(model.geotechnical?.profiles ?? []).map((p) => p.id)) + 1);
+      // Older files have no spectrum counter, and a saved one is never behind what is in use.
+      const savedSpectrumId = s.nextId.spectrum;
+      nextId.spectrum = Math.max(firstUnusedSpectrumId(), Number.isSafeInteger(savedSpectrumId) ? savedSpectrumId! : 1);
     },
 
     /** Explicit user action: clear the CAD-draft "unreviewed" tag. */
@@ -2963,8 +2999,8 @@ function createModelStore() {
         }
       }
       model.supports = new Map(model.supports);
-      const keepLoad = (l: Load) =>
-        !((l.type === 'nodal' || l.type === 'nodal3d') && l.data.nodeId === id);
+      // Every load on the node, an imposed displacement too (`LOAD_TARGET`).
+      const keepLoad = (l: Load) => loadNodeId(l) !== id;
       model.loads = model.loads.filter(keepLoad);
       if (_bulkLoadBuffer) _bulkLoadBuffer = _bulkLoadBuffer.filter(keepLoad);
       // Cascade to connectors/constraints: a dangling node reference is worse
@@ -3098,6 +3134,12 @@ function createModelStore() {
             : r)),
         };
       }
+      // The loads a floor-load definition wrote go with it (`defined-loads.ts`). The rewrite after
+      // keeps a marked load whose definition is missing as a plain load, so they stayed in every
+      // solve with nothing to say where they came from.
+      const keepLoad = (l: Load) => (l.data as { fromDef?: number }).fromDef !== id;
+      if (!model.loads.every(keepLoad)) model.loads = model.loads.filter(keepLoad);
+      if (_bulkLoadBuffer) _bulkLoadBuffer = _bulkLoadBuffer.filter(keepLoad);
       model.groups.delete(id);
       model.groups = new Map(model.groups);
       return 'removed';
@@ -3129,11 +3171,10 @@ function createModelStore() {
        */
       replaceInGroups('elements', id);
       replaceInSelfWeight(id);
-      model.loads = model.loads.filter(l =>
-        !((l.type === 'distributed' || l.type === 'pointOnElement' || l.type === 'thermal'
-          || l.type === 'distributed3d' || l.type === 'pointOnElement3d') &&
-          (l.data as any).elementId === id)
-      );
+      // Every load on the member, a tendon too (`LOAD_TARGET`).
+      const keepLoad = (l: Load) => loadMemberId(l) !== id;
+      model.loads = model.loads.filter(keepLoad);
+      if (_bulkLoadBuffer) _bulkLoadBuffer = _bulkLoadBuffer.filter(keepLoad);
       // A footing SURVIVES the loss of its column: its node, its dimensions and its soil
       // are all still there, and its bearing and thickness are still checkable. What it
       // loses is the punching perimeter and the dowel geometry, so the reference is cleared
@@ -3775,6 +3816,7 @@ function createModelStore() {
       nextId.group = 1;
       nextId.footing = 1;
       nextId.soilProfile = 1;
+      nextId.spectrum = 1;
       model.provenance = undefined;
       lastKinematicResult = null;
       uiStore.useNative3DPresentation();
@@ -4312,6 +4354,30 @@ function createModelStore() {
         else (lc as unknown as Record<string, unknown>)[k] = JSON.parse(JSON.stringify(v));
       }
       model.loadCases = [...model.loadCases];
+      return true;
+    },
+
+    /**
+     * A spectrum of the project's own (`ProUserSpectra.svelte`), under a number never given before:
+     * as the highest in use plus one, a spectrum deleted and a new one added had the same number,
+     * and a case still on the old one solved on the new one's table without a word.
+     */
+    addUserSpectrum(make: (id: number) => import('../engine/spectral-case').UserSpectrum): number {
+      const id = Math.max(nextId.spectrum, firstUnusedSpectrumId());
+      nextId.spectrum = id + 1;
+      this.setDynamics({ ...model.dynamics, spectra: [...(model.dynamics?.spectra ?? []), { ...make(id), id }] });
+      return id;
+    },
+
+    /** The spectral cases on a spectrum. */
+    casesOnSpectrum(id: number): LoadCase[] {
+      return model.loadCases.filter((c) => c.spectral?.source.kind === 'user' && c.spectral.source.spectrumId === id);
+    },
+
+    /** Remove a spectrum; false, and nothing removed, while a spectral case is on it (`casesOnSpectrum`). */
+    removeUserSpectrum(id: number): boolean {
+      if (this.casesOnSpectrum(id).length > 0) return false;
+      this.setDynamics({ ...model.dynamics, spectra: (model.dynamics?.spectra ?? []).filter((s) => s.id !== id) });
       return true;
     },
 
