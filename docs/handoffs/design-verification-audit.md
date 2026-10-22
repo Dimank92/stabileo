@@ -6,6 +6,111 @@ entre las alternativas que explora el diseño y las geometrías que finalmente c
 La prioridad es cerrar esa distancia y medir todos los bloqueos físicos antes de ampliar
 presupuestos de búsqueda.
 
+## Diagnóstico de los 1101 bloqueos retenidos
+
+Sobre el armado final de `d605bc305`, con fuerzas resueltas nuevamente y regeneración exacta.
+Esta sección diagnostica la asignación de 140 aprobados; los experimentos indicados abajo
+son continuaciones independientes de esa misma asignación.
+
+### Qué está chocando
+
+| Geometría del par | Bloqueos |
+| --- | ---: |
+| Barras superiores entre sí | 550 |
+| Barras inferiores entre sí | 147 |
+| Otros pares longitudinales | 103 |
+| Barra longitudinal con pieza transversal | 297 |
+| Dos piezas transversales | 4 |
+| Total | 1101 |
+
+Son 836 interpenetraciones y 265 déficits de separación. Dentro de los 550 pares superiores,
+172 son empalmes registrados, 196 son otras barras de tramos paralelos, 177 corresponden a
+líneas cruzadas y cinco son barras del mismo miembro. Los empalmes registrados suman 276
+incluyendo 104 inferiores; no se suman nuevamente a la tabla.
+
+Los 297 choques longitudinal/transversal se reparten en 146 contra la jaula del propio miembro
+(incluidas barras fusionadas), 125 contra la del vecino y 26 contra piezas del nudo. La escalera
+de traslaciones omite pares con piezas transversales: los 301 pares que incluyen esas piezas
+no reciben propuestas de desplazamiento. Eso conserva contención y recubrimiento, pero requiere
+un operador que reconstruya la jaula o la distribución de barras. Repetir la escalera no lo aporta.
+
+### Causas medidas y ensayos que las distinguen
+
+1. **Cierre incompatible con todas las esquinas disponibles.** En una sección de la viga 225,
+   las cuatro ubicaciones del cierre arrojan −4,251 mm de separación mínima. En la 328, la mejor
+   de las cuatro arroja −3,837 mm. El selector ya toma una de las mejores alternativas: cambiar
+   sólo la orientación no soluciona esas secciones. En 225 hay 85 conflictos propios, repetidos
+   a lo largo del miembro. Los 33 propios de 328 son principalmente del armado superior,
+   no inferior: 32 contra estribos y uno entre barras superiores.
+2. **Una mejora local puede bloquear el nudo vecino.** Redistribuir el inferior de 225 de 8+5
+   a 7+6 barras reduce el total de 1101 a 983, pero crea dos interpenetraciones de aproximadamente
+   15 mm con la barra vertical `15000:0-L2-v5` de la columna 43, antes aprobada. Además aumenta
+   una condición de empalme sin disponer. El algoritmo lo rechaza correctamente. La alternativa
+   7+3 de 328 baja a 1071 sin perder miembros aprobados, pero aumenta la categoría de conflictos
+   por separación; también se rechaza. Hace falta evaluar cambios coordinados antes de aceptar
+   el conjunto, conservando los controles actuales.
+3. **Las familias más gruesas tropiezan con anclaje y congestión.** Una segunda búsqueda superior,
+   con límite de 64 detallados y 512 verificaciones, no mejora los 1101. Realiza 59 detallados y
+   511 verificaciones: 99 propuestas fallan nominalmente, 56 se rechazan tras detallar y tres
+   no producen avance. Al repetir solamente la verificación nominal de esas 99 propuestas,
+   se reproducen exactamente los miembros rechazados. 89 propuestas fallan por anclaje, 20
+   por congestión y dos por flexión; las categorías se solapan. Entre los rechazos físicos
+   aparecen nuevos déficits de recubrimiento, empalmes y bloqueos de columnas. Aumentar sólo
+   el presupuesto no resuelve esta ejecución ni demuestra que se agotaron las alternativas.
+4. **Cuatro estaciones de estribos se solapan.** En 358 hay dos conjuntos de zonas contiguas
+   a 1 mm; en 356 y 381 aparecen dos estaciones de la misma zona separadas aproximadamente
+   3,8 mm, y en 378 dos zonas se encuentran a 3,7 mm. Son interferencias del posicionamiento
+   longitudinal de los estribos, distintas de los cierres y trabas corregidos anteriormente.
+   La reserva de la envolvente debe aplicarse también entre conjuntos y al rematar zonas,
+   conservando cobertura y separación máxima.
+5. **Cuatro vigas carecen de margen resistente ante la geometría final.** Las 192 y 195 pasan
+   nominalmente con utilización 0,992, pero con la tolerancia de profundidad de 15 mm quedan
+   en 1,029: demanda 405,53 kN·m frente a capacidad 394,03. Las 262 y 265 pasan de 0,973 a
+   1,005: 300,51 frente a 299,01 kN·m. En los cuatro registros no hay desplazamiento adicional
+   de capas; la tolerancia final basta para hacerlas fallar. Los otros 13 registros resistentes
+   fallidos son los provisionales biaxiales ya conocidos. Aumentar acero de forma general no
+   explica ni resuelve los 220 miembros fallidos.
+
+Los 1101 no incluyen 234 conflictos clasificados como marginales. Entre los 220 miembros
+fallidos hay 18 sin conflictos de las categorías overlap/clearance: nueve mantienen condiciones
+de empalme de columna y otros nueve condiciones de choques marginales. Dos de estos últimos,
+177 y 189, además tienen una condición de generación por contención en un doblez. Reducir sólo
+el contador de conflictos no basta para aprobarlos; las condiciones abiertas también deben cerrar.
+
+### Mejora pequeña encontrada y orden de trabajo
+
+El barrido de redistribución inferior considera nueve alternativas y acepta una: cambiar la
+viga 227 a filas 6+5 reduce **1101 → 1095**, conserva las 140 aprobaciones y se regenera exactamente.
+No agrega aprobados. Es una continuación medida, no un nuevo resultado de la secuencia completa
+desde cero ni una modificación del diseño por defecto.
+
+Los siguientes cambios deben abordar causas distintas:
+
+- Distribuir estaciones transversales considerando la envolvente de conjuntos contiguos.
+  Casos de aceptación: 356, 358, 378 y 381, sin perder cobertura ni superar el paso máximo.
+- Incluir factibilidad de cierres en las semillas y ampliar familias/distribuciones inferiores.
+  Rechazar barato una sección que choca en las cuatro esquinas, antes del detallado del edificio.
+- Usar el rechazo como guía de un vecindario: por ejemplo, 225 y columna 43, con sus empalmes.
+  Proponer el cambio compuesto y verificarlo completo; ninguna alternativa intermedia se publica.
+- Diseñar la transición entre patrones y el espacio ocupado en la jaula receptora. La continuidad
+  uniforme ayuda, pero sus alternativas actuales no resuelven las 276 parejas de empalme en conflicto.
+- Considerar la profundidad final y su tolerancia al dimensionar la semilla, para que las cuatro
+  vigas resistentes no dependan de un margen nominal insuficiente.
+
+Reproducción de las continuaciones desde `web/`, usando el audit de la ejecución completa:
+
+```sh
+STABILEO_REPAIR_SNAPSHOT=/tmp/design-continuity-audit.json STABILEO_REPAIR_CATALOG=64 STABILEO_REPAIR_AUDIT=/tmp/design-catalog-again.json npx vitest run --project unit src/lib/store/__tests__/design-next-conflicts-experiment.test.ts
+STABILEO_REPAIR_SNAPSHOT=/tmp/design-continuity-audit.json STABILEO_REPAIR_OPERATOR=redistributeLayers STABILEO_REPAIR_RUNS=16 STABILEO_REPAIR_TRACE=1 STABILEO_REPAIR_AUDIT=/tmp/design-rows-trace.json npx vitest run --project unit src/lib/store/__tests__/design-next-conflicts-experiment.test.ts
+STABILEO_REPAIR_SNAPSHOT=/tmp/design-continuity-audit.json STABILEO_REPAIR_NOMINAL_AUDIT=/tmp/design-catalog-again.json npx vitest run --project unit src/lib/store/__tests__/design-next-conflicts-experiment.test.ts
+STABILEO_CLOSURE_AUDIT=/tmp/design-continuity-audit.json npx vitest run --project unit src/lib/engine/detailing/__tests__/saved-closure-diagnosis.test.ts
+```
+
+La traza compara cada propuesta con la asignación restaurada y conserva cambios, causas de
+regresión respecto de esa asignación, miembros que adquirirían bloqueos
+y los conflictos/condiciones que los bloquean, además de los chequeos resistentes finales.
+La repetición nominal requiere un barrido sin aceptaciones, para no usar vecindarios distintos.
+
 ## Ampliación: espacio de las trabas y alternativas nuevas del catálogo
 
 La ejecución completa desde cero termina con **140 aprobados y 1101 conflictos bloqueantes**:
