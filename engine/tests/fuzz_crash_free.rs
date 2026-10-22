@@ -7,7 +7,7 @@
 use dedaliano_engine::solver::{linear, modal, staged, time_integration};
 use dedaliano_engine::types::*;
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 mod fuzz_models;
 use fuzz_models::{random_2d_model, random_3d_model};
@@ -223,7 +223,7 @@ fn fuzz_2d_extreme_stiffness_1k() {
         // Assign extreme stiffness values to materials
         for mat in input.materials.values_mut() {
             // Very wide range: 1.0 to 1e12
-            mat.e = 10f64.powf(rng.gen_range(0.0..12.0));
+            mat.e = 10f64.powf(rng.random_range(0.0..12.0));
         }
         let result = std::panic::catch_unwind(|| linear::solve_2d(&input));
         match result {
@@ -293,21 +293,21 @@ fn fuzz_2d_mixed_loads_1k() {
         // Add extra loads of every type
         let elem_ids: Vec<usize> = input.elements.values().map(|e| e.id).collect();
         if !elem_ids.is_empty() {
-            let eid = elem_ids[rng.gen_range(0..elem_ids.len())];
+            let eid = elem_ids[rng.random_range(0..elem_ids.len())];
             input.loads.push(SolverLoad::Distributed(SolverDistributedLoad {
                 element_id: eid,
-                q_i: rng.gen_range(-200.0..200.0),
-                q_j: rng.gen_range(-200.0..200.0),
+                q_i: rng.random_range(-200.0..200.0),
+                q_j: rng.random_range(-200.0..200.0),
                 a: None,
                 b: None,
             }));
-            let eid2 = elem_ids[rng.gen_range(0..elem_ids.len())];
+            let eid2 = elem_ids[rng.random_range(0..elem_ids.len())];
             input.loads.push(SolverLoad::PointOnElement(SolverPointLoadOnElement {
                 element_id: eid2,
-                a: rng.gen_range(0.05..0.95),
-                p: rng.gen_range(-300.0..300.0),
-                px: Some(rng.gen_range(-100.0..100.0)),
-                my: Some(rng.gen_range(-50.0..50.0)),
+                a: rng.random_range(0.05..0.95),
+                p: rng.random_range(-300.0..300.0),
+                px: Some(rng.random_range(-100.0..100.0)),
+                my: Some(rng.random_range(-50.0..50.0)),
             }));
         }
 

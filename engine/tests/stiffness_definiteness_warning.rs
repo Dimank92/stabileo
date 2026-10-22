@@ -16,14 +16,14 @@ fn warned(d: &[StructuredDiagnostic]) -> bool {
         .any(|x| x.code == DiagnosticCode::StiffnessNotPositiveDefinite && x.severity == Severity::Warning)
 }
 
-/// Fuzz models the certificate checker found non-positive-definite: 2D seed 86
-/// (Cholesky "succeeds" with a 2e-16 pivot ratio) and 3D seed 31 (Cholesky
-/// fails, dense LU returns results).
+/// Fuzz models the certificate checker found non-positive-definite: 2D seed 41
+/// and 3D seed 2 (under rand 0.10's RNG stream; the solver still returns
+/// results, flagged with a warning).
 #[test]
 fn non_positive_definite_fuzz_models_are_warned() {
-    let res = solve_2d(&fuzz_models::random_2d_model(86)).expect("solver returns results");
+    let res = solve_2d(&fuzz_models::random_2d_model(41)).expect("solver returns results");
     assert!(warned(&res.structured_diagnostics), "{:?}", res.structured_diagnostics);
-    let res = solve_3d(&fuzz_models::random_3d_model(100_031)).expect("solver returns results");
+    let res = solve_3d(&fuzz_models::random_3d_model(100_002)).expect("solver returns results");
     assert!(warned(&res.structured_diagnostics), "{:?}", res.structured_diagnostics);
     let d = res.structured_diagnostics.iter().find(|x| x.code == DiagnosticCode::StiffnessNotPositiveDefinite).unwrap();
     assert!(d.message.contains("singular or indefinite") && d.message.contains("meaningless"), "{}", d.message);
