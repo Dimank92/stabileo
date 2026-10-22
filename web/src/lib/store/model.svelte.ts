@@ -1414,6 +1414,10 @@ function createModelStore() {
     nu: 0.3,
     rho: 78.5,
     fy: 250,
+    // ASTM A36's minimum, as the grade catalogue has it (`data/structural-grades.ts`). Without it
+    // every steel check of a new model, the bundled examples included, read "not evaluated: the
+    // material lacks Fu", which is what a first user met on opening the steel design.
+    fu: 400,
   };
 
   const defaultSection: Section = {
