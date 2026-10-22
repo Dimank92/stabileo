@@ -128,7 +128,7 @@ describe('guided physical alternatives', () => {
 
   it('reports physical work pending when a budget prevents repair despite passing section checks', () => {
     const { input } = harness();
-    const r = runDesignFeedbackLoop({ ...input, detail: () => input.result,
+    const r = runDesignFeedbackLoop({ ...input, budget: undefined, detail: () => input.result,
       physicalSearch: { maxDetailingRuns: 0, maxMemberSearches: 0 },
     });
     expect(r.outcome).toBe('PHYSICAL_REPAIR_PENDING');
