@@ -3,6 +3,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { existsSync, readFileSync } from 'fs';
 import { execSync } from 'child_process';
 import { resolve } from 'path';
+import { PUBLIC_KEY_PREFIXES } from './src/lib/i18n/public-prefixes';
 
 /**
  * Stub out the WASM glue module when it hasn't been built yet.
@@ -32,7 +33,6 @@ function wasmStubPlugin(): Plugin {
  * when it loads (`lib/i18n/full-dictionaries.ts`). The entries are copied line by line, which
  * `union-merge-safe.test.ts` keeps possible: one entry per line.
  */
-export const PUBLIC_KEY_PREFIXES = ['landing.', 'blog.', 'contact.', 'lang.'];
 function publicI18nPlugin(): Plugin {
   const id = 'virtual:public-i18n';
   return {

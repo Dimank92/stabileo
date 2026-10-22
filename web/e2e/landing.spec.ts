@@ -658,6 +658,11 @@ test.describe('@landing landing page', () => {
       await expect(page).toHaveURL(/\/app\/basic/);
       await expect(page.locator('.app-container')).toBeVisible();
 
+      // A shared model at the root (`/#data=…`) still loads the application, which restores it
+      // behind the landing as it always did.
+      await page.goto('/#data=x');
+      await expect(page.locator('.app-container')).toHaveCount(1);
+
       await page.goto('/app/basic');
       await expect(page.locator('.landing')).toHaveCount(0);
       await expect(page.locator('.app-container')).toBeVisible();

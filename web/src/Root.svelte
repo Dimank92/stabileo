@@ -26,12 +26,21 @@
     history.replaceState(null, '', normalised + (redirectedRoute.includes('#') ? '' : location.hash));
   }
 
+  /**
+   * The fragments `lib/utils/url-sharing.ts` restores a model from (`CODE_HASH` is '#code=';
+   * not imported, so the public pages do not load the compression code it brings).
+   */
+  const SHARED_MODEL = /^#(data=|embed=|code=)/;
+
   /** The routes App.svelte calls public: the landing, the blog and the standing pages. */
   function route() {
     const { path } = parsePublicPath(location.pathname);
     const params = new URLSearchParams(location.search);
     const p = location.pathname;
     if (params.has('embed') || p === '/app' || p.startsWith('/app/') || p === '/demo' || p === '/demo/') return { kind: 'app' as const, path };
+    // A shared model (`/#data=…`, `#embed=…`, `#code=…`) is the application's to restore
+    // (`loadFromURLHash`): it used to be mounted behind the landing and read the fragment.
+    if (SHARED_MODEL.test(location.hash)) return { kind: 'app' as const, path };
     if (path === '/blog' || path.startsWith('/blog/') || findStandingPage(path)) return { kind: 'blog' as const, path };
     return { kind: 'landing' as const, path };
   }

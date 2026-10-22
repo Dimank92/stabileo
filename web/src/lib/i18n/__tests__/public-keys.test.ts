@@ -1,6 +1,6 @@
 /**
  * The public pages render before the application loads, with only the dictionary entries under
- * PUBLIC_KEY_PREFIXES (vite.config.ts, `virtual:public-i18n`). A key they use outside those
+ * PUBLIC_KEY_PREFIXES (`public-prefixes.ts`, built into `virtual:public-i18n` by vite.config.ts). A key they use outside those
  * prefixes would show as the bare key on the landing or the blog. Every string literal in their
  * sources that is a dictionary key must be a public one.
  */
@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import en from '../locales/en';
-import { PUBLIC_KEY_PREFIXES } from '../../../../vite.config';
+import { PUBLIC_KEY_PREFIXES } from '../public-prefixes';
 
 const SRC = join(import.meta.dirname, '../../..');
 /** What Root.svelte renders without the application, and what it imports. */
