@@ -66,10 +66,13 @@ jobs:
           toolchain: nightly-2026-10-15
           components: llvm-tools-preview
       # engine/.cargo/config.toml links with clang + mold.
+      # A pinned mold release tarball (wget with retries). apt used to install it here and could
+      # stall for an hour on a mirror; the version is the flake's (scripts/check-pins.sh).
       - name: Install mold linker
-        run: |
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y mold
+        uses: rui314/setup-mold@da13e0b42e392e3a45d1215033a2270b849d7d36 # main, 2026-10-08
+        with:
+          mold-version: 2.40.4
+          make-default: false
         timeout-minutes: 5
       - uses: Swatinem/rust-cache@v2
         with:

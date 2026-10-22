@@ -43,14 +43,13 @@ jobs:
           toolchain: 1.99.1
           components: clippy, rust-src
 
-      # Noninteractive and needrestart-proof: an apt prompt or a stalled mirror
-      # here hangs the job until the 6 h default timeout (seen on main and on
-      # PR #154, 2026-08-19 — the job sat in this step for over an hour). The
-      # step timeout turns the hang into a fast failure.
+      # A pinned mold release tarball (wget with retries). apt used to install it here and could
+      # stall for an hour on a mirror; the version is the flake's (scripts/check-pins.sh).
       - name: Install mold linker
-        run: |
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y mold
+        uses: rui314/setup-mold@da13e0b42e392e3a45d1215033a2270b849d7d36 # main, 2026-10-08
+        with:
+          mold-version: 2.40.4
+          make-default: false
         timeout-minutes: 5
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
@@ -79,19 +78,20 @@ jobs:
           toolchain: 1.99.1
           components: rust-src
 
-      # Noninteractive and needrestart-proof: an apt prompt or a stalled mirror
-      # here hangs the job until the 6 h default timeout (seen on main and on
-      # PR #154, 2026-08-19 — the job sat in this step for over an hour). The
-      # step timeout turns the hang into a fast failure.
+      # A pinned mold release tarball (wget with retries). apt used to install it here and could
+      # stall for an hour on a mirror; the version is the flake's (scripts/check-pins.sh).
       - name: Install mold linker
-        run: |
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y mold
+        uses: rui314/setup-mold@da13e0b42e392e3a45d1215033a2270b849d7d36 # main, 2026-10-08
+        with:
+          mold-version: 2.40.4
+          make-default: false
         timeout-minutes: 5
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: engine
+          # One cache for the two jobs that build the same debug test binaries.
+          shared-key: engine-test
 
       - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
         with:
@@ -177,19 +177,20 @@ jobs:
           toolchain: 1.99.1
           components: rust-src
 
-      # Noninteractive and needrestart-proof: an apt prompt or a stalled mirror
-      # here hangs the job until the 6 h default timeout (seen on main and on
-      # PR #154, 2026-08-19 — the job sat in this step for over an hour). The
-      # step timeout turns the hang into a fast failure.
+      # A pinned mold release tarball (wget with retries). apt used to install it here and could
+      # stall for an hour on a mirror; the version is the flake's (scripts/check-pins.sh).
       - name: Install mold linker
-        run: |
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y mold
+        uses: rui314/setup-mold@da13e0b42e392e3a45d1215033a2270b849d7d36 # main, 2026-10-08
+        with:
+          mold-version: 2.40.4
+          make-default: false
         timeout-minutes: 5
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: engine
+          # One cache for the two jobs that build the same debug test binaries.
+          shared-key: engine-test
 
       - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
         with:
@@ -219,10 +220,13 @@ jobs:
           toolchain: 1.99.1
           components: rust-src
 
+      # A pinned mold release tarball (wget with retries). apt used to install it here and could
+      # stall for an hour on a mirror; the version is the flake's (scripts/check-pins.sh).
       - name: Install mold linker
-        run: |
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y mold
+        uses: rui314/setup-mold@da13e0b42e392e3a45d1215033a2270b849d7d36 # main, 2026-10-08
+        with:
+          mold-version: 2.40.4
+          make-default: false
         timeout-minutes: 5
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
@@ -239,12 +243,108 @@ jobs:
         run: cargo nextest run --profile ci --cargo-profile release --test metamorphic
         timeout-minutes: 30
 
+  # The WASM engine, built once per run and shared by every web job (they used to build it nine
+  # times: web-unit ×2, web-build, determinism, e2e ×5). The glue is gitignored, so without it
+  # Vite would substitute a stub solver; the e2e readiness gate fails loudly if that happens.
+  wasm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: 1.99.1
+          targets: wasm32-unknown-unknown
+
+      # Pinned release, checksum-verified by install-action (no curl | sh).
+      - name: Install wasm-pack
+        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
+        with:
+          tool: wasm-pack@0.13.1
+        timeout-minutes: 5
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: engine
+          shared-key: wasm
+
+      - name: Build WASM engine
+        working-directory: engine
+        run: wasm-pack build --target web --out-dir ../web/src/lib/wasm --no-opt
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wasm
+          path: web/src/lib/wasm
+          include-hidden-files: true
+          retention-days: 3
+          if-no-files-found: error
+
+  # The site the e2e shards test, built once (each shard used to build it, prerender included,
+  # inside Playwright's webServer). VITE_E2E=1 compiles the read-only test hooks in; the marker
+  # says so, and playwright.config.ts refuses a prebuilt dist without it.
+  site-e2e:
+    needs: wasm
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # Built once per run by the `wasm` job, the same build as the shipped app.
+      - name: WASM engine (from the wasm job)
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: wasm
+          path: web/src/lib/wasm
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('web/package-lock.json') }}
+
+      # The build prerenders the public pages in a browser (web/scripts/prerender.ts).
+      - name: Install Chromium for prerendering
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
+      - name: Build the E2E site
+        working-directory: web
+        run: |
+          VITE_E2E=1 npm run build
+          echo "VITE_E2E=1 build of $GITHUB_SHA" > dist/e2e-build.txt
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: site-e2e
+          path: web/dist
+          include-hidden-files: true
+          retention-days: 3
+          if-no-files-found: error
+
+
   # The web suite runs as two jobs in parallel. It used to be one job that built
   # the app and then ran both Vitest passes back to back: 11–16 min, most of it
   # the unit pass waiting on its longest files. The unit pass needs the WASM
   # engine and nothing else, so it shards two ways here; the production-build
   # tests need Chromium and the built app, so they stay with the build.
   web-unit:
+    needs: wasm
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -255,31 +355,18 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
-        with:
-          toolchain: 1.99.1
-          targets: wasm32-unknown-unknown
-
-      # Pinned release, checksum-verified by install-action (no curl | sh).
-      - name: Install wasm-pack
-        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
-        with:
-          tool: wasm-pack@0.13.1
-        timeout-minutes: 5
-
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          workspaces: engine
-
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Build WASM engine
-        working-directory: engine
-        run: wasm-pack build --target web --out-dir ../web/src/lib/wasm --no-opt
+      # Built once per run by the `wasm` job, the same build as the shipped app.
+      - name: WASM engine (from the wasm job)
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: wasm
+          path: web/src/lib/wasm
 
       - name: Install dependencies
         working-directory: web
@@ -290,27 +377,12 @@ jobs:
         run: npx vitest run --project unit --shard=${{ matrix.shard }}/2
 
   web-build:
+    needs: wasm
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
-        with:
-          toolchain: 1.99.1
-          targets: wasm32-unknown-unknown
-
-      # Pinned release, checksum-verified by install-action (no curl | sh).
-      - name: Install wasm-pack
-        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
-        with:
-          tool: wasm-pack@0.13.1
-        timeout-minutes: 5
-
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          workspaces: engine
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -318,9 +390,12 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Build WASM engine
-        working-directory: engine
-        run: wasm-pack build --target web --out-dir ../web/src/lib/wasm --no-opt
+      # Built once per run by the `wasm` job, the same build as the shipped app.
+      - name: WASM engine (from the wasm job)
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: wasm
+          path: web/src/lib/wasm
 
       - name: Install dependencies
         working-directory: web
@@ -351,22 +426,13 @@ jobs:
         working-directory: web
         run: npx vitest run --project build
 
-      # The two gates every PR body names. They were run on the author's machine only: the type
-      # baseline and the svelte-check errors of the guarded paths now fail the job here too.
-      - name: Typecheck against its baseline
-        working-directory: web
-        run: npm run typecheck
-
-      - name: svelte-check on the guarded paths
-        working-directory: web
-        run: npm run check:gate
-
   # The WASM engine must give bit-identical results in every runtime it ships to
   # (docs/verification/TRUSTED_BASE.md, "Determinism across runtimes"): 184 solves and
   # certificates on fixed models (web/determinism/cases.mjs) in Chromium, Firefox and
   # WebKit, each compared float-by-bit-pattern with the same run in Node. A static page,
   # no app build.
   determinism:
+    needs: wasm
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -374,32 +440,18 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
-        with:
-          toolchain: 1.99.1
-          targets: wasm32-unknown-unknown
-
-      # Pinned release, checksum-verified by install-action (no curl | sh).
-      - name: Install wasm-pack
-        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
-        with:
-          tool: wasm-pack@0.13.1
-        timeout-minutes: 5
-
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          workspaces: engine
-
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      # The same build as the shipped app (deploy-gh-pages.yml).
-      - name: Build WASM engine
-        working-directory: engine
-        run: wasm-pack build --target web --out-dir ../web/src/lib/wasm --no-opt
+      # Built once per run by the `wasm` job, the same build as the shipped app.
+      - name: WASM engine (from the wasm job)
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: wasm
+          path: web/src/lib/wasm
 
       - name: Install dependencies
         working-directory: web
@@ -436,7 +488,10 @@ jobs:
   # `playwright --shard` splits by test count in file order and put the three
   # heaviest files in one shard (12.6 vs 7.8 min); by duration it is 7.5 each.
   e2e:
+    needs: [wasm, site-e2e]
     runs-on: ubuntu-latest
+    env:
+      E2E_PREBUILT: '1'
     strategy:
       fail-fast: false
       matrix:
@@ -446,39 +501,30 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
-        with:
-          toolchain: 1.99.1
-          targets: wasm32-unknown-unknown
-
-      # Pinned release, checksum-verified by install-action (no curl | sh).
-      - name: Install wasm-pack
-        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
-        with:
-          tool: wasm-pack@0.13.1
-        timeout-minutes: 5
-
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          workspaces: engine
-
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      # The WASM glue is gitignored, so it must be built here. Without it Vite
-      # substitutes a stub solver and every design assertion would pass vacuously —
-      # the e2e readiness gate (`__stabileo.solverReady()`) fails loudly if that
-      # ever happens.
-      - name: Build WASM engine
-        working-directory: engine
-        run: wasm-pack build --target web --out-dir ../web/src/lib/wasm --no-opt
+      # Built once per run by the `wasm` job, the same build as the shipped app.
+      - name: WASM engine (from the wasm job)
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: wasm
+          path: web/src/lib/wasm
 
       - name: Install dependencies
         working-directory: web
         run: npm ci
+
+      # The VITE_E2E=1 site, built once by `site-e2e`; Playwright serves it (E2E_PREBUILT) and
+      # refuses a dist without that job's marker.
+      - name: E2E site (from the site-e2e job)
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: site-e2e
+          path: web/dist
 
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

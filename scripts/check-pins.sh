@@ -35,5 +35,12 @@ if command -v nix >/dev/null 2>&1; then
   [ "wasm-pack@$flake_wasm" = "$wasm" ] || bad "flake has wasm-pack $flake_wasm, workflows $wasm"
 fi
 
-[ "$fail" -eq 0 ] && echo "check-pins: rust $channel, node $node, $wasm"
+mold=$(grep -rho 'mold-version: [0-9.]*' .github/workflows/*.yml | sort -u)
+[ "$(printf '%s\n' "$mold" | wc -l)" -eq 1 ] || bad "workflows disagree on mold: $mold"
+if command -v nix >/dev/null 2>&1; then
+  flake_mold=$(nix eval --raw --impure --expr "let f = builtins.getFlake (toString ./.); in (import f.inputs.nixpkgs { system = \"x86_64-linux\"; }).mold.version" 2>/dev/null)
+  [ "mold-version: $flake_mold" = "$mold" ] || bad "flake has mold $flake_mold, workflows ${mold#mold-version: }"
+fi
+
+[ "$fail" -eq 0 ] && echo "check-pins: rust $channel, node $node, $wasm, mold ${mold#mold-version: }"
 exit "$fail"

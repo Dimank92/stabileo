@@ -101,10 +101,13 @@ jobs:
           toolchain: 1.99.1
           components: rust-src
       # engine/.cargo/config.toml links with clang + mold.
+      # A pinned mold release tarball (wget with retries). apt used to install it here and could
+      # stall for an hour on a mirror; the version is the flake's (scripts/check-pins.sh).
       - name: Install mold linker
-        run: |
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y mold
+        uses: rui314/setup-mold@da13e0b42e392e3a45d1215033a2270b849d7d36 # main, 2026-10-08
+        with:
+          mold-version: 2.40.4
+          make-default: false
         timeout-minutes: 5
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Large certificate tests
@@ -132,10 +135,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: 1.99.1
+      # A pinned mold release tarball (wget with retries). apt used to install it here and could
+      # stall for an hour on a mirror; the version is the flake's (scripts/check-pins.sh).
       - name: Install mold linker
-        run: |
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y mold
+        uses: rui314/setup-mold@da13e0b42e392e3a45d1215033a2270b849d7d36 # main, 2026-10-08
+        with:
+          mold-version: 2.40.4
+          make-default: false
         timeout-minutes: 5
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
@@ -284,10 +290,13 @@ jobs:
           toolchain: nightly-2026-10-15
           components: rust-src
       # engine/.cargo/config.toml links with clang + mold.
+      # A pinned mold release tarball (wget with retries). apt used to install it here and could
+      # stall for an hour on a mirror; the version is the flake's (scripts/check-pins.sh).
       - name: Install mold linker
-        run: |
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y mold
+        uses: rui314/setup-mold@da13e0b42e392e3a45d1215033a2270b849d7d36 # main, 2026-10-08
+        with:
+          mold-version: 2.40.4
+          make-default: false
         timeout-minutes: 5
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
@@ -341,10 +350,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: 1.99.1
+      # A pinned mold release tarball (wget with retries). apt used to install it here and could
+      # stall for an hour on a mirror; the version is the flake's (scripts/check-pins.sh).
       - name: Install mold linker
-        run: |
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y mold
+        uses: rui314/setup-mold@da13e0b42e392e3a45d1215033a2270b849d7d36 # main, 2026-10-08
+        with:
+          mold-version: 2.40.4
+          make-default: false
         timeout-minutes: 5
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
@@ -396,10 +408,13 @@ jobs:
         with:
           toolchain: 1.99.1
           components: rust-src
+      # A pinned mold release tarball (wget with retries). apt used to install it here and could
+      # stall for an hour on a mirror; the version is the flake's (scripts/check-pins.sh).
       - name: Install mold linker
-        run: |
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y mold
+        uses: rui314/setup-mold@da13e0b42e392e3a45d1215033a2270b849d7d36 # main, 2026-10-08
+        with:
+          mold-version: 2.40.4
+          make-default: false
         timeout-minutes: 5
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Benchmarks compile
