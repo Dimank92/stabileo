@@ -578,28 +578,28 @@ pub fn solve_staged_3d(json: &str) -> Result<String, JsValue> {
 // ==================== Cable Analysis ====================
 
 /// Solve 2D cable analysis. JSON in → JSON out.
-/// Input: { "solver": SolverInput, "densities": { materialId: density_kg_m3 } }
+/// Input: { "solver": SolverInput, "densities": { materialId: density_kg_m3 }, "pretension"?: { elementId: kN } }
 #[wasm_bindgen]
 pub fn solve_cable_2d(json: &str, max_iter: usize, tolerance: f64) -> Result<String, JsValue> {
-    let input: types::ModalInput = serde_json::from_str(json)
+    let input: types::CableInput<types::SolverInput> = serde_json::from_str(json)
         .map_err(|e| JsValue::from_str(&format!("Parse error: {}", e)))?;
-    let result = solver::cable::solve_cable_2d(&input.solver, &input.densities, max_iter, tolerance)
+    let result = solver::cable::solve_cable_2d_pretensioned(&input.solver, &input.densities, &input.pretension, max_iter, tolerance)
         .map_err(|e| JsValue::from_str(&e))?;
     serde_json::to_string(&result.results)
         .map_err(|e| JsValue::from_str(&format!("Serialize error: {}", e)))
 }
 
 /// Solve 3D cable analysis. JSON in → JSON out.
-/// Input: { "solver": SolverInput3D, "densities": { materialId: density_kg_m3 } }
+/// Input: { "solver": SolverInput3D, "densities": { materialId: density_kg_m3 }, "pretension"?: { elementId: kN } }
 ///
 /// Returns the whole result, not only the structural one: `results`, `iterations`, `converged`
 /// and `cableForces` (per cable element: tension, horizontal thrust, sag, Ernst modulus and
-/// unstretched length). The unstretched length is the chord: the solver takes no pretension.
+/// unstretched length). The unstretched length is the chord, or the one a pretension given sets.
 #[wasm_bindgen]
 pub fn solve_cable_3d(json: &str, max_iter: usize, tolerance: f64) -> Result<String, JsValue> {
-    let input: types::ModalInput3D = serde_json::from_str(json)
+    let input: types::CableInput<types::SolverInput3D> = serde_json::from_str(json)
         .map_err(|e| JsValue::from_str(&format!("Parse error: {}", e)))?;
-    let result = solver::cable::solve_cable_3d(&input.solver, &input.densities, max_iter, tolerance)
+    let result = solver::cable::solve_cable_3d_pretensioned(&input.solver, &input.densities, &input.pretension, max_iter, tolerance)
         .map_err(|e| JsValue::from_str(&e))?;
     serde_json::to_string(&result)
         .map_err(|e| JsValue::from_str(&format!("Serialize error: {}", e)))

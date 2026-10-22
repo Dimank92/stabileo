@@ -250,6 +250,9 @@ pub enum DiagnosticCode {
     /// A frame or truss thermal load was solved with a default the input did not state:
     /// `phase` "alpha" (α = 12·10⁻⁶ /°C assumed) or "depth" (√(12·I/A) assumed for a gradient).
     ThermalDefaultAssumed,
+    /// A cable's own weight gives it over a quarter of its tension with its drawn chord as its
+    /// unstressed length (#527): `value` the largest share, `threshold` the quarter.
+    CableSelfWeightTension,
 }
 
 /// A structured diagnostic with enum code, severity, optional element/node
@@ -376,6 +379,7 @@ impl From<&StructuredDiagnostic> for SolverDiagnostic {
             DiagnosticCode::ConflictingConstraints | DiagnosticCode::CircularConstraint | DiagnosticCode::OverConstrainedDof => "constraints",
             DiagnosticCode::KnownIssue => "known_issue",
             DiagnosticCode::ThermalDefaultAssumed => "assumption",
+            DiagnosticCode::CableSelfWeightTension => "assumption",
         };
         let severity = match sd.severity {
             Severity::Info => "info",

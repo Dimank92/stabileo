@@ -31,6 +31,16 @@ describe('known-issue warnings in the reader’s language', () => {
     expect(knownIssueMessage({ code: 'thermal_default_assumed', phase: 'other', message: 'ENGINE' })).toBe('ENGINE');
   });
 
+  it('says a cable\'s own weight gives most of its tension, in the reader\'s language (#527)', () => {
+    for (const loc of ['es', 'en', 'pt'] as const) {
+      setLocale(loc);
+      const m = knownIssueMessage({ code: 'cable_self_weight_tension', value: 1.55, message: 'ENGINE' });
+      expect(m, loc).not.toBe('ENGINE');
+      expect(m, loc).toMatch(/100 %/);
+    }
+    expect(knownIssueMessage({ code: 'cable_self_weight_tension', value: 0.4, message: 'ENGINE' })).toMatch(/40 %/);
+  });
+
   it('has a sentence for every finding the engine contains, in es, en and pt', () => {
     for (const id of ['NL-5']) {
       for (const loc of ['es', 'en', 'pt'] as const) {
