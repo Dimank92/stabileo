@@ -1,18 +1,23 @@
 /** Bounded exploration of physical repair alternatives. No store writes or structural solves. */
 import type { DesignCodeAdapter } from '../design/code-adapter';
 import type { MemberContext } from '../design/member-context';
-import { designMember } from '../design/candidate-search';
+import { designMember, outcomeFromProvided } from '../design/candidate-search';
 import { beamCornerRecord, type BeamCornerRecord } from '../design/end-support-anchorage';
 import { STANDARD_LONG_DIAS } from '../design/objective';
 import { rebarHash } from '../design/rebar-hash';
 import { detailableReinforcement, type MemberDesignOutcome } from '../design/outcome';
 import type { RunDetailingResult } from './run-detailing';
+import { beamLayerAlternatives, type BeamLayerAlternative } from './beam-layer-alternatives';
+
+export type PhysicalRepairOperator = 'diameterFamily' | 'redistributeLayers';
 
 export interface PhysicalSearchBudget {
   /** Full geometry builds, including rejected trials. */
   maxDetailingRuns: number;
   /** Nominal member searches, each additionally bounded by designMember's budget. */
   maxMemberSearches: number;
+  /** Ordered repair operators. Omitted preserves the original diameter search. */
+  operators?: readonly PhysicalRepairOperator[];
 }
 
 export const DEFAULT_PHYSICAL_SEARCH_BUDGET: PhysicalSearchBudget = {
@@ -21,7 +26,10 @@ export const DEFAULT_PHYSICAL_SEARCH_BUDGET: PhysicalSearchBudget = {
 
 export interface PhysicalSearchTrial {
   elementId: number;
-  diameterMm: number;
+  operator: PhysicalRepairOperator;
+  diameterMm?: number;
+  region?: BeamLayerAlternative['region'];
+  counts?: number[];
   disposition: 'nominalFailure' | 'unchanged' | 'regression' | 'noProgress' | 'accepted';
   /** Members acquiring a physical condition they did not previously have. */
   newlyBlocked?: number[];
@@ -77,6 +85,10 @@ export function searchPhysicalDesignAlternatives(input: {
   for (const value of [input.budget.maxDetailingRuns, input.budget.maxMemberSearches]) {
     if (!Number.isSafeInteger(value) || value < 0) throw new Error('Physical search budgets must be non-negative integers');
   }
+  const operators = [...new Set<PhysicalRepairOperator>(input.budget.operators ?? ['diameterFamily'])];
+  if (operators.some(o => o !== 'diameterFamily' && o !== 'redistributeLayers')) {
+    throw new Error('Unknown physical repair operator');
+  }
   let result = input.result, outcomes = input.outcomes;
   let contexts = contextsFor(input.contexts, outcomes);
   const trials: PhysicalSearchTrial[] = [], changed = new Set<number>();
@@ -103,20 +115,41 @@ export function searchPhysicalDesignAlternatives(input: {
     // it does not assume that larger bars improve anchorage or physical clearance.
     const diameters = [...new Set([16, 12, 20, 25, ...allowed])].filter(d => allowed.includes(d));
     const seen = new Set([rebarHash(current.accepted)]);
-    for (const diameterMm of diameters) {
+    function* proposals(): Generator<{ trial: PhysicalSearchTrial; evaluate: () => MemberDesignOutcome | null }> {
+      for (const operator of operators) {
+        if (operator === 'diameterFamily') {
+          for (const diameterMm of diameters) yield {
+            trial: { elementId: id, operator, diameterMm, disposition: 'nominalFailure' },
+            evaluate: () => designMember(input.adapter, {
+              ...ctx!, material: { ...ctx!.material, longDiametersMm: [diameterMm] },
+            }),
+          };
+        } else {
+          for (const alternative of beamLayerAlternatives(ctx!, current!.accepted!)) yield {
+            trial: { elementId: id, operator, region: alternative.region, counts: alternative.counts, disposition: 'nominalFailure' },
+            evaluate: () => {
+              const verdict = input.adapter.verify(ctx!, alternative.reinforcement);
+              const checked = outcomeFromProvided(input.adapter, ctx!, alternative.reinforcement, verdict);
+              if (checked) checked.searchStats = { ...checked.searchStats, candidatesTried: 1, verifierCalls: 1 };
+              return checked;
+            },
+          };
+        }
+      }
+    }
+    for (const proposal of proposals()) {
       if (stats.detailingRuns >= input.budget.maxDetailingRuns
         || stats.memberSearches >= input.budget.maxMemberSearches) {
         termination = 'budget'; break members;
       }
-      const candidate = designMember(input.adapter, {
-        ...ctx, material: { ...ctx.material, longDiametersMm: [diameterMm] },
-      });
+      const candidate = proposal.evaluate();
       stats.memberSearches++;
-      stats.candidatesConsidered += candidate.searchStats.candidatesTried;
-      stats.verifierCalls += candidate.searchStats.verifierCalls;
-      const trial: PhysicalSearchTrial = { elementId: id, diameterMm, disposition: 'nominalFailure' };
+      const direct = proposal.trial.operator === 'redistributeLayers';
+      stats.candidatesConsidered += direct ? 1 : candidate!.searchStats.candidatesTried;
+      stats.verifierCalls += direct ? 1 : candidate!.searchStats.verifierCalls;
+      const trial = proposal.trial;
       trials.push(trial);
-      if (candidate.outcome !== 'VERIFIED' || !candidate.accepted) continue;
+      if (!candidate || candidate.outcome !== 'VERIFIED' || !candidate.accepted) continue;
       const hash = rebarHash(candidate.accepted);
       if (seen.has(hash)) { trial.disposition = 'unchanged'; continue; }
       seen.add(hash);

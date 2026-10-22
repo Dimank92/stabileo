@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  bentUpPermitted, evaluateCutoff, generateBeamBars, mergeStirrupZones, theoreticalCutoff,
+  bentUpPermitted, evaluateCutoff, generateBeamBars, layoutBarRow, mergeStirrupZones, theoreticalCutoff,
   type BeamGenerationInput, type BentUpPolicy, type MomentStation, type StirrupZone,
 } from '../generate-beam';
 
@@ -36,6 +36,33 @@ function input(over: Partial<BeamGenerationInput> = {}): BeamGenerationInput {
     ...over,
   };
 }
+
+describe('provided bottom rows reach the fabricated cage', () => {
+  it.each([[2, 4], [3, 2], [7, -1], [2.5, 3.5]])('does not certify an invalid prescribed population %j', (...rowCounts) => {
+    expect(layoutBarRow({ count: 6, diameterMm: 16, rowCounts,
+      clearWidth: 0.23, minClear: 0.025, layerClear: 0.025,
+    }).fits).toBe(false);
+  });
+  it('changes the actual row populations instead of repacking the same total', () => {
+    const build = (rowCounts: number[]) => generateBeamBars(input({
+      bottom: { count: 6, diameterMm: 16, rowCounts },
+      bentUp: { seismicDesign: 'notRequired', optOut: true },
+      // A coordinated six-bar row cannot overwrite a provided two-row cage.
+      transverseSlots: [-0.10, -0.06, -0.02, 0.02, 0.06, 0.10],
+      transverseLayers: [0, 0, 0, 0, 0, 0],
+    }));
+    const counts = (r: ReturnType<typeof build>) => {
+      const result = [0, 0];
+      for (const bar of r.bars.filter(b => b.id.includes('-bot-'))) result[r.barLayers[bar.id]]++;
+      return result;
+    };
+    const a = build([4, 2]), b = build([3, 3]);
+    expect(counts(a)).toEqual([4, 2]);
+    expect(counts(b)).toEqual([3, 3]);
+    expect(b.bars.filter(x => x.id.includes('-bot-')).map(x => x.segments))
+      .not.toEqual(a.bars.filter(x => x.id.includes('-bot-')).map(x => x.segments));
+  });
+});
 
 // ─── D13c ────────────────────────────────────────────────────────
 

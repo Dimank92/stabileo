@@ -106,7 +106,7 @@ export interface BeamGenerationInput {
   /** Nominal shear strength at each station, kN — for the §9.7.3.5 tests. */
   vn: number;
   /** Chosen bottom reinforcement (from the coordinator). */
-  bottom: { count: number; diameterMm: number };
+  bottom: { count: number; diameterMm: number; rowCounts?: readonly number[] };
   /** Chosen top reinforcement at each support. */
   topStart: { count: number; diameterMm: number };
   topEnd: { count: number; diameterMm: number };
@@ -566,6 +566,8 @@ export interface BarSlot {
  */
 export function layoutBarRow(opts: {
   count: number;
+  /** Explicit outer-to-inner row counts from a provided cage. */
+  rowCounts?: readonly number[];
   diameterMm: number;
   /** Section width available between the stirrup legs, m. */
   clearWidth: number;
@@ -592,19 +594,25 @@ export function layoutBarRow(opts: {
   // rather than nothing — the shortfall is reported by `fits`.
   const perLayer = Math.max(1, Math.min(count,
     Math.floor((clearWidth + minClear) / (d + minClear))));
-  const layers = Math.ceil(count / perLayer);
-  const fits = perLayer * layers >= count && perLayer >= Math.min(count, 2);
+  const requested = opts.rowCounts;
+  const validRows = requested && requested.length > 0
+    && requested.reduce((n, v) => n + v, 0) === count
+    && requested.every((n, i) => Number.isSafeInteger(n) && n >= 2 && n <= perLayer
+      && (i === 0 || n <= requested[i - 1]));
+  const rows = validRows ? requested : Array.from({ length: Math.ceil(count / perLayer) },
+    (_, i) => Math.min(perLayer, count - i * perLayer));
+  const layers = rows.length;
+  const fits = (!requested || !!validRows) && perLayer * layers >= count && perLayer >= Math.min(count, 2);
 
   const slots: BarSlot[] = [];
   // Layer 0 spread to the full available width, so its outer bars seat against the stirrup
   // legs and §25.7.1.2's bends contain a bar by construction.
-  const inFirst = Math.min(perLayer, count);
+  const inFirst = rows[0];
   const basePitch = inFirst > 1 ? (clearWidth - d) / (inFirst - 1) : 0;
   const baseAcross = (k: number) => (inFirst > 1 ? -(clearWidth - d) / 2 + k * basePitch : 0);
 
-  let placed = 0;
   for (let layer = 0; layer < layers; layer++) {
-    const inThis = Math.min(perLayer, count - placed);
+    const inThis = rows[layer];
     // §25.2.2: an upper layer sits DIRECTLY ABOVE layer 0's bars, so it takes a centred subset
     // of layer 0's positions rather than a spread of its own.
     const offset = Math.floor((inFirst - inThis) / 2);
@@ -617,7 +625,6 @@ export function layoutBarRow(opts: {
         layer,
       });
     }
-    placed += inThis;
   }
   return { slots, layers, perLayer, fits };
 }
@@ -792,11 +799,11 @@ export function generateBeamBars(input: BeamGenerationInput): GeneratedBeam {
    */
   const intoLayer = (rows: ReadonlyArray<ReadonlyArray<number>>, layer: number, dia: number) =>
     stackedLayerDepth(rows, layer, dia, inset, input.edition) - inset(dia);
-  const placeGroup = (count: number, dia: number, faceUpward: boolean, own = false, outerHalf?: number, rows: ReadonlyArray<ReadonlyArray<number>> = []) => {
+  const placeGroup = (count: number, dia: number, faceUpward: boolean, own = false, outerHalf?: number, rows: ReadonlyArray<ReadonlyArray<number>> = [], rowCounts?: readonly number[]) => {
     // `outerHalf`: the row's outer bars at ±outerHalf instead of in the stirrup's bends.
     const clearWidth = outerHalf !== undefined ? 2 * outerHalf + dia / 1000 : clearWidthFor(dia);
     const layout = layoutBarRow({
-      count, diameterMm: dia, clearWidth,
+      count, rowCounts, diameterMm: dia, clearWidth,
       minClear: spacing.minClear, layerClear: layerSpacing.minClear,
       placementTolerance: DEFAULT_TOLERANCES.placement,
     });
@@ -1120,9 +1127,11 @@ export function generateBeamBars(input: BeamGenerationInput): GeneratedBeam {
     }
   }
 
-  const botWide = fromLine ? [] : placeGroup(Math.max(input.bottom.count, input.transverseSlots?.length ?? 0), input.bottom.diameterMm, false);
+  const botWide = fromLine || input.bottom.rowCounts ? [] : placeGroup(Math.max(input.bottom.count, input.transverseSlots?.length ?? 0), input.bottom.diameterMm, false);
   const botPick = fromLine ? [] : pickLegal(botWide, input.bottom.count, input.bottom.diameterMm);
-  const botSlotsRaw = fromLine ? [] : botPick ? botPick.map((i) => botWide[i]!) : placeGroup(input.bottom.count, input.bottom.diameterMm, false, true);
+  const botSlotsRaw = fromLine ? [] : input.bottom.rowCounts
+    ? placeGroup(input.bottom.count, input.bottom.diameterMm, false, true, undefined, [], input.bottom.rowCounts)
+    : botPick ? botPick.map((i) => botWide[i]!) : placeGroup(input.bottom.count, input.bottom.diameterMm, false, true);
   /**
    * Which bottom bars continue, and which are curtailed — ordered OUTERMOST FIRST.
    *

@@ -228,3 +228,90 @@ con conflictos y mantenimiento de cobertura. Guarda la traza en `/tmp/design-gui
 y los tiempos por pasada en `/tmp/design-guided-timing.json`. Las pruebas pequeñas cubren
 continuación tras rechazo, pérdida de cobertura, preservación de identidades físicas, respeto
 de bloqueos/catálogos, actualización de vecinos y presupuestos.
+
+## Incremento: reparar las filas de una jaula existente
+
+Se agrega `redistributeLayers` como operador opcional del mismo ciclo. Transfiere una barra
+entre filas inferiores adyacentes, conservando cantidad total, diámetro, número de filas,
+estribos y tratamientos de extremo. Admite hasta tres filas de un mismo diámetro y exige
+que las filas interiores no tengan más barras que las exteriores. No combina grupos con
+cortes distintos ni modifica el armado superior reconciliado a lo largo de la viga.
+El espacio inicial tiene como máximo cuatro alternativas por miembro.
+
+Cada alternativa pasa por el verificador nominal con la nueva altura útil y recibe un
+certificado propio. Después se reconstruye el detalle completo con los asientos vecinos
+actualizados. La aceptación conserva cobertura y aprobaciones por identidad y rechaza
+regresiones resistentes o aumentos de condiciones abiertas, igual que el operador de diámetros.
+Los presupuestos cuentan también propuestas rechazadas; no se ejecutan análisis estructurales.
+
+### Que una alternativa llegue a la geometría
+
+El primer ensayo de redistribución verificó ocho propuestas nominales y produjo ocho detalles
+idénticos: `beamGroups` transmitía cantidad y diámetro, y el generador volvía a repartir las
+barras sobre las posiciones compartidas de coordinación. Cambiar las filas nominales no
+cambiaba la jaula construida.
+
+La reparación ahora declara `regions.preserveBottomRows`. El materializador conserva esas
+poblaciones de filas y las dispone sobre asientos propios de la cara inferior. Esta decisión
+forma parte del hash del armado y se persiste junto al candidato aceptado. Un patrón que no
+cabe o que este camino no puede representar permanece sin verificar; no se transforma
+silenciosamente en otro patrón aprobado. Las líneas dibujadas explícitamente conservan su
+precedencia y requieren un operador de línea para cambiarlas.
+
+No se fuerza esta política en todo el modelo: el ensayo global redujo los conflictos a 2294,
+pero dejó sólo 66 aprobados y agregó condiciones de generación y empalme. Se descartó. El
+operador aplica la política por miembro, con una comprobación completa antes de conservarla.
+
+### Elección de cierres sobre geometría materializada
+
+El selector de los cuatro cierres existentes ahora construye los mismos segmentos que emite
+y mide la distancia al segmento completo de cada gancho, usando el muestreador geométrico
+compartido con colisiones. Ya no considera el desplazamiento axial del gancho como separación
+frente a una barra longitudinal que continúa por esa zona. Conserva la preferencia de
+alternancia cuando las diferencias quedan dentro del error de cuerda del muestreo.
+No cambia radios, ángulos, extensiones ni umbrales de aceptación del detector final.
+
+La regresión incluye 126 secciones y evalúa exhaustivamente las cuatro esquinas mediante
+el medidor 3D independiente del selector. También comprueba rotación, traslación y cambio
+de identificadores. La prueba incluye una sección con barra interior Ø10 en coordenadas
+(-100, -185) mm: el selector anterior escogía una separación de −0,716 mm aunque existía
+otra esquina que despejaba la barra. Corregir esa elección no aumenta por sí solo los
+aprobados del edificio de referencia.
+
+### Resultado y reproducción
+
+Sobre el estado de 76 aprobados obtenido por la búsqueda de diámetros, ocho pruebas completas
+del nuevo operador aceptaron la viga **227**, con una distribución inferior **7+4**, y rechazaron
+siete propuestas. Se conservaron los mismos 76 aprobados y la cobertura de los 408 miembros.
+Los conflictos bloqueantes bajaron de **2066 a 1992** y los totales de **2391 a 2320**;
+las restantes clases de condiciones abiertas conservaron sus conteos. No se obtuvieron nuevas
+aprobaciones completas: reducir conflictos pendientes no equivale a cerrar el diseño de la viga.
+
+La alternativa de la viga 225 bajaba el total a 1948 conflictos, pero bloqueaba la columna 43
+y se rechazó. Las de las vigas 177 y 189 también reducían conflictos, pero no superaban la
+comprobación completa. Estas decisiones muestran por qué el conteo de choques no basta.
+
+Activación sobre el armado actual:
+
+```ts
+detailingStore.generate({ physicalSearch: {
+  maxDetailingRuns: 8,
+  maxMemberSearches: 64,
+  operators: ['redistributeLayers'],
+} });
+```
+
+Omitir `operators` conserva la búsqueda de familias de diámetros. Se puede proporcionar una
+lista ordenada de ambos operadores, con presupuesto compartido; se acepta como máximo una
+reparación por miembro en cada barrido. El modo automático y la interfaz no se modifican.
+
+Reproducción desde `web/`, con WASM release:
+
+```sh
+STABILEO_LAYER_SEARCH=8 npx vitest run --project unit --maxWorkers=1 src/lib/store/__tests__/design-layer-search-experiment.test.ts
+```
+
+El experimento guarda `/tmp/design-layer-search.json`, con identidades, condiciones, intentos,
+tiempo transcurrido y CPU por pasada. Comprueba además que el resultado persista al regenerar
+sin ejecutar de nuevo el operador. Una ejecución anterior produjo los resultados geométricos
+indicados pero excedió el límite de tiempo del test; no se usa para afirmar rendimiento.

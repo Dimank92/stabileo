@@ -6,6 +6,8 @@ import type { MemberDesignOutcome } from '../../design/outcome';
 import type { RunDetailingResult } from '../run-detailing';
 import { detailRegresses, runDesignFeedbackLoop } from '../design-feedback-loop';
 import { searchPhysicalDesignAlternatives } from '../physical-design-search';
+import { syntheticBeamContext } from '../../design/__tests__/helpers';
+import { rebarHash } from '../../design/rebar-hash';
 
 function outcome(id: number, diameter: number): MemberDesignOutcome {
   return { elementId: id, outcome: 'VERIFIED', accepted: {
@@ -41,6 +43,38 @@ function harness() {
 afterEach(() => vi.restoreAllMocks());
 
 describe('guided physical alternatives', () => {
+  it.each([false, true])('reverifies a layer redistribution and retains it only if the full detail improves (nominal failure: %s)', nominalFailure => {
+    const { input, generate } = harness();
+    input.contexts.set(1, syntheticBeamContext());
+    const current = outcome(1, 16);
+    current.accepted!.regions!.bottomSpan = { count: 6, diameter: 16 };
+    current.accepted!.regions!.bottomSpanLayers = [
+      { count: 4, row: 0, diameter: 16 }, { count: 2, row: 1, diameter: 16 },
+    ];
+    input.outcomes.set(1, current);
+    const verify = vi.spyOn(input.adapter, 'verify').mockReturnValue({
+      strengthCheckCount: 2, checks: [{ status: nominalFailure ? 'fail' : 'ok' }],
+      worstUtilization: nominalFailure ? 1.1 : 0.9, checkedAxes: ['My'],
+    } as never);
+    const r = searchPhysicalDesignAlternatives({ ...input,
+      budget: { maxDetailingRuns: 1, maxMemberSearches: 1, operators: ['redistributeLayers'] },
+    });
+    expect(generate).not.toHaveBeenCalled();
+    expect(verify).toHaveBeenCalledTimes(1);
+    expect(r.stats.candidatesConsidered).toBe(1);
+    expect(r.stats.verifierCalls).toBe(1);
+    expect(r.trials[0].operator).toBe('redistributeLayers');
+    if (nominalFailure) {
+      expect(input.detail).not.toHaveBeenCalled();
+      expect(r.outcomes).toBe(input.outcomes);
+    } else {
+      expect(r.changed).toEqual([1]);
+      const accepted = r.outcomes.get(1)!;
+      expect(accepted.accepted!.regions!.bottomSpanLayers!.map(l => l.count)).toEqual([3, 3]);
+      expect(accepted.certificate!.rebarHash).toBe(rebarHash(accepted.accepted));
+      expect(accepted.certificate!.rebarHash).not.toBe(rebarHash(current.accepted));
+    }
+  });
   it('rejects damage to a neighbor, then tries another diameter and retains only the accepted assignment', () => {
     const { input } = harness();
     input.detail.mockReturnValueOnce(detail([], [2])).mockReturnValueOnce(detail([]));

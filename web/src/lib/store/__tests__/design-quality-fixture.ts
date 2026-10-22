@@ -12,6 +12,11 @@ export async function frameDesignQuality() {
   resultsStore.setResults3D(validateAndSolve3D(modelStore.model as never, true, false) as never);
   resultsStore.setCombinationResults3D(combo.perCase, combo.perCombo, combo.envelope);
   designRunStore.designAll({ maxRunMs: 180_000 });
+  return currentFrameDesignQuality();
+}
+
+/** Read the published design after a further production detailing/repair command. */
+export function currentFrameDesignQuality() {
   const assemblies = modelStore.model.detailing?.assemblies ?? [];
   const summary = verificationStore.runSummary!;
   const counts: Record<string, number> = {};
