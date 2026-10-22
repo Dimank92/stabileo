@@ -11,7 +11,7 @@ import { beamLayerAlternatives, type BeamLayerAlternative } from './beam-layer-a
 import { beamContinuityAlternatives } from './beam-continuity-alternatives';
 import { detailRegressionReasons } from './detail-regression';
 
-export type PhysicalRepairOperator = 'diameterFamily' | 'redistributeLayers' | 'harmonizeTop' | 'harmonizeTopLine' | 'harmonizeBottomLine';
+export type PhysicalRepairOperator = 'diameterFamily' | 'redistributeLayers' | 'harmonizeTop' | 'harmonizeTopLine' | 'harmonizeBottomLine' | 'harmonizeTopCatalog';
 
 export interface PhysicalSearchBudget {
   /** Full geometry builds, including rejected trials. */
@@ -96,7 +96,7 @@ export function searchPhysicalDesignAlternatives(input: {
     if (!Number.isSafeInteger(value) || value < 0) throw new Error('Physical search budgets must be non-negative integers');
   }
   const operators = [...new Set<PhysicalRepairOperator>(input.budget.operators ?? ['diameterFamily'])];
-  if (operators.some(o => o !== 'diameterFamily' && o !== 'redistributeLayers' && o !== 'harmonizeTop' && o !== 'harmonizeTopLine' && o !== 'harmonizeBottomLine')) {
+  if (operators.some(o => o !== 'diameterFamily' && o !== 'redistributeLayers' && o !== 'harmonizeTop' && o !== 'harmonizeTopLine' && o !== 'harmonizeBottomLine' && o !== 'harmonizeTopCatalog')) {
     throw new Error('Unknown physical repair operator');
   }
   if (operators.some(o => o.startsWith('harmonize'))) {
@@ -265,13 +265,14 @@ export function continuityLines(contexts: ReadonlyMap<number, MemberContext>, re
 
 /** Uniform longitudinal patterns are checked and published on a whole neighbourhood atomically. */
 function searchBeamContinuity(input: Parameters<typeof searchPhysicalDesignAlternatives>[0]): PhysicalSearchResult {
-  const operator = input.budget.operators![0] as 'harmonizeTop' | 'harmonizeTopLine' | 'harmonizeBottomLine';
+  const operator = input.budget.operators![0] as 'harmonizeTop' | 'harmonizeTopLine' | 'harmonizeBottomLine' | 'harmonizeTopCatalog';
+  const catalog = operator === 'harmonizeTopCatalog';
   let result = input.result, outcomes = input.outcomes;
   const trials: PhysicalSearchTrial[] = [], changed = new Set<number>();
   const stats: PhysicalSearchResult['stats'] = { detailingRuns: 0, memberSearches: 0,
     candidatesConsidered: 0, verifierCalls: 0, structuralSolves: 0 };
   let termination: PhysicalSearchResult['termination'] = 'sweepComplete';
-  // Only real transitions with an open splice condition. No inference from member numbering.
+  // Real transitions come from topology; catalog repair also handles already fused bars.
   const conditions = (r: RunDetailingResult, jointId: string) => r.assemblies.flatMap(a => a.unsupported)
     .filter(u => (u.key === 'detailing.lapCheck.unarranged' || u.key === 'detailing.lapCheck.integrity')
       && u.params?.joint === jointId).length;
@@ -288,23 +289,35 @@ function searchBeamContinuity(input: Parameters<typeof searchPhysicalDesignAlter
   // heavy repeated clashes caused by bars extending into the next member's stirrups.
   const burden = (ids: number[]) => result.assemblies.reduce((n, a) => n + a.conflicts
     .filter(c => c.severity !== 'marginal' && c.elementIds.some(id => ids.includes(id))).length, 0);
+  // A top-only change cannot repair an isolated bottom or transverse clash. Use the
+  // actual conflicting bars (including fused ownership), not every blocked member.
+  const topOwners = new Map(result.assemblies.flatMap(a => a.bars ?? [])
+    .filter(b => b.role === 'longitudinal' && b.layerId?.includes(':top'))
+    .map(b => [b.id, b.ownerElementIds]));
+  const topClashes = (ids: number[]) => result.assemblies.reduce((n, a) => n + a.conflicts
+    .filter(c => c.severity !== 'marginal' && [c.barA, c.barB]
+      .some(bar => topOwners.get(bar)?.some(id => ids.includes(id)))).length, 0);
   const targets = operator !== 'harmonizeTop'
-    ? continuityLines(input.contexts, result).filter(p => p.jointIds.some(j => conditions(result, j)))
+    ? continuityLines(input.contexts, result).filter(p => catalog
+      ? topClashes(p.ids) > 0 : p.jointIds.some(j => conditions(result, j)))
     : [...pairs.values()].map(p => ({ ids: [...p.ids], jointIds: [p.jointId] }));
-  const ranked = targets.map(p => ({ ...p, burden: burden(p.ids) }))
+  const ranked = targets.map(p => ({ ...p, burden: burden(p.ids), offset: 0 }))
     .sort((a, b) => (operator === 'harmonizeBottomLine' ? b.burden - a.burden : a.burden - b.burden)
       || a.ids[0] - b.ids[0] || a.ids[1] - b.ids[1]);
   const seen = new Set<string>();
-  pairLoop: for (const { ids, jointIds } of ranked) {
+  pairLoop: for (const target of ranked) {
+    const { ids, jointIds } = target;
     const open = (r: RunDetailingResult) => jointIds.reduce((n, j) => n + conditions(r, j), 0);
-    if (!open(result)) continue;
+    if (!catalog && !open(result)) continue;
     const contexts = contextsFor(input.contexts, outcomes);
     if (ids.some(id => !contexts.has(id) || contexts.get(id)!.elementType !== 'beam'
       || contexts.get(id)!.span || input.lockedMembers?.has(id)
       || outcomes.get(id)?.outcome !== 'VERIFIED' || !outcomes.get(id)?.accepted)) continue;
     const ctx = ids.map(id => contexts.get(id)!);
     const current = ids.map(id => outcomes.get(id)!.accepted!);
-    for (const proposal of beamContinuityAlternatives(ctx, current, operator === 'harmonizeBottomLine' ? 'bottom' : 'top')) {
+    let proposalIndex = 0;
+    for (const proposal of beamContinuityAlternatives(ctx, current, operator === 'harmonizeBottomLine' ? 'bottom' : 'top', catalog ? 'catalog' : 'existing')) {
+      if (proposalIndex++ < target.offset) continue;
       if (stats.detailingRuns >= input.budget.maxDetailingRuns || stats.memberSearches + ids.length > input.budget.maxMemberSearches) {
         termination = 'budget'; break pairLoop;
       }
@@ -346,13 +359,23 @@ function searchBeamContinuity(input: Parameters<typeof searchPhysicalDesignAlter
       trial.splicePairsAfter = splicePairs(detailed, jointIds);
       if (trial.newlyBlocked.length || ids.some(id => !detailed.reverification.some(r => r.elementId === id
         && (r.status === 'ok' || r.status === 'warn'))) || input.regresses(result, detailed)) {
-        trial.disposition = 'regression'; continue;
+        trial.disposition = 'regression';
+        // Give every catalog neighbourhood a full trial before spending another on
+        // the same line. Resume at the next proposal against the latest neighbours.
+        if (catalog) { ranked.push({ ...target, offset: proposalIndex }); break; }
+        continue;
       }
       // Do not accept a change that merely displaces this joint's unresolved splice.
       // One grouped warning can represent many bad pairs. Resolving some of those
       // pairs is real progress even while the remaining pairs keep that warning open.
-      if (open(detailed) >= open(result) && trial.splicePairsAfter >= trial.splicePairsBefore) {
-        trial.disposition = 'noProgress'; continue;
+      const localClashes = (r: RunDetailingResult) => r.assemblies.reduce((n, a) => n + a.conflicts
+        .filter(c => c.severity !== 'marginal' && c.elementIds.some(id => ids.includes(id))).length, 0);
+      const localProgress = catalog && (ids.filter(id => after.has(id)).length < ids.filter(id => before.has(id)).length
+        || localClashes(detailed) < localClashes(result));
+      if (!localProgress && open(detailed) >= open(result) && trial.splicePairsAfter >= trial.splicePairsBefore) {
+        trial.disposition = 'noProgress';
+        if (catalog) { ranked.push({ ...target, offset: proposalIndex }); break; }
+        continue;
       }
       trial.disposition = 'accepted';
       ids.forEach((id, i) => { if (rebarHash(proposal.reinforcement[i]) !== rebarHash(current[i])) changed.add(id); });

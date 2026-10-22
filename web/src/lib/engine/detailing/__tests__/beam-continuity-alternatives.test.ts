@@ -11,6 +11,21 @@ const reinforcement = (count: number, diameter: number): ProvidedReinforcement =
 const contexts = () => [syntheticBeamContext(), syntheticBeamContext({ elementId: 2 })] as const;
 
 describe('paired top continuity patterns', () => {
+  it('offers a common catalog family absent from both original designs, with a bounded count/row search', () => {
+    const ctx = contexts(), current = [reinforcement(7, 12), reinforcement(8, 10)];
+    ctx[1].material.longDiametersMm = [16];
+    const candidates = [...beamContinuityAlternatives(ctx, current, 'top', 'catalog')];
+    expect(candidates.map(p => p.layers)).toEqual([
+      [{ row: 0, count: 4, diameter: 16 }], [{ row: 0, count: 5, diameter: 16 }],
+    ]);
+    for (const p of candidates) for (const r of p.reinforcement) {
+      expect(r.regions!.bottomSpan).toEqual(current[0].regions!.bottomSpan);
+      expect(r.regions!.topStartLayers).toEqual(r.regions!.topEndLayers);
+    }
+    ctx[0].material.longDiametersMm = [12];
+    expect([...beamContinuityAlternatives(ctx, current, 'top', 'catalog')]).toEqual([]);
+  });
+
   it('preserves each member’s bottom end treatments and top/transverse steel when harmonizing the bottom', () => {
     const current = [reinforcement(4, 12), reinforcement(3, 16)];
     current[0].regions!.bottomGroups = [{ layers: [{ count: 3, diameter: 16, row: 0 }], anchorageStart: 'hook' }];

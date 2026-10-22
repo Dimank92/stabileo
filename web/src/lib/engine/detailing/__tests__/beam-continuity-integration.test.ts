@@ -15,11 +15,11 @@ import type { ProvidedReinforcement } from '../../../design-contract/reinforceme
 // = w L²/8 = 153.1125 kN m. The initial top patterns (7Ø12 and 4Ø16) both resist it,
 // but cannot occupy their nearly coincident positions as a lap. Either uniform pattern
 // is a finite, known alternative to test; the engine must still build and verify it.
-it.each(['original', 'rotated', 'reversed', 'renumbered', 'three spans', 'three spans reversed', 'bottom three spans'] as const)(
+it.each(['original', 'rotated', 'reversed', 'renumbered', 'three spans', 'three spans reversed', 'bottom three spans', 'catalog three spans'] as const)(
   'closes both spans through the production path (%s)', mode => {
   const model = structuredClone(fixture);
   model.nodes[1].x = 6; model.nodes[2].x = 12;
-  const three = mode.includes('three spans'), bottom = mode.startsWith('bottom');
+  const three = mode.includes('three spans'), bottom = mode.startsWith('bottom'), catalog = mode.startsWith('catalog');
   if (three) {
     model.nodes.push({ id: 4, x: 18, y: 0, z: 0 });
     model.elements.push({ ...model.elements[1], id: 3, nodeI: 3, nodeJ: 4 });
@@ -47,8 +47,8 @@ it.each(['original', 'rotated', 'reversed', 'renumbered', 'three spans', 'three 
   const firstId = model.elements[0].id;
   const solved = solveFixture(model);
   const rebar = (id: number): ProvidedReinforcement => ({ regions: {
-    topStart: { count: !bottom && id === firstId ? 7 : 4, diameter: !bottom && id === firstId ? 12 : 16 },
-    topEnd: { count: !bottom && id === firstId ? 7 : 4, diameter: !bottom && id === firstId ? 12 : 16 },
+    topStart: { count: !bottom && id === firstId ? 7 : catalog ? 8 : 4, diameter: !bottom && id === firstId ? 12 : catalog ? 12 : 16 },
+    topEnd: { count: !bottom && id === firstId ? 7 : catalog ? 8 : 4, diameter: !bottom && id === firstId ? 12 : catalog ? 12 : 16 },
     bottomSpan: { count: bottom && id !== firstId ? 7 : 4, diameter: bottom && id !== firstId ? 12 : 16 },
     bottomGroups: [{ layers: [{ count: bottom && id !== firstId ? 7 : 4, diameter: bottom && id !== firstId ? 12 : 16, row: 0 }],
       anchorageStart: 'hook', anchorageEnd: 'hook' }],
@@ -61,7 +61,7 @@ it.each(['original', 'rotated', 'reversed', 'renumbered', 'three spans', 'three 
     expect(Math.max(...ctx.stations!.comboResults.flatMap(c => c.stations.map(s => Math.abs(s.my)))))
       .toBeCloseTo(three ? 122.49 : 153.1125, 3);
     const r = rebar(id), verdict = cirsoc201Adapter.verify(ctx, r);
-    expect(['ok', 'warn']).toContain(verdict.overallStatus);
+    expect(['ok', 'warn'], JSON.stringify({ id, checks: verdict.checks.filter(c => c.status === 'fail') })).toContain(verdict.overallStatus);
     const o = outcomeFromProvided(cirsoc201Adapter, ctx, r, verdict);
     expect(o?.outcome).toBe('VERIFIED'); outcomes.set(id, o!);
   }
@@ -79,8 +79,9 @@ it.each(['original', 'rotated', 'reversed', 'renumbered', 'three spans', 'three 
   const result = searchPhysicalDesignAlternatives({ adapter: cirsoc201Adapter, contexts: solved.contexts,
     outcomes, result: before, detail, regresses: detailRegresses,
     budget: { maxDetailingRuns: 4, maxMemberSearches: 12,
-      operators: [bottom ? 'harmonizeBottomLine' : three ? 'harmonizeTopLine' : 'harmonizeTop'] } });
+      operators: [catalog ? 'harmonizeTopCatalog' : bottom ? 'harmonizeBottomLine' : three ? 'harmonizeTopLine' : 'harmonizeTop'] } });
   expect(result.changed.length).toBeGreaterThan(0);
+  if (catalog) for (const o of result.outcomes.values()) expect(o.accepted!.regions!.topStart).toEqual({ count: 5, diameter: 16 });
   const assertClosed = (r: ReturnType<typeof detail>) => {
     expect(r.skipped).toEqual([]);
     expect(r.provisionalMembers).toEqual([]);

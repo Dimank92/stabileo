@@ -191,8 +191,9 @@ export interface StirrupSetInput {
    * Shift of this PIECE along the member axis, m, within its set.
    *
    * The pieces of one set are not coplanar. A closed stirrup and the crossties threaded
-   * through it are separate bars standing side by side against the formwork, one diameter
-   * apart — they cannot all occupy one section plane, and modelling them that way makes every
+   * through it are separate bars standing side by side against the formwork. Body planes
+   * are one diameter apart, with an extra half diameter beside the perimeter closure.
+   * They cannot all occupy one section plane, and modelling them that way makes every
    * crossing between them read as an interpenetration. Measured on the joint cage: 24
    * crosstie-to-stirrup and 12 crosstie-to-crosstie overlaps, all at zero station difference,
    * all of them the model rather than the steel.
@@ -1023,10 +1024,8 @@ export function buildStirrupSet(input: StirrupSetInput): StirrupSetResult {
   const interior = chosen.offsets;
 
   const offsets = [-halfAcross, ...interior, halfAcross];
-  // The set STRADDLES its station rather than starting at it. Centring keeps the group's
-  // centroid on the design station — so the spacing the table asked for is the spacing
-  // between set centres — and halves how far the outermost piece reaches, which is what
-  // decides whether a set at the end of a zone still fits inside it.
+  // Centre the complete axial envelope, including the perimeter closure, on the station.
+  // Repeating that envelope preserves the specified pitch and reserves both ends of a zone.
   const nudge = setNudge(1 + interior.length, input.stirrupDiaMm);
   const pieces: TransversePiece[] = [buildClosedStirrup({ ...input, axialNudge: nudge(0) })];
   for (let i = 0; i < interior.length; i++) {
@@ -1037,21 +1036,22 @@ export function buildStirrupSet(input: StirrupSetInput): StirrupSetResult {
 }
 
 /**
- * Axial offsets for the `n` pieces of one set, centred on the design station.
+ * Axial offsets for the `n` pieces of one set, with its centreline envelope centred
+ * on the design station.
  *
- * Adjacent pieces sit one bar diameter apart — touching, which is how they stand against the
- * formwork — and the group's centroid stays on the station the spacing table chose, so the
- * table's spacing remains the spacing between sets. `setSpread` is what a caller must reserve
- * at each end of a zone for the set to fit inside it.
+ * The perimeter stirrup's closing tails sit half a diameter either side of its body plane.
+ * The first crosstie therefore needs 1.5 diameters from that plane; subsequent planar ties
+ * need one diameter. Every repeated piece retains the prescribed station spacing.
+ * `setSpread` includes the closing tails, so end reservations use the same geometry.
  */
 export function setNudge(n: number, diaMm: number): (i: number) => number {
   const step = diaMm / 1000;
-  return (i: number) => (i - (n - 1) / 2) * step;
+  return (i: number) => (i - (n - 1) / 2 + (i > 0 ? 0.5 : 0)) * step;
 }
 
-/** Full axial thickness of a set of `n` pieces, m. */
+/** Axial centreline envelope of a set, including closure offsets (surface radii additional). */
 export function setSpread(n: number, diaMm: number): number {
-  return Math.max(0, n - 1) * diaMm / 1000;
+  return Math.max(0, n) * diaMm / 1000;
 }
 
 /**

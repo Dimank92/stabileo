@@ -2923,19 +2923,8 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
       bandHi = Math.min(bandHi, e.hi);
     }
 
-    const band = bandHi - bandLo;
-    if (!(band > 0)) {
-      cMb.unsupported.push(formatClause(clause('cirsoc-201', input.edition, '15.3.1.2',
-        'el nudo no deja luz libre entre la armadura inferior y superior de las vigas ' +
-        'para alojar estribos horizontales; la armadura transversal del nudo no se genera')));
-      continue;
-    }
-
     const zoneId = `joint-${top.id}:ties`;
-    const from = bandLo;
-    const stations = stirrupStations({
-      from: 0, to: band, spacing: jointSpacing, nextZoneStartsAtEnd: false,
-    });
+    let from = bandLo;
     // The beam steel passing through the joint is CONFINED by these ties, and the tie belongs
     // to the joint rather than to the column alone. Both facts have to be recorded or the
     // classifier sees an unrelated pair and reaches for §25.2.3's column bar spacing.
@@ -3002,6 +2991,21 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
       }
       return best;
     };
+    // The clearance band bounds every piece, not just the set's nominal station.
+    // Probe the full cage at mid-joint; end stations can contain a subset of these bars.
+    // Reserve the closure and staggered crossties before placing the first/last set.
+    const halfSet = setSpread(tieSetAt(jointMid - from, 0).pieces.length, cCtx.material.stirrupDia) / 2;
+    from += halfSet;
+    const band = bandHi - halfSet - from;
+    if (!(band > 0)) {
+      cMb.unsupported.push(formatClause(clause('cirsoc-201', input.edition, '15.3.1.2',
+        'el nudo no deja luz libre entre la armadura inferior y superior de las vigas ' +
+        'para alojar estribos horizontales; la armadura transversal del nudo no se genera')));
+      continue;
+    }
+    const stations = stirrupStations({
+      from: 0, to: band, spacing: jointSpacing, nextZoneStartsAtEnd: false,
+    });
     for (let si = 0; si < stations.length; si++) {
       const set = tieSetAt(stations[si], si);
       if (set.unsupported.length > 0) {

@@ -6,6 +6,92 @@ entre las alternativas que explora el diseño y las geometrías que finalmente c
 La prioridad es cerrar esa distancia y medir todos los bloqueos físicos antes de ampliar
 presupuestos de búsqueda.
 
+## Ampliación: espacio de las trabas y alternativas nuevas del catálogo
+
+La ejecución completa desde cero termina con **140 aprobados y 1101 conflictos bloqueantes**:
+441 bloqueos menos que `6e939b609` (28,6%) y 56 aprobaciones adicionales. Conserva las 84
+identidades anteriores; son 114 columnas y 26 vigas, frente a 81 y tres. Ningún aprobado
+participa en un conflicto bloqueante. Quedan 220 fallidos, 35 búsquedas agotadas y 13 provisionales.
+La regeneración sin búsqueda reproduce exactamente todos los veredictos y conflictos.
+
+Dos reservas geométricas omitían parte del acero que se construye. El cierre del estribo
+sobresale medio diámetro respecto de su plano: separar la primera traba solamente un diámetro
+dejaba interpenetraciones. Además, la banda libre del nudo se aplicaba a la estación del
+conjunto, aunque las piezas extremas sobresalen de ella. Ahora se reserva la envolvente axial
+completa, incluidos los cierres, tanto al separar piezas como al colocar conjuntos en el nudo.
+Se conserva el paso entre piezas equivalentes de conjuntos sucesivos. Si no cabe el conjunto,
+se mantiene una condición de generación abierta.
+
+El operador opt-in `harmonizeTopCatalog` explora familias comunes que no necesitan existir en
+otra viga. Parte del área superior máxima de la línea y propone el menor número de barras
+que la cubre en cada diámetro permitido, más una barra para explorar otra distribución.
+El área sólo guía la propuesta: resistencia, anclaje y geometría final deben verificarse.
+Se conservan los grupos, terminaciones, catálogos y exclusiones de los operadores anteriores.
+Sólo se seleccionan líneas con conflictos que involucren sus barras superiores reales,
+incluidas las fusionadas. Cada línea recibe un ensayo físico antes del segundo ensayo de otra;
+los rechazos nominales siguen siendo baratos y consumen su presupuesto explícito.
+
+En esta ejecución, las reparaciones anteriores, ya con las reservas corregidas, llegan a
+95 aprobados y 1310 bloqueos. El catálogo superior acepta 12 líneas y termina con 140/1101:
+64 detallados, 322 verificaciones nominales y cero reanálisis estructurales; se alcanza el
+presupuesto, no el agotamiento del catálogo. La etapa inferior previa completa su barrido
+con 52 detallados y 190 verificaciones nominales. El test completo consume 561,14 s en una
+ejecución local; el tiempo incluye todas las etapas y no es una garantía de rendimiento.
+
+La reconstrucción del armado guardado de `6e939b609` permite separar las causas:
+
+| Cambio acumulado sobre el armado retenido | Aprobados finales | Conflictos bloqueantes |
+| --- | ---: | ---: |
+| Estado anterior | 84 | 1542 |
+| Reserva del cierre junto a las trabas | 88 | 1454 |
+| Reserva del conjunto completo dentro del nudo | 98 | 1442 |
+| Catálogo superior, 64 ensayos físicos | 140 | 1234 |
+
+Esta reconstrucción conserva las 84 identidades y termina con 114 columnas y 26 vigas aprobadas.
+Su asignación es distinta de la obtenida desde cero: corregir las reservas antes de los
+operadores anteriores también cambia qué alternativas se aceptan. Los conteos de aprobados
+coinciden, pero no todas las identidades nuevas; ambas conservan las 84 del estado anterior.
+Las cuatro vigas que libera la corrección del nudo son 191, 214, 215 y 216. El catálogo acepta
+12 líneas, realiza 357 verificaciones nominales y llega al presupuesto de 64 detallados;
+no ejecuta nuevos análisis estructurales. La regeneración de ese armado reproduce exactamente
+los aprobados y los conflictos. La prueba de restauración escribe solamente armados aceptados
+o provisionales biaxiales; las búsquedas agotadas no reciben su mejor candidato rechazado.
+
+Las regresiones nuevas miden directamente separación entre piezas, envolvente de cierres,
+contención y paso para diámetros de 6, 8 y 10 mm, ambos cierres y marcos rotados. Otra mide
+la separación de cada pieza transversal del nudo respecto de las barras horizontales de las
+vigas. Un octavo caso pequeño con solver real cierra tres luces de 6 m usando 5Ø16 en lugar
+de los patrones iniciales 7Ø12 y 8Ø12. Las pruebas de búsqueda comprueban conservación global,
+presupuestos, selección por barras en conflicto y alternancia entre líneas.
+Las diez suites dirigidas suman 174 pruebas aprobadas. La integración de 408 miembros pasa
+y fija 140 aprobados, 26 vigas y 1101 bloqueos como regresión de esta secuencia, además de la
+conservación por identidad y la regeneración exacta. Typecheck: 442 errores existentes frente
+a baseline 443, sin errores nuevos.
+
+Reproducción completa desde `web/` (incluye todas las etapas anteriores):
+
+```sh
+STABILEO_CONTINUITY_EXPERIMENT=64 STABILEO_BOTTOM_EXPERIMENT=1 STABILEO_CATALOG_EXPERIMENT=64 STABILEO_CONTINUITY_AUDIT=/tmp/design-continuity-audit.json npx vitest run --project unit src/lib/store/__tests__/design-continuity-experiment.test.ts
+```
+
+Para investigar una asignación retenida sin repetir la búsqueda anterior:
+
+```sh
+STABILEO_REPAIR_SNAPSHOT=/tmp/design-continuity-audit.json STABILEO_REPAIR_CATALOG=64 npx vitest run --project unit src/lib/store/__tests__/design-next-conflicts-experiment.test.ts
+```
+
+Este segundo comando vuelve a resolver fuerzas, restaura el armado, reconstruye y verifica
+todo el detalle; guarda su evidencia en `/tmp/design-next-conflicts.json`. No reemplaza la
+prueba completa desde cero. La búsqueda sigue siendo opt-in y acotada: completar este
+presupuesto no demuestra que las alternativas estén agotadas ni que el edificio verifique.
+
+Los **1101 conflictos de la ejecución completa** se reparten en 276 parejas de empalme
+registradas, 524 pares longitudinales adicionales, 297 pares longitudinal/transversal y cuatro
+pares transversales. Las concentraciones siguientes están en el armado inferior de 225
+(85 conflictos propios), en el de 328 (33), y en transiciones que penetran la jaula del tramo vecino.
+Requieren operadores sobre la posición inferior y las transiciones; cambiar otra vez el acero
+superior no aborda esas causas.
+
 ## Ampliación: continuidad superior e inferior por líneas completas
 
 La búsqueda por parejas dejaba tramos fuera del reemplazo: una unión ya fusionada no tiene

@@ -87,6 +87,61 @@ describe('atomic top continuity repair', () => {
       .toBe(rebarHash(result.outcomes.get(id)!.accepted));
   });
 
+  it('explores catalog patterns for blocked lines even when all their splices are continuous', () => {
+    const { input, verify } = line();
+    input.result.assemblies[0].unsupported = [];
+    input.result.lapping.laps = [];
+    input.result.assemblies[0].bars = [{ id: 'shared-top', role: 'longitudinal',
+      layerId: '1:top', ownerElementIds: [1, 2, 3] }] as never;
+    input.result.assemblies[0].conflicts[0].barA = 'shared-top';
+    const result = searchPhysicalDesignAlternatives({ ...input,
+      budget: { ...input.budget, operators: ['harmonizeTopCatalog'] } });
+    expect(result.trials[0]).toMatchObject({ disposition: 'accepted', operator: 'harmonizeTopCatalog',
+      elementIds: [1, 2, 3], splicePairsBefore: 0, splicePairsAfter: 0 });
+    expect(verify).toHaveBeenCalledTimes(3);
+    expect(result.result.assemblies[0].conflicts).toEqual([]);
+  });
+
+  it('does not spend a top catalog budget on bottom-only clashes', () => {
+    const { input, verify } = line();
+    input.result.assemblies[0].bars = [{ id: 'shared-bottom', role: 'longitudinal',
+      layerId: '1:bottom', ownerElementIds: [1, 2, 3] }] as never;
+    input.result.assemblies[0].conflicts[0].barA = 'shared-bottom';
+    const result = searchPhysicalDesignAlternatives({ ...input,
+      budget: { ...input.budget, operators: ['harmonizeTopCatalog'] } });
+    expect(result.trials).toEqual([]);
+    expect(verify).not.toHaveBeenCalled();
+    expect(input.detail).not.toHaveBeenCalled();
+  });
+
+  it('tries the next catalog line before spending a second full run on the first', () => {
+    const { input, verify } = line();
+    const model = input.contexts.get(1)!.modelData;
+    for (const id of [7, 8, 9, 10]) model.nodes.set(id, { id, x: id * 6, y: 0, z: 0 });
+    for (const id of [4, 5, 6]) {
+      model.elements.set(id, { ...model.elements.get(1)!, id, nodeI: id + 3, nodeJ: id + 4 });
+      input.contexts.set(id, { ...syntheticBeamContext({ elementId: id }), modelData: model });
+      input.outcomes.set(id, outcome(id, id === 4 ? 12 : 16));
+      input.result.reverification.push({ ...input.result.reverification[0], elementId: id });
+      input.result.layering!.lineOfMember.set(id, 'second');
+    }
+    input.result.assemblies[0].bars = [1, 4].map(id => ({ id: `top-${id}`, role: 'longitudinal',
+      layerId: `${id}:top`, ownerElementIds: [id, id + 1, id + 2] })) as never;
+    input.result.assemblies[0].conflicts = [1, 2, 4, 5].map(id => ({
+      ...input.result.assemblies[0].conflicts[0], elementIds: [id], barA: `top-${id < 4 ? 1 : 4}`,
+    }));
+    const improved = { ...input.result, assemblies: [{ ...input.result.assemblies[0],
+      conflicts: input.result.assemblies[0].conflicts.slice(0, 2) }] };
+    input.detail.mockReturnValueOnce(input.result).mockReturnValueOnce(improved);
+    const result = searchPhysicalDesignAlternatives({ ...input,
+      budget: { maxDetailingRuns: 2, maxMemberSearches: 6, operators: ['harmonizeTopCatalog'] } });
+    expect(result.trials.map(t => [t.elementIds, t.disposition])).toEqual([
+      [[1, 2, 3], 'noProgress'], [[4, 5, 6], 'accepted'],
+    ]);
+    expect(verify).toHaveBeenCalledTimes(6);
+    expect(input.detail).toHaveBeenCalledTimes(2);
+  });
+
   it('does not join a crossing beam even if an upstream line identifier is shared', () => {
     const { input } = line();
     input.contexts.get(1)!.modelData.nodes.set(4, { id: 4, x: 12, y: 6, z: 0 });
