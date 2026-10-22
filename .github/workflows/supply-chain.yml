@@ -46,10 +46,19 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 20
+          node-version-file: .nvmrc
       # What ships to users: fail on any high or critical advisory.
+      # Retried only when the registry's audit endpoint itself failed (it has, and a rerun was
+      # the fix); an advisory fails at once.
       - name: npm audit (production dependencies)
-        run: npm audit --omit=dev --audit-level=high
+        run: |
+          for attempt in 1 2 3; do
+            out=$(npm audit --omit=dev --audit-level=high 2>&1) && { echo "$out"; exit 0; }
+            echo "$out"
+            echo "$out" | grep -qiE 'audit endpoint returned an error|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|socket hang up' || exit 1
+            echo "audit endpoint failed (attempt $attempt), retrying"; sleep 20
+          done
+          exit 1
       # Build and test tooling. Reported, and failing on critical only for
       # packages with a non-breaking fix; see docs/security/AUDIT.md for the
       # dev-only advisories that wait on a major upgrade.

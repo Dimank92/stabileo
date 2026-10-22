@@ -528,6 +528,11 @@ export interface Element extends Element3DMetadata {
   /** Inactive, tension only or compression only (`engine/member-behaviour.ts`). Absent: linear. */
   behaviour?: import('../engine/member-behaviour').MemberBehaviour;
   /**
+   * A cable's pretension, kN: its tension on the drawn chord under its own weight alone, from
+   * which the engine sets its unstressed length (#527). Absent: the chord is the unstressed length.
+   */
+  cablePretension?: number;
+  /**
    * The members this one lies over and was kept with ("Keep both" on the overlap question,
    * `model/edit/connection-questions.ts`): not asked about again, on this open or the next.
    * Read only by that question; the analysis and the diagnostics do not look at it.

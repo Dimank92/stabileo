@@ -3,11 +3,14 @@
   "version": "0.3.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22 <23"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build && npx tsx scripts/prerender.ts",
     "preview": "vite preview",
-    "wasm": "cd ../engine && wasm-pack build --target web --out-dir ../web/src/lib/wasm --no-opt",
+    "wasm": "../scripts/wasm-cached.sh",
     "test": "node scripts/test-all.mjs",
     "test:watch": "vitest --project unit",
     "check": "svelte-check --tsconfig ./tsconfig.json",
