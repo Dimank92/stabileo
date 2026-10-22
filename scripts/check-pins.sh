@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
-# cargo-fuzz's sanitizers need a nightly: this dated one, and only in the fuzz job.
+# cargo-fuzz's sanitizers and llvm-cov --branch need a nightly: this dated one, only there.
 NIGHTLY=nightly-2026-10-15
 
 fail=0
