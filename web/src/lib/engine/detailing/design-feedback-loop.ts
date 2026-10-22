@@ -56,9 +56,11 @@ import {
 import { rebarHash } from '../design/rebar-hash';
 import type { ProvidedRebarResult } from '../station-design-forces';
 import type { FinalGeometryRecord, RunDetailingResult } from './run-detailing';
+import { searchPhysicalDesignAlternatives, physicallyBlockedMembers,
+  type PhysicalSearchBudget, type PhysicalSearchResult } from './physical-design-search';
 
 /** How the whole loop ended. Same vocabulary as a single member's repair. */
-export type LoopOutcome = RepairKind | 'FEEDBACK_LOOP_CYCLE_DETECTED' | 'FINAL_DETAIL_REGRESSION';
+export type LoopOutcome = RepairKind | 'FEEDBACK_LOOP_CYCLE_DETECTED' | 'FINAL_DETAIL_REGRESSION' | 'PHYSICAL_REPAIR_PENDING';
 
 /**
  * Precedence when several members end differently.
@@ -82,9 +84,9 @@ export interface DesignFeedbackLoopInput {
   /**
    * Member contexts, passed through UNCHANGED.
    *
-   * The loop only ever derives `{...ctx, finalGeometry}` copies from these; it never
-   * rebuilds a context, which is what guarantees the demands are the ones the solver
-   * produced and that no solve is implied.
+   * Strength repair derives `{...ctx, finalGeometry}` copies. Optional physical repair also
+   * refreshes the neighboring beam seats from the trial assignment. Neither changes the
+   * demands, sections or analysis revisions, or runs a structural solve.
    */
   contexts: ReadonlyMap<number, MemberContext>;
   /** Outcomes of the initial design run, at nominal geometry. */
@@ -96,7 +98,7 @@ export interface DesignFeedbackLoopInput {
    * long input list. The callback MUST supply the authoritative verifier for the same
    * assignment it is handed, otherwise step 4 has nothing to report.
    */
-  detail: (outcomes: ReadonlyMap<number, MemberDesignOutcome>) => RunDetailingResult;
+  detail: (outcomes: ReadonlyMap<number, MemberDesignOutcome>, contexts?: ReadonlyMap<number, MemberContext>) => RunDetailingResult;
   /** Members whose reinforcement the engineer pinned. Never replaced. */
   lockedMembers?: ReadonlySet<number>;
   /**
@@ -105,6 +107,8 @@ export interface DesignFeedbackLoopInput {
    */
   maxIterations?: number;
   budget?: RepairBudget;
+  /** Opt-in physical repair sweep; full-detail trials have a separate operation budget. */
+  physicalSearch?: PhysicalSearchBudget;
 }
 
 export const DEFAULT_MAX_ITERATIONS = 8;
@@ -139,6 +143,8 @@ export interface DesignFeedbackLoopResult {
   /** The reinforcement assignment that produced `result`. */
   outcomes: ReadonlyMap<number, MemberDesignOutcome>;
   iterations: LoopIteration[];
+  /** Physical alternatives have their own trace; never masquerade as strength repairs. */
+  physicalSearch?: PhysicalSearchResult;
   /** Members still failing re-verification, with the reason the repair could not fix them. */
   unrepaired: Array<{
     elementId: number;
@@ -377,6 +383,20 @@ export function runDesignFeedbackLoop(
     iteration.assignmentHash = nextHash;
   }
 
+  const physicalSearch = input.physicalSearch ? searchPhysicalDesignAlternatives({
+    adapter: input.adapter, contexts: input.contexts, outcomes, result,
+    detail: input.detail, lockedMembers: locked, budget: input.physicalSearch,
+    regresses: detailRegresses,
+  }) : undefined;
+  if (physicalSearch) {
+    outcomes = physicalSearch.outcomes;
+    result = physicalSearch.result;
+    stats.detailingRuns += physicalSearch.stats.detailingRuns;
+    stats.candidatesConsidered += physicalSearch.stats.candidatesConsidered;
+    stats.verifierCalls += physicalSearch.stats.verifierCalls;
+    stats.truncated ||= physicalSearch.termination === 'budget';
+  }
+
   // ── Classify the ending ──
   const stillFailing = failingRecords(result, input.contexts);
   const unrepaired = stillFailing.map((rec) => {
@@ -405,8 +425,12 @@ export function runDesignFeedbackLoop(
     if (stats.truncated) kinds.add('FEEDBACK_LOOP_TRUNCATED');
     outcome = OUTCOME_PRECEDENCE.find((k) => kinds.has(k)) ?? 'FEEDBACK_LOOP_TRUNCATED';
   }
+  if (physicalSearch && outcome === 'FINAL_GEOMETRY_VERIFIED' && physicallyBlockedMembers(result).size) {
+    outcome = 'PHYSICAL_REPAIR_PENDING';
+  }
 
-  return { outcome, result, outcomes, iterations, unrepaired, sectionAdvice, stats };
+  return { outcome, result, outcomes, iterations, unrepaired, sectionAdvice, stats,
+    ...(physicalSearch ? { physicalSearch } : {}) };
 }
 
 /**
@@ -414,7 +438,7 @@ export function runDesignFeedbackLoop(
  * missing verification, or an additional physical blocker for fewer local check failures.
  * These are separate gates, not a weighted score where steel savings can cancel a failure.
  */
-function detailRegresses(before: RunDetailingResult, after: RunDetailingResult): boolean {
+export function detailRegresses(before: RunDetailingResult, after: RunDetailingResult): boolean {
   const passes = (status: FinalGeometryRecord['status']) => status === 'ok' || status === 'warn';
   const next = new Map(after.reverification.map(r => [r.elementId, r]));
   if (before.reverification.some(r => !next.has(r.elementId)

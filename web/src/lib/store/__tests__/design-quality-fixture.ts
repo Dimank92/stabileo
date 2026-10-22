@@ -32,3 +32,6 @@ export async function frameDesignQuality() {
     open: assemblies.flatMap(a => a.unsupported).reduce((n, u) => { n[u.key] = (n[u.key] ?? 0) + 1; return n; }, {} as Record<string, number>) };
   return { output, verifiedIds };
 }
+
+/** Final physical approvals before guided alternatives; preserved by identity. */
+export const PHYSICAL_BASELINE_PASSES = [2, 4, 7, 8, 9, 13, 16, 17, 18, 19, 20, 32, 34, 38, 42, 43, 48, 52, 53, 54, 55, 58, 63, 68, 70, 74, 77, 78, 79, 82, 83, 84, 89, 94, 97, 98, 99, 102, 103, 104, 107, 109, 113, 114, 115, 118, 119, 121, 122, 123, 124, 125, 136, 137, 138, 139, 140, 142, 143, 144, 147, 148, 149, 152, 153, 154, 157, 158, 159, 185, 201, 202];

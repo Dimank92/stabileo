@@ -44,6 +44,8 @@ it.runIf(!!process.env.STABILEO_DESIGN_AUDIT)('audits final failures and search 
       lapping: run.lapping,
       layering: run.layering,
       loop: { outcome: loop.outcome, stats: loop.stats, unrepaired: loop.unrepaired,
+        physicalSearch: loop.physicalSearch ? { trials: loop.physicalSearch.trials,
+          stats: loop.physicalSearch.stats, termination: loop.physicalSearch.termination } : undefined,
         iterations: loop.iterations.map(i => ({ failed: i.failed, proposed: i.proposed, changed: i.changed, rejected: i.rejected })) },
       coordination: run.coordination.map(c => ({ id: c.assembly.id, attempts: c.repair.attempts,
         unresolved: c.repair.unresolved, moved: c.repair.moved, trace: c.repair.trace })),

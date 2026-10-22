@@ -137,7 +137,7 @@ y luego el modelo completo. Este único edificio no prueba robustez general.
 
 ## Reproducción y estado de implementación
 
-Se agrega únicamente un experimento opt-in; no cambia el generador de producción. Desde `web/`:
+El experimento de paletas es opt-in y no cambia el generador de producción. Desde `web/`:
 
 ```sh
 STABILEO_BEAM_PALETTE=baseline STABILEO_HEURISTICS_OUTPUT=/tmp/beam-baseline.json npx vitest run --project unit --maxWorkers=2 src/lib/store/__tests__/design-heuristics-experiment.test.ts
@@ -148,3 +148,79 @@ El JSON guarda identidades, estados, resultados de búsqueda y cobertura por tip
 comprueban ejecución completa y ausencia de aprobados con conflictos físicos detectados;
 que el experimento pase **no significa que la heurística sea aceptable**. Comparar cobertura,
 identidades, condiciones abiertas y costo antes de proponer su adopción.
+
+## Siguiente incremento: explorar alternativas locales con una guía
+
+El rechazo de una paleta global no descarta sus armados como alternativas locales. Se implementa
+`physical-design-search.ts`, integrado como segunda etapa opcional del ciclo y accesible desde
+`detailingStore.generate({ physicalSearch: { maxDetailingRuns: 8, maxMemberSearches: 64 } })`.
+La ejecución automática conserva su configuración anterior; esta búsqueda todavía se activa
+explícitamente. No hay un nuevo control de interfaz en este incremento.
+
+La primera operación disponible intenta simplificar una viga a una familia de diámetros:
+
+1. Prioriza miembros por cantidad de conflictos físicos bloqueantes, con desempate estable.
+2. Ensaya familias dentro del catálogo permitido. La prioridad inicial es Ø16, Ø12, Ø20 y
+   Ø25, seguida de los restantes tamaños permitidos: es una heurística de orden, no una
+   restricción nueva del proyecto ni una regla normativa.
+3. Diseña y verifica cada alternativa antes de pagar un detallado completo. Un fallo nominal
+   descarta esa alternativa y conserva el armado anterior; jamás elimina el miembro del modelo.
+4. Reconstruye y verifica el detalle completo con las referencias actualizadas de las barras
+   vecinas. Rechaza pérdida de cobertura, nuevos miembros bloqueados, regresiones resistentes
+   y aumentos de las categorías de condiciones abiertas que controla el ciclo existente.
+5. Conserva el cambio sólo si supera esas protecciones y reduce miembros bloqueados o
+   conflictos bloqueantes. Un rechazo permite probar otra familia y continuar con otro miembro.
+   El candidato aceptado y su detalle se conservan juntos.
+
+La búsqueda recorre una vez la lista priorizada y conserva el mejor estado aceptado. No
+memoiza rechazos entre geometrías. Respeta miembros bloqueados por el usuario y no reemplaza
+propuestas biaxiales ni piezas de vigas divididas en varios elementos; estas últimas necesitan
+una operación conjunta. El presupuesto limita tanto búsquedas nominales como reconstrucciones
+completas, incluidas las rechazadas. Agotar esas operaciones no demuestra inviabilidad.
+
+### Resultado del camino completo
+
+| Medición | Base | Con exploración local |
+| --- | ---: | ---: |
+| Aprobados finales | 72 | 76 |
+| Aprobados anteriores perdidos | — | 0 |
+| Fallidos | 288 | 284 |
+| Vigas no disponibles | 35 | 35 |
+| Propuestas biaxiales | 13 | 13 |
+| Conflictos bloqueantes | 2981 | 2066 |
+
+Se conservan los 72 aprobados por identidad y se agregan las columnas **40, 45, 50 y 65**,
+al despejar interferencias con vigas. Se reemplazan los armados de las vigas 207, 223, 257,
+204, 254 y 230. La mejora de los vecinos no significa que esas seis vigas ya cierren todos
+sus propios requisitos. Los bloqueos de empalmes pendientes conservan sus conteos anteriores.
+
+Se hicieron 18 búsquedas nominales, con 489 candidatos/verificaciones; sólo 8 llegaron a la
+reconstrucción completa. Se aceptaron 6 cambios y se rechazaron 2. El cierre del barrido fue
+por presupuesto, conservando el mejor estado. No hubo nuevos cálculos estructurales.
+
+La repetición instrumentada reprodujo identidades, condiciones y conflictos: 35,40 s de
+ejecución del test, frente a aproximadamente 15 s de la base medida antes. Las diez pasadas
+de detalle —dos del ciclo inicial y ocho alternativas— sumaron 28,40 s de tiempo transcurrido.
+Una ejecución anterior registró 573,77 s y no se reprodujo; no se atribuye esa diferencia a una
+causa ni se usa para estimar rendimiento. Son mediciones locales, no un SLA. La prioridad de
+rendimiento sigue siendo verificar sólo la dependencia afectada y conservar una pasada global
+de aceptación, sin perder equivalencia con el resultado completo.
+
+Este incremento demuestra que explorar y conservar alternativas sí mejora el caso auditado.
+No implementa todavía cambios conjuntos por nudo, reubicación de empalmes ni nuevas geometrías
+de cierre. Tampoco busca reparar todas las clases de fallos físicos: selecciona miembros que
+participan en interferencias. Esos operadores deben agregarse a la misma búsqueda y validarse
+con más geometrías; un edificio no prueba robustez general.
+
+Reproducción desde `web/` con WASM release:
+
+```sh
+STABILEO_GUIDED_SEARCH=8 npx vitest run --project unit --maxWorkers=2 src/lib/store/__tests__/design-guided-search-experiment.test.ts
+npx vitest run --project unit --maxWorkers=2 src/lib/engine/detailing/__tests__/physical-design-search.test.ts src/lib/engine/detailing/__tests__/design-feedback-loop.test.ts
+```
+
+El experimento exige los 72 aprobados anteriores, los cuatro nuevos, ausencia de aprobados
+con conflictos y mantenimiento de cobertura. Guarda la traza en `/tmp/design-guided-search.json`
+y los tiempos por pasada en `/tmp/design-guided-timing.json`. Las pruebas pequeñas cubren
+continuación tras rechazo, pérdida de cobertura, preservación de identidades físicas, respeto
+de bloqueos/catálogos, actualización de vecinos y presupuestos.
