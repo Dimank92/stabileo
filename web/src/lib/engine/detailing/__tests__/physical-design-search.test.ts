@@ -42,6 +42,97 @@ function harness() {
 
 afterEach(() => vi.restoreAllMocks());
 
+describe('atomic top continuity repair', () => {
+  function paired() {
+    const { input } = harness();
+    for (const id of [1, 2]) input.contexts.set(id, syntheticBeamContext({ elementId: id }));
+    input.outcomes.set(1, outcome(1, 12)); input.outcomes.set(2, outcome(2, 16));
+    input.result = detail([1, 2]);
+    input.result.assemblies[0].unsupported = [{ key: 'detailing.lapCheck.unarranged',
+      scope: { elementIds: [1, 2] }, params: { joint: 'n2' }, message: 'overlap', refs: [] }];
+    input.result.lapping = { laps: [{ jointId: 'n2', fromElementId: 1, toElementId: 2 }] as never, fused: 0, unmaterialised: [] };
+    const verify = vi.spyOn(input.adapter, 'verify').mockReturnValue({
+      overallStatus: 'ok', strengthCheckCount: 2, checks: [{ status: 'ok' }], worstUtilization: 0.8, checkedAxes: ['My'],
+    } as never);
+    return { input: { ...input, budget: { maxDetailingRuns: 2, maxMemberSearches: 4, operators: ['harmonizeTop'] as const } }, verify };
+  }
+
+  it('checks both proposed members against their new neighbours and publishes the pair only after full detail', () => {
+    const { input, verify } = paired();
+    const result = searchPhysicalDesignAlternatives(input);
+    expect(verify).toHaveBeenCalledTimes(2);
+    expect(result.trials[0]).toMatchObject({ elementIds: [1, 2], jointId: 'n2', disposition: 'accepted' });
+    expect(input.detail).toHaveBeenCalledTimes(1);
+    const proposed = input.detail.mock.calls[0][0];
+    for (const id of [1, 2]) {
+      const r = proposed.get(id)!;
+      expect(r.certificate!.rebarHash).toBe(rebarHash(r.accepted));
+      expect(r.accepted!.regions!.topStart!.diameter).toBe(12);
+    }
+    // Top seats also account for the unchanged bottom hooks (Ø16).
+    expect(verify.mock.calls[0][0].beamCorners!.get(2)!.topDiasMm).toEqual([12, 16]);
+    expect(input.outcomes.get(2)!.accepted!.regions!.topStart!.diameter).toBe(16);
+    expect(result.stats).toMatchObject({ detailingRuns: 1, memberSearches: 2, verifierCalls: 2, structuralSolves: 0 });
+  });
+
+  it('rejects the whole pair if either nominal check fails', () => {
+    const { input, verify } = paired();
+    verify.mockReturnValue({ strengthCheckCount: 2, checks: [{ status: 'fail' }], worstUtilization: 1.2 } as never);
+    const result = searchPhysicalDesignAlternatives(input);
+    expect(input.detail).not.toHaveBeenCalled();
+    expect(result.outcomes).toBe(input.outcomes);
+    expect(result.trials.every(t => t.nominalFailures?.length === 2)).toBe(true);
+  });
+
+  it('does not certify a warning that requires a hook the proposal does not provide', () => {
+    const { input, verify } = paired();
+    verify.mockReturnValue({ overallStatus: 'fail', strengthCheckCount: 2,
+      checks: [{ status: 'warn', anchorHook: { face: 'bottom', toward: 'start', group: 0 } }],
+      worstUtilization: 0.8, checkedAxes: ['My'] } as never);
+    expect(searchPhysicalDesignAlternatives(input).changed).toEqual([]);
+    expect(input.detail).not.toHaveBeenCalled();
+  });
+
+  it.each(['locked', 'provisional', 'budget'] as const)('does not partly replace a pair when %s', mode => {
+    const { input, verify } = paired();
+    if (mode === 'provisional') input.outcomes.set(2, { ...input.outcomes.get(2)!, outcome: 'PROVISIONAL_BIAXIAL' });
+    if (mode === 'budget') input.budget.maxMemberSearches = 1;
+    const result = searchPhysicalDesignAlternatives({ ...input, lockedMembers: mode === 'locked' ? new Set([2]) : undefined });
+    expect(verify).not.toHaveBeenCalled();
+    expect(result.outcomes).toBe(input.outcomes);
+    expect(result.changed).toEqual([]);
+    if (mode === 'budget') expect(result.termination).toBe('budget');
+  });
+
+  it('rejects a nominally valid pair if the final detail regresses', () => {
+    const { input } = paired();
+    input.detail.mockReturnValue(detail([], [2]));
+    const result = searchPhysicalDesignAlternatives(input);
+    expect(result.changed).toEqual([]);
+    expect(result.result).toBe(input.result);
+    expect(result.trials.map(t => t.disposition)).toEqual(['regression', 'regression']);
+  });
+
+  it('requires improvement of the target splice, not just fewer other clashes', () => {
+    const { input } = paired();
+    const fewer = detail([]);
+    fewer.assemblies[0].unsupported = input.result.assemblies[0].unsupported;
+    input.detail.mockReturnValue(fewer);
+    expect(searchPhysicalDesignAlternatives(input).trials.map(t => t.disposition)).toEqual(['noProgress', 'noProgress']);
+  });
+
+  it('shares operation budgets across paired and single-member operators', () => {
+    const { input } = paired();
+    input.detail.mockReturnValueOnce(detail([1])).mockReturnValue(detail([]));
+    const result = searchPhysicalDesignAlternatives({ ...input,
+      budget: { maxDetailingRuns: 2, maxMemberSearches: 3, operators: ['harmonizeTop', 'diameterFamily'] } });
+    expect(result.trials.map(t => t.operator)).toEqual(['harmonizeTop', 'diameterFamily']);
+    expect(result.trials.map(t => t.disposition)).toEqual(['accepted', 'accepted']);
+    expect(result.stats).toMatchObject({ detailingRuns: 2, memberSearches: 3, verifierCalls: 3 });
+    expect(result.changed).toEqual([1, 2]);
+  });
+});
+
 describe('guided physical alternatives', () => {
   it.each([false, true])('reverifies a layer redistribution and retains it only if the full detail improves (nominal failure: %s)', nominalFailure => {
     const { input, generate } = harness();

@@ -8,8 +8,9 @@ import { rebarHash } from '../design/rebar-hash';
 import { detailableReinforcement, type MemberDesignOutcome } from '../design/outcome';
 import type { RunDetailingResult } from './run-detailing';
 import { beamLayerAlternatives, type BeamLayerAlternative } from './beam-layer-alternatives';
+import { beamContinuityAlternatives } from './beam-continuity-alternatives';
 
-export type PhysicalRepairOperator = 'diameterFamily' | 'redistributeLayers';
+export type PhysicalRepairOperator = 'diameterFamily' | 'redistributeLayers' | 'harmonizeTop';
 
 export interface PhysicalSearchBudget {
   /** Full geometry builds, including rejected trials. */
@@ -26,6 +27,9 @@ export const DEFAULT_PHYSICAL_SEARCH_BUDGET: PhysicalSearchBudget = {
 
 export interface PhysicalSearchTrial {
   elementId: number;
+  /** Atomic replacement; elementId remains the representative for single-member readers. */
+  elementIds?: number[];
+  jointId?: string;
   operator: PhysicalRepairOperator;
   diameterMm?: number;
   region?: BeamLayerAlternative['region'];
@@ -34,6 +38,7 @@ export interface PhysicalSearchTrial {
   /** Members acquiring a physical condition they did not previously have. */
   newlyBlocked?: number[];
   blockingConflicts?: number;
+  nominalFailures?: number[];
 }
 
 export interface PhysicalSearchResult {
@@ -86,8 +91,26 @@ export function searchPhysicalDesignAlternatives(input: {
     if (!Number.isSafeInteger(value) || value < 0) throw new Error('Physical search budgets must be non-negative integers');
   }
   const operators = [...new Set<PhysicalRepairOperator>(input.budget.operators ?? ['diameterFamily'])];
-  if (operators.some(o => o !== 'diameterFamily' && o !== 'redistributeLayers')) {
+  if (operators.some(o => o !== 'diameterFamily' && o !== 'redistributeLayers' && o !== 'harmonizeTop')) {
     throw new Error('Unknown physical repair operator');
+  }
+  if (operators.includes('harmonizeTop')) {
+    if (operators.length === 1) return searchBeamContinuity(input);
+    // Atomic pair repair is a separate sweep. All sweeps share the caller's budgets.
+    let retained: PhysicalSearchResult = { outcomes: input.outcomes, result: input.result, trials: [],
+      changed: [], termination: 'sweepComplete', stats: { detailingRuns: 0, memberSearches: 0,
+        candidatesConsidered: 0, verifierCalls: 0, structuralSolves: 0 } };
+    for (const operator of operators) {
+      const next = searchPhysicalDesignAlternatives({ ...input, outcomes: retained.outcomes, result: retained.result,
+        budget: { operators: [operator], maxDetailingRuns: input.budget.maxDetailingRuns - retained.stats.detailingRuns,
+          maxMemberSearches: input.budget.maxMemberSearches - retained.stats.memberSearches } });
+      const stats = { ...retained.stats };
+      for (const key of ['detailingRuns', 'memberSearches', 'candidatesConsidered', 'verifierCalls'] as const) stats[key] += next.stats[key];
+      retained = { ...next, stats, trials: [...retained.trials, ...next.trials],
+        changed: [...new Set([...retained.changed, ...next.changed])].sort((a, b) => a - b) };
+      if (next.termination === 'budget') break;
+    }
+    return retained;
   }
   let result = input.result, outcomes = input.outcomes;
   let contexts = contextsFor(input.contexts, outcomes);
@@ -170,6 +193,90 @@ export function searchPhysicalDesignAlternatives(input: {
       }
       trial.disposition = 'accepted';
       outcomes = proposed; result = detailed; contexts = trialContexts; changed.add(id);
+      break;
+    }
+  }
+  return { outcomes, result, trials, changed: [...changed].sort((a, b) => a - b), termination, stats };
+}
+
+/** Uniform top patterns are tried on a whole pair, never published one member at a time. */
+function searchBeamContinuity(input: Parameters<typeof searchPhysicalDesignAlternatives>[0]): PhysicalSearchResult {
+  let result = input.result, outcomes = input.outcomes;
+  const trials: PhysicalSearchTrial[] = [], changed = new Set<number>();
+  const stats: PhysicalSearchResult['stats'] = { detailingRuns: 0, memberSearches: 0,
+    candidatesConsidered: 0, verifierCalls: 0, structuralSolves: 0 };
+  let termination: PhysicalSearchResult['termination'] = 'sweepComplete';
+  // Only real transitions with an open splice condition. No inference from member numbering.
+  const conditions = (r: RunDetailingResult, jointId: string) => r.assemblies.flatMap(a => a.unsupported)
+    .filter(u => (u.key === 'detailing.lapCheck.unarranged' || u.key === 'detailing.lapCheck.integrity')
+      && u.params?.joint === jointId).length;
+  const pairs = new Map<string, { ids: [number, number]; jointId: string }>();
+  for (const lap of result.lapping?.laps ?? []) {
+    if (lap.fromElementId === undefined || lap.toElementId === undefined || lap.fromElementId === lap.toElementId) continue;
+    const ids = [lap.fromElementId, lap.toElementId].sort((a, b) => a - b) as [number, number];
+    if (conditions(result, lap.jointId)) pairs.set(`${lap.jointId}:${ids.join(',')}`, { ids, jointId: lap.jointId });
+  }
+  // Start with smaller blocked neighbourhoods: many repeated stirrup clashes should not
+  // consume every trial before a simple continuity defect is considered.
+  const burden = (ids: number[]) => result.assemblies.reduce((n, a) => n + a.conflicts
+    .filter(c => c.severity !== 'marginal' && c.elementIds.some(id => ids.includes(id))).length, 0);
+  const ranked = [...pairs.values()].map(p => ({ ...p, burden: burden(p.ids) }))
+    .sort((a, b) => a.burden - b.burden || a.ids[0] - b.ids[0] || a.ids[1] - b.ids[1]);
+  const seen = new Set<string>();
+  pairLoop: for (const { ids, jointId } of ranked) {
+    if (!conditions(result, jointId)) continue;
+    const contexts = contextsFor(input.contexts, outcomes);
+    if (ids.some(id => !contexts.has(id) || contexts.get(id)!.elementType !== 'beam'
+      || contexts.get(id)!.span || input.lockedMembers?.has(id)
+      || outcomes.get(id)?.outcome !== 'VERIFIED' || !outcomes.get(id)?.accepted)) continue;
+    const ctx = ids.map(id => contexts.get(id)!) as [MemberContext, MemberContext];
+    const current = ids.map(id => outcomes.get(id)!.accepted!) as [NonNullable<MemberDesignOutcome['accepted']>, NonNullable<MemberDesignOutcome['accepted']>];
+    for (const proposal of beamContinuityAlternatives(ctx, current)) {
+      if (stats.detailingRuns >= input.budget.maxDetailingRuns || stats.memberSearches + 2 > input.budget.maxMemberSearches) {
+        termination = 'budget'; break pairLoop;
+      }
+      if (proposal.reinforcement.every((r, i) => rebarHash(r) === rebarHash(current[i]))) continue;
+      // Neighbours are part of the key: a refusal from an earlier assignment is not final.
+      const hash = [...outcomes].map(([id, o]) => `${id}:${o.accepted ? rebarHash(o.accepted) : o.outcome}`).join('|')
+        + `>${ids.join(',')}:${proposal.reinforcement.map(rebarHash).join(',')}`;
+      if (seen.has(hash)) continue;
+      seen.add(hash);
+      const proposed = new Map(outcomes);
+      ids.forEach((id, i) => proposed.set(id, { ...outcomes.get(id)!, accepted: proposal.reinforcement[i] }));
+      const trialContexts = contextsFor(input.contexts, proposed);
+      const trial: PhysicalSearchTrial = { elementId: ids[0], elementIds: [...ids], jointId,
+        operator: 'harmonizeTop', diameterMm: proposal.layers[0].diameter,
+        counts: proposal.layers.map(l => l.count), disposition: 'nominalFailure', nominalFailures: [] };
+      trials.push(trial);
+      for (let i = 0; i < ids.length; i++) {
+        const c = trialContexts.get(ids[i])!, reinforcement = proposal.reinforcement[i];
+        const verdict = input.adapter.verify(c, reinforcement);
+        const checked = outcomeFromProvided(input.adapter, c, reinforcement, verdict);
+        stats.memberSearches++; stats.candidatesConsidered++; stats.verifierCalls++;
+        // outcomeFromProvided also admits a warning asking the caller to add a hook.
+        // This operator preserves end treatments; it cannot certify an unbuilt hook.
+        if ((verdict.overallStatus !== 'ok' && verdict.overallStatus !== 'warn')
+          || verdict.checks.some(c => c.anchorHook) || !checked?.accepted || checked.outcome !== 'VERIFIED') trial.nominalFailures!.push(ids[i]);
+        else {
+          checked.searchStats = { ...checked.searchStats, candidatesTried: 1, verifierCalls: 1 };
+          proposed.set(ids[i], checked);
+        }
+      }
+      if (trial.nominalFailures!.length) continue;
+      const detailed = input.detail(proposed, trialContexts);
+      stats.detailingRuns++;
+      const before = physicallyBlockedMembers(result), after = physicallyBlockedMembers(detailed);
+      trial.newlyBlocked = [...after].filter(id => !before.has(id)).sort((a, b) => a - b);
+      trial.blockingConflicts = conflicts(detailed);
+      if (trial.newlyBlocked.length || ids.some(id => !detailed.reverification.some(r => r.elementId === id
+        && (r.status === 'ok' || r.status === 'warn'))) || input.regresses(result, detailed)) {
+        trial.disposition = 'regression'; continue;
+      }
+      // Do not accept a change that merely displaces this joint's unresolved splice.
+      if (conditions(detailed, jointId) >= conditions(result, jointId)) { trial.disposition = 'noProgress'; continue; }
+      trial.disposition = 'accepted';
+      ids.forEach((id, i) => { if (rebarHash(proposal.reinforcement[i]) !== rebarHash(current[i])) changed.add(id); });
+      outcomes = proposed; result = detailed;
       break;
     }
   }

@@ -2274,10 +2274,17 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
   /**
    * How far inside the support face a beam's first stirrup stands (`stirrupInsetI`): its legs
    * clear of the column's face bars by the column's clear distance, those bars a cover, a tie
-   * and half a bar inside the face. Nothing where no designed column stands at the node.
+   * and half a bar inside the face. At a zero-width support on a continuous beam, each
+   * automatic cage also needs room for its own closing tails: placing both end stirrups
+   * exactly on the shared node fabricates two intersecting pieces.
    */
-  const stirrupInsetAt = (nodeId: number, stirrupDiaMm: number): number => {
-    let inset = 0;
+  const stirrupInsetAt = (nodeId: number, id: number, stirrupDiaMm: number, closingDiaMm: number): number => {
+    // A construction choice, not a new code minimum. One diameter covers the half-diameter
+    // closing offset plus the bar radius. Each neighbouring cage stays on its own side.
+    // Explicit line cages retain their prescribed stations. Positive-width supports already
+    // separate the beam cages at their faces.
+    let inset = supportFaceOffset(nodeId, id) === 0 && lineContinuesAt(id, nodeId)
+      && !input.linePieces?.get(id)?.stirrups.length ? closingDiaMm / 1000 : 0;
     for (const cid of columns) {
       const c = input.elements.get(cid);
       if (!c || (c.nodeI !== nodeId && c.nodeJ !== nodeId)) continue;
@@ -2475,8 +2482,10 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
       up: { x: 0, y: 0, z: 1 },
       supportFaceI: supportFaceOffset(el.nodeI, id),
       supportFaceJ: supportFaceOffset(el.nodeJ, id),
-      stirrupInsetI: stirrupInsetAt(el.nodeI, ctx.material.stirrupDia),
-      stirrupInsetJ: stirrupInsetAt(el.nodeJ, ctx.material.stirrupDia),
+      stirrupInsetI: stirrupInsetAt(el.nodeI, id, ctx.material.stirrupDia, designedStirrups
+        ? Math.max(designedStirrups.support.diameter, designedStirrups.span.diameter) : ctx.material.stirrupDia),
+      stirrupInsetJ: stirrupInsetAt(el.nodeJ, id, ctx.material.stirrupDia, designedStirrups
+        ? Math.max(designedStirrups.support.diameter, designedStirrups.span.diameter) : ctx.material.stirrupDia),
       transverseSlots: layoutChoice.slots.get(id),
       transverseLayers: layoutChoice.slotLayers.get(id),
       layerRaise: layerRaiseOf.get(id) ?? 0,

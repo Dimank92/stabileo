@@ -1,0 +1,54 @@
+import { describe, expect, it } from 'vitest';
+import { beamContinuityAlternatives } from '../beam-continuity-alternatives';
+import { syntheticBeamContext } from '../../design/__tests__/helpers';
+import type { ProvidedReinforcement } from '../../../design-contract/reinforcement';
+
+const reinforcement = (count: number, diameter: number): ProvidedReinforcement => ({ regions: {
+  topStart: { count, diameter }, topEnd: { count, diameter },
+  topStartLayers: [{ count, diameter, row: 0 }], topEndLayers: [{ count, diameter, row: 0 }],
+  bottomSpan: { count: 3, diameter: 16 }, stirrupsSupport: { diameter: 8, legs: 2, spacing: 0.1 },
+} });
+const contexts = () => [syntheticBeamContext(), syntheticBeamContext({ elementId: 2 })] as const;
+
+describe('paired top continuity patterns', () => {
+  it('offers both existing families on both ends of both beams, without changing bottom or transverse steel', () => {
+    const current = [reinforcement(4, 12), reinforcement(3, 16)] as const;
+    const before = structuredClone(current);
+    const alternatives = [...beamContinuityAlternatives(contexts(), current)];
+    expect(alternatives).toHaveLength(2);
+    expect(alternatives.map(a => a.layers)).toEqual([
+      [{ count: 4, diameter: 12, row: 0 }], [{ count: 3, diameter: 16, row: 0 }],
+    ]);
+    for (const alternative of alternatives) for (const r of alternative.reinforcement) {
+      expect(r.regions!.topStartLayers).toEqual(alternative.layers);
+      expect(r.regions!.topEndLayers).toEqual(alternative.layers);
+      expect(r.regions!.bottomSpan).toEqual(before[0].regions!.bottomSpan);
+      expect(r.regions!.stirrupsSupport).toEqual(before[0].regions!.stirrupsSupport);
+    }
+    alternatives[0].reinforcement[0].regions!.topStartLayers![0].count = 99;
+    expect(current).toEqual(before);
+    expect(alternatives[0].reinforcement[1].regions!.topStartLayers![0].count).toBe(4);
+  });
+
+  it('intersects both project catalogs and checks fit in the receiving section', () => {
+    const [a, b] = contexts();
+    b.material = { ...b.material, longDiametersMm: [16] };
+    const current = [reinforcement(4, 12), reinforcement(3, 16)] as const;
+    expect([...beamContinuityAlternatives([a, b], current)].map(p => p.layers[0].diameter)).toEqual([16]);
+    b.axes = { ...b.axes, bFlex: 0.08 };
+    expect([...beamContinuityAlternatives([a, b], current)]).toEqual([]);
+  });
+
+  it.each(['curtailment', 'groups', 'span', 'mixed', 'fractional'] as const)('does not reinterpret unsupported %s intent', mode => {
+    const [a, b] = contexts(), current = [reinforcement(4, 12), reinforcement(4, 12)] as const;
+    if (mode === 'curtailment') current[0].regions!.continuity = { topStartIntoSpan: false };
+    if (mode === 'groups') current[0].regions!.topStartGroups = [{ layers: [{ count: 4, diameter: 12, row: 0 }] }];
+    if (mode === 'span') a.span = { elements: [1, 2], representative: 1 } as never;
+    if (mode === 'mixed' || mode === 'fractional') for (const r of current) {
+      const layers = mode === 'mixed' ? [{ count: 2, diameter: 12, row: 0 }, { count: 2, diameter: 16, row: 1 }]
+        : [{ count: 2.5, diameter: 12, row: 0 }];
+      r.regions!.topStartLayers = layers; r.regions!.topEndLayers = layers;
+    }
+    expect([...beamContinuityAlternatives([a, b], current)]).toEqual([]);
+  });
+});

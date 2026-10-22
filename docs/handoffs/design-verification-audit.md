@@ -6,6 +6,335 @@ entre las alternativas que explora el diseño y las geometrías que finalmente c
 La prioridad es cerrar esa distancia y medir todos los bloqueos físicos antes de ampliar
 presupuestos de búsqueda.
 
+## Actualización: diagnóstico después de las reparaciones de diámetros y filas
+
+Ejecución del 22 de octubre sobre `93ed6fa70`, con instrumentación de diagnóstico local:
+8 ensayos físicos de familias de diámetros y luego 8 de redistribución inferior. Se guardaron
+los estados completos antes y después del segundo operador. Los números de las secciones
+históricas siguientes corresponden al diseño anterior; los resultados para esta secuencia son
+los de la tabla. El incremento de continuidad posterior, descrito abajo, baja los bloqueantes
+de 1992 a 1986 y conserva estos mismos estados de miembros:
+
+| Estado final | Miembros |
+| --- | ---: |
+| Aprobados, incluidos 9 con advertencias | 76 |
+| Fallidos con condiciones de detallado abiertas | 284 |
+| Búsqueda inicial agotada, sin armado aceptado | 35 |
+| Provisionales por verificación biaxial no cubierta | 13 |
+| Total | 408 |
+
+Los 76 aprobados son 73 columnas y 3 vigas. Los 284 fallidos son 87 columnas y 197 vigas:
+280 pasan la reverificación resistente y 4 también fallan en ella. Por tanto, aumentar acero
+de forma general no responde al bloqueo dominante. Los 35 agotados se reparten en congestión
+(21), anclaje (8), ambos (3), anclaje/corte/congestión (2) y flexión (1). Esto describe el espacio
+explorado, no demuestra imposibilidad de diseñar esas secciones.
+
+### Geometría pendiente
+
+Los **1992 conflictos bloqueantes** se particionan sin duplicar pares:
+
+| Tipo de par | Conflictos |
+| --- | ---: |
+| Parejas registradas de empalme | 534 |
+| Otras barras longitudinales | 765 |
+| Longitudinal y pieza transversal | 599 |
+| Dos piezas transversales | 94 |
+
+La partición cruza `lapping.laps` por IDs de ambas barras y, para los demás pares, `bar.role`.
+Se excluye `severity === 'marginal'`. No es un conteo de miembros: un miembro participa en muchos
+conflictos y varias categorías. Persisten además 97 condiciones agrupadas de empalmes superpuestos,
+42 de integridad, 9 de separación, 4 de distancia entre parejas y 2 de falta de pareja; estas
+condiciones afectan respectivamente a 153, 68, 9, 4 y 2 miembros, con solapamientos.
+Las 97 condiciones pueden representar varias parejas cada una; no equivalen a 97 pares físicos.
+
+Casos confirmados en el estado final:
+
+- **Vigas 178–179:** el empalme superior conserva 3 mm entre ejes, con 13 mm necesarios para
+  que no se interpenetren. Prolongar las barras no construye el desplazamiento transversal.
+- **Nudo 26, vigas 177–178:** cuatro empalmes superiores y cero barras continuas. El comprobador
+  deja abierta la condición de integridad; no se resuelve cambiando sólo las filas inferiores.
+  Es una condición conservadora no acreditada, no una prueba general de que todo empalme allí sea ilegal.
+- **Columna 21:** separación libre de 14,4 mm frente a los 40 mm exigidos por el comprobador.
+- **Columna 26:** pareja de empalme separada 184,2 mm frente al límite calculado de 150 mm.
+- **Columna 27:** barras del tramo superior sin pareja inferior.
+- **Vigas 177 y 189:** el generador sigue dejando abierta la condición de barra longitudinal
+  en los dobleces del estribo (`generation`, referencia 25.7.1.2).
+
+### Por qué la viga 227 mejora pero no verifica
+
+La modificación conserva 11 barras inferiores Ø12 y pasa de **8+3 a 7+4**. Su reverificación
+resistente sigue en `ok`, pero los conflictos físicos evolucionan así:
+
+| Tipo | Antes | Después |
+| --- | ---: | ---: |
+| Longitudinal–transversal | 80 | 0 |
+| Otras longitudinales | 16 | 20 |
+| Parejas de empalme | 6 | 8 |
+| Total bloqueante de la viga | 102 | 28 |
+
+Quedan empalmes superiores con la viga 228: una pareja tiene **4,4 mm entre ejes frente a
+18 mm necesarios**, y también separaciones insuficientes con barras inferiores de los tramos
+vecinos. Aparecen seis choques de barras inferiores con barras de las columnas **46 y 47**,
+con interpenetración de 16 mm. Ambas columnas ya estaban bloqueadas antes del cambio.
+
+Esto expone una limitación del objetivo actual: conserva los miembros aprobados y reduce
+conflictos globales, pero puede introducir nuevos pares conflictivos entre miembros que ya
+fallaban. El descenso neto de 74 es real; no significa que cada restricción local mejore.
+Tampoco los 80 choques eliminados representan 80 causas independientes: un mismo problema de
+posición se repite a lo largo de los estribos. Conviene agrupar por causa geométrica y medir
+qué falta para completar cada miembro/nudo, además del número bruto de pares.
+
+### Límites de la búsqueda y siguiente intervención
+
+El operador nuevo sólo redistribuye barras inferiores de una viga, con diámetro y número total
+constantes. No cambia empalmes superiores, continuidad de línea ni transiciones de columnas.
+La cola se ordena por número de conflictos y no incluye miembros que sólo tienen condiciones
+de continuidad/empalme sin choques. Se detiene por presupuesto tras ocho ensayos; esto no es
+una prueba de agotamiento de alternativas.
+
+La propuesta para la viga 225 bajaba el total de 2066 a 1948, pero bloqueaba la columna 43,
+previamente aprobada, y se rechazó correctamente. Reparar una viga por vez limita la búsqueda
+cuando hace falta modificar conjuntamente el nudo y los vecinos. La búsqueda de posiciones
+tampoco encontró una solución dentro de su dominio: reporta 62 nudos incompatibles y 80
+eventos de vaciado de dominio sobre 43 miembros distintos, sin agotar su presupuesto de
+cómputo. Su dominio es `beamLayoutsOnly`, con columnas y arreglos de nudo incompletos.
+
+Los cuatro fallos resistentes restantes son las vigas 192 y 195 (utilización final 1,029),
+y 262 y 265 (1,005). Sus registros incluyen una tolerancia desfavorable de altura útil de
+15 mm. La reparación encuentra límites de anclaje en el primer par, y de acero máximo/anclaje
+en el segundo; emite consejo de sección para este último. Los límites de reparación no deben
+confundirse con la categoría exacta del chequeo que produjo cada utilización.
+
+La siguiente intervención prioritaria es construir y comprobar conjuntamente las transiciones
+de empalme y la continuidad superior de una línea, empezando por dos tramos reproducibles.
+Después, reparar el conjunto viga–columnas de un nudo y sus cierres. Cada aceptación debe
+conservar los aprobados y demostrar que completa restricciones, no sólo elimina muchas
+repeticiones de un choque. Los 13 provisionales necesitan cobertura biaxial del verificador;
+seguir probando jaulas no sustituye esa implementación.
+
+### Reproducción y validación de esta actualización
+
+Desde `web/`:
+
+```sh
+STABILEO_LAYER_SEARCH=8 STABILEO_LAYER_AUDIT=/tmp/design-layer-audit npx vitest run --project unit src/lib/store/__tests__/design-layer-search-experiment.test.ts
+```
+
+Guarda `.before.json` y `.after.json` con miembros, resultados, geometría, empalmes y conflictos.
+La ejecución pasó **1/1 test**, incluido regenerar el estado aceptado sin volver a ejecutar la
+búsqueda: 71,18 s de test y 74,19 s totales. Reprodujo los mismos IDs aprobados, ensayos y 1992
+conflictos de las ejecuciones anteriores. La etapa de filas llevó 25,40 s. Es una ejecución
+local satisfactoria posterior a los dos timeouts documentados, no una garantía de rendimiento.
+
+## Primer incremento del plan: continuidad superior por parejas
+
+Implementado el 22 de octubre, después de la auditoría anterior. El operador `harmonizeTop`
+lee transiciones reales con condiciones de empalme/integridad pendientes y propone patrones
+superiores comunes para ambos tramos y sus dos extremos. Reutiliza hasta cuatro patrones ya
+presentes, dentro del catálogo y el espacio de ambas secciones. No modifica el armado inferior,
+los estribos ni las terminaciones; excluye grupos superiores explícitos, continuidad editada,
+miembros fijados, provisionales y vigas compuestas por varios elementos de análisis.
+
+Cada propuesta se evalúa como un paquete: se actualizan los asientos de ambos vecinos, se
+verifican los dos armados y se reconstruye el detalle completo antes de aceptar. También se
+exige reverificación resistente favorable para ambos tramos y que disminuyan las condiciones
+del nudo objetivo. Los ganchos pedidos pero todavía no provistos se rechazan: una advertencia
+que pide construir un gancho no es una aprobación de la geometría actual. Se conservan las
+protecciones globales y las aprobaciones por identidad de las búsquedas anteriores.
+
+### Caso completamente resuelto
+
+Fixture de dos luces de 6 m, sección 35×65 cm, H25, cargas de 12 kN/m permanentes y 8 kN/m
+variables, más peso propio. Los apoyos declaran sus seis restricciones; el momento del apoyo
+intermedio calculado por el solver coincide con el valor independiente wL²/8 = 153,1125 kN·m.
+El armado inicial, 7Ø12 superiores en un tramo y 4Ø16 en el otro, pasa el chequeo nominal pero
+deja cuatro interferencias y condiciones de empalme e integridad en el apoyo.
+
+La búsqueda genera un patrón común y deja **ambos miembros con resistencia verificada, cero
+conflictos bloqueantes y cero condiciones abiertas**. Se comprueba que existe el número correcto
+de barras superiores compartidas, que los estribos siguen presentes con separación ≤125 mm,
+y que regenerar los armados aceptados conserva el cierre. Pasa también al rotar/trasladar el
+modelo, invertir sus extremos y renumerar los elementos; se compara el veredicto, no se exige
+que dos alternativas igualmente válidas produzcan la misma selección.
+
+El fixture expuso otro defecto: en apoyos sin ancho de columna, las dos jaulas automáticas
+colocaban sus estribos extremos en el mismo plano. Ahora cada una reserva hacia su tramo el
+espacio de su cierre: un diámetro transversal, que cubre medio diámetro de desfase del cierre
+y el radio de la barra. Es una elección geométrica, no una nueva exigencia normativa. Se
+mantienen las estaciones prescritas de líneas explícitas y el comportamiento en apoyos con
+ancho de columna; las interferencias continúan midiéndose sobre las piezas reales.
+
+### Resultado en el edificio de 408 miembros
+
+Después de las búsquedas de diámetros y filas, con ocho ensayos completos adicionales:
+
+| Medida | Antes | Después |
+| --- | ---: | ---: |
+| Aprobados finales | 76 | 76, mismas identidades |
+| Conflictos bloqueantes | 1992 | 1986 |
+| Condiciones agrupadas de empalme superpuesto | 97 | 95 |
+| Condiciones de integridad | 42 | 41 |
+
+Se aceptaron las propuestas de los pares 211–212 y 178–179; cambiaron los armados de 212 y 179.
+Hubo diez propuestas, veinte llamadas al verificador, ocho detallados completos y cero nuevos
+análisis estructurales. Se mantienen 35 búsquedas agotadas, 13 provisionales y el resto de condiciones;
+no hay nuevas aprobaciones completas en este edificio. El operador no resuelve todavía las
+transiciones que requieren cambios de posición, de columnas o de toda una línea.
+
+Validación: **154 tests en siete archivos**, más la integración de 408 miembros, todos pasaron.
+La integración incluye persistencia y regeneración sin volver a ejecutar la búsqueda, con
+igualdad de estados, aprobados y conflictos. Su última ejecución llevó 101,80 s totales;
+la etapa nueva, 30,26 s. El typecheck no agrega errores: 442 existentes frente a una base de 443.
+Estos son tiempos de una ejecución local, no un compromiso de rendimiento.
+
+Reproducción desde `web/`:
+
+```sh
+npx vitest run --project unit src/lib/engine/detailing/__tests__/beam-continuity-integration.test.ts
+STABILEO_CONTINUITY_EXPERIMENT=8 npx vitest run --project unit src/lib/store/__tests__/design-continuity-experiment.test.ts
+```
+
+El operador está disponible en `physicalSearch.operators: ['harmonizeTop']`; sigue siendo opt-in.
+Se puede combinar con los operadores previos, compartiendo presupuesto. La integración al
+flujo automático general sigue siendo el paso 6 del plan; este incremento prueba una primera
+familia de soluciones construibles y no declara terminado ese plan.
+
+## Plan de implementación para cerrar diseños
+
+Objetivo: encontrar armados íntegramente verificables para casos construibles dentro del
+catálogo y las restricciones del proyecto, y distinguir los casos que requieren ampliar ese
+dominio, cambiar sección o completar un verificador. No asumir que los 408 miembros actuales
+admiten solución con sus secciones fijas. El objetivo final es resolver el modelo completo;
+los 76 aprobados actuales constituyen un piso de regresión para las reparaciones de armado.
+
+### 1. Casos con solución conocida y criterios de aceptación
+
+Antes de cambiar el algoritmo, construir fixtures pequeños a partir de las causas medidas:
+dos vigas con diámetros distintos (178–179), empalme superior 227–228, nudo 26 con continuidad,
+transición de columnas con cambio de cantidad/posición, cierre con dos y tres filas, y un nudo
+que necesite cambiar más de un miembro. Cada fixture tendrá una disposición válida de referencia,
+además de la actual que falla. Si no se encuentra esa referencia con la sección fija, registrar
+esa incertidumbre y no usar el fixture como prueba de factibilidad.
+
+Verificar las referencias mediante cálculos y geometría independientes del generador: capacidad,
+anclaje, continuidad, separaciones, radios y tolerancias aplicables. Incluir configuraciones
+inválidas próximas al límite para detectar tanto falsos positivos como falsos negativos. Una
+imagen plausible o una aprobación del mismo generador no basta como referencia.
+
+Instrumentar una lista de restricciones con miembros, barras, nudo, magnitud y operaciones
+aplicables. Agrupar las repeticiones de un mismo defecto sin perder las comprobaciones individuales.
+Registrar el motivo exacto de cada rechazo; `regression` solo no alcanza. Separar explícitamente
+`budget`, agotamiento del dominio explorado, verificador no disponible y solicitud de sección.
+
+**Aceptación:** los fixtures válidos pasan el camino completo y los inválidos fallan por la causa
+esperada. El resumen distingue las cuatro categorías anteriores y reproduce el estado de partida.
+
+### 2. Alternativas con geometría construible
+
+Extender `splice.ts`, `lap-materialize.ts`, `generate-beam.ts` y los generadores transversales.
+La compatibilidad de un empalme debe devolver una construcción concreta: parejas de barras,
+trayectorias, zona de solape y terminaciones. Materializar ese mismo plan sin volver a elegir
+parejas o posiciones incompatibles. Una transición puede usar continuidad, empalme con posiciones
+compatibles o desplazamiento admisible; cada opción necesita comprobaciones propias, incluidos
+terceros y estribos. La bandera `contactLap` no autoriza una interpenetración.
+
+Generar jaulas completas con alternativas de diámetro, cantidad, filas, asientos, cierres y trabas.
+Comprobar temprano la sección, pero conservar varias familias geométricamente distintas: menor
+área o menos filas no implican mejor comportamiento en el nudo. Reutilizar los verificadores finales
+para evitar que el filtro inicial y la geometría construida apliquen reglas diferentes.
+
+**Aceptación:** el generador encuentra soluciones para los fixtures de empalme y cierre, sin
+conflictos ni condiciones abiertas; persistir y regenerar conserva la solución. Rotar, trasladar
+o invertir los extremos del modelo conserva el veredicto físico. No alterar tolerancias para pasar.
+
+### 3. Diseño de líneas de vigas y pilas de columnas
+
+Usar `beam-line.ts` y `column-stacks.ts` para decidir el armado que debe ser compatible entre
+tramos. En vigas, proponer continuidad de barras base y refuerzos locales, con zonas admisibles
+de terminación/empalme según las demandas y reglas del proyecto. Incluir ambas caras e inversión
+de momentos. En columnas, planificar correspondencias entre pisos, cambios de diámetro/cantidad
+y espacio ocupado por las transiciones y el armado transversal.
+
+Extender la programación dinámica y las tablas de compatibilidad existentes para elegir entre
+los planes geométricos del paso 2. Mantener alternativas de línea para resolver después los cruces
+con otras líneas y columnas. Una viga compuesta por varios elementos de análisis debe sustituirse
+como unidad, conservando todas sus demandas y propietarios de barras.
+
+**Aceptación:** el generador cierra los casos de continuidad superior, falta de pareja y transición
+de columnas. Los conflictos entre parejas disminuyen junto con nuevas aprobaciones completas en
+los casos objetivo. Comprobar propiedad de barras fusionadas, cantidades, dibujos y persistencia.
+
+### 4. Reparación conjunta guiada por la causa
+
+Extender `physical-design-search.ts`: la cola debe incluir todas las restricciones pendientes,
+también continuidad o empalmes sin choque. Cada causa propone operaciones adecuadas y el conjunto
+mínimo de decisiones conectadas: dos extremos, un nudo viga–columnas o un tramo de línea/pila.
+Ampliar ese conjunto si las alternativas pequeñas no funcionan, con límites por operaciones.
+
+Mantener varias alternativas de trabajo y el último diseño aceptado por separado. Los estados
+intermedios pueden necesitar más de un cambio para ser viables; evaluar y aceptar el paquete
+completo de forma atómica. Usar estados visitados y claves que incluyan a los vecinos para evitar
+ciclos y rechazos cacheados fuera de contexto.
+
+La aceptación conservará cobertura, comprobaciones aplicables y miembros aprobados por identidad.
+Ordenar propuestas por miembros completamente aprobados y restricciones del conjunto resueltas;
+después, defectos agrupados y sus magnitudes; por último acero, formas y costo. Mantener también
+el control de regresión por clase de fallo. Registrar los nuevos conflictos entre miembros ya
+fallidos, como los de 227 con 46/47, sin esconderlos detrás del descenso del contador global.
+Un movimiento parcial podrá servir como estado de búsqueda; no se presentará como cierre del nudo.
+
+**Aceptación:** resolver un fixture con solución conocida que requiere dos cambios conjuntos,
+y reproducir la conservación de aprobados. En el caso 227, exigir eliminar todas sus condiciones
+y no trasladar bloqueos a sus vecinos antes de declararlo resuelto. Las pruebas de búsqueda sobre
+dominios pequeños se compararán con enumeración exhaustiva del mismo dominio.
+
+### 5. Resolver los límites ajenos al detallado
+
+Dos entregas separadas, que no deben bloquear las correcciones geométricas:
+
+- **Cobertura biaxial:** implementar y contrastar las comprobaciones que faltan con referencias
+  independientes y casos límite, sin convertir los 13 provisionales en aprobados por omisión.
+  Integrar su resultado al dimensionado y a la reverificación final.
+- **Alternativas de sección:** cuando el catálogo de armado no alcance, proponer dimensiones
+  dentro de los límites del proyecto. Evaluar cada propuesta en un estado separado, recalcular
+  análisis, peso, rigidez y demandas, y volver a diseñar/verificar el modelo afectado. El resultado
+  publicable debe tener análisis y certificados de la misma geometría. Aplicar los cambios según
+  las restricciones de edición del proyecto; conservar la versión anterior hasta completar el ciclo.
+
+**Aceptación:** casos biaxiales independientes; un caso que cierre cambiando sección y otro que
+alcance el presupuesto sin solución, con estado explícito y sin certificados anteriores reutilizados.
+Un cambio de sección puede invalidar aprobaciones previas: sólo se acepta tras verificarlas de nuevo.
+
+### 6. Eficiencia e integración al flujo habitual
+
+Primero validar las reparaciones con reconstrucción completa. Después introducir filtros locales,
+compatibilidades reutilizables y caché por geometría/materiales/demandas/vecinos/versiones. Invalidar
+por dependencias reales, incluidos empalmes, barras compartidas y pisos vecinos. Comprobar equivalencia
+entre evaluación incremental y completa y conservar una validación completa antes de publicar.
+
+Medir en una colección de modelos pequeños, medianos y el de 408 miembros: aprobaciones por identidad,
+restricciones pendientes, evaluaciones, regeneraciones, memoria y tiempos p50/p95 con condiciones
+documentadas. Comparar base, búsqueda actual y nueva con igual presupuesto; el tiempo de máquina no
+debe cambiar el significado de «dominio agotado». Mantener pruebas pequeñas en CI y el edificio completo
+en una integración acotada, sin multiplicar ejecuciones pesadas innecesariamente.
+
+Con los criterios satisfechos, integrar las nuevas semillas y reparaciones al diseño habitual:
+no dejarlas exclusivamente en experimentos opt-in. Mostrar progreso, causa pendiente, presupuesto
+consumido y próximo tipo de acción; permitir continuar desde el último estado consistente.
+
+**Aceptación:** mismo resultado entre cálculo completo e incremental, presupuesto respetado,
+regeneración estable y operación desde el flujo real. Un diseño sólo se declara completo si todos
+sus miembros y comprobaciones aplicables están verificados y no quedan bloqueos físicos abiertos.
+
+### Secuencia de entregas
+
+1 → 2 → 3 → 4 es el camino principal. El paso 5 se divide en verificador biaxial y ciclo de secciones;
+pueden desarrollarse como entregas independientes una vez fijados los contratos de diagnóstico.
+El paso 6 optimiza e integra operadores ya validados. Cada paso puede dividirse en PRs pequeños;
+ningún PR necesita esperar a que los 408 elementos estén resueltos, pero debe cerrar sus fixtures
+objetivo y conservar las aprobaciones existentes. El primer objetivo demostrable es generar desde
+cero dos tramos compatibles; el siguiente, cerrar su línea y luego el nudo completo.
+
 La [investigación de procedimientos de dimensionado y heurísticas](design-sizing-heuristics.md)
 añade referencias de ingeniería y cuatro experimentos de catálogo del 22 de octubre. Ninguna
 restricción global de diámetros evaluada se adopta: aumentan las pérdidas de cobertura aunque
