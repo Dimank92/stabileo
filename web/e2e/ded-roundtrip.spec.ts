@@ -34,7 +34,7 @@
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
-import { bootPro } from './fixtures';
+import { acknowledgeRecheck, bootPro } from './fixtures';
 import {
   test, expect, openPreparedWorkspace, openWorkspaceFromCommandRow, readTally, readPieces,
 } from './prepared-building';
@@ -53,14 +53,8 @@ async function openProjectView(page: Page) {
 async function openDed(page: Page, path: string) {
   await openProjectView(page);
   await page.getByTestId('pp-open-file').setInputFiles(path);
-  // The small fixture was solved with an earlier results version, so opening it raises the
-  // re-check notice (`recheck-provenance.spec.ts` is about that notice); acknowledge it here.
-  const notice = page.getByTestId('recheck-notice');
-  if (await notice.waitFor({ state: 'visible', timeout: 5_000 }).then(() => true, () => false)) {
-    await page.getByTestId('recheck-ack').check();
-    await page.getByTestId('recheck-later').click();
-    await expect(notice).toBeHidden();
-  }
+  // The small fixture was solved with an earlier results version.
+  await acknowledgeRecheck(page);
 }
 
 /** Save through the ribbon's button and keep the file. */
