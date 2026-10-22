@@ -82,6 +82,8 @@ export interface Material {
   nu: number;
   rho: number; // kN/m³
   fy?: number; // MPa (yield stress for stress verification)
+  /** MPa: ultimate tensile strength. The steel checks read it (rupture, bearing, net section). */
+  fu?: number;
   /**
    * Coefficient of thermal expansion, 1/°C. Absent: the family's (`engine/thermal-alpha.ts`),
    * and the engine's 1,2·10⁻⁵ when the family cannot be told.
@@ -1414,6 +1416,10 @@ function createModelStore() {
     nu: 0.3,
     rho: 78.5,
     fy: 250,
+    // ASTM A36's minimum, as the grade catalogue has it (`data/structural-grades.ts`). Without it
+    // every steel check of a new model, the bundled examples included, read "not evaluated: the
+    // material lacks Fu", which is what a first user met on opening the steel design.
+    fu: 400,
   };
 
   const defaultSection: Section = {
