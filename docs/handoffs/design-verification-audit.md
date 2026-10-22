@@ -6,6 +6,11 @@ entre las alternativas que explora el diseño y las geometrías que finalmente c
 La prioridad es cerrar esa distancia y medir todos los bloqueos físicos antes de ampliar
 presupuestos de búsqueda.
 
+La [investigación de procedimientos de dimensionado y heurísticas](design-sizing-heuristics.md)
+añade referencias de ingeniería y cuatro experimentos de catálogo del 22 de octubre. Ninguna
+restricción global de diámetros evaluada se adopta: aumentan las pérdidas de cobertura aunque
+algunos contadores de aprobaciones y conflictos mejoren.
+
 ## Corrección de la medición
 
 La revisión auditada mostraba 84 miembros `ok` o `warn`, pero 12 todavía participaban en
