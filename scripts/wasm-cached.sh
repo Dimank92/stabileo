@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Build the WASM engine into web/src/lib/wasm, or copy it from a cache when the same sources were
-# already built. The key is everything the build reads: the committed engine tree, Cargo.lock,
-# the workspace Cargo.toml, the toolchain pin and the wasm-pack version. Uncommitted changes
-# under engine/ (or to those files) always build, and are never stored.
+# already built. The key is the commit the engine embeds as its provenance (engine/build.rs:
+# STABILEO_GIT_COMMIT, else HEAD), with the toolchain pin and the wasm-pack version: a hit is the
+# build of that very commit, so certificates and reproduction bundles name the right one. Worktrees
+# made from the same base share it. Uncommitted changes under engine/ (or to the files the build
+# reads) always build, and are never stored.
 #
 #   scripts/wasm-cached.sh          # cache hit: a copy, seconds; miss: wasm-pack, then stored
 #   STABILEO_WASM_CACHE=0 ...       # always build
@@ -19,7 +21,8 @@ if [ "${STABILEO_WASM_CACHE:-1}" = 0 ] || [ -n "$(git status --porcelain -- engi
 fi
 
 key=$( {
-  for f in engine Cargo.lock Cargo.toml rust-toolchain.toml; do git rev-parse "HEAD:$f" 2>/dev/null || echo "no $f"; done
+  echo "${STABILEO_GIT_COMMIT:-$(git rev-parse HEAD)}"
+  git rev-parse HEAD:rust-toolchain.toml 2>/dev/null || echo "no rust-toolchain.toml"
   wasm-pack --version
 } | shasum -a 256 | cut -c1-32)
 hit=$cache_root/$key
@@ -38,8 +41,13 @@ mkdir -p "$cache_root"
 tmp=$(mktemp -d "$cache_root/.tmp.XXXXXX")
 cp -R "$out/." "$tmp/"
 touch "$tmp/.complete"
-# Another worktree may have stored the same key meanwhile: keep theirs.
-mv "$tmp" "$hit" 2>/dev/null || rm -rf "$tmp"
+# Publish once: the mkdir is the lock, and a key someone stored meanwhile is kept (an mv onto an
+# existing directory would nest this build inside it).
+if mkdir "$hit.lock" 2>/dev/null; then
+  [ -e "$hit" ] || mv "$tmp" "$hit"
+  rmdir "$hit.lock"
+fi
+rm -rf "$tmp"
 # Keep the 20 most recent builds.
-ls -1dt "$cache_root"/*/ 2>/dev/null | tail -n +21 | while read -r d; do rm -rf "$d"; done
+ls -1dt "$cache_root"/*/ 2>/dev/null | grep -v "\.lock/$" | tail -n +21 | while read -r d; do rm -rf "$d"; done
 echo "wasm: built and cached ($key)"
