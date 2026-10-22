@@ -9,7 +9,9 @@ import './styles/touch-density.css';
 import './styles/pro-kit.css';
 import './styles/panel-scrollbars.css';
 import 'katex/dist/katex.min.css';
-import App from './App.svelte';
+// The public pages render without the application, which loads on the first app route
+// (Root.svelte): they used to download and run all of it.
+import Root from './Root.svelte';
 import { mount } from 'svelte';
 
 /*
@@ -28,7 +30,7 @@ import { mount } from 'svelte';
  */
 document.getElementById('prerender')?.remove();
 
-const app = mount(App, {
+const app = mount(Root, {
   target: document.getElementById('app')!,
 });
 

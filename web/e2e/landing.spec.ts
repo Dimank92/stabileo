@@ -91,11 +91,15 @@ test.describe('@landing landing page', () => {
   });
 
   test('renders the landing overlay at /', async ({ page }) => {
+    // The engine is never fetched for a public page: it is half of what the landing used to download.
+    const wasm: string[] = [];
+    page.on('request', (r) => { if (r.url().endsWith('.wasm')) wasm.push(r.url()); });
     await bootLanding(page);
 
     await expect(page.locator('.landing')).toBeVisible();
-    // The application stays mounted behind the overlay rather than unmounting.
-    await expect(page.locator('.app-container.hidden-behind-landing')).toHaveCount(1);
+    // The application is not loaded behind the landing (Root.svelte): it loads on the first app route.
+    await expect(page.locator('.app-container')).toHaveCount(0);
+    expect(wasm).toEqual([]);
 
     const h1 = page.locator('.landing h1');
     await expect(h1).toHaveCount(1);
@@ -647,7 +651,12 @@ test.describe('@landing landing page', () => {
       // pass; this is the guard that says so.
       await bootLanding(page);
       await expect(page.locator('.landing')).toBeVisible();
-      await expect(page.locator('.app-container.hidden-behind-landing')).toHaveCount(1);
+      await expect(page.locator('.app-container')).toHaveCount(0);
+
+      // Entering the application from the landing loads it in place.
+      await page.locator('.landing .btn-primary').first().click();
+      await expect(page).toHaveURL(/\/app\/basic/);
+      await expect(page.locator('.app-container')).toBeVisible();
 
       await page.goto('/app/basic');
       await expect(page.locator('.landing')).toHaveCount(0);

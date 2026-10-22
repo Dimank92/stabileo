@@ -25,6 +25,38 @@ function wasmStubPlugin(): Plugin {
   };
 }
 
+/**
+ * `virtual:public-i18n`: the dictionaries' entries the public pages read (`landing.*`, `blog.*`, `lang.*`,
+ * `contact.*`), in en, es and pt. The landing and the blog load these instead of the whole
+ * dictionaries (3 MB of source, most of the public bundle); the application registers the rest
+ * when it loads (`lib/i18n/full-dictionaries.ts`). The entries are copied line by line, which
+ * `union-merge-safe.test.ts` keeps possible: one entry per line.
+ */
+export const PUBLIC_KEY_PREFIXES = ['landing.', 'blog.', 'contact.', 'lang.'];
+function publicI18nPlugin(): Plugin {
+  const id = 'virtual:public-i18n';
+  return {
+    name: 'public-i18n',
+    resolveId(s) {
+      return s === id ? '\0' + id : null;
+    },
+    load(resolved) {
+      if (resolved !== '\0' + id) return null;
+      let out = '';
+      for (const loc of ['en', 'es', 'pt']) {
+        const file = resolve(__dirname, 'src/lib/i18n/locales', `${loc}.ts`);
+        this.addWatchFile(file);
+        const lines = readFileSync(file, 'utf8').split('\n').filter((l) => {
+          const m = /^\s*(['"])([^'"]+)\1: /.exec(l);
+          return !!m && PUBLIC_KEY_PREFIXES.some((p) => m[2].startsWith(p));
+        });
+        out += `export const ${loc} = {\n${lines.join('\n')}\n};\n`;
+      }
+      return out;
+    },
+  };
+}
+
 /** Not Vitest's business: dependencies, build output, and Playwright's own specs. */
 // `.stryker-tmp` holds Stryker's sandbox copies of the tests (without the gitignored WASM build):
 // collected here, a mutation run in progress made every engine test fail.
@@ -83,7 +115,7 @@ function appVersion(): string {
 }
 
 export default defineConfig({
-  plugins: [wasmStubPlugin(), svelte()],
+  plugins: [wasmStubPlugin(), publicI18nPlugin(), svelte()],
   define: {
     __STABILEO_COMMIT__: JSON.stringify(buildCommit()),
     __STABILEO_VERSION__: JSON.stringify(appVersion()),
