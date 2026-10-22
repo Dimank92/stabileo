@@ -2,6 +2,7 @@
 linker = "clang"
 rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 
-# Rebuild std for WASM to enable JS-backed Instant::now() (fixes time panic)
-[unstable]
-build-std = ["std", "panic_abort"]
+# There used to be an `[unstable] build-std` here "for a JS-backed Instant::now() in WASM". Only a
+# nightly reads it, and the WASM has always been built on stable, which ignores it; the clocks the
+# engine reads in WASM are gated off (`solver/linear.rs`, `now_micros`). On CI's nightly it rebuilt
+# std for every native test build, for nothing.

@@ -1,4 +1,4 @@
-.PHONY: dev dev-backend dev-web wasm build build-backend build-web \
+.PHONY: check-pins dev dev-backend dev-web wasm build build-backend build-web \
        test test-engine test-backend test-web test-inventory \
        docker-build docker-up docker-down \
        clean fmt check
@@ -29,6 +29,10 @@ build-backend:
 
 build-web: wasm
 	cd web && npm install && npm run build
+
+## One version of each tool everywhere (rust-toolchain.toml, .nvmrc, flake.nix, CI)
+check-pins:
+	scripts/check-pins.sh
 
 # ── Test ─────────────────────────────────────────────────────
 
