@@ -7613,8 +7613,7 @@ const pt: Translations = {
    * estados por família reutilizam `design.families.census.unknown` e
    * `design.families.state.noElements`, portanto este é só o caso da lista inteira.
    */
-  'design.memberList.nothingClassified':
-    'Nenhum elemento foi classificado ainda. Calcule os esforços e as famílias serão contadas.',
+  'design.memberList.nothingClassified': 'Nenhum elemento foi classificado ainda. Calcule os esforços e as famílias serão contadas.',
   'design.memberList.emptyModel': 'Este modelo ainda não tem elementos para detalhar.',
   'design.export.cannot.onDisk': "Não podemos confirmar que o arquivo continua no seu disco: o navegador entrega o download e o perde de vista.",
   'design.export.cannot.kept': "Não podemos confirmar que você salvou: o diálogo pode ter sido cancelado.",
