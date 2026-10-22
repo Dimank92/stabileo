@@ -82,6 +82,8 @@ export interface Material {
   nu: number;
   rho: number; // kN/m³
   fy?: number; // MPa (yield stress for stress verification)
+  /** MPa: ultimate tensile strength. The steel checks read it (rupture, bearing, net section). */
+  fu?: number;
   /**
    * Coefficient of thermal expansion, 1/°C. Absent: the family's (`engine/thermal-alpha.ts`),
    * and the engine's 1,2·10⁻⁵ when the family cannot be told.
