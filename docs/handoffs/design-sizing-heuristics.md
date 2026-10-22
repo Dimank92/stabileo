@@ -5,6 +5,10 @@ La recomendación es generar alternativas de armado compatibles entre miembros, 
 las alternativas del catálogo y elegir la reparación según el fallo. Restringir globalmente
 los diámetros no produjo una mejora aceptable en el ejemplo evaluado.
 
+La [comparación de algoritmos de siete programas](design-software-algorithms.md) amplía
+estas referencias y concreta los siguientes incrementos: plantillas de jaula, diversidad
+de alternativas, reparación conjunta por nudo y verificación incremental.
+
 ## Procedimientos de referencia
 
 Las referencias siguientes aportan procedimientos; sus límites numéricos no sustituyen la
