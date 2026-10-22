@@ -6,13 +6,95 @@ entre las alternativas que explora el diseño y las geometrías que finalmente c
 La prioridad es cerrar esa distancia y medir todos los bloqueos físicos antes de ampliar
 presupuestos de búsqueda.
 
+## Ampliación: continuidad superior e inferior por líneas completas
+
+La búsqueda por parejas dejaba tramos fuera del reemplazo: una unión ya fusionada no tiene
+registro de empalme. Los nuevos operadores `harmonizeTopLine` y `harmonizeBottomLine` usan
+las líneas del coordinador y las transiciones materializadas, comprueban conectividad y
+colinealidad y verifican todos sus miembros como un paquete. Incluyen uniones ya continuas;
+no incorporan vigas cruzadas, solapadas ni ramas ambiguas. Los catálogos se intersectan y se
+preservan las terminaciones de cada miembro, incluidos los ganchos inferiores explícitos.
+
+También se corrigió la medida de avance: una condición agrupada puede representar ocho
+parejas mal colocadas. Pasar de ocho a dos es una mejora real aunque siga abierto un aviso.
+Se cuenta esa reducción sin alterar la verificación física ni las protecciones contra regresión.
+Los ensayos ahora registran qué miembro perdió resistencia o qué categoría de bloqueo aumentó.
+
+### Resultado medido en los 408 miembros
+
+| Etapa | Aprobados finales | Conflictos bloqueantes |
+| --- | ---: | ---: |
+| Estado anterior comunicado (`e1993c32d`) | 76 | 1986 |
+| Parejas con avance contado por barras pendientes | 77 | 1982 |
+| Continuidad superior por líneas completas | 81 | 1641 |
+| Continuidad inferior por líneas completas | 84 | 1542 |
+
+La mejora acumulada desde 1986 es de **444 conflictos bloqueantes (22,4%) y ocho aprobaciones**.
+Se conservan las 76 identidades y se agregan las columnas 72, 105, 110, 120, 126, 130, 131 y 135.
+Son 81 columnas y tres vigas aprobadas: todavía no se sumaron vigas completamente aprobadas en
+este edificio. Se mantienen 276 fallidos, 35 búsquedas iniciales agotadas y 13 provisionales.
+Ningún aprobado participa en un conflicto bloqueante. Las condiciones agrupadas de empalme
+superpuesto bajan de 95 a 77, y las de integridad de 41 a 31; separación, distancia entre parejas
+y falta de pareja permanecen en 9, 4 y 2. Hay dos condiciones de generación pendientes.
+
+La etapa superior realizó 44 detallados y 188 verificaciones nominales; la inferior, 63 y 223.
+Ambas completaron el barrido de los patrones existentes y ejecutaron cero análisis estructurales
+nuevos. No es una prueba de agotamiento del espacio de diseño: faltan familias de barras nuevas,
+transiciones con desplazamiento construido, cambios de jaulas de columnas y cambios de sección.
+Los tiempos de una ejecución local fueron 121,72 s y 174,92 s para esas etapas, respectivamente.
+La integración completa consumió 395,71 s dentro del test; estos tiempos no son un SLA.
+La repetición final con geometría guardada reprodujo exactamente 84 aprobados y 1542 conflictos:
+365,09 s dentro del test, 368,10 s totales y 153,59 s en la etapa inferior.
+
+La geometría retenida permite particionar los 1542 bloqueos sin duplicar pares:
+
+| Par que entra en conflicto | Cantidad |
+| --- | ---: |
+| Dos barras registradas como pareja de empalme | 349 |
+| Otras dos barras longitudinales | 701 |
+| Barra longitudinal y pieza transversal | 398 |
+| Dos piezas transversales | 94 |
+
+Los 276 miembros aún fallidos son 197 vigas y 79 columnas; todos tienen condiciones de detallado
+abiertas. Esta partición pertenece al estado final de 1542, no al diagnóstico anterior de 1992.
+
+
+### Verificación y límites
+
+- Siete casos pequeños con solver real: dos tramos con rotación/traslación, extremos invertidos
+  y renumeración, y tres tramos con continuidad superior, extremos invertidos y continuidad
+  inferior. Todos cierran sin condiciones abiertas ni conflictos bloqueantes. En tres luces
+  iguales de 6 m se contrasta el momento con wL²/10 = 122,49 kN·m. Se comprueban barras compartidas
+  en cada unión, estribos presentes y separados como máximo 125 mm, y regeneración estable.
+- Regresiones de reemplazo atómico, presupuesto para toda la línea, comprobación de todos los
+  certificados, continuidad ya fusionada, rechazo de cruces/solapes y avance dentro de un aviso
+  agrupado. Las siete suites dirigidas suman 165 pruebas aprobadas.
+- La integración del edificio conserva los aprobados por identidad y regenera exactamente los
+  mismos veredictos y conflictos sin ejecutar la búsqueda. Fija además los 84 aprobados y los
+  1542 conflictos como regresión de la secuencia completa.
+- Typecheck sin errores nuevos: 442 existentes frente a una base de 443.
+
+Reproducción desde `web/`, con WASM release:
+
+```sh
+npx vitest run --project unit src/lib/engine/detailing/__tests__/beam-continuity-integration.test.ts
+STABILEO_CONTINUITY_EXPERIMENT=80 STABILEO_LINE_EXPERIMENT=1 npx vitest run --project unit src/lib/store/__tests__/design-continuity-experiment.test.ts
+STABILEO_CONTINUITY_EXPERIMENT=64 STABILEO_BOTTOM_EXPERIMENT=1 npx vitest run --project unit src/lib/store/__tests__/design-continuity-experiment.test.ts
+```
+
+`STABILEO_CONTINUITY_AUDIT=/tmp/design-continuity-audit.json` guarda además miembros, geometría,
+empalmes, conflictos y reverificación final. Los operadores continúan **opt-in**; su integración
+al diseño habitual y la regeneración incremental siguen pendientes. El diseño completo aún no
+verifica: 1542 bloqueos no son una solución final, y los patrones comunes no reemplazan el
+trabajo necesario sobre transiciones y jaulas de los nudos.
+
 ## Actualización: diagnóstico después de las reparaciones de diámetros y filas
 
 Ejecución del 22 de octubre sobre `93ed6fa70`, con instrumentación de diagnóstico local:
 8 ensayos físicos de familias de diámetros y luego 8 de redistribución inferior. Se guardaron
 los estados completos antes y después del segundo operador. Los números de las secciones
 históricas siguientes corresponden al diseño anterior; los resultados para esta secuencia son
-los de la tabla. El incremento de continuidad posterior, descrito abajo, baja los bloqueantes
+los de la tabla. El primer incremento de continuidad, documentado más abajo, bajó los bloqueantes
 de 1992 a 1986 y conserva estos mismos estados de miembros:
 
 | Estado final | Miembros |

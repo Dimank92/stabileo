@@ -2,10 +2,14 @@ import { writeFileSync } from 'node:fs';
 import { expect, it, vi } from 'vitest';
 import { currentFrameDesignQuality, frameDesignQuality } from './design-quality-fixture';
 import { detailingStore } from '../detailing.svelte';
+import { verificationStore } from '../verification.svelte';
 import * as feedback from '../../engine/detailing/design-feedback-loop';
 
 // STABILEO_CONTINUITY_EXPERIMENT=8 npx vitest run --project unit src/lib/store/__tests__/design-continuity-experiment.test.ts
-it.runIf(!!process.env.STABILEO_CONTINUITY_EXPERIMENT)('repairs paired continuity and preserves physical approvals', async () => {
+it.runIf(!!process.env.STABILEO_CONTINUITY_EXPERIMENT)('repairs beam continuity and preserves physical approvals', async () => {
+  const bottom = !!process.env.STABILEO_BOTTOM_EXPERIMENT;
+  const line = bottom || !!process.env.STABILEO_LINE_EXPERIMENT;
+  const maxDetailingRuns = Number(process.env.STABILEO_CONTINUITY_EXPERIMENT);
   const run = feedback.runDesignFeedbackLoop;
   const spy = vi.spyOn(feedback, 'runDesignFeedbackLoop').mockImplementation(i =>
     run({ ...i, physicalSearch: i.physicalSearch ?? { maxDetailingRuns: 8, maxMemberSearches: 64 } }));
@@ -15,11 +19,18 @@ it.runIf(!!process.env.STABILEO_CONTINUITY_EXPERIMENT)('repairs paired continuit
       maxDetailingRuns: 8, maxMemberSearches: 64, operators: ['redistributeLayers'],
     } })).not.toBeNull();
   } finally { spy.mockRestore(); }
+  const seeded = currentFrameDesignQuality();
+  if (line) expect(detailingStore.generate({ physicalSearch: {
+    maxDetailingRuns: 8, maxMemberSearches: 64, operators: ['harmonizeTop'],
+  } })).not.toBeNull();
+  if (bottom) expect(detailingStore.generate({ physicalSearch: {
+    maxDetailingRuns: 80, maxMemberSearches: 512, operators: ['harmonizeTopLine'],
+  } })).not.toBeNull();
   const before = currentFrameDesignQuality();
   const start = performance.now();
   expect(detailingStore.generate({ physicalSearch: {
-    maxDetailingRuns: Number(process.env.STABILEO_CONTINUITY_EXPERIMENT), maxMemberSearches: 64,
-    operators: ['harmonizeTop'],
+    maxDetailingRuns, maxMemberSearches: 512,
+    operators: [bottom ? 'harmonizeBottomLine' : line ? 'harmonizeTopLine' : 'harmonizeTop'],
   } }), detailingStore.lastError ?? '').not.toBeNull();
   const elapsedMs = performance.now() - start;
   const after = currentFrameDesignQuality();
@@ -27,8 +38,16 @@ it.runIf(!!process.env.STABILEO_CONTINUITY_EXPERIMENT)('repairs paired continuit
   const evidence = { before, after, elapsedMs, trials: search.trials, stats: search.stats,
     termination: search.termination, changed: search.changed };
   writeFileSync('/tmp/design-continuity-search.json', JSON.stringify(evidence));
-  console.log(JSON.stringify(evidence));
+  if (process.env.STABILEO_CONTINUITY_AUDIT) writeFileSync(process.env.STABILEO_CONTINUITY_AUDIT, JSON.stringify({
+    ...evidence, members: [...verificationStore.contexts].map(([id, ctx]) => ({ id, kind: ctx.elementType,
+      section: ctx.section, material: ctx.material, verdict: verificationStore.memberVerdict(id),
+      outcome: verificationStore.outcomeFor(id) })),
+    reverification: search.result.reverification, lapping: search.result.lapping,
+    layering: search.result.layering, layoutSearch: search.result.layoutSearch, assemblies: search.result.assemblies,
+  }, (_key, value) => value instanceof Map ? Object.fromEntries(value) : value instanceof Set ? [...value] : value));
+  console.log(JSON.stringify({ before: before.output, after: after.output, elapsedMs, stats: search.stats }));
   expect(after.verifiedIds).toEqual(expect.arrayContaining(before.verifiedIds));
+  expect(after.verifiedIds).toEqual(expect.arrayContaining(seeded.verifiedIds));
   expect(after.output.passingWithBlockingConflicts).toEqual([]);
   expect(after.output.exhausted).toBe(before.output.exhausted);
   expect(after.output.provisional).toBe(before.output.provisional);
@@ -37,6 +56,15 @@ it.runIf(!!process.env.STABILEO_CONTINUITY_EXPERIMENT)('repairs paired continuit
     expect(count, key).toBeLessThanOrEqual(before.output.open[key] ?? 0);
   }
   expect(search.stats.structuralSolves).toBe(0);
+  if (bottom && maxDetailingRuns >= 64) {
+    expect(after.verifiedIds).toHaveLength(84);
+    expect(after.verifiedIds).toEqual(expect.arrayContaining([72, 105, 110, 120, 126, 130, 131, 135]));
+    expect(after.output.blockingConflicts).toBe(1542);
+    expect(search.termination).toBe('sweepComplete');
+  } else if (line && maxDetailingRuns >= 80) {
+    expect(after.verifiedIds).toHaveLength(81);
+    expect(after.output.blockingConflicts).toBe(1641);
+  }
   expect(detailingStore.generate()).not.toBeNull();
   const replay = currentFrameDesignQuality();
   expect(replay.verifiedIds).toEqual(after.verifiedIds);

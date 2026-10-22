@@ -15,10 +15,18 @@ import type { ProvidedReinforcement } from '../../../design-contract/reinforceme
 // = w L²/8 = 153.1125 kN m. The initial top patterns (7Ø12 and 4Ø16) both resist it,
 // but cannot occupy their nearly coincident positions as a lap. Either uniform pattern
 // is a finite, known alternative to test; the engine must still build and verify it.
-it.each(['original', 'rotated', 'reversed', 'renumbered'] as const)(
+it.each(['original', 'rotated', 'reversed', 'renumbered', 'three spans', 'three spans reversed', 'bottom three spans'] as const)(
   'closes both spans through the production path (%s)', mode => {
   const model = structuredClone(fixture);
   model.nodes[1].x = 6; model.nodes[2].x = 12;
+  const three = mode.includes('three spans'), bottom = mode.startsWith('bottom');
+  if (three) {
+    model.nodes.push({ id: 4, x: 18, y: 0, z: 0 });
+    model.elements.push({ ...model.elements[1], id: 3, nodeI: 3, nodeJ: 4 });
+    model.supports.push({ id: 4, nodeId: 4, type: 'rollerZ' });
+    model.loads.push(...model.loads.filter(l => l.data.elementId === 2)
+      .map(l => ({ ...l, data: { ...l.data, id: l.data.id + 4, elementId: 3 } })));
+  }
   Object.assign(model.sections[0], { b: 0.35, h: 0.65, a: 0.35 * 0.65,
     iy: 0.35 * 0.65 ** 3 / 12, iz: 0.65 * 0.35 ** 3 / 12 });
   model.supports.push({ id: 3, nodeId: 2, type: 'rollerZ' });
@@ -30,7 +38,7 @@ it.each(['original', 'rotated', 'reversed', 'renumbered'] as const)(
   if (mode === 'rotated') for (const n of model.nodes) {
     const x = n.x; n.x = 20; n.y = x - 7; n.z = 4;
   }
-  if (mode === 'reversed') for (const e of model.elements) [e.nodeI, e.nodeJ] = [e.nodeJ, e.nodeI];
+  if (mode.includes('reversed')) for (const e of model.elements) [e.nodeI, e.nodeJ] = [e.nodeJ, e.nodeI];
   if (mode === 'renumbered') {
     const ids = new Map([[1, 19], [2, 7]]);
     for (const e of model.elements) e.id = ids.get(e.id)!;
@@ -39,10 +47,11 @@ it.each(['original', 'rotated', 'reversed', 'renumbered'] as const)(
   const firstId = model.elements[0].id;
   const solved = solveFixture(model);
   const rebar = (id: number): ProvidedReinforcement => ({ regions: {
-    topStart: { count: id === firstId ? 7 : 4, diameter: id === firstId ? 12 : 16 },
-    topEnd: { count: id === firstId ? 7 : 4, diameter: id === firstId ? 12 : 16 },
-    bottomSpan: { count: 4, diameter: 16 },
-    bottomGroups: [{ layers: [{ count: 4, diameter: 16, row: 0 }], anchorageStart: 'hook', anchorageEnd: 'hook' }],
+    topStart: { count: !bottom && id === firstId ? 7 : 4, diameter: !bottom && id === firstId ? 12 : 16 },
+    topEnd: { count: !bottom && id === firstId ? 7 : 4, diameter: !bottom && id === firstId ? 12 : 16 },
+    bottomSpan: { count: bottom && id !== firstId ? 7 : 4, diameter: bottom && id !== firstId ? 12 : 16 },
+    bottomGroups: [{ layers: [{ count: bottom && id !== firstId ? 7 : 4, diameter: bottom && id !== firstId ? 12 : 16, row: 0 }],
+      anchorageStart: 'hook', anchorageEnd: 'hook' }],
     stirrupsSupport: { diameter: 8, legs: 2, spacing: 0.125 },
     stirrupsSpan: { diameter: 8, legs: 2, spacing: 0.125 },
   } });
@@ -50,7 +59,7 @@ it.each(['original', 'rotated', 'reversed', 'renumbered'] as const)(
   for (const [id, ctx] of solved.contexts) {
     // Independent statics value: a different load/model must not accidentally weaken the fixture.
     expect(Math.max(...ctx.stations!.comboResults.flatMap(c => c.stations.map(s => Math.abs(s.my)))))
-      .toBeCloseTo(153.1125, 3);
+      .toBeCloseTo(three ? 122.49 : 153.1125, 3);
     const r = rebar(id), verdict = cirsoc201Adapter.verify(ctx, r);
     expect(['ok', 'warn']).toContain(verdict.overallStatus);
     const o = outcomeFromProvided(cirsoc201Adapter, ctx, r, verdict);
@@ -69,20 +78,24 @@ it.each(['original', 'rotated', 'reversed', 'renumbered'] as const)(
     .toContain('detailing.lapCheck.unarranged');
   const result = searchPhysicalDesignAlternatives({ adapter: cirsoc201Adapter, contexts: solved.contexts,
     outcomes, result: before, detail, regresses: detailRegresses,
-    budget: { maxDetailingRuns: 4, maxMemberSearches: 8, operators: ['harmonizeTop'] } });
+    budget: { maxDetailingRuns: 4, maxMemberSearches: 12,
+      operators: [bottom ? 'harmonizeBottomLine' : three ? 'harmonizeTopLine' : 'harmonizeTop'] } });
   expect(result.changed.length).toBeGreaterThan(0);
   const assertClosed = (r: ReturnType<typeof detail>) => {
     expect(r.skipped).toEqual([]);
     expect(r.provisionalMembers).toEqual([]);
     expect(r.assemblies.flatMap(a => a.unsupported)).toEqual([]);
     expect(r.assemblies.flatMap(a => a.conflicts).filter(c => c.severity !== 'marginal')).toEqual([]);
-    expect(r.reverification).toHaveLength(2);
+    expect(r.reverification).toHaveLength(three ? 3 : 2);
     expect(r.reverification.every(v => v.status === 'ok' || v.status === 'warn')).toBe(true);
     const bars = r.assemblies.flatMap(a => a.bars);
     // The middle support really has shared top steel, not two deleted member cages.
     const top = result.outcomes.get(firstId)!.accepted!.regions!.topStart!;
-    expect(bars.filter(b => b.role === 'longitudinal' && b.layerId?.includes(':top')
-      && b.ownerElementIds.length === 2)).toHaveLength(top.count);
+    for (let i = 1; i < model.elements.length; i++) {
+      const pair = [model.elements[i - 1].id, model.elements[i].id];
+      expect(bars.filter(b => b.role === 'longitudinal' && b.layerId?.includes(':top')
+        && pair.every(id => b.ownerElementIds.includes(id)))).toHaveLength(top.count);
+    }
     for (const id of outcomes.keys()) {
       const stations = bars.filter(b => b.role === 'transverse' && b.ownerElementIds.includes(id))
         .map(b => b.station!).sort((a, b) => a - b);

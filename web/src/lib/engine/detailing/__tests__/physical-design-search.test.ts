@@ -5,7 +5,7 @@ import type { MemberContext } from '../../design/member-context';
 import type { MemberDesignOutcome } from '../../design/outcome';
 import type { RunDetailingResult } from '../run-detailing';
 import { detailRegresses, runDesignFeedbackLoop } from '../design-feedback-loop';
-import { searchPhysicalDesignAlternatives } from '../physical-design-search';
+import { continuityLines, searchPhysicalDesignAlternatives } from '../physical-design-search';
 import { syntheticBeamContext } from '../../design/__tests__/helpers';
 import { rebarHash } from '../../design/rebar-hash';
 
@@ -56,6 +56,76 @@ describe('atomic top continuity repair', () => {
     } as never);
     return { input: { ...input, budget: { maxDetailingRuns: 2, maxMemberSearches: 4, operators: ['harmonizeTop'] as const } }, verify };
   }
+
+  function line() {
+    const { input, verify } = paired();
+    const model = { ...input.contexts.get(1)!.modelData,
+      nodes: new Map([1, 2, 3, 4].map(id => [id, { id, x: (id - 1) * 6, y: 0, z: 0 }])),
+      elements: new Map([1, 2, 3].map(id => [id, { id, nodeI: id, nodeJ: id + 1,
+        materialId: 1, sectionId: 1, type: 'frame' }])),
+    };
+    input.contexts.set(3, syntheticBeamContext({ elementId: 3 }));
+    for (const ctx of input.contexts.values()) ctx.modelData = model;
+    input.outcomes.set(3, outcome(3, 16));
+    input.result.reverification.push({ ...input.result.reverification[0], elementId: 3 });
+    input.result.layering = { lineOfMember: new Map([[1, 'line'], [2, 'line'], [3, 'line']]) } as never;
+    const closed = detail([]);
+    closed.reverification.push({ ...closed.reverification[0], elementId: 3 });
+    input.detail.mockReturnValue(closed);
+    return { input: { ...input, budget: { maxDetailingRuns: 2, maxMemberSearches: 6,
+      operators: ['harmonizeTopLine'] as const } }, verify };
+  }
+
+  it('includes an already fused continuation with no lap record and certifies all three members', () => {
+    const { input, verify } = line();
+    expect(continuityLines(input.contexts, input.result)).toEqual([{ ids: [1, 2, 3], jointIds: ['n2', 'n3'] }]);
+    const result = searchPhysicalDesignAlternatives(input);
+    expect(result.trials[0]).toMatchObject({ elementIds: [1, 2, 3], disposition: 'accepted' });
+    expect(verify).toHaveBeenCalledTimes(3);
+    expect(result.changed).toEqual([1, 2, 3]);
+    for (const id of [1, 2, 3]) expect(result.outcomes.get(id)!.certificate!.rebarHash)
+      .toBe(rebarHash(result.outcomes.get(id)!.accepted));
+  });
+
+  it('does not join a crossing beam even if an upstream line identifier is shared', () => {
+    const { input } = line();
+    input.contexts.get(1)!.modelData.nodes.set(4, { id: 4, x: 12, y: 6, z: 0 });
+    expect(continuityLines(input.contexts, input.result)).toEqual([{ ids: [1, 2], jointIds: ['n2'] }]);
+  });
+
+  it('does not join overlapping members extending in the same direction from a joint', () => {
+    const { input } = line();
+    input.contexts.get(1)!.modelData.nodes.set(4, { id: 4, x: 7, y: 0, z: 0 });
+    expect(continuityLines(input.contexts, input.result)).toEqual([{ ids: [1, 2], jointIds: ['n2'] }]);
+  });
+
+  it('refuses an ambiguous fork with two collinear continuations at the same joint', () => {
+    const { input } = line();
+    input.contexts.get(1)!.modelData.elements.get(3)!.nodeI = 2;
+    expect(continuityLines(input.contexts, input.result)).toEqual([]);
+    expect(searchPhysicalDesignAlternatives(input).changed).toEqual([]);
+    expect(input.detail).not.toHaveBeenCalled();
+  });
+
+  it('reserves the whole line budget before doing any member verification', () => {
+    const { input, verify } = line();
+    input.budget.maxMemberSearches = 2;
+    const result = searchPhysicalDesignAlternatives(input);
+    expect(result.termination).toBe('budget');
+    expect(verify).not.toHaveBeenCalled();
+    expect(input.detail).not.toHaveBeenCalled();
+    expect(result.outcomes).toBe(input.outcomes);
+  });
+
+  it('rolls back the whole line and records the member whose final resistance worsened', () => {
+    const { input } = line();
+    const failed = detail([]);
+    failed.reverification.push({ ...failed.reverification[0], elementId: 3, status: 'fail' });
+    input.detail.mockReturnValue(failed);
+    const result = searchPhysicalDesignAlternatives(input);
+    expect(result.outcomes).toBe(input.outcomes);
+    expect(result.trials.every(t => t.regressions?.includes('reverification:3'))).toBe(true);
+  });
 
   it('checks both proposed members against their new neighbours and publishes the pair only after full detail', () => {
     const { input, verify } = paired();
@@ -119,6 +189,18 @@ describe('atomic top continuity repair', () => {
     fewer.assemblies[0].unsupported = input.result.assemblies[0].unsupported;
     input.detail.mockReturnValue(fewer);
     expect(searchPhysicalDesignAlternatives(input).trials.map(t => t.disposition)).toEqual(['noProgress', 'noProgress']);
+  });
+
+  it('recognizes fewer unresolved pairs inside a still-open grouped splice warning', () => {
+    const { input } = paired();
+    input.result.assemblies[0].unsupported[0].params!.pairs = 8;
+    const fewer = detail([1, 2]);
+    fewer.assemblies[0].unsupported = [{ ...input.result.assemblies[0].unsupported[0],
+      params: { joint: 'n2', pairs: 2 } }];
+    input.detail.mockReturnValue(fewer);
+    const result = searchPhysicalDesignAlternatives(input);
+    expect(result.trials[0]).toMatchObject({ disposition: 'accepted', splicePairsBefore: 8, splicePairsAfter: 2 });
+    expect(result.result.assemblies[0].unsupported).toHaveLength(1);
   });
 
   it('shares operation budgets across paired and single-member operators', () => {

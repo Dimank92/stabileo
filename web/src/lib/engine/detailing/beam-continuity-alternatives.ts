@@ -1,4 +1,4 @@
-/** Small, atomic alternatives for the top steel of two adjacent beam members. */
+/** Atomic longitudinal patterns for an adjacent beam pair or line. */
 import type { ProvidedReinforcement, RebarLayer } from '../../design-contract/reinforcement';
 import type { MemberContext } from '../design/member-context';
 import { STANDARD_LONG_DIAS } from '../design/objective';
@@ -6,26 +6,31 @@ import { BEAM_LIMITS, maxBarsPerRow } from '../design/candidate-enumerate-beam';
 
 export interface BeamContinuityAlternative {
   layers: RebarLayer[];
-  reinforcement: [ProvidedReinforcement, ProvidedReinforcement];
+  reinforcement: ProvidedReinforcement[];
 }
 
 /**
- * Reuse each existing top pattern on BOTH beams and at BOTH ends. The generator may then
+ * Reuse each existing pattern throughout the line. The generator may then
  * carry equal bars through their shared support. This is a proposal, not a continuity proof:
  * different sections, seats, demand and neighbours still require full detailing.
  * Explicit curtailment/groups and multi-element spans need a different operator.
  */
 export function* beamContinuityAlternatives(
-  contexts: readonly [MemberContext, MemberContext],
-  current: readonly [ProvidedReinforcement, ProvidedReinforcement],
+  contexts: readonly MemberContext[],
+  current: readonly ProvidedReinforcement[],
+  face: 'top' | 'bottom' = 'top',
 ): Generator<BeamContinuityAlternative> {
+  if (contexts.length < 2 || contexts.length !== current.length) return;
   if (contexts.some(c => c.elementType !== 'beam' || c.span)) return;
-  if (current.some(r => !r.regions || r.regions.topStartGroups || r.regions.topEndGroups
-    || r.regions.continuity)) return;
+  if (current.some(r => !r.regions || r.regions.continuity || (face === 'top'
+    ? r.regions.topStartGroups || r.regions.topEndGroups
+    : r.regions.bottomGroups && r.regions.bottomGroups.length !== 1))) return;
   const seen = new Set<string>();
-  for (const r of current) for (const face of ['topStart', 'topEnd'] as const) {
-    const group = r.regions![face];
-    const layers = r.regions![`${face}Layers`] ?? (group ? [{ ...group, row: 0 }] : []);
+  const regions = face === 'top' ? ['topStart', 'topEnd'] as const : ['bottomSpan'] as const;
+  for (const r of current) for (const region of regions) {
+    const group = r.regions![region];
+    const layers = (face === 'bottom' ? r.regions!.bottomGroups?.[0].layers : undefined)
+      ?? r.regions![`${region}Layers`] ?? (group ? [{ ...group, row: 0 }] : []);
     if (!layers.length || layers.length > BEAM_LIMITS.maxRows) continue;
     const ordered = [...layers].sort((a, b) => a.row - b.row);
     const dia = ordered[0].diameter;
@@ -42,10 +47,15 @@ export function* beamContinuityAlternatives(
     if (seen.has(key)) continue;
     seen.add(key);
     const count = ordered.reduce((sum, l) => sum + l.count, 0);
-    const copy = (r: ProvidedReinforcement): ProvidedReinforcement => ({ ...r, regions: {
+    const copy = (r: ProvidedReinforcement): ProvidedReinforcement => ({ ...r, regions: face === 'top' ? {
       ...r.regions, topStart: { count, diameter: dia }, topEnd: { count, diameter: dia },
       topStartLayers: ordered.map(l => ({ ...l })), topEndLayers: ordered.map(l => ({ ...l })),
+    } : {
+      ...r.regions, bottomSpan: { count, diameter: dia }, bottomSpanLayers: ordered.map(l => ({ ...l })),
+      preserveBottomRows: true,
+      ...(r.regions!.bottomGroups ? { bottomGroups: [{ ...r.regions!.bottomGroups[0],
+        layers: ordered.map(l => ({ ...l })) }] } : {}),
     } });
-    yield { layers: ordered.map(l => ({ ...l })), reinforcement: [copy(current[0]), copy(current[1])] };
+    yield { layers: ordered.map(l => ({ ...l })), reinforcement: current.map(copy) };
   }
 }

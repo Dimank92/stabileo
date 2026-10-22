@@ -11,6 +11,25 @@ const reinforcement = (count: number, diameter: number): ProvidedReinforcement =
 const contexts = () => [syntheticBeamContext(), syntheticBeamContext({ elementId: 2 })] as const;
 
 describe('paired top continuity patterns', () => {
+  it('preserves each member’s bottom end treatments and top/transverse steel when harmonizing the bottom', () => {
+    const current = [reinforcement(4, 12), reinforcement(3, 16)];
+    current[0].regions!.bottomGroups = [{ layers: [{ count: 3, diameter: 16, row: 0 }], anchorageStart: 'hook' }];
+    current[1].regions!.bottomSpan = { count: 4, diameter: 12 };
+    const before = structuredClone(current);
+    const proposals = [...beamContinuityAlternatives(contexts(), current, 'bottom')];
+    expect(proposals).toHaveLength(2);
+    for (const proposal of proposals) proposal.reinforcement.forEach((r, i) => {
+      expect(r.regions!.bottomSpanLayers).toEqual(proposal.layers);
+      expect(r.regions!.topStart).toEqual(before[i].regions!.topStart);
+      expect(r.regions!.stirrupsSupport).toEqual(before[i].regions!.stirrupsSupport);
+      expect(r.regions!.preserveBottomRows).toBe(true);
+      expect(r.regions!.bottomGroups?.[0].anchorageStart).toBe(before[i].regions!.bottomGroups?.[0].anchorageStart);
+    });
+    expect(current).toEqual(before);
+    current[0].regions!.bottomGroups!.push({ layers: [{ count: 2, diameter: 12, row: 0 }] });
+    expect([...beamContinuityAlternatives(contexts(), current, 'bottom')]).toEqual([]);
+  });
+
   it('offers both existing families on both ends of both beams, without changing bottom or transverse steel', () => {
     const current = [reinforcement(4, 12), reinforcement(3, 16)] as const;
     const before = structuredClone(current);
