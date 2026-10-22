@@ -315,3 +315,14 @@ El experimento guarda `/tmp/design-layer-search.json`, con identidades, condicio
 tiempo transcurrido y CPU por pasada. Comprueba además que el resultado persista al regenerar
 sin ejecutar de nuevo el operador. Una ejecución anterior produjo los resultados geométricos
 indicados pero excedió el límite de tiempo del test; no se usa para afirmar rendimiento.
+
+La repetición instrumentada reprodujo los 76 aprobados por identidad, los 1992 conflictos
+bloqueantes y las ocho decisiones. La etapa nueva tomó 220,76 s transcurridos y 76,85 s de CPU;
+sus nueve reconstrucciones (una inicial y ocho alternativas) sumaron 218,12 s y 75,92 s de CPU.
+Las diez reconstrucciones de la búsqueda anterior ya habían consumido 625,57 s transcurridos
+y 131,97 s de CPU. El test completo terminó por su límite de 600 s, con 985,60 s registrados
+en el cuerpo del test; por tanto, **la prueba integral no está verde**. Había otras suites
+ejecutándose en la misma máquina y una carga alta; estas observaciones no aíslan la causa
+de cada demora ni establecen un tiempo normal. Las 170 pruebas dirigidas de los módulos
+afectados pasaron y el chequeo de tipos no agregó errores (442 existentes frente a 443 de
+baseline). Se mantiene el incremento en draft hasta completar una corrida integral estable.
