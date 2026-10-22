@@ -11,6 +11,7 @@
    * it: an app route on arrival, or the landing's "enter the app". From then on App.svelte owns
    * every route, public ones included, exactly as before, so nothing changes once it is up.
    */
+  import { tick } from 'svelte';
   import LandingPage from './components/LandingPage.svelte';
   import BlogPage from './components/blog/BlogPage.svelte';
   import { parsePublicPath, publicHref } from './lib/i18n/public-routes';
@@ -57,7 +58,13 @@
   let loading: Promise<void> | null = null;
 
   function loadApp() {
-    loading ??= import('./App.svelte').then((m) => { app = m.default; });
+    loading ??= import('./App.svelte').then(async (m) => {
+      app = m.default;
+      // Tell main.ts the application is up: it installs the browser-test hooks then (in an
+      // e2e build only), so that "the hooks are there" still means "the application is up".
+      await tick();
+      window.dispatchEvent(new CustomEvent('stabileo-app-ready'));
+    });
     return loading;
   }
 

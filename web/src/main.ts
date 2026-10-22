@@ -44,8 +44,14 @@ const app = mount(Root, {
 //
 // The hooks additionally require `?e2e=1` at runtime (see e2e-hooks.ts), so both gates
 // must hold. Playwright's webServer sets VITE_E2E=1 for its build.
+//
+// They are installed when the application is up (Root.svelte loads it on the first app route
+// and says so), so a spec that waits for them is waiting for the application, as it was when
+// the application mounted at once.
 if (import.meta.env.VITE_E2E === '1') {
-  void import('./lib/utils/e2e-hooks').then((m) => m.installE2EHooks());
+  window.addEventListener('stabileo-app-ready', () => {
+    void import('./lib/utils/e2e-hooks').then((m) => m.installE2EHooks());
+  }, { once: true });
 }
 
 export default app;
