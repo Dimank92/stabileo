@@ -1164,7 +1164,7 @@ export type InfluenceDirection = 'vertical' | 'horizontal';
  * without retiring the solve (`restoreViewsOnly`). A setter that records through that channel
  * adds its field here.
  */
-const VIEW_CHANNEL_FIELDS = ['views', 'grid', 'dynamics', 'notes', 'projectInfo', 'deflectionLimits'] as const;
+const VIEW_CHANNEL_FIELDS = ['views', 'grid', 'notes', 'projectInfo', 'deflectionLimits'] as const;
 
 /** Whether a floor-load definition wrote the load (`model/loads/floor-definitions.ts` `isDefinedLoad`). */
 const isDefinedLoadData = (l: Load | undefined): boolean => (l?.data as { fromDef?: number } | undefined)?.fromDef !== undefined;
@@ -1924,6 +1924,12 @@ function createModelStore() {
         const next = snap[k] !== undefined ? JSON.parse(JSON.stringify(snap[k])) : undefined;
         if (JSON.stringify(m[k] ?? null) === JSON.stringify(next ?? null)) continue;
         m[k] = next;
+      }
+      // The spectra and time history were recorded here before they were known to be analysis
+      // inputs; a session saved then still holds such entries. Undoing one is a model edit.
+      if (JSON.stringify(s.dynamics ?? null) !== JSON.stringify(model.dynamics ?? null)) {
+        model.dynamics = s.dynamics ? JSON.parse(JSON.stringify(s.dynamics)) : undefined;
+        this.bumpModelVersion();
       }
       // Names of nodes and members travel on this channel too: the analysis reads neither.
       const named = <T extends { name?: string }>(map: Map<number, T>, entries: ReadonlyArray<[number, { name?: string }]> | undefined): Map<number, T> | null => {
@@ -4125,7 +4131,6 @@ function createModelStore() {
       model.grid = grid && (grid.axes.length > 0 || grid.levels.length > 0) ? JSON.parse(JSON.stringify(grid)) : undefined;
     },
 
-    /** State the project's dynamic analysis settings. Undoable; the solve survives it. */
     /** State the notes in the view. Undoable; they touch no result. */
     setNotes(notes: import('../model/annotations').ViewNote[]): void {
       if (!_undoBatching) _pushUndoView?.();
@@ -4166,9 +4171,17 @@ function createModelStore() {
       model.deflectionLimits = d && d.rules.length > 0 ? JSON.parse(JSON.stringify(d)) : undefined;
     },
 
+    /**
+     * State the project's spectra and time history. They change what a solve computes (a user
+     * spectrum feeds the spectral load cases, the time history its run), so this is a model edit:
+     * undoable, and the results on hand are retired. A write that changes nothing takes no step.
+     */
     setDynamics(d: { timeHistory?: import('../engine/dynamics/time-history-spec').TimeHistorySpec; spectra?: import('../engine/spectral-case').UserSpectrum[] } | null): void {
-      if (!_undoBatching) _pushUndoView?.();
-      model.dynamics = d && (d.timeHistory || d.spectra?.length) ? JSON.parse(JSON.stringify(d)) : undefined;
+      const next = d && (d.timeHistory || d.spectra?.length) ? JSON.parse(JSON.stringify(d)) : undefined;
+      if (JSON.stringify(next ?? null) === JSON.stringify(model.dynamics ?? null)) return;
+      if (!_undoBatching) _pushUndo?.();
+      model.dynamics = next;
+      this.bumpModelVersion();
     },
 
     /** State the project's combination rules; an empty list withdraws them. */

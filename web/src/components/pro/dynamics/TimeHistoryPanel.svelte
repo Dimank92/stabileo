@@ -111,6 +111,9 @@
     onError(null);
     running = true;
     try {
+      // The spec run is the one saved, first: saving it is a model edit (`setDynamics`), and a
+      // result stamped before it would read as stale the moment it is shown.
+      save(JSON.stringify(spec));
       const { input, densities } = buildDynamicInput();
       const fields = timeHistoryInput(spec, densities, spectrumSa);
       const res = solveTimeHistory3D({ solver: input, ...fields }) as TimeHistoryResult3D;
@@ -118,7 +121,6 @@
       const main = (['x', 'y', 'z'] as const).find((d) => spec.ground[d].source !== 'none') ?? 'x';
       component = main === 'z' ? 'uz' : main === 'y' ? 'uy' : 'ux';
       nodeId = peakNode(res);
-      save(JSON.stringify(spec));
     } catch (e) {
       onError(`${t('pro.th.title')}: ${errorText(e, 'Error')}`);
     } finally {
