@@ -1,4 +1,4 @@
-.PHONY: check-pins dev dev-backend dev-web wasm build build-backend build-web \
+.PHONY: check-pins worktree worktree-prune dev dev-backend dev-web wasm build build-backend build-web \
        test test-engine test-backend test-web test-inventory \
        docker-build docker-up docker-down \
        clean fmt check
@@ -16,9 +16,17 @@ dev-backend:
 dev-web: wasm
 	cd web && npm install && npm run dev
 
-## Build WASM engine for the frontend
+## Build WASM engine for the frontend (a copy from the cache when these sources were built before)
 wasm:
-	cd engine && wasm-pack build --target web --out-dir ../web/src/lib/wasm --no-opt
+	scripts/wasm-cached.sh
+
+## A new worktree ready to test in seconds: make worktree NAME=fix-x [BASE=main]
+worktree:
+	scripts/worktree.sh $(NAME) $(or $(BASE),main)
+
+## Remove the worktrees that are clean and already on origin/main (never forces)
+worktree-prune:
+	scripts/worktree-prune.sh
 
 # ── Build ────────────────────────────────────────────────────
 
