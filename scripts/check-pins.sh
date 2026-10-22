@@ -11,6 +11,8 @@ NIGHTLY=nightly-2026-10-15
 fail=0
 bad() { echo "check-pins: $*" >&2; fail=1; }
 
+[ -z "$(git ls-files '*rust-toolchain*' | grep -vx rust-toolchain.toml)" ] || bad "a second rust-toolchain file: $(git ls-files '*rust-toolchain*' | grep -vx rust-toolchain.toml)"
+
 channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
 [ -n "$channel" ] || bad "rust-toolchain.toml has no channel"
 
