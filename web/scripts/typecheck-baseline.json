@@ -1,5 +1,5 @@
 {
-	"total": 416,
+	"total": 249,
 	"entries": [
 		{
 			"file": "src/lib/ai/__tests__/build-model.test.ts",
@@ -206,12 +206,6 @@
 			"count": 25
 		},
 		{
-			"file": "src/lib/engine/__tests__/deformed-shape.test.ts",
-			"code": "TS2353",
-			"message": "Object literal may only specify known properties, and 'fy' does not exist in type 'SolverNodalLoad | SolverDistributedLoad | SolverPointLoadOnElement | SolverAxialDistributedLoad | SolverThermalLoad'.",
-			"count": 9
-		},
-		{
 			"file": "src/lib/engine/__tests__/design-check-results.test.ts",
 			"code": "TS6133",
 			"message": "'CheckStatus' is declared but its value is never read.",
@@ -221,12 +215,6 @@
 			"file": "src/lib/engine/__tests__/diff-fuzz-helpers.ts",
 			"code": "TS2322",
 			"message": "Type 'Map<number, { id: number; x: number; y: number; }>' is not assignable to type 'Map<number, SolverNode>'.",
-			"count": 1
-		},
-		{
-			"file": "src/lib/engine/__tests__/diff-fuzz-helpers.ts",
-			"code": "TS2353",
-			"message": "Object literal may only specify known properties, and 'fy' does not exist in type 'SolverNodalLoad | SolverDistributedLoad | SolverPointLoadOnElement | SolverAxialDistributedLoad | SolverThermalLoad'.",
 			"count": 1
 		},
 		{
@@ -410,12 +398,6 @@
 			"count": 2
 		},
 		{
-			"file": "src/lib/engine/__tests__/e2e-comprehensive.test.ts",
-			"code": "TS2353",
-			"message": "Object literal may only specify known properties, and 'fy' does not exist in type 'SolverNodalLoad | SolverDistributedLoad | SolverPointLoadOnElement | SolverAxialDistributedLoad | SolverThermalLoad'.",
-			"count": 36
-		},
-		{
 			"file": "src/lib/engine/__tests__/embed-2d-in-3d.test.ts",
 			"code": "TS2554",
 			"message": "Expected 1 arguments, but got 2.",
@@ -466,12 +448,6 @@
 		{
 			"file": "src/lib/engine/__tests__/inclined-supports.test.ts",
 			"code": "TS2353",
-			"message": "Object literal may only specify known properties, and 'dy' does not exist in type 'SolverSupport'.",
-			"count": 2
-		},
-		{
-			"file": "src/lib/engine/__tests__/inclined-supports.test.ts",
-			"code": "TS2353",
 			"message": "Object literal may only specify known properties, and 'fy' does not exist in type 'SolverNodalLoad | SolverDistributedLoad | SolverPointLoadOnElement | SolverAxialDistributedLoad | SolverThermalLoad'.",
 			"count": 1
 		},
@@ -500,12 +476,6 @@
 			"count": 1
 		},
 		{
-			"file": "src/lib/engine/__tests__/kinematic-analysis.test.ts",
-			"code": "TS2353",
-			"message": "Object literal may only specify known properties, and 'fy' does not exist in type 'SolverNodalLoad | SolverDistributedLoad | SolverPointLoadOnElement | SolverAxialDistributedLoad | SolverThermalLoad'.",
-			"count": 5
-		},
-		{
 			"file": "src/lib/engine/__tests__/kinematic-report.test.ts",
 			"code": "TS2322",
 			"message": "Type 'Map<number, { id: number; x: number; y: number; }>' is not assignable to type 'Map<number, SolverNode>'.",
@@ -518,22 +488,10 @@
 			"count": 1
 		},
 		{
-			"file": "src/lib/engine/__tests__/load-cases.test.ts",
-			"code": "TS2353",
-			"message": "Object literal may only specify known properties, and 'fy' does not exist in type 'SolverNodalLoad | SolverDistributedLoad | SolverPointLoadOnElement | SolverAxialDistributedLoad | SolverThermalLoad'.",
-			"count": 1
-		},
-		{
 			"file": "src/lib/engine/__tests__/load-decomposition.test.ts",
 			"code": "TS2322",
 			"message": "Type 'Map<number, { id: number; x: number; y: number; }>' is not assignable to type 'Map<number, SolverNode>'.",
 			"count": 1
-		},
-		{
-			"file": "src/lib/engine/__tests__/load-decomposition.test.ts",
-			"code": "TS2353",
-			"message": "Object literal may only specify known properties, and 'fy' does not exist in type 'SolverNodalLoad | SolverDistributedLoad | SolverPointLoadOnElement | SolverAxialDistributedLoad | SolverThermalLoad'.",
-			"count": 3
 		},
 		{
 			"file": "src/lib/engine/__tests__/local-axes-parity.test.ts",
@@ -570,12 +528,6 @@
 			"code": "TS2339",
 			"message": "Property 'y' does not exist on type 'SolverNode'.",
 			"count": 2
-		},
-		{
-			"file": "src/lib/engine/__tests__/node-equilibrium.test.ts",
-			"code": "TS2353",
-			"message": "Object literal may only specify known properties, and 'fy' does not exist in type 'SolverNodalLoad | SolverDistributedLoad | SolverPointLoadOnElement | SolverAxialDistributedLoad | SolverThermalLoad'.",
-			"count": 3
 		},
 		{
 			"file": "src/lib/engine/__tests__/partial-distributed.test.ts",
@@ -644,18 +596,6 @@
 			"count": 2
 		},
 		{
-			"file": "src/lib/engine/__tests__/solver-mechanism.test.ts",
-			"code": "TS2353",
-			"message": "Object literal may only specify known properties, and 'fy' does not exist in type 'SolverNodalLoad | SolverDistributedLoad | SolverPointLoadOnElement | SolverAxialDistributedLoad | SolverThermalLoad'.",
-			"count": 21
-		},
-		{
-			"file": "src/lib/engine/__tests__/solver-phase1.test.ts",
-			"code": "TS2322",
-			"message": "Type '() => { nodes: Map<number, SolverNode>; materials: Map<number, { id: number; e: number; nu: number; }>; sections: Map<number, { id: number; a: number; iz: number; }>; elements: Map<...>; supports: Map<...>; loads: ({ ...; } | { ...; })[]; }' is not assignable to type '() => SolverInput'.",
-			"count": 2
-		},
-		{
 			"file": "src/lib/engine/__tests__/solver-phase1.test.ts",
 			"code": "TS2322",
 			"message": "Type 'Map<number, { id: number; x: number; y: number; }>' is not assignable to type 'Map<number, SolverNode>'.",
@@ -664,26 +604,8 @@
 		{
 			"file": "src/lib/engine/__tests__/solver-phase1.test.ts",
 			"code": "TS2339",
-			"message": "Property 'fy' does not exist on type 'SolverNodalLoad'.",
-			"count": 2
-		},
-		{
-			"file": "src/lib/engine/__tests__/solver-phase1.test.ts",
-			"code": "TS2339",
-			"message": "Property 'mz' does not exist on type 'SolverNodalLoad'.",
-			"count": 1
-		},
-		{
-			"file": "src/lib/engine/__tests__/solver-phase1.test.ts",
-			"code": "TS2339",
 			"message": "Property 'y' does not exist on type 'SolverNode'.",
 			"count": 10
-		},
-		{
-			"file": "src/lib/engine/__tests__/solver-phase1.test.ts",
-			"code": "TS2353",
-			"message": "Object literal may only specify known properties, and 'fy' does not exist in type 'SolverNodalLoad | SolverDistributedLoad | SolverPointLoadOnElement | SolverAxialDistributedLoad | SolverThermalLoad'.",
-			"count": 70
 		},
 		{
 			"file": "src/lib/engine/__tests__/solver-phase1.test.ts",
@@ -702,12 +624,6 @@
 			"code": "TS2322",
 			"message": "Type 'Map<number, { id: number; x: number; y: number; }>' is not assignable to type 'Map<number, SolverNode>'.",
 			"count": 6
-		},
-		{
-			"file": "src/lib/engine/__tests__/solver.test.ts",
-			"code": "TS2353",
-			"message": "Object literal may only specify known properties, and 'fy' does not exist in type 'SolverNodalLoad | SolverDistributedLoad | SolverPointLoadOnElement | SolverAxialDistributedLoad | SolverThermalLoad'.",
-			"count": 11
 		},
 		{
 			"file": "src/lib/engine/__tests__/split-element.test.ts",
