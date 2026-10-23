@@ -696,7 +696,7 @@ export function decompressSnapshot(data: string): ModelSnapshot | null {
     const parsed = prepareSharedSnapshot(JSON.parse(json));
     if (!parsed) return null;
 
-    const elems = parsed.elements as Array<[number, Record<string, unknown>]>;
+    const elems = parsed.elements as unknown as Array<[number, Record<string, unknown>]>;
     if (Array.isArray(elems)) {
       for (const [, elem] of elems) {
         if (!elem) continue;

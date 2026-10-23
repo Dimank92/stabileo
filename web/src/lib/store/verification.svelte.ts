@@ -31,7 +31,7 @@ import { regulationsStore } from './regulations.svelte';
 import type { DesignRunSummary, MemberDesignOutcome } from '../engine/design/outcome';
 import { utilizationStatus } from '../engine/design/outcome';
 import { rebarHash } from '../engine/design/rebar-hash';
-import { getDesignCode, type DesignCodeId } from '../engine/design/code-adapter';
+import { getDesignCode } from '../engine/design/code-adapter';
 import type { OrientationIssue } from '../engine/design/orientation-diagnostic';
 import { failingLimits, isKnownBiaxialLimitation }
   from '../engine/detailing/element-status';

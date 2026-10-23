@@ -32,14 +32,14 @@ import {
 } from './station-design-forces';
 import { extractBeamStationBuffer3D, extractBeamStationsGrouped3D, isSolverReady } from './wasm-solver';
 import { autoVerifyFromResults, type AutoVerifyModelData } from './auto-verify';
-import { classifyElement, type ElementVerification } from './codes/argentina/cirsoc201';
+import type { ElementVerification } from './codes/argentina/cirsoc201';
 import { verifySteelElement, type SteelVerification, type SteelDesignParams, type TensionConnection } from './codes/argentina/cirsoc301';
 import { angleSection, type AngleCompressionInput } from './steel/angle-section';
 import { engineGateSteel, type SteelDemandSet, type SteelEngineRecheck } from './codes/argentina/cirsoc301-engine-gate';
 import { momentGradient, type StationMoment } from './steel/moment-gradient';
 import { memberNetArea, memberEndsFor, type MemberEnd, type TensionSectionInput } from './steel/tension-connection';
 import type { GoverningPerElement3D } from './governing-case';
-import type { CheckStatus, MemberDesignResult, DesignCheckSummary } from './design-check-results';
+import type { MemberDesignResult, DesignCheckSummary } from './design-check-results';
 import { isDesignedMember, maskAxialDemand } from './design/behaviour-demands';
 
 // ─── Station Demands ─────────────────────────────────────────

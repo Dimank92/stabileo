@@ -40,7 +40,7 @@
  */
 
 import {
-  buildStraightBarWithHooks, minMandrelDiameter, standardHook,
+  buildStraightBarWithHooks, standardHook,
   type BarPath, type BarSegment, type HookAngle, type Point3,
 } from '../../codes/cirsoc201/bar-geometry';
 import { minClearBetweenLayers, minClearSpacingInLayer } from '../../codes/cirsoc201/spacing';

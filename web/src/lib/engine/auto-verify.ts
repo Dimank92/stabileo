@@ -12,7 +12,7 @@
  * This is a pure function: no store reads, no side effects.
  */
 
-import type { AnalysisResults3D, ElementForces3D } from './types-3d';
+import type { AnalysisResults3D } from './types-3d';
 import type { GoverningPerElement3D } from './governing-case';
 import type { ElementDesignDemands } from './station-design-forces';
 import { verifyElement, classifyElement, computeJointPsiFromModel } from './codes/argentina/cirsoc201';

@@ -145,7 +145,9 @@ export type DetailedSupport = SolverSupport & { restrainedDofs?: [boolean, boole
 function isDofRestrained(sup: SolverSupport, localDof: number): boolean {
   const explicit = (sup as DetailedSupport).restrainedDofs;
   if (explicit) return !!explicit[localDof];
-  switch (sup.type) {
+  // As a string: the store still writes the legacy 'rollerY' (the same roller as 'rollerZ'),
+  // which the solver's own SupportType no longer names.
+  switch (sup.type as string) {
     case 'fixed': return true;
     case 'pinned': return localDof === 0 || localDof === 1;
     case 'rollerX': return localDof === 1;
