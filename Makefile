@@ -86,7 +86,7 @@ help:
 	@echo "  make test.web.determinism - WASM results bit-identical across Node and three browsers"
 	@echo "  make e2e.web.build        - The VITE_E2E=1 site the e2e suites run on with E2E_PREBUILT=1"
 	@echo "  make e2e.web.smoke [SHARD=1/5] - Playwright smoke suite"
-	@echo "  make e2e.web.slow / e2e.web.visual - The heavier Playwright suites"
+	@echo "  make e2e.web.slow [SHARD=1/5] / e2e.web.visual - The heavier Playwright suites"
 	@echo "  make lint.backend   - Format check and credo over the backend"
 	@echo "  make format         - Format Elixir and Rust"
 	@echo ""
@@ -239,7 +239,7 @@ e2e.web.smoke:
 	$(NIX_RUN) bash -c 'cd web && npx playwright test --grep @smoke $(if $(SHARD),$$(node scripts/e2e-shard.mjs $(subst /, ,$(SHARD))))'
 
 e2e.web.slow:
-	$(NIX_RUN) bash -c 'cd web && npx playwright test --grep "@slow" --grep-invert "visual baselines"'
+	$(NIX_RUN) bash -c 'cd web && npx playwright test --grep "@slow" --grep-invert "visual baselines" $(if $(SHARD),--shard=$(SHARD))'
 
 e2e.web.visual:
 	$(NIX_RUN) bash -c 'cd web && npx playwright test --grep "visual baselines" $(if $(UPDATE_SNAPSHOTS),--update-snapshots)'

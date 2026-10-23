@@ -1,4 +1,7 @@
 <script lang="ts">
+  // First: every dictionary entry, before anything here renders (the store starts with the public
+  // pages' entries only; Root.svelte loads this component on the first app route).
+  import './lib/i18n/full-dictionaries';
   import { seedProStarterLibrary } from './lib/pro/pro-starter-library';
   import ProQuickEdit from './components/pro/ProQuickEdit.svelte';
   import { is3DWorkspace } from './lib/utils/workspace';

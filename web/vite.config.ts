@@ -3,6 +3,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { copyFileSync, cpSync, existsSync, readFileSync } from 'fs';
 import { execSync } from 'child_process';
 import { resolve } from 'path';
+import { PUBLIC_KEY_PREFIXES } from './src/lib/i18n/public-prefixes';
 
 /**
  * Stub out the WASM glue module when it hasn't been built yet.
@@ -21,6 +22,37 @@ function wasmStubPlugin(): Plugin {
       if (id === '\0wasm-stub') {
         return 'export function initSync() {} export function solve_3d() { return "{}"; }';
       }
+    },
+  };
+}
+
+/**
+ * `virtual:public-i18n`: the dictionaries' entries the public pages read (`landing.*`, `blog.*`, `lang.*`,
+ * `contact.*`), in en, es and pt. The landing and the blog load these instead of the whole
+ * dictionaries (3 MB of source, most of the public bundle); the application registers the rest
+ * when it loads (`lib/i18n/full-dictionaries.ts`). The entries are copied line by line, which
+ * `union-merge-safe.test.ts` keeps possible: one entry per line.
+ */
+function publicI18nPlugin(): Plugin {
+  const id = 'virtual:public-i18n';
+  return {
+    name: 'public-i18n',
+    resolveId(s) {
+      return s === id ? '\0' + id : null;
+    },
+    load(resolved) {
+      if (resolved !== '\0' + id) return null;
+      let out = '';
+      for (const loc of ['en', 'es', 'pt']) {
+        const file = resolve(__dirname, 'src/lib/i18n/locales', `${loc}.ts`);
+        this.addWatchFile(file);
+        const lines = readFileSync(file, 'utf8').split('\n').filter((l) => {
+          const m = /^\s*(['"])([^'"]+)\1: /.exec(l);
+          return !!m && PUBLIC_KEY_PREFIXES.some((p) => m[2].startsWith(p));
+        });
+        out += `export const ${loc} = {\n${lines.join('\n')}\n};\n`;
+      }
+      return out;
     },
   };
 }
@@ -147,7 +179,7 @@ function appVersion(): string {
 }
 
 export default defineConfig({
-  plugins: [wasmStubPlugin(), svelte(), ...(ADMIN ? [adminRootPlugin(), adminPublicAssetsPlugin()] : [])],
+  plugins: [wasmStubPlugin(), publicI18nPlugin(), svelte(), ...(ADMIN ? [adminRootPlugin(), adminPublicAssetsPlugin()] : [])],
   define: {
     __STABILEO_COMMIT__: JSON.stringify(buildCommit()),
     __STABILEO_VERSION__: JSON.stringify(appVersion()),

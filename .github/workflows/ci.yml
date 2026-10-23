@@ -5,6 +5,8 @@ on:
     branches: [main]
   # Every base branch: PRs stacked on another PR get CI too.
   pull_request:
+  # The merge queue: each PR is tested on top of the ones merging before it, so two PRs that
+  # are green on their own cannot break main together.
   merge_group:
 
 concurrency:
@@ -570,16 +572,19 @@ jobs:
         run: nix develop --command bash -c "cd web && npx playwright install-deps chromium"
       # `@landing` stays out: on CI every landing case after the first wedges in
       # `browser.newContext`; run `npx playwright test --grep @landing` locally.
-      - name: E2E smoke suite
+      - name: E2E smoke suite (shard ${{ matrix.shard }}/5)
         run: make e2e.web.smoke SHARD=${{ matrix.shard }}/5
-      - name: E2E slow suite
-        if: matrix.shard == 1 && (github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'run-e2e'))
-        run: make e2e.web.slow
+      # Heavier suite (408-member model): in the merge queue, so it runs on exactly what lands on
+      # main, before it lands; on a PR only with the `run-e2e` label. Split five ways: on one
+      # shard it took 1.5 to 2.3 hours, after the merge, and main stayed red when it failed.
+      - name: E2E slow suite (shard ${{ matrix.shard }}/5)
+        if: github.event_name == 'merge_group' || contains(github.event.pull_request.labels.*.name, 'run-e2e')
+        run: make e2e.web.slow SHARD=${{ matrix.shard }}/5
       # Non-blocking until the Linux baselines under web/e2e/__screenshots__/linux/
       # prove stable. Never pass --update-snapshots by default: it would overwrite
       # the baselines and leave the gate inert. UPDATE_SNAPSHOTS=1 refreshes them once.
       - name: E2E visual baselines (non-blocking comparison)
-        if: matrix.shard == 1 && (github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'run-e2e'))
+        if: matrix.shard == 1 && (github.event_name == 'merge_group' || github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'run-e2e'))
         continue-on-error: true
         run: make e2e.web.visual UPDATE_SNAPSHOTS=${{ vars.UPDATE_SNAPSHOTS == '1' && '1' || '' }}
       - name: Upload Linux screenshot baselines / diffs
