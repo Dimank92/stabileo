@@ -36,6 +36,8 @@ function visit(href: string) {
 
 async function load() {
   vi.resetModules();
+  // A fresh i18n store holds the public entries only; the admin app registers the rest.
+  await import('../../lib/i18n/full-dictionaries');
   const { setLocale } = await import('../../lib/i18n');
   setLocale('en');
   storage.clear();

@@ -1,4 +1,7 @@
 <script lang="ts">
+  // First: every dictionary entry, before anything here renders (the store starts with the public
+  // pages' entries only, and the admin keys are not among them).
+  import '../lib/i18n/full-dictionaries';
   import { onMount } from 'svelte';
   import { adminAuth } from './admin-auth.svelte';
   import { i18n, t } from '../lib/i18n';

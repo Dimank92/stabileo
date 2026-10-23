@@ -47,6 +47,8 @@ function on(route: string, ...responses: Route[]) {
 
 async function signedIn() {
   vi.resetModules();
+  // A fresh i18n store holds the public entries only; the admin app registers the rest.
+  await import('../../lib/i18n/full-dictionaries');
   const { adminAuth } = await import('../admin-auth.svelte');
   const { adminAllowlist } = await import('../admin-allowlist.svelte');
   on('POST /auth/login', () => json(200, SESSION));
