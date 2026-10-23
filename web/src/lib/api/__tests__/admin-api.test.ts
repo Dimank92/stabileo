@@ -40,7 +40,7 @@ let fetchMock: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   fetchMock = vi.fn();
   vi.stubGlobal('fetch', fetchMock);
-  setAuthHooks({ accessToken: () => 'admin-access', refresh: vi.fn(async () => false) });
+  setAuthHooks({ accessToken: () => 'admin-access', refresh: vi.fn(async () => 'rejected' as const) });
 });
 
 afterEach(() => {
@@ -155,7 +155,7 @@ describe('adminApi', () => {
 
   it('refreshes once on an expired token and retries the call with the new one', async () => {
     let token = 'stale';
-    const refresh = vi.fn(async () => { token = 'fresh'; return true; });
+    const refresh = vi.fn(async () => { token = 'fresh'; return 'ok' as const; });
     setAuthHooks({ accessToken: () => token, refresh });
     fetchMock
       .mockResolvedValueOnce(json(401, { error: 'invalid_token', message: 'Invalid token' }))
@@ -169,7 +169,7 @@ describe('adminApi', () => {
   });
 
   it('retries only once', async () => {
-    const refresh = vi.fn(async () => true);
+    const refresh = vi.fn(async () => 'ok' as const);
     setAuthHooks({ accessToken: () => 'tok', refresh });
     fetchMock
       .mockResolvedValueOnce(json(401, { error: 'invalid_token', message: 'Invalid token' }))
@@ -184,7 +184,7 @@ describe('adminApi', () => {
   });
 
   it('does not refresh on a failed login', async () => {
-    const refresh = vi.fn(async () => true);
+    const refresh = vi.fn(async () => 'ok' as const);
     setAuthHooks({ accessToken: () => 'tok', refresh });
     fetchMock.mockResolvedValueOnce(json(401, { error: 'invalid_credentials', message: 'Invalid email or password' }));
 

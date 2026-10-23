@@ -1,4 +1,4 @@
-import { ApiError, setAuthHooks } from '../api/client';
+import { ApiError, setAuthHooks, type RefreshOutcome } from '../api/client';
 import { authApi, type Account, type ProfileUpdate, type RegisterInput, type LoginInput, type Session } from '../api/auth';
 import { accounts } from '../features';
 
@@ -27,40 +27,50 @@ let account = $state<Account | null>(null);
 let status = $state<AuthStatus>('anonymous');
 let userLoginEnabled = $state(false);
 let accessToken: string | null = null;
-let refreshing: Promise<boolean> | null = null;
+// The refresh token this tab last stored. Other tabs share the stored key and may replace it.
+let ownRefreshToken: string | null = null;
+let refreshing: Promise<RefreshOutcome> | null = null;
 
 function applySession(session: Session): Account {
   accessToken = session.access_token;
+  ownRefreshToken = session.refresh_token;
   writeRefreshToken(session.refresh_token);
   account = session.account;
   status = 'authenticated';
   return session.account;
 }
 
-function clearSession(): void {
+// Forgets the stored token only while it is still `token`: one another tab stored since is live.
+function clearSession(token: string | null = readRefreshToken()): void {
   accessToken = null;
-  writeRefreshToken(null);
+  ownRefreshToken = null;
+  if (readRefreshToken() === token) writeRefreshToken(null);
   account = null;
   status = 'anonymous';
 }
 
-function refreshSession(): Promise<boolean> {
+async function renew(token: string, retried = false): Promise<RefreshOutcome> {
+  try {
+    applySession(await authApi.refresh(token));
+    return 'ok';
+  } catch (e) {
+    if (!(e instanceof ApiError && e.status === 401)) return 'unavailable';
+    // Two tabs refreshing at once send the same token and only one wins; the loser finds the
+    // winner's successor in storage and renews with that.
+    const stored = readRefreshToken();
+    if (!retried && stored && stored !== token) return renew(stored, true);
+    clearSession(token);
+    return 'rejected';
+  }
+}
+
+function refreshSession(): Promise<RefreshOutcome> {
   if (refreshing) return refreshing;
   const token = readRefreshToken();
-  if (!token) return Promise.resolve(false);
-  refreshing = authApi
-    .refresh(token)
-    .then((session) => {
-      applySession(session);
-      return true;
-    })
-    .catch((e: unknown) => {
-      if (e instanceof ApiError && e.status === 401) clearSession();
-      return false;
-    })
-    .finally(() => {
-      refreshing = null;
-    });
+  if (!token) return Promise.resolve('rejected');
+  refreshing = renew(token).finally(() => {
+    refreshing = null;
+  });
   return refreshing;
 }
 
@@ -78,7 +88,7 @@ async function authenticated<T>(call: () => Promise<T>): Promise<T> {
   try {
     return await call();
   } catch (e) {
-    if (e instanceof ApiError && e.status === 401 && e.code !== 'invalid_current_password') clearSession();
+    if (e instanceof ApiError && e.status === 401 && e.code !== 'invalid_current_password') clearSession(ownRefreshToken);
     throw e;
   }
 }
@@ -104,8 +114,8 @@ export const authStore = {
     if (!accounts()) return;
     const restore = status === 'anonymous' && readRefreshToken() !== null;
     if (restore) status = 'loading';
-    const [, ok] = await Promise.all([loadConfig(), restore ? refreshSession() : Promise.resolve(true)]);
-    if (!ok && status === 'loading') status = account ? 'authenticated' : 'anonymous';
+    const [, outcome] = await Promise.all([loadConfig(), restore ? refreshSession() : Promise.resolve('ok')]);
+    if (outcome !== 'ok' && status === 'loading') status = account ? 'authenticated' : 'anonymous';
   },
 
   register(input: RegisterInput): Promise<Account> {

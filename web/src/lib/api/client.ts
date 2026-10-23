@@ -20,9 +20,16 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * How a refresh ended: `ok` renewed the session; `rejected` means the server refused the refresh
+ * token, so the session is over; `unavailable` means no answer (network, 5xx), so the session may
+ * still be live and is kept for a later call to retry.
+ */
+export type RefreshOutcome = 'ok' | 'rejected' | 'unavailable';
+
 export interface AuthHooks {
   accessToken(): string | null;
-  refresh(): Promise<boolean>;
+  refresh(): Promise<RefreshOutcome>;
 }
 
 let hooks: AuthHooks | null = null;
@@ -97,9 +104,14 @@ export async function request<T>(method: Method, path: string, opts: RequestOpti
 
   if (resp.status === 401 && opts.auth && hooks) {
     const code = isRecord(body) && typeof body.error === 'string' ? body.error : '';
-    if (!NOT_A_SESSION_FAILURE.has(code) && (await hooks.refresh())) {
-      resp = await send(method, path, opts);
-      body = await readJson(resp);
+    if (!NOT_A_SESSION_FAILURE.has(code)) {
+      const outcome = await hooks.refresh();
+      // Not the 401: callers end the session on a 401, and nothing said this one is over.
+      if (outcome === 'unavailable') throw new ApiError(0, 'network_error', 'Could not renew the session');
+      if (outcome === 'ok') {
+        resp = await send(method, path, opts);
+        body = await readJson(resp);
+      }
     }
   }
 

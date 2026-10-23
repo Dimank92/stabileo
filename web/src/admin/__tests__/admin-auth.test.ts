@@ -219,6 +219,49 @@ describe('the admin auth store', () => {
     expect(storage.size).toBe(0);
   });
 
+  it('a refresh that lost the race to another tab retries with the token that tab stored', async () => {
+    const { adminAuth, adminApi } = await load();
+    on('POST /auth/login', () => json(200, session(1)));
+    on('GET /auth/me', () => json(401, { error: 'invalid_token', message: 'Expired' }), () => json(200, { data: ADMIN }));
+    on(
+      'POST /auth/refresh',
+      () => {
+        // The other tab rotated admin-refresh-1 first and stored its successor.
+        storage.set('stabileo-admin-refresh-token', 'admin-refresh-2');
+        return json(401, { error: 'refresh_failed', message: 'Already rotated' });
+      },
+      () => json(200, session(3)),
+    );
+    await adminAuth.login({ email: 'admin@stabileo.com', password: 'pw' });
+
+    await expect(adminAuth.call(() => adminApi.me())).resolves.toEqual(ADMIN);
+
+    expect(seen.filter((s) => s.route === 'POST /auth/refresh').map((s) => s.body)).toEqual([
+      { refresh_token: 'admin-refresh-1' },
+      { refresh_token: 'admin-refresh-2' },
+    ]);
+    expect(adminAuth.status).toBe('authenticated');
+    expect(adminAuth.endedBy).toBeNull();
+    expect(storage.get('stabileo-admin-refresh-token')).toBe('admin-refresh-3');
+  });
+
+  it('an unreachable refresh keeps the session and its token, and a later call recovers', async () => {
+    const { adminAuth, adminApi } = await load();
+    on('POST /auth/login', () => json(200, session(1)));
+    const expired = () => json(401, { error: 'invalid_token', message: 'Expired' });
+    on('GET /auth/me', expired, expired, () => json(200, { data: ADMIN }));
+    on('POST /auth/refresh', () => { throw new TypeError('Failed to fetch'); }, () => json(200, session(2)));
+    await adminAuth.login({ email: 'admin@stabileo.com', password: 'pw' });
+
+    await expect(adminAuth.call(() => adminApi.me())).rejects.toMatchObject({ status: 0, code: 'network_error' });
+    expect(adminAuth.status).toBe('authenticated');
+    expect(adminAuth.endedBy).toBeNull();
+    expect(storage.get('stabileo-admin-refresh-token')).toBe('admin-refresh-1');
+
+    await expect(adminAuth.call(() => adminApi.me())).resolves.toEqual(ADMIN);
+    expect(storage.get('stabileo-admin-refresh-token')).toBe('admin-refresh-2');
+  });
+
   it('call() leaves the session alone on a non-401 error', async () => {
     const { adminAuth, adminApi } = await load();
     on('POST /auth/login', () => json(200, session(1)));

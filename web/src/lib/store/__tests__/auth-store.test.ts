@@ -257,6 +257,85 @@ describe('the auth store', () => {
     expect(storage.size).toBe(0);
   });
 
+  it('a refresh that lost the race to another tab retries with the token that tab stored', async () => {
+    const { authStore } = await load();
+    on('POST /login', () => json(200, session(1)));
+    on('GET /me', () => json(401, { error: 'unauthorized', message: 'Token expired' }), () => json(200, { data: ADA }));
+    on(
+      'POST /refresh',
+      () => {
+        // The other tab rotated refresh-1 first and stored its successor.
+        storage.set('stabileo-refresh-token', 'refresh-2');
+        return json(401, { error: 'refresh_failed', message: 'Already rotated' });
+      },
+      () => json(200, session(3)),
+    );
+    await authStore.login({ email: 'ada@example.com', password: 'pw-pw-pw-pw' });
+
+    await expect(authStore.loadMe()).resolves.toEqual(ADA);
+
+    expect(seen.filter((s) => s.route === 'POST /refresh').map((s) => s.body)).toEqual([
+      { refresh_token: 'refresh-1' },
+      { refresh_token: 'refresh-2' },
+    ]);
+    expect(authStore.status).toBe('authenticated');
+    expect(storage.get('stabileo-refresh-token')).toBe('refresh-3');
+  });
+
+  it('a rejected refresh does not remove a token another tab stored meanwhile', async () => {
+    const { authStore } = await load();
+    on('POST /login', () => json(200, session(1)));
+    on('GET /me', () => json(401, { error: 'unauthorized', message: 'Token expired' }));
+    on(
+      'POST /refresh',
+      () => {
+        storage.set('stabileo-refresh-token', 'refresh-2');
+        return json(401, { error: 'refresh_failed', message: 'Already rotated' });
+      },
+      () => {
+        // ...and by the time this one is rejected, a third tab has rotated again.
+        storage.set('stabileo-refresh-token', 'refresh-3');
+        return json(401, { error: 'refresh_failed', message: 'Already rotated' });
+      },
+    );
+    await authStore.login({ email: 'ada@example.com', password: 'pw-pw-pw-pw' });
+
+    await expect(authStore.loadMe()).rejects.toMatchObject({ status: 401 });
+
+    expect(authStore.status).toBe('anonymous');
+    expect(storage.get('stabileo-refresh-token')).toBe('refresh-3');
+  });
+
+  it('an unreachable refresh keeps the session and its token, and a later call recovers', async () => {
+    const { authStore } = await load();
+    on('POST /login', () => json(200, session(1)));
+    const expired = () => json(401, { error: 'unauthorized', message: 'Token expired' });
+    on('GET /me', expired, expired, () => json(200, { data: ADA }));
+    on('POST /refresh', () => { throw new TypeError('Failed to fetch'); }, () => json(200, session(2)));
+    await authStore.login({ email: 'ada@example.com', password: 'pw-pw-pw-pw' });
+
+    await expect(authStore.loadMe()).rejects.toMatchObject({ status: 0, code: 'network_error' });
+    expect(authStore.status).toBe('authenticated');
+    expect(authStore.account).toEqual(ADA);
+    expect(storage.get('stabileo-refresh-token')).toBe('refresh-1');
+
+    await expect(authStore.loadMe()).resolves.toEqual(ADA);
+    expect(storage.get('stabileo-refresh-token')).toBe('refresh-2');
+  });
+
+  it('a refresh the server fails with a 5xx keeps the session and its token', async () => {
+    const { authStore } = await load();
+    on('POST /login', () => json(200, session(1)));
+    on('GET /me', () => json(401, { error: 'unauthorized', message: 'Token expired' }));
+    on('POST /refresh', () => json(503, { error: 'unavailable', message: 'Try again' }));
+    await authStore.login({ email: 'ada@example.com', password: 'pw-pw-pw-pw' });
+
+    await expect(authStore.loadMe()).rejects.not.toMatchObject({ status: 401 });
+
+    expect(authStore.status).toBe('authenticated');
+    expect(storage.get('stabileo-refresh-token')).toBe('refresh-1');
+  });
+
   it('a wrong current password keeps the session and does not refresh', async () => {
     const { authStore } = await load();
     on('POST /login', () => json(200, session(1)));

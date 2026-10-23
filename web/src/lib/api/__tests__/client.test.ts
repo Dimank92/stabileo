@@ -61,7 +61,7 @@ describe('the API client', () => {
 
   it('refreshes once on a 401 and retries with the new token', async () => {
     let token = 'stale';
-    const refresh = vi.fn(async () => { token = 'fresh'; return true; });
+    const refresh = vi.fn(async () => { token = 'fresh'; return 'ok' as const; });
     setAuthHooks({ accessToken: () => token, refresh });
     fetchMock
       .mockResolvedValueOnce(json(401, { error: 'unauthorized', message: 'Unauthorized' }))
@@ -75,7 +75,7 @@ describe('the API client', () => {
   });
 
   it('retries only once: a second 401 is thrown', async () => {
-    const refresh = vi.fn(async () => true);
+    const refresh = vi.fn(async () => 'ok' as const);
     setAuthHooks({ accessToken: () => 'tok', refresh });
     fetchMock
       .mockResolvedValueOnce(json(401, { error: 'unauthorized', message: 'Unauthorized' }))
@@ -89,8 +89,8 @@ describe('the API client', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('does not retry when the refresh fails', async () => {
-    const refresh = vi.fn(async () => false);
+  it('does not retry when the refresh is rejected', async () => {
+    const refresh = vi.fn(async () => 'rejected' as const);
     setAuthHooks({ accessToken: () => 'tok', refresh });
     fetchMock.mockResolvedValueOnce(json(401, { error: 'unauthorized', message: 'Unauthorized' }));
 
@@ -100,8 +100,20 @@ describe('the API client', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('throws a network error, not the 401, when the refresh got no answer', async () => {
+    const refresh = vi.fn(async () => 'unavailable' as const);
+    setAuthHooks({ accessToken: () => 'tok', refresh });
+    fetchMock.mockResolvedValueOnce(json(401, { error: 'unauthorized', message: 'Unauthorized' }));
+
+    const err = await request('GET', '/api/v1/auth/me', { auth: true }).catch((e) => e);
+
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err).toMatchObject({ status: 0, code: 'network_error' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('does not refresh on a 401 that is about the request, not the session', async () => {
-    const refresh = vi.fn(async () => true);
+    const refresh = vi.fn(async () => 'ok' as const);
     setAuthHooks({ accessToken: () => 'tok', refresh });
     fetchMock.mockResolvedValueOnce(json(401, { error: 'invalid_current_password', message: 'Wrong password' }));
 
@@ -112,7 +124,7 @@ describe('the API client', () => {
   });
 
   it('does not refresh on a public call', async () => {
-    const refresh = vi.fn(async () => true);
+    const refresh = vi.fn(async () => 'ok' as const);
     setAuthHooks({ accessToken: () => 'tok', refresh });
     fetchMock.mockResolvedValueOnce(json(401, { error: 'unauthorized', message: 'nope' }));
 
