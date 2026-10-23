@@ -2,7 +2,7 @@
 # A new worktree, ready to test in seconds: `make worktree NAME=fix-x [BASE=main]`.
 #
 #   ../stabileo-<name> on a new branch <name> from origin/<base>;
-#   web/node_modules cloned from the main checkout when the lockfiles match (an APFS/reflink copy:
+#   web/node_modules cloned from any checkout of the repository whose lockfile matches (an APFS/reflink copy:
 #   instant, no extra disk), otherwise `npm ci --prefer-offline`;
 #   the WASM engine from scripts/wasm-cached.sh (a copy when the engine sources were built before).
 #
@@ -20,10 +20,17 @@ here=$(cd "$(dirname "$0")" && pwd)
 git -C "$main" fetch -q origin "$base"
 git -C "$main" worktree add -q -b "$name" "$dir" "origin/$base"
 
-if [ -d "$main/web/node_modules" ] && cmp -s "$main/web/package-lock.json" "$dir/web/package-lock.json"; then
+# Any checkout of this repository (the main one or another worktree) whose lockfile matches.
+src=
+while IFS= read -r w; do
+  [ "$w" = "$dir" ] && continue
+  if [ -d "$w/web/node_modules" ] && cmp -s "$w/web/package-lock.json" "$dir/web/package-lock.json"; then src=$w; break; fi
+done < <(git -C "$main" worktree list --porcelain | sed -n 's/^worktree //p')
+
+if [ -n "$src" ]; then
   # -c: clonefile on macOS; --reflink=auto elsewhere (a plain copy where it is not supported).
-  cp -cR "$main/web/node_modules" "$dir/web/" 2>/dev/null || cp -R --reflink=auto "$main/web/node_modules" "$dir/web/"
-  echo "node_modules: cloned from $main"
+  cp -cR "$src/web/node_modules" "$dir/web/" 2>/dev/null || cp -R --reflink=auto "$src/web/node_modules" "$dir/web/"
+  echo "node_modules: cloned from $src"
 else
   (cd "$dir/web" && npm ci --prefer-offline --no-audit --no-fund >/dev/null)
   echo "node_modules: npm ci"

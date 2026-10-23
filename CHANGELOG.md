@@ -9,30 +9,7 @@ It should capture what changed, not what should be built next.
 
 ## Unreleased
 
-### Fixed
-
-#### Editing a spectrum retires the results solved on the old one (2026-10-21)
-
-A user spectrum feeds the spectral load cases of the main solve (#261), and the time history
-its own run, but `setDynamics` recorded on the views undo channel, which retires nothing, and
-the edit did not bump the model version: D + Ex solved on a 0.4 g spectrum stayed on screen
-after the spectrum became 0.8 g, live calc did not re-run, and undoing the edit kept the 0.8 g
-results (W3-01). The spectra and the time history are now a model edit: undoable, and the
-results on hand are retired on the edit, its undo and its redo; a write that changes nothing
-takes no step. Undo entries a session saved on the old channel restore them the same way.
-Test: `web/src/lib/store/__tests__/spectrum-edit-retires-results.test.ts`.
-
-#### PRO DXF of the envelope draws the envelope; no deformed shape for an envelope or SRSS set (2026-10-21)
-
-The DXF integrated the envelope's end forces as one load state: each end's largest force, from
-whichever combination gives it, with the first combination's member loads. On a portal whose
-wind combination is listed before the dead load the beam was drawn and labelled at 320.59 kN·m
-against an envelope peak of 49.16. It now draws the envelope's own positive and negative station
-curves, labelled and scaled from the envelope, as the figures do (#271); the same holds when the
-envelope is the set on screen. An envelope (each value from its own combination) and an SRSS or
-ABS set (magnitudes without a sign) are no deflected state: neither writes a deformed shape any
-more, and their reactions are written as values without an arrow. The RESULTS layer says what
-was left out (W4-01, W4-02).
+One file per change in [`changelog.d/`](changelog.d/README.md); `scripts/changelog.py --release` moves them here.
 
 ## 0.3.0 (2026-10-21)
 

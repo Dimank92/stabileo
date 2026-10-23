@@ -14,6 +14,20 @@ export const CURRENT_STAMP = {
 
 
 /**
+ * Acknowledge the re-check notice when opening a project solved with an earlier results version
+ * raises it (a committed fixture is, after every results-version bump). Specs about the notice
+ * itself (`recheck-provenance.spec.ts`) assert it instead.
+ */
+export async function acknowledgeRecheck(page: Page): Promise<void> {
+  const notice = page.getByTestId('recheck-notice');
+  if (await notice.waitFor({ state: 'visible', timeout: 5_000 }).then(() => true, () => false)) {
+    await page.getByTestId('recheck-ack').check();
+    await page.getByTestId('recheck-later').click();
+    await expect(notice).toBeHidden();
+  }
+}
+
+/**
  * Shared Playwright fixtures for the RC Design suite.
  *
  * Determinism rules encoded here:
