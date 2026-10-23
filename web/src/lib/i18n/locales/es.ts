@@ -4993,6 +4993,7 @@ const es: Record<string, string> = {
   'pro.bmStraight': 'Recto',
   'pro.bmHooked': 'C/ gancho',
   'pro.bmStirrup': 'Estribo',
+  'pro.bmCrosstie': "Traba",
   'pro.slabsTab': 'Losas',
   'pro.driftTab': 'Drift',
   'pro.cirsoc201': 'CIRSOC 201 — Hormigón armado',
