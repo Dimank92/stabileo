@@ -25,7 +25,7 @@
 import { modelStore, resultsStore, uiStore } from '../store';
 import { computeLocalAxes3D } from '../engine/local-axes-3d';
 import { projectNodeToScene, shouldProjectModelToXZ } from '../geometry/coordinate-system';
-import { computeDiagram3D, computeGlobalMax3D, getDiagramLocalDirection, type Diagram3DKind, type ElementDiagram3D } from '../engine/diagrams-3d';
+import { computeDiagram3D, computeGlobalMax3D, envelopeDiagrams3D, getDiagramLocalDirection, type Diagram3DKind, type ElementDiagram3D } from '../engine/diagrams-3d';
 import { computeDiagramDisplayDirection } from '../three/diagram-render-3d';
 import { computeDeformedShape3DPair, type ElementEI } from '../three/deformed-shape-3d';
 import { eiOf } from '../engine/member-deflection';
@@ -82,8 +82,11 @@ const COLORS: Record<string, { fill: string; stroke: string }> = {
 };
 const SYM: Record<Diagram3DKind, string> = { momentY: 'My', momentZ: 'Mz', shearY: 'Vy', shearZ: 'Vz', axial: 'N', torsion: 'T' };
 
-/** Match the figure's result, including a named envelope or an export of a set off screen. */
-function envelopeOf(r: AnalysisResults3D): FullEnvelope3D | undefined {
+/**
+ * The envelope a result is the largest values of, a named one or the store's, on screen or not;
+ * undefined for a load state. Figures and the DXF draw its station curves (`figureDiagrams`).
+ */
+export function envelopeOf(r: AnalysisResults3D): FullEnvelope3D | undefined {
   return [resultsStore.fullEnvelope3D, resultsStore.envelope3D].find((e) => e?.maxAbsResults3D === r) ?? undefined;
 }
 
@@ -94,19 +97,7 @@ function diagramMax(r: AnalysisResults3D, kind: Diagram3DKind): number {
 /** Envelope end forces are not a load state: draw both station envelopes directly. */
 function figureDiagrams(r: AnalysisResults3D, ef: ElementForces3D, kind: Diagram3DKind): ElementDiagram3D[] {
   const env = envelopeOf(r);
-  if (!env) return [computeDiagram3D(ef, kind)];
-  const e = env[kind].elements.find((e) => e.elementId === ef.elementId);
-  if (!e) return [];
-  return [e.posValues, e.negValues].map((values) => {
-    let maxValue = -Infinity, minValue = Infinity, maxAbsValue = 0;
-    const points = e.tPositions.map((t, i) => {
-      const value = values[i] ?? 0;
-      maxValue = Math.max(maxValue, value); minValue = Math.min(minValue, value);
-      if (Math.abs(value) > Math.abs(maxAbsValue)) maxAbsValue = value;
-      return { t, value };
-    });
-    return { elementId: ef.elementId, points, maxValue, minValue, maxAbsValue };
-  }).filter((d) => d.points.length > 0);
+  return env ? envelopeDiagrams3D(env[kind], ef.elementId) : [computeDiagram3D(ef, kind)];
 }
 
 /** The diagram components a content draws: both planes when both carry something. */

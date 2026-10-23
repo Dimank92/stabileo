@@ -19,10 +19,8 @@
         erlang = pkgs.beam.interpreters.erlang_27;
         elixir = pkgs.beam.packages.erlang_27.elixir_1_18;
 
-        rustToolchain = pkgs.rust-bin.stable.latest.default.override {
-          extensions = [ "rust-src" "rust-analyzer" "clippy" "rustfmt" ];
-          targets = [ "wasm32-unknown-unknown" ];
-        };
+        # The one toolchain, shared with rustup and every CI job (scripts/check-pins.sh).
+        rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
       in
       {
         devShells.default = pkgs.mkShell {
@@ -32,8 +30,10 @@
             pkgs.wasm-pack
             pkgs.cargo-watch
             pkgs.cargo-nextest
+            # Compiled crates shared by every worktree (RUSTC_WRAPPER below).
+            pkgs.sccache
 
-            # Node / frontend
+            # Node / frontend: the major in .nvmrc, which CI reads.
             pkgs.nodejs_22
             pkgs.nodePackages.npm
 
@@ -80,6 +80,8 @@
             # Playwright checks browser libraries with the ldd on PATH, which here is the shell's and cannot see the system's.
             export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1
           '';
+
+          RUSTC_WRAPPER = "sccache";
 
           LANG = "en_US.UTF-8";
           LC_ALL = "en_US.UTF-8";

@@ -247,6 +247,12 @@ pub enum DiagnosticCode {
     /// A known issue that can make this result wrong, contained until it is fixed
     /// (`known_issues.rs`): the finding id in `phase`, the issue number in `value`.
     KnownIssue,
+    /// A frame or truss thermal load was solved with a default the input did not state:
+    /// `phase` "alpha" (α = 12·10⁻⁶ /°C assumed) or "depth" (√(12·I/A) assumed for a gradient).
+    ThermalDefaultAssumed,
+    /// A cable's own weight gives it over a quarter of its tension with its drawn chord as its
+    /// unstressed length (#527): `value` the largest share, `threshold` the quarter.
+    CableSelfWeightTension,
 }
 
 /// A structured diagnostic with enum code, severity, optional element/node
@@ -372,6 +378,8 @@ impl From<&StructuredDiagnostic> for SolverDiagnostic {
             DiagnosticCode::NoFreeDofs | DiagnosticCode::LocalMechanism | DiagnosticCode::SingularMatrix | DiagnosticCode::DisconnectedNode | DiagnosticCode::NearDuplicateNodes | DiagnosticCode::InstabilityRisk | DiagnosticCode::ShellDistortion | DiagnosticCode::SuspiciousLocalAxis | DiagnosticCode::ExcessiveDisplacement | DiagnosticCode::StiffnessNotPositiveDefinite => "model_quality",
             DiagnosticCode::ConflictingConstraints | DiagnosticCode::CircularConstraint | DiagnosticCode::OverConstrainedDof => "constraints",
             DiagnosticCode::KnownIssue => "known_issue",
+            DiagnosticCode::ThermalDefaultAssumed => "assumption",
+            DiagnosticCode::CableSelfWeightTension => "assumption",
         };
         let severity = match sd.severity {
             Severity::Info => "info",

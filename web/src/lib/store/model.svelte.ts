@@ -1,3 +1,4 @@
+import { migrateArcLocalAxes } from '../model/curved-member';
 import {
   defaultCodeSettings, migrateCodeSettings, type ProjectCodeSettings,
 } from '../codes/project-code-settings';
@@ -81,6 +82,8 @@ export interface Material {
   nu: number;
   rho: number; // kN/m³
   fy?: number; // MPa (yield stress for stress verification)
+  /** MPa: ultimate tensile strength. The steel checks read it (rupture, bearing, net section). */
+  fu?: number;
   /**
    * Coefficient of thermal expansion, 1/°C. Absent: the family's (`engine/thermal-alpha.ts`),
    * and the engine's 1,2·10⁻⁵ when the family cannot be told.
@@ -527,6 +530,11 @@ export interface Element extends Element3DMetadata {
   /** Inactive, tension only or compression only (`engine/member-behaviour.ts`). Absent: linear. */
   behaviour?: import('../engine/member-behaviour').MemberBehaviour;
   /**
+   * A cable's pretension, kN: its tension on the drawn chord under its own weight alone, from
+   * which the engine sets its unstressed length (#527). Absent: the chord is the unstressed length.
+   */
+  cablePretension?: number;
+  /**
    * The members this one lies over and was kept with ("Keep both" on the overlap question,
    * `model/edit/connection-questions.ts`): not asked about again, on this open or the next.
    * Read only by that question; the analysis and the diagnostics do not look at it.
@@ -548,7 +556,16 @@ export interface Element extends Element3DMetadata {
    * See `lib/model/curved-member.ts`. Carries no analysis meaning: the solver
    * sees straight members and is not told about this.
    */
-  arc?: { id: number; spec: import('../model/curved-member').ArcSpec };
+  arc?: {
+    id: number; spec: import('../model/curved-member').ArcSpec;
+    /**
+     * 1: the member's local axes were set by the arc rule of #418 (`arcMemberLocalY`) — when it
+     * was built, or by the one-time read-migration of an arc saved before. Absent: an arc from
+     * before #418, which `migrateArcLocalAxes` migrates once. Never migrated again after that, so
+     * a member set back to automatic axes stays automatic through undo, redo and reopening.
+     */
+    axes?: 1;
+  };
   /**
    * Stated unbraced length for lateral-torsional buckling, m — where the member is braced
    * against it more often than its geometry shows. Replaces the deduced `Lb`, never `L`; see
@@ -1399,6 +1416,10 @@ function createModelStore() {
     nu: 0.3,
     rho: 78.5,
     fy: 250,
+    // ASTM A36's minimum, as the grade catalogue has it (`data/structural-grades.ts`). Without it
+    // every steel check of a new model, the bundled examples included, read "not evaluated: the
+    // material lacks Fu", which is what a first user met on opening the steel design.
+    fu: 400,
   };
 
   const defaultSection: Section = {
@@ -2317,6 +2338,20 @@ function createModelStore() {
           }
         }
       }
+      // Arcs drawn before #418 (SP-15) left their members on the default local axes, which turn
+      // the near-vertical members of an arch by 90°: they take the arc's own orientation. Not a
+      // member any load or support refers to: its local data would change direction with it.
+      const referenced = new Set<number>();
+      for (const l of model.loads) {
+        const d = l.data as { elementId?: unknown; elementIds?: unknown } | undefined;
+        if (typeof d?.elementId === 'number') referenced.add(d.elementId);
+        if (Array.isArray(d?.elementIds)) for (const id of d.elementIds) if (typeof id === 'number') referenced.add(id);
+      }
+      for (const sp of model.supports.values()) {
+        const id = (sp as { dofLocalElementId?: unknown }).dofLocalElementId;
+        if (typeof id === 'number') referenced.add(id);
+      }
+      migrateArcLocalAxes(model.elements, model.nodes, (id) => referenced.has(id));
       model.loadCases = s.loadCases
         ? s.loadCases.map(c => ({ type: (c as any).type ?? inferLoadCaseType(c.name), ...c }))
         : [{ id: 1, type: 'D' as LoadCaseType, name: 'Dead Load' }, { id: 2, type: 'L' as LoadCaseType, name: 'Live Load' }, { id: 3, type: 'W' as LoadCaseType, name: 'Wind' }, { id: 4, type: 'E' as LoadCaseType, name: 'Earthquake' }];

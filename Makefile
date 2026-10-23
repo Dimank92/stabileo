@@ -1,6 +1,6 @@
 .PHONY: help install-nix shell setup setup.run git.setup deps backend.run console routes \
        lint.engine check.engine.acceptance-models test.engine.gates test.engine.metamorphic test.engine.suite bench.engine \
-       web.deps typecheck.web test.web.unit test.web.build test.web.determinism e2e.web.setup e2e.web.smoke e2e.web.slow e2e.web.visual \
+       web.deps typecheck.web test.web.unit test.web.build test.web.determinism e2e.web.setup e2e.web.build e2e.web.smoke e2e.web.slow e2e.web.visual \
        test.ci-scripts \
        test test.engine test.backend test.backend.file test.web test.ai-backend test.inventory \
        lint.backend format format.backend \
@@ -12,6 +12,7 @@
        services services.stop postgres.start postgres.stop \
        inst inst.check inst.claim inst.release inst.list ports \
        docker.build docker.up docker.down \
+       check-pins check.changelog worktree worktree-prune \
        fmt check clean
 
 NIX_RUN = nix develop --command
@@ -51,6 +52,8 @@ help:
 	@echo "  make install-nix    - Install Nix (Determinate Systems installer)"
 	@echo "  make shell          - Enter the nix development shell"
 	@echo "  make setup          - First-time setup: claim an instance, start PostgreSQL, fetch deps, create the DB"
+	@echo "  make worktree NAME=fix-x [BASE=main] - A worktree ready to test in seconds"
+	@echo "  make worktree-prune - Remove worktrees that are clean and already on origin/main"
 	@echo ""
 	@echo "Development:"
 	@echo "  make backend.run    - Start the Phoenix backend (port 4100 + INST*10)"
@@ -70,6 +73,8 @@ help:
 	@echo "  make test.ai-backend - Legacy Rust AI backend tests"
 	@echo ""
 	@echo "CI-shaped targets (what each CI job runs):"
+	@echo "  make check-pins           - One version of each tool in rust-toolchain.toml, .nvmrc, flake.nix and CI"
+	@echo "  make check.changelog      - changelog.d/ fragments are well formed"
 	@echo "  make lint.engine          - Clippy over the engine"
 	@echo "  make test.engine.gates    - The named engine correctness gates"
 	@echo "  make test.engine.metamorphic - Metamorphic tests, in release"
@@ -79,6 +84,7 @@ help:
 	@echo "  make test.web.unit [SHARD=1/2] - Vitest unit pass"
 	@echo "  make test.web.build       - Production build + build-pass tests"
 	@echo "  make test.web.determinism - WASM results bit-identical across Node and three browsers"
+	@echo "  make e2e.web.build        - The VITE_E2E=1 site the e2e suites run on with E2E_PREBUILT=1"
 	@echo "  make e2e.web.smoke [SHARD=1/5] - Playwright smoke suite"
 	@echo "  make e2e.web.slow / e2e.web.visual - The heavier Playwright suites"
 	@echo "  make lint.backend   - Format check and credo over the backend"
@@ -223,6 +229,11 @@ test.web.determinism:
 e2e.web.setup:
 	$(NIX_RUN) bash -c "cd web && npx playwright install chromium"
 
+# The site the e2e suites test with E2E_PREBUILT=1: VITE_E2E=1 compiles the read-only test hooks in,
+# and web/playwright.config.ts refuses a prebuilt dist without the marker. Needs make e2e.web.setup.
+e2e.web.build:
+	$(NIX_RUN) bash -c 'cd web && VITE_E2E=1 npm run build && echo "VITE_E2E=1 build of $${GITHUB_SHA:-$$(git rev-parse HEAD)}" > dist/e2e-build.txt'
+
 # SHARD=i/n picks whole spec files balanced by measured duration (web/scripts/e2e-shard.mjs).
 e2e.web.smoke:
 	$(NIX_RUN) bash -c 'cd web && npx playwright test --grep @smoke $(if $(SHARD),$$(node scripts/e2e-shard.mjs $(subst /, ,$(SHARD))))'
@@ -261,6 +272,14 @@ test.inventory:
 			printf "total registered: %d\n", eng + ref; \
 		}'
 
+## One version of each tool everywhere (rust-toolchain.toml, .nvmrc, flake.nix, CI)
+check-pins:
+	scripts/check-pins.sh
+
+## Unreleased changes are one file each in changelog.d/ (scripts/changelog.py)
+check.changelog:
+	$(NIX_RUN) python3 -I scripts/changelog.py --check
+
 test.ci-scripts:
 	$(NIX_RUN) bash -c 'shellcheck -S warning .github/scripts/*.sh'
 
@@ -273,9 +292,17 @@ format.backend:
 
 format: format.backend fmt
 
-## Build the WASM engine for the frontend
+## Build the WASM engine for the frontend (a copy from the cache when these sources were built before)
 wasm:
-	cd engine && $(NIX_RUN) wasm-pack build --target web --out-dir ../web/src/lib/wasm --no-opt
+	$(NIX_RUN) scripts/wasm-cached.sh
+
+## A new worktree ready to test in seconds: make worktree NAME=fix-x [BASE=main]
+worktree:
+	scripts/worktree.sh $(NAME) $(or $(BASE),main)
+
+## Remove the worktrees that are clean and already on origin/main (never forces)
+worktree-prune:
+	scripts/worktree-prune.sh
 
 web.setup:
 	$(NIX_RUN) bash -c "cd web && npm install"

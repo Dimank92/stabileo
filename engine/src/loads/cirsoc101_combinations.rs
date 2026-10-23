@@ -262,8 +262,8 @@ fn principal(basic: u8) -> &'static [LoadSymbol] {
     match basic {
         2 => &[LoadSymbol::L],
         3 => &[LoadSymbol::Lr, LoadSymbol::S, LoadSymbol::R],
-        4 => &[LoadSymbol::W],
-        5 => &[LoadSymbol::E],
+        4 | 6 => &[LoadSymbol::W],
+        5 | 7 => &[LoadSymbol::E],
         _ => &[],
     }
 }
@@ -387,6 +387,14 @@ pub fn generate_combinations(i: &CombinationInputs) -> Vec<Combination> {
     if p.e {
         push(&mut out, 7, String::new(), vec![term(D, 0.9), term(E, 1.0)], vec![ref_basic()], vec![]);
     }
+    // With H and neither W nor E, 6 and 7 with their principal load not acting are 0,9 D + H: the
+    // check where the dead load resists the earth pressure (a retaining wall). Nothing else in the
+    // set reaches it, since every other combination has D at 1,2 or 1,4.
+    if p.h && !p.w && !p.e {
+        let refs = vec![ref_basic(), cref("cirsoc-101", "2025", "2.3.2", "efectos de cargas que no estén actuando")];
+        let notes = vec![note_with("loads.cirsoc101.note.notActing", json!({ "loads": "W, E" }))];
+        push(&mut out, 6, "-noWE".to_string(), vec![term(D, 0.9)], refs, notes);
+    }
 
     // §2.3.2: the effects of one or more loads not acting.
     if i.not_acting.unwrap_or(true) {
@@ -398,10 +406,13 @@ pub fn generate_combinations(i: &CombinationInputs) -> Vec<Combination> {
             if prin.is_empty() {
                 continue;
             }
+            // With H in it, the principal load is droppable too: 1,2 D + 1,6 H is not between
+            // 1,4 D and a printed combination when D and H act in opposite senses (LOADS.md).
+            let with_h = c.terms.iter().any(|t| t.symbol == H && t.factor != 0.0);
             let companions: Vec<LoadSymbol> = c
                 .terms
                 .iter()
-                .filter(|t| is_companion(t.symbol) && !prin.contains(&t.symbol) && t.factor != 0.0)
+                .filter(|t| is_companion(t.symbol) && (with_h || !prin.contains(&t.symbol)) && t.factor != 0.0)
                 .map(|t| t.symbol)
                 .collect();
             if !c.terms.iter().any(|t| prin.contains(&t.symbol)) {

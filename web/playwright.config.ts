@@ -71,6 +71,18 @@ const HOST = '127.0.0.1';
  * configs. A stale answer here is safe in one direction only, so when in
  * doubt it rebuilds.
  */
+/**
+ * CI builds the E2E site once (the `site-e2e` job) and every shard serves that build:
+ * `E2E_PREBUILT=1` skips the build here. Only a VITE_E2E=1 build carries the hooks the tests
+ * drive, so the job leaves a marker in it, and a prebuilt dist without the marker is refused
+ * rather than served (a production dist would time every PRO fixture out, as it once did).
+ */
+const PREBUILT = process.env.E2E_PREBUILT === '1';
+export const E2E_BUILD_MARKER = 'e2e-build.txt';
+if (PREBUILT && !existsSync(resolve(fileURLToPath(new URL('.', import.meta.url)), 'dist', E2E_BUILD_MARKER))) {
+  throw new Error(`E2E_PREBUILT=1 but dist/${E2E_BUILD_MARKER} is missing: dist is not a VITE_E2E=1 build`);
+}
+
 function distIsStale(): boolean {
   const root = fileURLToPath(new URL('.', import.meta.url));
   const dist = resolve(root, 'dist', 'index.html');
@@ -174,7 +186,9 @@ export default defineConfig({
     // VITE_E2E=1 is what compiles the read-only test hooks into the bundle. A normal
     // `npm run build` omits them entirely, so a production artifact can never expose
     // `window.__stabileo` — proved by src/lib/utils/__tests__/e2e-hook-gating.test.ts.
-    command: `VITE_E2E=1 npm run build && npx vite preview --port ${PORT} --host ${HOST} --strictPort`,
+    command: PREBUILT
+      ? `npx vite preview --port ${PORT} --host ${HOST} --strictPort`
+      : `VITE_E2E=1 npm run build && npx vite preview --port ${PORT} --host ${HOST} --strictPort`,
     url: BASE_URL,
     /*
      * An explicit E2E_PORT means "give me my own server", so reuse is off for
@@ -185,7 +199,12 @@ export default defineConfig({
      * waiting for hooks that bundle does not contain.
      */
     reuseExistingServer: !process.env.CI && !process.env.E2E_PORT && !distIsStale(),
-    timeout: 240_000,
+    /*
+     * The command builds the whole site, prerender included, before serving it. On a busy CI
+     * runner that passed 240 s twice on 2026-10-22 ("Timed out waiting 240000ms from
+     * config.webServer"), failing a shard before any test ran; 10 minutes leaves room.
+     */
+    timeout: PREBUILT ? 60_000 : 600_000,
     stdout: 'pipe',
     stderr: 'pipe',
   },
