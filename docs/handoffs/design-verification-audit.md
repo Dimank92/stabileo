@@ -6,6 +6,81 @@ entre las alternativas que explora el diseño y las geometrías que finalmente c
 La prioridad es cerrar esa distancia y medir todos los bloqueos físicos antes de ampliar
 presupuestos de búsqueda.
 
+## Conservar las filas verificadas antes de redistribuirlas
+
+La coordinación compartía posiciones entre los grupos superiores e inferiores. Conservaba
+la cantidad y el diámetro totales, pero podía cambiar las poblaciones por capa que el diseño
+había verificado. La lectura de los tramos rectos en el centro de cada viga muestra:
+
+| Viga | Inferior verificado | Inferior generado antes | Inferior retenido ahora |
+| --- | --- | --- | --- |
+| 224 | 8+5 Ø10 | 7+6 Ø10 | 8+5 Ø10 |
+| 225 | 8+5 Ø10 | 6+6+1 Ø10 | 8+5 Ø10 |
+| 328 | 8+2 Ø10 | 6+4 Ø10 | 8+2 Ø10 |
+
+El operador opt-in `preserveBottomRows` ofrece la distribución ya verificada con la instrucción
+de conservar sus filas durante el detallado. No aumenta área, cambia diámetros ni modifica
+ganchos o terminaciones. Es una alternativa física que se vuelve a verificar: no se impone a
+todos los miembros porque la disposición propia puede chocar con sus vecinos. Se aplica a
+filas uniformes de dos o tres capas; omite filas ya preservadas, grupos múltiples, tramos
+compuestos y miembros bloqueados por el usuario. Comparte el presupuesto y los controles
+globales de regresión de los operadores existentes.
+
+Sobre el audit de `f430f371c`, `preserveBottomRows` seguido de `redistributeLayers` dentro de
+cada miembro produce estas aceptaciones, con 16 detallados y 16 verificaciones nominales:
+
+| Propuesta aceptada | Bloqueantes después |
+| --- | ---: |
+| Estado anterior | 1092 |
+| Conservar 225 en 8+5 | 974 |
+| Conservar 224 en 8+5 | 960 |
+| Conservar 328 en 8+2 | 926 |
+| Redistribuir 227 a 6+5 | 920 |
+
+Son **172 bloqueos menos (15,8%)**, conservando las 140 identidades aprobadas y sin nuevos
+análisis estructurales durante la búsqueda. No agrega miembros aprobados: los afectados
+todavía tienen otros conflictos. Ningún aprobado participa en bloqueos y la regeneración sin
+búsqueda reproduce exactamente el resultado. La restauración de filas por sí sola llega a 926;
+los últimos seis bloqueos los elimina el operador de redistribución existente.
+
+Esto corrige el diagnóstico anterior de 225: las cuatro esquinas chocaban en su jaula
+**generada 6+6+1**, no se había demostrado que la jaula nominal 8+5 fuera inviable. Conservar
+8+5 permite cerrar los estribos sin los choques que la alternativa 7+6 producía en columna 43.
+Análogamente, cambiar la distribución inferior de 328 deja una esquina libre para el cierre
+que antes chocaba con sus barras superiores. Probar el armado ya dimensionado antes de
+modificarlo resulta esencial en estos casos.
+
+El resultado retenido tiene 545 pares superiores, 131 inferiores, 97 otros longitudinales y
+147 longitudinal/transversal: 920 en total. Las líneas superiores de 235–238 siguen siendo
+la mayor concentración. Persisten las condiciones de empalme, generación y resistencia
+identificadas abajo. No se afirma haber agotado las alternativas: la búsqueda llega a su
+presupuesto de 16 detallados.
+
+Pasan 138 pruebas dirigidas en cinco suites, incluyendo la reproducción 8+5 → 6+6+1, la
+conservación de grupos y anclajes y el rechazo de una mejora local que bloquea un vecino.
+Typecheck no agrega errores (442 existentes frente a baseline 443).
+
+La secuencia completa desde cero también pasa con **140 aprobados y 920 bloqueantes**,
+conserva las 140 identidades y reproduce los veredictos y conflictos al regenerar. La etapa
+nueva acepta los mismos cuatro miembros de la reconstrucción. El test completo consumió
+899,79 s en esta ejecución local, incluyendo todas las etapas previas; ese tiempo no es una
+garantía de rendimiento. El timeout del experimento con la etapa adicional deja margen para
+máquinas más lentas. La búsqueda de conservación/redistribución mantiene el límite de
+16 detallados y 128 verificaciones nominales; consumió 16 de cada una.
+
+Reproducción completa desde `web/`, agregando la nueva etapa al final:
+
+```sh
+STABILEO_CONTINUITY_EXPERIMENT=64 STABILEO_BOTTOM_EXPERIMENT=1 STABILEO_CATALOG_EXPERIMENT=64 STABILEO_ROW_PRESERVATION=16 STABILEO_CONTINUITY_AUDIT=/tmp/design-preserve-audit.json npx vitest run --project unit src/lib/store/__tests__/design-continuity-experiment.test.ts
+```
+
+Para continuar directamente desde el audit anterior, el experimento admite operadores
+separados por comas y mantiene el orden indicado:
+
+```sh
+STABILEO_REPAIR_SNAPSHOT=/tmp/design-generator-final-audit.json STABILEO_REPAIR_OPERATOR=preserveBottomRows,redistributeLayers STABILEO_REPAIR_RUNS=16 STABILEO_REPAIR_AUDIT=/tmp/design-preserve-audit.json npx vitest run --project unit src/lib/store/__tests__/design-next-conflicts-experiment.test.ts
+```
+
 ## Correcciones del generador — 23 de octubre
 
 Tres errores reproducidos en la generación de geometría:

@@ -39,6 +39,28 @@ function input(over: Partial<BeamGenerationInput> = {}): BeamGenerationInput {
 }
 
 describe('provided bottom rows reach the fabricated cage', () => {
+  it('restores a verified 8+5 bottom cage instead of borrowing a 6+6+1 layout from the top', () => {
+    const row = [-0.133778, -0.080267, -0.026756, 0.026756, 0.080267, 0.133778];
+    const build = (rowCounts?: number[]) => generateBeamBars(input({
+      b: 0.35, h: 0.65, bottom: { count: 13, diameterMm: 10, rowCounts },
+      topStart: { count: 24, diameterMm: 10 }, topEnd: { count: 24, diameterMm: 10 },
+      transverseSlots: [...row, ...row, ...row, ...row],
+      transverseLayers: [0, 1, 2, 3].flatMap(layer => row.map(() => layer)),
+      bentUp: { seismicDesign: 'notRequired', optOut: true },
+    }));
+    const rows = (g: ReturnType<typeof build>) => {
+      const counts: number[] = [];
+      for (const bar of g.bars.filter(b => b.id.includes('-bot-'))) {
+        counts[g.barLayers[bar.id]] = (counts[g.barLayers[bar.id]] ?? 0) + 1;
+      }
+      return counts;
+    };
+    expect(rows(build())).toEqual([6, 6, 1]);
+    const restored = build([8, 5]);
+    expect(rows(restored)).toEqual([8, 5]);
+    expect(restored.bars.filter(b => b.id.includes('-bot-')).every(b => b.diameterMm === 10)).toBe(true);
+  });
+
   it.each([[2, 4], [3, 2], [7, -1], [2.5, 3.5]])('does not certify an invalid prescribed population %j', (...rowCounts) => {
     expect(layoutBarRow({ count: 6, diameterMm: 16, rowCounts,
       clearWidth: 0.23, minClear: 0.025, layerClear: 0.025,

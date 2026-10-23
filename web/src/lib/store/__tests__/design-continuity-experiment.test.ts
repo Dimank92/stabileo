@@ -9,6 +9,7 @@ import * as feedback from '../../engine/detailing/design-feedback-loop';
 it.runIf(!!process.env.STABILEO_CONTINUITY_EXPERIMENT)('repairs beam continuity and preserves physical approvals', async () => {
   const bottom = !!process.env.STABILEO_BOTTOM_EXPERIMENT;
   const catalogRuns = Number(process.env.STABILEO_CATALOG_EXPERIMENT ?? 0);
+  const rowRuns = Number(process.env.STABILEO_ROW_PRESERVATION ?? 0);
   const line = bottom || !!process.env.STABILEO_LINE_EXPERIMENT;
   const maxDetailingRuns = Number(process.env.STABILEO_CONTINUITY_EXPERIMENT);
   const run = feedback.runDesignFeedbackLoop;
@@ -39,11 +40,16 @@ it.runIf(!!process.env.STABILEO_CONTINUITY_EXPERIMENT)('repairs beam continuity 
   if (catalogRuns) expect(detailingStore.generate({ physicalSearch: {
     maxDetailingRuns: catalogRuns, maxMemberSearches: 768, operators: ['harmonizeTopCatalog'],
   } }), detailingStore.lastError ?? '').not.toBeNull();
+  const catalog = currentFrameDesignQuality();
+  const catalogStats = detailingStore.lastFeedbackLoop!.physicalSearch!.stats;
+  if (rowRuns) expect(detailingStore.generate({ physicalSearch: {
+    maxDetailingRuns: rowRuns, maxMemberSearches: 128, operators: ['preserveBottomRows', 'redistributeLayers'],
+  } }), detailingStore.lastError ?? '').not.toBeNull();
   const after = currentFrameDesignQuality();
   const search = detailingStore.lastFeedbackLoop!.physicalSearch!;
   const evidence = { before, after, elapsedMs, trials: search.trials, stats: search.stats,
     termination: search.termination, changed: search.changed, continuity,
-    continuityStats: continuitySearch.stats };
+    continuityStats: continuitySearch.stats, catalog, catalogStats };
   writeFileSync('/tmp/design-continuity-search.json', JSON.stringify(evidence));
   if (process.env.STABILEO_CONTINUITY_AUDIT) writeFileSync(process.env.STABILEO_CONTINUITY_AUDIT, JSON.stringify({
     ...evidence, members: [...verificationStore.contexts].map(([id, ctx]) => ({ id, kind: ctx.elementType,
@@ -56,6 +62,7 @@ it.runIf(!!process.env.STABILEO_CONTINUITY_EXPERIMENT)('repairs beam continuity 
   expect(after.verifiedIds).toEqual(expect.arrayContaining(before.verifiedIds));
   expect(after.verifiedIds).toEqual(expect.arrayContaining(seeded.verifiedIds));
   expect(after.verifiedIds).toEqual(expect.arrayContaining(continuity.verifiedIds));
+  expect(after.verifiedIds).toEqual(expect.arrayContaining(catalog.verifiedIds));
   expect(after.output.passingWithBlockingConflicts).toEqual([]);
   expect(after.output.exhausted).toBe(before.output.exhausted);
   expect(after.output.provisional).toBe(before.output.provisional);
@@ -84,6 +91,7 @@ it.runIf(!!process.env.STABILEO_CONTINUITY_EXPERIMENT)('repairs beam continuity 
         152, 153, 154, 155, 156, 157, 158, 159, 160, 185, 201, 202, 211, 212, 213, 285, 286,
         287, 288, 289, 290, 291, 292, 293, 294, 295, 296, 316, 317, 318, 319, 320, 321, 322, 323]));
       expect(after.output.blockingConflicts).toBeLessThanOrEqual(1092);
+      if (rowRuns === 16) expect(after.output.blockingConflicts).toBeLessThanOrEqual(920);
       expect(after.verifiedIds.filter(id => verificationStore.contexts.get(id)?.elementType === 'beam').length).toBeGreaterThanOrEqual(26);
     }
   } else if (line && maxDetailingRuns >= 80) {
@@ -94,4 +102,4 @@ it.runIf(!!process.env.STABILEO_CONTINUITY_EXPERIMENT)('repairs beam continuity 
   const replay = currentFrameDesignQuality();
   expect(replay.verifiedIds).toEqual(after.verifiedIds);
   expect(replay.output).toEqual(after.output);
-}, 900_000);
+}, process.env.STABILEO_ROW_PRESERVATION ? 1_200_000 : 900_000);

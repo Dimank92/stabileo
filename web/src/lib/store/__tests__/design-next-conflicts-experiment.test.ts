@@ -78,7 +78,8 @@ it.runIf(!!process.env.STABILEO_REPAIR_SNAPSHOT)('reverifies a retained reinforc
   try {
     if (runs) expect(detailingStore.generate({ physicalSearch: {
       maxDetailingRuns: Number(runs), maxMemberSearches: 512,
-      operators: [(process.env.STABILEO_REPAIR_OPERATOR ?? 'harmonizeTopCatalog') as PhysicalRepairOperator],
+      operators: (process.env.STABILEO_REPAIR_OPERATOR ?? 'harmonizeTopCatalog')
+        .split(',').map(s => s.trim()) as PhysicalRepairOperator[],
     } }), detailingStore.lastError ?? '').not.toBeNull();
   } finally { spy?.mockRestore(); }
   const after = currentFrameDesignQuality();

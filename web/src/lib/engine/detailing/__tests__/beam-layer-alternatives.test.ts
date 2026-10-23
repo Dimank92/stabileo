@@ -14,6 +14,29 @@ function cage(counts = [4, 2]): ProvidedReinforcement {
 }
 
 describe('repairs starting from existing beam layers', () => {
+  it('offers the certified populations themselves before changing them', () => {
+    const ctx = syntheticBeamContext(), input = cage();
+    const before = JSON.stringify(input);
+    const [proposal] = [...beamLayerAlternatives(ctx, input, true)];
+    expect(proposal.counts).toEqual([4, 2]);
+    expect(proposal.reinforcement).toEqual({ ...input, regions: { ...input.regions, preserveBottomRows: true } });
+    expect(JSON.stringify(input)).toBe(before);
+    expect([...beamLayerAlternatives(ctx, proposal.reinforcement, true)]).toEqual([]);
+    expect([...beamLayerAlternatives(ctx, cage([2, 4]), true)]).toEqual([]);
+    expect([...beamLayerAlternatives({ ...ctx, span: {} as never }, input, true)]).toEqual([]);
+  });
+
+  it('preserves authoritative groups, cutoffs and hooks in a placement-only proposal', () => {
+    const input = cage();
+    input.regions!.bottomGroups = [{ layers: input.regions!.bottomSpanLayers!,
+      continueStart: false, extensionStart: 0.4, anchorageEnd: 'hook' }];
+    const [proposal] = [...beamLayerAlternatives(syntheticBeamContext(), input, true)];
+    expect(proposal.reinforcement.regions!.bottomGroups).toEqual(input.regions!.bottomGroups);
+    expect(proposal.reinforcement.regions!.bottomSpanLayers).toEqual(input.regions!.bottomSpanLayers);
+    input.regions!.bottomGroups.push({ layers: [{ count: 2, row: 0, diameter: 12 }] });
+    expect([...beamLayerAlternatives(syntheticBeamContext(), input, true)]).toEqual([]);
+  });
+
   it('preserves steel, diameters, regions and the input while offering different seats', () => {
     const input = cage();
     const before = JSON.stringify(input);

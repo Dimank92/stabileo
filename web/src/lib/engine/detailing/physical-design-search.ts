@@ -11,7 +11,7 @@ import { beamLayerAlternatives, type BeamLayerAlternative } from './beam-layer-a
 import { beamContinuityAlternatives } from './beam-continuity-alternatives';
 import { detailRegressionReasons } from './detail-regression';
 
-export type PhysicalRepairOperator = 'diameterFamily' | 'redistributeLayers' | 'harmonizeTop' | 'harmonizeTopLine' | 'harmonizeBottomLine' | 'harmonizeTopCatalog';
+export type PhysicalRepairOperator = 'diameterFamily' | 'redistributeLayers' | 'preserveBottomRows' | 'harmonizeTop' | 'harmonizeTopLine' | 'harmonizeBottomLine' | 'harmonizeTopCatalog';
 
 export interface PhysicalSearchBudget {
   /** Full geometry builds, including rejected trials. */
@@ -96,7 +96,7 @@ export function searchPhysicalDesignAlternatives(input: {
     if (!Number.isSafeInteger(value) || value < 0) throw new Error('Physical search budgets must be non-negative integers');
   }
   const operators = [...new Set<PhysicalRepairOperator>(input.budget.operators ?? ['diameterFamily'])];
-  if (operators.some(o => o !== 'diameterFamily' && o !== 'redistributeLayers' && o !== 'harmonizeTop' && o !== 'harmonizeTopLine' && o !== 'harmonizeBottomLine' && o !== 'harmonizeTopCatalog')) {
+  if (operators.some(o => o !== 'diameterFamily' && o !== 'redistributeLayers' && o !== 'preserveBottomRows' && o !== 'harmonizeTop' && o !== 'harmonizeTopLine' && o !== 'harmonizeBottomLine' && o !== 'harmonizeTopCatalog')) {
     throw new Error('Unknown physical repair operator');
   }
   if (operators.some(o => o.startsWith('harmonize'))) {
@@ -153,7 +153,7 @@ export function searchPhysicalDesignAlternatives(input: {
             }),
           };
         } else {
-          for (const alternative of beamLayerAlternatives(ctx!, current!.accepted!)) yield {
+          for (const alternative of beamLayerAlternatives(ctx!, current!.accepted!, operator === 'preserveBottomRows')) yield {
             trial: { elementId: id, operator, region: alternative.region, counts: alternative.counts, disposition: 'nominalFailure' },
             evaluate: () => {
               const verdict = input.adapter.verify(ctx!, alternative.reinforcement);
@@ -172,7 +172,7 @@ export function searchPhysicalDesignAlternatives(input: {
       }
       const candidate = proposal.evaluate();
       stats.memberSearches++;
-      const direct = proposal.trial.operator === 'redistributeLayers';
+      const direct = proposal.trial.operator !== 'diameterFamily';
       stats.candidatesConsidered += direct ? 1 : candidate!.searchStats.candidatesTried;
       stats.verifierCalls += direct ? 1 : candidate!.searchStats.verifierCalls;
       const trial = proposal.trial;

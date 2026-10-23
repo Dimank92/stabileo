@@ -19,8 +19,10 @@ export interface BeamLayerAlternative {
  * Multiple curtailment groups need a joint layout operator and are left untouched.
  * The first operator covers bottom steel only: top steel is reconciled across the
  * member and needs a coordinated proposal. At most four alternatives for three rows.
+ * `preserveCurrent` instead offers only the existing populations with explicit physical
+ * placement, because the shared coordination slots may have repacked them during generation.
  */
-export function* beamLayerAlternatives(ctx: MemberContext, current: ProvidedReinforcement): Generator<BeamLayerAlternative> {
+export function* beamLayerAlternatives(ctx: MemberContext, current: ProvidedReinforcement, preserveCurrent = false): Generator<BeamLayerAlternative> {
   if (ctx.elementType !== 'beam' || ctx.span || !current.regions) return;
   for (const [region, groupKey] of REGIONS) {
     const groups = current.regions[groupKey];
@@ -39,6 +41,17 @@ export function* beamLayerAlternatives(ctx: MemberContext, current: ProvidedRein
     // This is an enumeration bound. Aggregate, bend seats, spacing and strength
     // are evaluated by the authoritative verifier and materialized detail below.
     const limit = maxBarsPerRow(ctx.axes.bFlex, ctx.material.cover, stirrupDia, dia);
+    if (preserveCurrent) {
+      // Coordination can repack a certified 8+5 cage onto the top group's slots.
+      // First offer the certified populations themselves, before changing steel or rows.
+      // It is still a physical proposal: both end joints and the full detail must pass.
+      if (!current.regions.preserveBottomRows
+        && layers.every((l, i) => l.count <= limit && (i === 0 || l.count <= layers[i - 1].count))) yield {
+        region, counts: layers.map(l => l.count),
+        reinforcement: { ...current, regions: { ...current.regions, preserveBottomRows: true } },
+      };
+      continue;
+    }
     for (let row = 0; row + 1 < layers.length; row++) {
       for (const [from, to] of [[row, row + 1], [row + 1, row]]) {
         if (layers[from].count <= BEAM_LIMITS.minBarsPerRow || layers[to].count >= limit) continue;

@@ -271,7 +271,32 @@ describe('atomic top continuity repair', () => {
 });
 
 describe('guided physical alternatives', () => {
-  it.each([false, true])('reverifies a layer redistribution and retains it only if the full detail improves (nominal failure: %s)', nominalFailure => {
+  it('rejects a preserved-row cage with fewer clashes when it newly blocks a neighbor', () => {
+    const { input } = harness();
+    input.contexts.set(1, syntheticBeamContext());
+    const current = outcome(1, 16);
+    current.accepted!.regions!.bottomSpan = { count: 6, diameter: 16 };
+    current.accepted!.regions!.bottomSpanLayers = [
+      { count: 4, row: 0, diameter: 16 }, { count: 2, row: 1, diameter: 16 },
+    ];
+    input.outcomes.set(1, current);
+    vi.spyOn(input.adapter, 'verify').mockReturnValue({
+      strengthCheckCount: 2, checks: [{ status: 'ok' }], worstUtilization: 0.9, checkedAxes: ['My'],
+    } as never);
+    input.detail.mockReturnValue(detail([2])); // Two old conflicts replaced by one new neighbor conflict.
+    const r = searchPhysicalDesignAlternatives({ ...input,
+      budget: { maxDetailingRuns: 1, maxMemberSearches: 1, operators: ['preserveBottomRows'] },
+    });
+    expect(r.trials).toMatchObject([{ disposition: 'regression', blockingConflicts: 1, newlyBlocked: [2] }]);
+    expect(r.outcomes).toBe(input.outcomes);
+    expect(r.result).toBe(input.result);
+    expect(r.changed).toEqual([]);
+  });
+
+  it.each([
+    ['redistributeLayers', false], ['redistributeLayers', true],
+    ['preserveBottomRows', false], ['preserveBottomRows', true],
+  ] as const)('reverifies %s and retains it only if the full detail improves (nominal failure: %s)', (operator, nominalFailure) => {
     const { input, generate } = harness();
     input.contexts.set(1, syntheticBeamContext());
     const current = outcome(1, 16);
@@ -285,20 +310,21 @@ describe('guided physical alternatives', () => {
       worstUtilization: nominalFailure ? 1.1 : 0.9, checkedAxes: ['My'],
     } as never);
     const r = searchPhysicalDesignAlternatives({ ...input,
-      budget: { maxDetailingRuns: 1, maxMemberSearches: 1, operators: ['redistributeLayers'] },
+      budget: { maxDetailingRuns: 1, maxMemberSearches: 1, operators: [operator] },
     });
     expect(generate).not.toHaveBeenCalled();
     expect(verify).toHaveBeenCalledTimes(1);
     expect(r.stats.candidatesConsidered).toBe(1);
     expect(r.stats.verifierCalls).toBe(1);
-    expect(r.trials[0].operator).toBe('redistributeLayers');
+    expect(r.trials[0].operator).toBe(operator);
     if (nominalFailure) {
       expect(input.detail).not.toHaveBeenCalled();
       expect(r.outcomes).toBe(input.outcomes);
     } else {
       expect(r.changed).toEqual([1]);
       const accepted = r.outcomes.get(1)!;
-      expect(accepted.accepted!.regions!.bottomSpanLayers!.map(l => l.count)).toEqual([3, 3]);
+      expect(accepted.accepted!.regions!.bottomSpanLayers!.map(l => l.count))
+        .toEqual(operator === 'preserveBottomRows' ? [4, 2] : [3, 3]);
       expect(accepted.certificate!.rebarHash).toBe(rebarHash(accepted.accepted));
       expect(accepted.certificate!.rebarHash).not.toBe(rebarHash(current.accepted));
     }
