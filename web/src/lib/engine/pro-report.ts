@@ -452,6 +452,24 @@ const REPORT_CSS = `
 
 // ─── Report HTML generation ──────────────────────────────────────
 
+/** The verification report's bar-marks table, in the reader's language (`pro.bm*`). */
+export function barMarksTableHtml(barMarks: NonNullable<ReportData['barMarks']>, tr: TFunc): string {
+  const html: string[] = [];
+  html.push(`<h3>${escHtml(tr('pro.bmTitle') || 'Bar Marks — Estimated Cutting Lengths')}</h3>`);
+  const shapeL = (s: string) => s === 'stirrup' ? (tr('pro.bmStirrup') || 'Stirrup') : s === 'crosstie' ? (tr('pro.bmCrosstie') || 'Crosstie') : s === 'hooked' ? (tr('pro.bmHooked') || 'Hooked') : (tr('pro.bmStraight') || 'Straight');
+  html.push(`<table><thead><tr><th>${escHtml(tr('pro.bmMark') || 'Mark')}</th><th>Ø (mm)</th><th>${escHtml(tr('pro.bmShape') || 'Shape')}</th><th>${escHtml(tr('pro.bmCutLen') || 'Cut. L')} (m)</th><th>${escHtml(tr('pro.bmCount') || 'Count')}</th><th>${escHtml(tr('pro.bmTotalLen') || 'Total L')} (m)</th><th>${escHtml(tr('pro.bmWeight') || 'Weight')} (kg)</th><th>Stock</th></tr></thead><tbody>`);
+  for (const m of barMarks) {
+    const note = m.overStock ? ' <span style="color:#f0a500">⚠ &gt;12m</span>' : '';
+    const stockNote = m.needsStockSplice ? `${m.stockLength}m (${m.nStockSplices}sp)` : m.shape !== 'stirrup' && m.shape !== 'crosstie' ? `${m.stockLength}m` : '';
+    html.push(`<tr><td><strong>${escHtml(m.mark)}</strong></td><td class="num">${m.diameter}</td><td>${escHtml(shapeL(m.shape))}</td><td class="num">${m.cuttingLength.toFixed(2)}</td><td class="num">${m.count}</td><td class="num">${m.totalLength.toFixed(1)}</td><td class="num">${m.weight.toFixed(1)}${note}</td><td class="num">${stockNote}</td></tr>`);
+  }
+  const tw = barMarks.reduce((s, m) => s + m.weight, 0);
+  const tl = barMarks.reduce((s, m) => s + m.totalLength, 0);
+  html.push(`<tr style="font-weight:bold;border-top:2px solid #444"><td colspan="5"></td><td class="num">${tl.toFixed(1)}</td><td class="num">${tw.toFixed(1)}</td><td></td></tr>`);
+  html.push(`</tbody></table>`);
+  return html.join('\n');
+}
+
 export function generateReportHtml(data: ReportData): string {
   const { projectName, date, nodes, elements, materials, sections, supports, loadCount, results, verifications, quantities, screenshot } = data;
   // Use provided translation function or fallback to identity (returns key)
@@ -1311,20 +1329,7 @@ export function generateReportHtml(data: ReportData): string {
     html.push(`</tbody></table>`);
 
     // Bar marks table
-    if (data.barMarks && data.barMarks.length > 0) {
-      html.push(`<h3>${escHtml(tr('report.barMarks') || 'Bar Marks — Estimated Cutting Lengths')}</h3>`);
-      const shapeL = (s: string) => s === 'stirrup' ? (tr('report.bmStirrup') || 'Stirrup') : s === 'hooked' ? (tr('report.bmHooked') || 'Hooked') : (tr('report.bmStraight') || 'Straight');
-      html.push(`<table><thead><tr><th>${escHtml(tr('report.bmMark') || 'Mark')}</th><th>Ø (mm)</th><th>${escHtml(tr('report.bmShape') || 'Shape')}</th><th>${escHtml(tr('report.bmCutLen') || 'Cut. L')} (m)</th><th>${escHtml(tr('report.bmCount') || 'Count')}</th><th>${escHtml(tr('report.bmTotalLen') || 'Total L')} (m)</th><th>${escHtml(tr('report.bmWeight') || 'Weight')} (kg)</th><th>Stock</th></tr></thead><tbody>`);
-      for (const m of data.barMarks) {
-        const note = m.overStock ? ' <span style="color:#f0a500">⚠ &gt;12m</span>' : '';
-        const stockNote = m.needsStockSplice ? `${m.stockLength}m (${m.nStockSplices}sp)` : m.shape !== 'stirrup' ? `${m.stockLength}m` : '';
-        html.push(`<tr><td><strong>${escHtml(m.mark)}</strong></td><td class="num">${m.diameter}</td><td>${escHtml(shapeL(m.shape))}</td><td class="num">${m.cuttingLength.toFixed(2)}</td><td class="num">${m.count}</td><td class="num">${m.totalLength.toFixed(1)}</td><td class="num">${m.weight.toFixed(1)}${note}</td><td class="num">${stockNote}</td></tr>`);
-      }
-      const tw = data.barMarks.reduce((s, m) => s + m.weight, 0);
-      const tl = data.barMarks.reduce((s, m) => s + m.totalLength, 0);
-      html.push(`<tr style="font-weight:bold;border-top:2px solid #444"><td colspan="5"></td><td class="num">${tl.toFixed(1)}</td><td class="num">${tw.toFixed(1)}</td><td></td></tr>`);
-      html.push(`</tbody></table>`);
-    }
+    if (data.barMarks && data.barMarks.length > 0) html.push(barMarksTableHtml(data.barMarks, tr));
 
   }
 

@@ -5000,6 +5000,7 @@ const en: Record<string, string> = {
   'pro.bmStraight': 'Straight',
   'pro.bmHooked': 'Hooked',
   'pro.bmStirrup': 'Stirrup',
+  'pro.bmCrosstie': "Crosstie",
   'pro.slabsTab': 'Slabs',
   'pro.driftTab': 'Drift',
   'pro.cirsoc201': 'CIRSOC 201 — Reinforced concrete',
