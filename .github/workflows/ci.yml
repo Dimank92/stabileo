@@ -49,6 +49,10 @@ jobs:
         run: scripts/check-pins.sh
       - name: Changelog fragments are well formed
         run: python3 -I scripts/changelog.py --check
+      # The engine's test files are modules of a few listed binaries (autotests = false): a file
+      # in no binary would never run, one in two would run twice.
+      - name: Every engine test file is in exactly one test binary
+        run: python3 -I scripts/check-test-targets.py
 
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
@@ -79,6 +83,11 @@ jobs:
   # step here, add its filter to the suite exclusion as well (verified with:
   # cargo nextest list --profile ci -E '<filter>' | wc -l — suite + gates must
   # equal the old combined filter's count).
+  #
+  # The gates are modules of the `gates` and `certificates` test binaries
+  # (engine/tests/<binary>/main.rs); a test's name starts with its file's
+  # module, so `test(/^sparse_shell_gates::/)` is the old sparse_shell_gates
+  # binary. nextest fails a step whose filter matches no test.
   test:
     runs-on: ${{ (vars.STABILEO_SELF_HOSTED == 'true' && github.event_name != 'pull_request') && fromJSON('["self-hosted","stabileo"]') || 'ubuntu-latest' }}
     timeout-minutes: 45
@@ -127,34 +136,34 @@ jobs:
 
       - name: Sparse shell gates
         working-directory: engine
-        run: cargo nextest run --profile ci --test sparse_shell_gates
+        run: cargo nextest run --profile ci --test gates -E 'test(/^sparse_shell_gates::/)'
 
       - name: Solver invariants gate
         working-directory: engine
-        run: cargo nextest run --profile ci --test solver_invariants
+        run: cargo nextest run --profile ci --test gates -E 'test(/^solver_invariants::/)'
 
       - name: Solver CI coverage gate
         working-directory: engine
-        run: cargo nextest run --profile ci --test solver_ci_coverage
+        run: cargo nextest run --profile ci --test gates -E 'test(/^solver_ci_coverage::/)'
 
       - name: Conditioning adversarial gate
         working-directory: engine
-        run: cargo nextest run --profile ci --test conditioning_adversarial
+        run: cargo nextest run --profile ci --test gates -E 'test(/^conditioning_adversarial::/)'
 
       # Wall-clock timing gates: run single-threaded so elapsed time reflects
       # CPU work, not contention from co-scheduled tests on shared 2-4 vCPU
       # runners. Measuring wall time under parallel execution made these flaky.
       - name: Performance regression gates
         working-directory: engine
-        run: cargo nextest run --profile ci --test perf_regression_gates --test-threads 1
+        run: cargo nextest run --profile ci --test gates -E 'test(/^perf_regression_gates::/)' --test-threads 1
 
       - name: Advanced perf gates
         working-directory: engine
-        run: cargo nextest run --profile ci --test perf_regression_advanced --test-threads 1
+        run: cargo nextest run --profile ci --test gates -E 'test(/^perf_regression_advanced::/)' --test-threads 1
 
       - name: k_full overbuild gates
         working-directory: engine
-        run: cargo nextest run --profile ci --test kfull_overbuild_gates
+        run: cargo nextest run --profile ci --test gates -E 'test(/^kfull_overbuild_gates::/)'
 
       # Real-model acceptance suite (docs/verification/ACCEPTANCE.md): public
       # benchmark buildings against their published reference results. A
@@ -166,13 +175,13 @@ jobs:
 
       - name: Acceptance suite gate
         working-directory: engine
-        run: cargo nextest run --profile ci --test acceptance
+        run: cargo nextest run --profile ci --test gates -E 'test(/^acceptance::/)'
 
       # Result certificates (docs/verification/CERTIFY.md): honesty against a
       # double-double reference, buckling/modal enclosures, fuzz oracle.
       - name: Certificate gate
         working-directory: engine
-        run: cargo nextest run --profile ci --test certify --test properties_2d --test properties_3d
+        run: cargo nextest run --profile ci --test certificates -E 'test(/^certify::/) + test(/^properties_2d::/) + test(/^properties_3d::/)'
 
   # The remaining ~6700 tests, sharded 2-way. Excludes the named gates above
   # (they run in the `test` job) and the wall-clock timing benchmarks/perf
@@ -216,7 +225,7 @@ jobs:
 
       - name: Run test suite (shard ${{ matrix.shard }}/2)
         working-directory: engine
-        run: cargo nextest run --profile ci -E 'all() - test(harmonic_phase_breakdown) - test(harmonic_modal_vs_direct_timing) - binary(perf_regression_advanced) - binary(perf_regression_gates) - (test(/benchmark_shell/) + test(/benchmark_beam_shell/) + test(/benchmark_plate/) + test(/benchmark_navier/) + test(/benchmark_scordelis/) + test(/benchmark_cantilever/) + test(/benchmark_pinched/) + test(/test_quad_thin_plate/)) - (test(/acceptance_.*shell/) + test(/acceptance_.*diaphragm/)) - test(/benchmark_.*constraint/) - binary(sparse_shell_gates) - binary(solver_invariants) - binary(solver_ci_coverage) - binary(conditioning_adversarial) - binary(kfull_overbuild_gates) - binary(certify) - binary(properties_2d) - binary(properties_3d) - binary(acceptance) - binary(metamorphic)' --partition count:${{ matrix.shard }}/2
+        run: cargo nextest run --profile ci -E 'all() - test(harmonic_phase_breakdown) - test(harmonic_modal_vs_direct_timing) - (binary(gates) & (test(/^perf_regression_advanced::/) + test(/^perf_regression_gates::/))) - (test(/benchmark_shell/) + test(/benchmark_beam_shell/) + test(/benchmark_plate/) + test(/benchmark_navier/) + test(/benchmark_scordelis/) + test(/benchmark_cantilever/) + test(/benchmark_pinched/) + test(/test_quad_thin_plate/)) - (test(/acceptance_.*shell/) + test(/acceptance_.*diaphragm/)) - test(/benchmark_.*constraint/) - (binary(gates) & (test(/^sparse_shell_gates::/) + test(/^solver_invariants::/) + test(/^solver_ci_coverage::/) + test(/^conditioning_adversarial::/) + test(/^kfull_overbuild_gates::/) + test(/^acceptance::/))) - (binary(certificates) & (test(/^certify::/) + test(/^properties_2d::/) + test(/^properties_3d::/))) - binary(metamorphic)' --partition count:${{ matrix.shard }}/2
         timeout-minutes: 20
 
   # Metamorphic tests, sampled tier (docs/verification/METAMORPHIC.md): every
