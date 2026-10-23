@@ -115,7 +115,7 @@ defmodule StabileoAuth.Controllers.Admin.UserControllerTest do
 
     test "force-logout revokes every session and reports how many", %{token: token} do
       user = Factory.insert(:account)
-      log_in(user)
+      %{access_token: access} = log_in(user)
       log_in(user)
 
       body = admin_request(:post, "/users/#{user.id}/force-logout", %{}, token) |> json_body(200)
@@ -127,6 +127,18 @@ defmodule StabileoAuth.Controllers.Admin.UserControllerTest do
                from(s in Session, where: s.account_id == ^user.id and is_nil(s.revoked_at)),
                :count
              ) == 0
+
+      assert request(:get, "/me", %{}, access) |> json_body(401)
+    end
+
+    test "force-logout of another admin ends their admin access token", %{token: token} do
+      other = Factory.insert(:admin, %{email: "admin2@example.com", name: "Admin 2"})
+      other_token = admin_log_in(other).access_token
+
+      admin_request(:post, "/users/#{other.id}/force-logout", %{}, token) |> json_body(200)
+
+      assert admin_request(:get, "/users", %{}, other_token) |> json_body(401)
+      assert admin_request(:get, "/users", %{}, token) |> json_body(200)
     end
 
     test "404 for an unknown id", %{token: token} do

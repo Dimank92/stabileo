@@ -30,6 +30,9 @@ defmodule StabileoAuth.Controllers.PasswordControllerTest do
            })
            |> json_body(200)
 
+    assert request(:get, "/me", %{}, ctx.current.access_token) |> json_body(200)
+    assert request(:get, "/me", %{}, ctx.other.access_token) |> json_body(401)
+
     assert request(:post, "/refresh", %{"refresh_token" => ctx.current.refresh_token})
            |> json_body(200)
 

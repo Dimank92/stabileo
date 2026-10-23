@@ -5,6 +5,10 @@ defmodule StabileoAuth.Plugs.Authenticate do
 
   `app: "admin"` accepts only admin-site tokens, and only while the account is
   still an admin; the default accepts only product tokens.
+
+  The token's session must still be live: logout, force logout and a password
+  change revoke sessions, and their access tokens end with them rather than at
+  their expiry.
   """
 
   import Plug.Conn
@@ -12,14 +16,15 @@ defmodule StabileoAuth.Plugs.Authenticate do
 
   require Logger
 
-  alias StabileoAuth.{Accounts, AdminAccess, Tokens}
-  alias StabileoRepo.Schemas.Account
+  alias StabileoAuth.{Accounts, AdminAccess, Sessions, Tokens}
+  alias StabileoRepo.Schemas.{Account, Session}
 
   def init(opts), do: Keyword.get(opts, :app, "app")
 
   def call(conn, app) do
     with {:ok, token} <- bearer_token(conn),
          {:ok, %{"app" => ^app} = claims} <- Tokens.verify_access_token(token),
+         :ok <- live_session(claims),
          {:ok, account} <- load_account(claims["sub"]),
          :ok <- authorize(app, account) do
       Logger.metadata(account_id: account.id)
@@ -48,6 +53,15 @@ defmodule StabileoAuth.Plugs.Authenticate do
       _ -> {:error, :missing_token}
     end
   end
+
+  defp live_session(%{"session_id" => session_id, "sub" => account_id}) do
+    case Sessions.get_session(session_id) do
+      %Session{account_id: ^account_id} = session -> Sessions.validate_session(session)
+      _ -> {:error, :session_not_found}
+    end
+  end
+
+  defp live_session(_claims), do: {:error, :session_not_found}
 
   defp load_account(account_id) do
     case Accounts.get_account(account_id) do

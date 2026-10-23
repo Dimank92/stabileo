@@ -147,7 +147,7 @@ defmodule StabileoAuth.Controllers.AuthControllerTest do
   end
 
   describe "POST /refresh" do
-    test "rotates: new pair works, the old refresh token stops working" do
+    test "rotates: new pair works, the old refresh and access tokens stop working" do
       session = log_in(Factory.insert(:account))
 
       body =
@@ -162,6 +162,7 @@ defmodule StabileoAuth.Controllers.AuthControllerTest do
       assert reused["error"] == "refresh_failed"
 
       assert request(:get, "/me", %{}, body["access_token"]) |> json_body(200)
+      assert request(:get, "/me", %{}, session.access_token) |> json_body(401)
     end
 
     test "401 for garbage, an access token, or nothing" do
@@ -188,7 +189,7 @@ defmodule StabileoAuth.Controllers.AuthControllerTest do
   end
 
   describe "DELETE /logout" do
-    test "revokes the session behind the refresh token" do
+    test "revokes the session behind the refresh token, and its access token" do
       session = log_in(Factory.insert(:account))
 
       assert request(:delete, "/logout", %{"refresh_token" => session.refresh_token})
@@ -196,6 +197,8 @@ defmodule StabileoAuth.Controllers.AuthControllerTest do
 
       assert request(:post, "/refresh", %{"refresh_token" => session.refresh_token})
              |> json_body(401)
+
+      assert request(:get, "/me", %{}, session.access_token) |> json_body(401)
     end
 
     test "answers 200 even without a valid token" do

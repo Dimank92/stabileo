@@ -105,10 +105,10 @@ Seeds create `demo@stabileo.com` / `stabileo-demo-password` (`StabileoRepo.DemoP
 | Register with short password / missing name / bad email | 422 with that field in `details` |
 | Login right / wrong password / unknown email | 200 / 401 `invalid_credentials` / 401 `invalid_credentials` |
 | Login on a disabled account | 403 `account_disabled` |
-| Refresh | New token pair; the old refresh token then fails with 401 |
-| Logout | The refresh token stops working |
+| Refresh | New token pair; the old refresh token then fails with 401, and so does the old access token |
+| Logout | The refresh token and the access tokens of its session stop working |
 | `GET /me` without / with bad / with good token | 401 / 401 / 200 with every account key |
 | `PUT /me` with profile fields | 200, fields persisted; `email` in the body is ignored |
 | `PUT /me` with invalid country or locale | 422 with the field in `details` |
 | `PUT /password` with wrong current password | 401 `invalid_current_password` |
-| `PUT /password` with right current password | 200, new password logs in, other sessions revoked, current one kept |
+| `PUT /password` with right current password | 200, new password logs in, other sessions revoked (their access tokens too), current one kept |
