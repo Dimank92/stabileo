@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The merge queue: each PR is tested on top of the ones merging before it, so two PRs that
+  # are green on their own cannot break main together.
+  merge_group:
 
 env:
   CARGO_TERM_COLOR: always
@@ -558,12 +561,13 @@ jobs:
         working-directory: web
         run: npx playwright test --grep @smoke $(node scripts/e2e-shard.mjs ${{ matrix.shard }} 5)
 
-      # Heavier suite (408-member model): main + opt-in label only.
-      # The slow and visual suites are small; they run once, in shard 1.
-      - name: E2E slow suite
-        if: matrix.shard == 1 && (github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'run-e2e'))
+      # Heavier suite (408-member model): in the merge queue, so it runs on exactly what lands on
+      # main, before it lands; on a PR only with the `run-e2e` label. Split five ways: on one
+      # shard it took 1.5 to 2.3 hours, after the merge, and main stayed red when it failed.
+      - name: E2E slow suite (shard ${{ matrix.shard }}/5)
+        if: github.event_name == 'merge_group' || contains(github.event.pull_request.labels.*.name, 'run-e2e')
         working-directory: web
-        run: npx playwright test --grep "@slow" --grep-invert "visual baselines"
+        run: npx playwright test --grep "@slow" --grep-invert "visual baselines" --shard=${{ matrix.shard }}/5
 
       # NON-BLOCKING on this first landing (approved decision O7): pixel gates that
       # block on day one are how e2e suites end up disabled. Promote once the Linux
@@ -579,7 +583,7 @@ jobs:
       # baselines have proven stable. To intentionally refresh them, run the job once
       # with UPDATE_SNAPSHOTS=1.
       - name: E2E visual baselines (non-blocking comparison)
-        if: matrix.shard == 1 && (github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'run-e2e'))
+        if: matrix.shard == 1 && (github.event_name == 'merge_group' || github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'run-e2e'))
         continue-on-error: true
         working-directory: web
         run: npx playwright test --grep "visual baselines" ${{ vars.UPDATE_SNAPSHOTS == '1' && '--update-snapshots' || '' }}
