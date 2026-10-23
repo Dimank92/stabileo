@@ -22,12 +22,16 @@
  * Each finding is recorded with `expect.soft`, so one run reports all of them, and every
  * press prints one `SWEEP|…` line — the matrix this suite covered, as data
  * (`e2e/.artifacts/basic-advanced-sweep.log`). A finding that is a KNOWN defect becomes a
- * `known-defect` annotation instead, and is pinned by its own `test.fail` at the end of the
- * file. The numbers follow the audit report; D2, D13, D14 and D15 were found by the first
- * run and no longer reproduce on this branch, so they have no pin.
+ * `known-defect` annotation instead, and is pinned by its own `test.fail` in `pinnedDefects`
+ * below. The numbers follow the audit report; D2, D13, D14 and D15 were found by the first run
+ * and no longer reproduce on this branch, so they have no pin.
  *
  * Models are the examples plus generated projects loaded through
  * `__stabileoActions.loadProject`, the same deserializer File → Open uses.
+ *
+ * This file is the harness; the `basic-advanced-sweep-*.spec.ts` files run it, each on a slice
+ * of the matrix. As one spec file the sweep took 54 minutes, and a CI shard runs whole files,
+ * so one shard carried all of it while the others waited.
  */
 import type { Page, Locator } from '@playwright/test';
 import { test, expect, CURRENT_STAMP } from './fixtures';
@@ -310,13 +314,39 @@ async function diff(page: Page, a: string, b: string): Promise<{ changed: number
  * read 613 px on one run and 80 on the next).
  */
 async function motion(page: Page): Promise<number> {
-  const a = await shot(page);
+  const frames = [await shot(page)];
   await page.waitForTimeout(330);
-  const b = await shot(page);
+  frames.push(await shot(page));
   await page.waitForTimeout(470);
-  const c = await shot(page);
-  const d = await Promise.all([diff(page, a, b), diff(page, b, c), diff(page, a, c)]);
-  return Math.max(...d.map((x) => x.changed));
+  frames.push(await shot(page));
+  let moved = await largestChange(page, frames);
+  /*
+   * Too little: look across a whole period before calling it still. The shapes swing as
+   * sin(t / 500 ms) (viewport3d/results-sync.ts), a period of about 3.1 s, and three frames
+   * 0.8 s apart can all sit around one crest, where the shape barely moves. On CI tower-3d-2,
+   * a small drawing with little margin, read 28 to 390 px this way while moving (issue #607).
+   * Four more frames 700 ms apart span the period; a still shape still reads ~0.
+   */
+  if (moved <= MOVES) {
+    for (let k = 0; k < 4; k++) {
+      await page.waitForTimeout(700);
+      frames.push(await shot(page));
+    }
+    moved = await largestChange(page, frames);
+  }
+  return moved;
+}
+
+/** More pixels than this between two frames is a shape in motion. */
+const MOVES = 400;
+
+/** The largest difference between any two of the frames. */
+async function largestChange(page: Page, frames: readonly string[]): Promise<number> {
+  let most = 0;
+  for (let i = 0; i < frames.length; i++) {
+    for (let j = i + 1; j < frames.length; j++) most = Math.max(most, (await diff(page, frames[i], frames[j])).changed);
+  }
+  return most;
 }
 
 /** Keep the two images a failed comparison was made from, for the report. */
@@ -622,7 +652,7 @@ async function pressOne(ctx: Ctx, fn: Fn, opts: { checkPixels: boolean }): Promi
       /* The mode shapes move: two frames of the same one must differ, which also proves it is drawn. */
       if (fn.key === 'modal') {
         rec.moved = await motion(page);
-        flag(ctx, fn.key, 'motion', rec.moved > 400, `${tag}: the mode shape does not move (${rec.moved} px between frames)`);
+        flag(ctx, fn.key, 'motion', rec.moved > MOVES, `${tag}: the mode shape does not move (${rec.moved} px between frames)`);
       } else {
         flag(ctx, fn.key, 'drawn', d.changed > 300, `${tag}: running, and nothing new is drawn (${d.changed} px)`);
       }
@@ -759,12 +789,12 @@ function finish(ctx: Ctx): void {
 
 /* ──────────────────────────── the matrix ──────────────────────────── */
 
-const EXAMPLES_2D = [
+export const EXAMPLES_2D = [
   'simply-supported', 'continuous-beam', 'portal-frame', 'two-story-frame', 'truss', 'three-hinge-arch',
   'gerber-beam', 'spring-support', 'settlement', 'thermal', 'bridge-moving-load',
 ];
-const EXAMPLES_3D = ['3d-portal-frame', '3d-space-truss', 'grid-beams', 'tower-3d-2'];
-const GENERATED_RUNS = [...Object.keys(GENERATED), 'gen-gable-frame@3d', 'portal-frame@3d', 'truss@3d'];
+export const EXAMPLES_3D = ['3d-portal-frame', '3d-space-truss', 'grid-beams', 'tower-3d-2'];
+export const GENERATED_RUNS = [...Object.keys(GENERATED), 'gen-gable-frame@3d', 'portal-frame@3d', 'truss@3d'];
 
 /** Load, and optionally solve and edit: one of the three conditions every function is pressed in. */
 function condition(ctx: Ctx, name: string, cond: 'unsolved' | 'solved' | 'edited'): () => Promise<void> {
@@ -783,32 +813,56 @@ function condition(ctx: Ctx, name: string, cond: 'unsolved' | 'solved' | 'edited
   };
 }
 
-test.describe('@slow Basic advanced sweep — examples: unsolved, solved, edited', () => {
-  test.setTimeout(15 * 60_000);
-  for (const name of [...EXAMPLES_2D, ...EXAMPLES_3D]) {
-    test(name, async ({ page }) => {
-      const ctx = await boot(page);
-      /*
-       * The edit is a node dragged with the Move tool, a 2D gesture: in 3D the same drag
-       * orbits the camera, so the 3D examples are swept unsolved and solved only.
-       */
-      const conds = EXAMPLES_3D.includes(name) ? ['unsolved', 'solved'] as const : ['unsolved', 'solved', 'edited'] as const;
-      for (const cond of conds) await sweep(ctx, cond, condition(ctx, name, cond));
-      finish(ctx);
-    });
-  }
-});
+/**
+ * The examples, each swept unsolved, solved and (in 2D) edited. Called by the
+ * `basic-advanced-sweep-*.spec.ts` files with a slice of `EXAMPLES_2D` / `EXAMPLES_3D`, so the
+ * sweep spreads over several CI shards instead of filling one (see `scripts/e2e-shard.mjs`).
+ */
+export function sweepExamples(names: readonly string[]): void {
+  test.describe('@slow Basic advanced sweep — examples: unsolved, solved, edited', () => {
+    test.setTimeout(15 * 60_000);
+    for (const name of names) {
+      test(name, quarantine(name), async ({ page }) => {
+        const ctx = await boot(page);
+        /*
+         * The edit is a node dragged with the Move tool, a 2D gesture: in 3D the same drag
+         * orbits the camera, so the 3D examples are swept unsolved and solved only.
+         */
+        const conds = EXAMPLES_3D.includes(name) ? ['unsolved', 'solved'] as const : ['unsolved', 'solved', 'edited'] as const;
+        for (const cond of conds) await sweep(ctx, cond, condition(ctx, name, cond));
+        finish(ctx);
+      });
+    }
+  });
+}
 
-test.describe('@slow Basic advanced sweep — models outside the examples', () => {
-  test.setTimeout(12 * 60_000);
-  for (const name of GENERATED_RUNS) {
-    test(name, async ({ page }) => {
-      const ctx = await boot(page);
-      for (const cond of ['unsolved', 'solved'] as const) await sweep(ctx, cond, condition(ctx, name, cond));
-      finish(ctx);
-    });
-  }
-});
+/**
+ * Examples quarantined as `@flaky` (web/e2e/README.md), each with the issue that tracks it: they
+ * leave the blocking PR and queue runs and run in CI's `e2e-flaky` job, with retries, until the
+ * issue is closed and the entry removed.
+ */
+const QUARANTINED: Readonly<Record<string, string>> = {
+  'tower-3d-2': 'https://github.com/lambdaclass/stabileo/issues/607',
+};
+
+function quarantine(name: string): { tag?: string; annotation?: { type: string; description: string } } {
+  const issue = QUARANTINED[name];
+  return issue ? { tag: '@flaky', annotation: { type: 'issue', description: issue } } : {};
+}
+
+/** Generated models outside the examples, unsolved and solved: a slice of `GENERATED_RUNS`. */
+export function sweepGenerated(names: readonly string[]): void {
+  test.describe('@slow Basic advanced sweep — models outside the examples', () => {
+    test.setTimeout(12 * 60_000);
+    for (const name of names) {
+      test(name, async ({ page }) => {
+        const ctx = await boot(page);
+        for (const cond of ['unsolved', 'solved'] as const) await sweep(ctx, cond, condition(ctx, name, cond));
+        finish(ctx);
+      });
+    }
+  });
+}
 
 /* ──────────────────────────── 2D ↔ 3D with a function open ──────────────────────────── */
 
@@ -826,97 +880,101 @@ async function runningKey(page: Page): Promise<string | null> {
   return (await page.getByTestId('steps-catalog').isVisible()) ? 'steps' : null;
 }
 
-test.describe('@slow Basic advanced sweep — switching 2D ↔ 3D with a function open', () => {
-  test.setTimeout(12 * 60_000);
-  for (const name of ['portal-frame', 'gen-gable-frame']) {
-    test(name, async ({ page }) => {
-      const ctx = await boot(page);
-      for (const fn of FUNCTIONS) {
-        await test.step(fn.key, async () => {
-          await loadNamed(ctx, name);
-          await solveFromRibbon(ctx);
-          ctx.cond = 'switch';
-          ctx.step.label = `${name} [switch] ${fn.key}`;
-          /*
-           * The plain views are taken AFTER one round trip: a round trip by itself changes
-           * the 2D view (the solved drawing does not come back — see D17), and measuring
-           * a function against a view the switch itself changed would blame the function.
-           */
-          await openList(ctx);
-          await flipDimension(ctx, true);
-          await flipDimension(ctx, false);
-          await openList(ctx);
-          const base2d = await shot(page);
-          await flipDimension(ctx, true);
-          await openList(ctx);
-          const base3d = await shot(page);
-          await flipDimension(ctx, false);
-          await openList(ctx);
-          const again = await diff(page, base2d, await shot(page));
-          if (again.changed > Math.max(400, again.total * 0.002)) {
-            note(`SWITCH|${name}|${fn.key}|plain 2D view not reproducible after a round trip (${again.changed} px), skipped`);
-            return;
-          }
-
-          const btn = fn.find(page);
-          await btn.scrollIntoViewIfNeeded();
-          if (await btn.isDisabled()) return;
-          await press(ctx, btn);
-          await page.waitForTimeout(600);
-          if (fn.follow && await runningKey(page)) await fn.follow(ctx);
-          const running2d = await runningKey(page);
-
-          await flipDimension(ctx, true);
-          ctx.three = true;
-          const running3d = await runningKey(page);
-          const view3d = await shot(page);
-          const d3 = await diff(page, base3d, view3d);
-          const only2d = !!FUNCTIONS.find((f) => f.key === running3d)?.only2d;
-          flag(ctx, running3d ?? fn.key, 'mode', !only2d, `${name} ${fn.key}: in 3D the header says a 2D-only function (${running3d}) is still running`);
-          const stale3d = !running3d && d3.changed >= Math.max(400, d3.total * 0.002);
-          if (stale3d) keep(`${name}-switch-${fn.key}-3d`, { plain: base3d, now: view3d });
-          flag(ctx, fn.key, 'restore', !stale3d, `${name} ${fn.key}: switched to 3D, nothing is running and the view is not the plain 3D view (${d3.changed} px) — a stale drawing`);
-          const bad = badTokens(await visibleText(page));
-          flag(ctx, fn.key, 'badtext', bad.length === 0, `${name} ${fn.key} in 3D: bad text ${bad.join(',')}`);
-          await openList(ctx);
-
-          await flipDimension(ctx, false);
-          ctx.three = false;
-          const back2d = await runningKey(page);
-          let d2 = -1;
-          if (!back2d) {
+export function sweepSwitching(): void {
+  test.describe('@slow Basic advanced sweep — switching 2D ↔ 3D with a function open', () => {
+    test.setTimeout(12 * 60_000);
+    for (const name of ['portal-frame', 'gen-gable-frame']) {
+      test(name, async ({ page }) => {
+        const ctx = await boot(page);
+        for (const fn of FUNCTIONS) {
+          await test.step(fn.key, async () => {
+            await loadNamed(ctx, name);
+            await solveFromRibbon(ctx);
+            ctx.cond = 'switch';
+            ctx.step.label = `${name} [switch] ${fn.key}`;
+            /*
+             * The plain views are taken AFTER one round trip: a round trip by itself changes
+             * the 2D view (the solved drawing does not come back — see D17), and measuring
+             * a function against a view the switch itself changed would blame the function.
+             */
             await openList(ctx);
-            const view2d = await shot(page);
-            const r = await diff(page, base2d, view2d);
-            d2 = r.changed;
-            const stale2d = r.changed >= Math.max(400, r.total * 0.002);
-            if (stale2d) keep(`${name}-switch-${fn.key}-2d`, { plain: base2d, now: view2d });
-            flag(ctx, fn.key, 'restore', !stale2d, `${name} ${fn.key}: back in 2D, nothing is running and the view is not the plain 2D view (${r.changed} px) — a stale drawing`);
-          }
-          note(`SWITCH|${name}|${fn.key}|2d=${running2d ?? '-'}|3d=${running3d ?? '-'}|d3=${d3.changed}|back2d=${back2d ?? '-'}|d2=${d2}`);
-          await openList(ctx);
-        });
-      }
-      finish(ctx);
-    });
-  }
-});
+            await flipDimension(ctx, true);
+            await flipDimension(ctx, false);
+            await openList(ctx);
+            const base2d = await shot(page);
+            await flipDimension(ctx, true);
+            await openList(ctx);
+            const base3d = await shot(page);
+            await flipDimension(ctx, false);
+            await openList(ctx);
+            const again = await diff(page, base2d, await shot(page));
+            if (again.changed > Math.max(400, again.total * 0.002)) {
+              note(`SWITCH|${name}|${fn.key}|plain 2D view not reproducible after a round trip (${again.changed} px), skipped`);
+              return;
+            }
+
+            const btn = fn.find(page);
+            await btn.scrollIntoViewIfNeeded();
+            if (await btn.isDisabled()) return;
+            await press(ctx, btn);
+            await page.waitForTimeout(600);
+            if (fn.follow && await runningKey(page)) await fn.follow(ctx);
+            const running2d = await runningKey(page);
+
+            await flipDimension(ctx, true);
+            ctx.three = true;
+            const running3d = await runningKey(page);
+            const view3d = await shot(page);
+            const d3 = await diff(page, base3d, view3d);
+            const only2d = !!FUNCTIONS.find((f) => f.key === running3d)?.only2d;
+            flag(ctx, running3d ?? fn.key, 'mode', !only2d, `${name} ${fn.key}: in 3D the header says a 2D-only function (${running3d}) is still running`);
+            const stale3d = !running3d && d3.changed >= Math.max(400, d3.total * 0.002);
+            if (stale3d) keep(`${name}-switch-${fn.key}-3d`, { plain: base3d, now: view3d });
+            flag(ctx, fn.key, 'restore', !stale3d, `${name} ${fn.key}: switched to 3D, nothing is running and the view is not the plain 3D view (${d3.changed} px) — a stale drawing`);
+            const bad = badTokens(await visibleText(page));
+            flag(ctx, fn.key, 'badtext', bad.length === 0, `${name} ${fn.key} in 3D: bad text ${bad.join(',')}`);
+            await openList(ctx);
+
+            await flipDimension(ctx, false);
+            ctx.three = false;
+            const back2d = await runningKey(page);
+            let d2 = -1;
+            if (!back2d) {
+              await openList(ctx);
+              const view2d = await shot(page);
+              const r = await diff(page, base2d, view2d);
+              d2 = r.changed;
+              const stale2d = r.changed >= Math.max(400, r.total * 0.002);
+              if (stale2d) keep(`${name}-switch-${fn.key}-2d`, { plain: base2d, now: view2d });
+              flag(ctx, fn.key, 'restore', !stale2d, `${name} ${fn.key}: back in 2D, nothing is running and the view is not the plain 2D view (${r.changed} px) — a stale drawing`);
+            }
+            note(`SWITCH|${name}|${fn.key}|2d=${running2d ?? '-'}|3d=${running3d ?? '-'}|d3=${d3.changed}|back2d=${back2d ?? '-'}|d2=${d2}`);
+            await openList(ctx);
+          });
+        }
+        finish(ctx);
+      });
+    }
+  });
+}
 
 /* ──────────────────────────── on a phone ──────────────────────────── */
 
-test.describe('@slow Basic advanced sweep — on a phone', () => {
-  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
-  test.setTimeout(8 * 60_000);
-  for (const name of ['portal-frame', '3d-portal-frame']) {
-    test(name, async ({ page }) => {
-      const ctx = await boot(page, true);
-      /* The sheet covers part of the model on a phone, so the drawing is not compared here. */
-      await sweep(ctx, 'phone-unsolved', condition(ctx, name, 'unsolved'), { checkPixels: false });
-      await sweep(ctx, 'phone-solved', condition(ctx, name, 'solved'), { checkPixels: false });
-      finish(ctx);
-    });
-  }
-});
+export function sweepOnAPhone(): void {
+  test.describe('@slow Basic advanced sweep — on a phone', () => {
+    test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    test.setTimeout(8 * 60_000);
+    for (const name of ['portal-frame', '3d-portal-frame']) {
+      test(name, async ({ page }) => {
+        const ctx = await boot(page, true);
+        /* The sheet covers part of the model on a phone, so the drawing is not compared here. */
+        await sweep(ctx, 'phone-unsolved', condition(ctx, name, 'unsolved'), { checkPixels: false });
+        await sweep(ctx, 'phone-solved', condition(ctx, name, 'solved'), { checkPixels: false });
+        finish(ctx);
+      });
+    }
+  });
+}
 
 /* ──────────────────────────── known defects, pinned ──────────────────────────── */
 
@@ -943,169 +1001,171 @@ async function pressBack(page: Page): Promise<void> {
   await page.waitForTimeout(400);
 }
 
-test.describe('@slow Basic advanced — defects found by this sweep, now regression tests', () => {
-  test('D1 influence line: "← Back" throws and leaves the line drawn', async ({ page }) => {
-    const ctx = await boot(page);
-    await loadNamed(ctx, 'portal-frame');
-    await solveFromRibbon(ctx);
-    await runFn(ctx, 'influenceLine');
-    await clickOnModel(ctx, (await memberMiddle(page))!);
-    await expect(page.locator('.toast-success').filter({ hasText: /Influence line/ })).toBeVisible();
-    await pressBack(page);
-    expect(ctx.errors).toEqual([]);
-    expect(await diagram(page)).not.toBe('influenceLine');
-  });
-
-  test('D3 P-Δ: "← Back" on a model never solved leaves second-order results as the static ones', async ({ page }) => {
-    const ctx = await boot(page);
-    await loadNamed(ctx, 'portal-frame');
-    await runFn(ctx, 'pdelta');
-    await pressBack(page);
-    expect((await page.evaluate(() => window.__stabileo.viewportPick())).hasResults).toBe(false);
-  });
-
-  test('D4 plastic collapse: after "← Back" the solved view shows the collapse state', async ({ page }) => {
-    const ctx = await boot(page);
-    await loadNamed(ctx, 'portal-frame');
-    await solveFromRibbon(ctx);
-    await openList(ctx);
-    const before = await shot(page);
-    await runFn(ctx, 'plastic');
-    await pressBack(page);
-    const d = await diff(page, before, await shot(page));
-    expect(d.changed).toBeLessThan(Math.max(400, d.total * 0.002));
-  });
-
-  test('D5 free-body view: "← Back" drops the diagram the user was looking at', async ({ page }) => {
-    const ctx = await boot(page);
-    await loadNamed(ctx, 'portal-frame');
-    await solveFromRibbon(ctx);
-    const before = await diagram(page);
-    await runFn(ctx, 'despiece');
-    await pressBack(page);
-    expect(await diagram(page)).toBe(before);
-  });
-
-  test('D6 moving load: "← Back" leaves the moment diagram the run switched to', async ({ page }) => {
-    const ctx = await boot(page);
-    await loadNamed(ctx, 'portal-frame');
-    await solveFromRibbon(ctx);
-    const before = await diagram(page);
-    await runFn(ctx, 'trainLoad');
-    await FUNCTIONS.find((f) => f.key === 'trainLoad')!.follow!(ctx);
-    await pressBack(page);
-    expect(await diagram(page)).toBe(before);
-  });
-
-  test('D7 explained step by step: opening the catalog and going back re-frames the model view', async ({ page }) => {
-    const ctx = await boot(page);
-    await loadNamed(ctx, 'portal-frame');
-    await openList(ctx);
-    const before = await shot(page);
-    await page.getByTestId('adv-steps').click();
-    await expect(page.getByTestId('steps-catalog')).toBeVisible();
-    await page.getByTestId('steps-catalog-back').click();
-    const d = await diff(page, before, await shot(page));
-    expect(d.changed).toBeLessThan(Math.max(400, d.total * 0.002));
-  });
-
-  test('D8 3D Dynamic: "← Back" on a model never solved hides its loads', async ({ page }) => {
-    const ctx = await boot(page);
-    await loadNamed(ctx, '3d-portal-frame');
-    await openList(ctx);
-    const before = await shot(page);
-    await runFn(ctx, 'modal');
-    await pressBack(page);
-    const d = await diff(page, before, await shot(page));
-    expect(d.changed).toBeLessThan(Math.max(400, d.total * 0.002));
-  });
-
-  test('D9 3D section analysis: "← Back" leaves the picked member selected', async ({ page }) => {
-    const ctx = await boot(page);
-    await loadNamed(ctx, '3d-portal-frame');
-    await solveFromRibbon(ctx);
-    await runFn(ctx, 'stress');
-    await clickOnModel(ctx, (await memberMiddle(page))!);
-    await page.waitForTimeout(500);
-    await pressBack(page);
-    expect((await page.evaluate(() => window.__stabileo.selectionByKind())).elements).toEqual([]);
-  });
-
-  test('D10 3D section analysis on a section with no shape: an error, and "← Back" stops working', async ({ page }) => {
-    const ctx = await boot(page);
-    await loadNamed(ctx, '3d-space-truss');
-    await solveFromRibbon(ctx);
-    await runFn(ctx, 'stress');
-    await clickOnModel(ctx, (await memberMiddle(page))!);
-    await page.waitForTimeout(600);
-    await pressBack(page);
-    expect(ctx.errors).toEqual([]);
-    await expect(page.getByTestId('adv-running')).toBeHidden();
-  });
-
-  test('D11 Dynamic: the mode shape of a beam whose nodes are all supported does not move', async ({ page }) => {
-    const ctx = await boot(page);
-    await loadNamed(ctx, 'simply-supported');
-    await runFn(ctx, 'modal');
-    await expect(page.getByTestId('adv-running')).toBeVisible();
-    expect(await motion(page)).toBeGreaterThan(400);
-  });
-
-  test.describe('on a phone', () => {
-    test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
-    test('D12 a tap on the model logs "Unable to preventDefault inside passive event listener"', async ({ page }) => {
-      const ctx = await boot(page, true);
+export function pinnedDefects(): void {
+  test.describe('@slow Basic advanced — defects found by this sweep, now regression tests', () => {
+    test('D1 influence line: "← Back" throws and leaves the line drawn', async ({ page }) => {
+      const ctx = await boot(page);
       await loadNamed(ctx, 'portal-frame');
+      await solveFromRibbon(ctx);
+      await runFn(ctx, 'influenceLine');
+      await clickOnModel(ctx, (await memberMiddle(page))!);
+      await expect(page.locator('.toast-success').filter({ hasText: /Influence line/ })).toBeVisible();
+      await pressBack(page);
+      expect(ctx.errors).toEqual([]);
+      expect(await diagram(page)).not.toBe('influenceLine');
+    });
+
+    test('D3 P-Δ: "← Back" on a model never solved leaves second-order results as the static ones', async ({ page }) => {
+      const ctx = await boot(page);
+      await loadNamed(ctx, 'portal-frame');
+      await runFn(ctx, 'pdelta');
+      await pressBack(page);
+      expect((await page.evaluate(() => window.__stabileo.viewportPick())).hasResults).toBe(false);
+    });
+
+    test('D4 plastic collapse: after "← Back" the solved view shows the collapse state', async ({ page }) => {
+      const ctx = await boot(page);
+      await loadNamed(ctx, 'portal-frame');
+      await solveFromRibbon(ctx);
+      await openList(ctx);
+      const before = await shot(page);
+      await runFn(ctx, 'plastic');
+      await pressBack(page);
+      const d = await diff(page, before, await shot(page));
+      expect(d.changed).toBeLessThan(Math.max(400, d.total * 0.002));
+    });
+
+    test('D5 free-body view: "← Back" drops the diagram the user was looking at', async ({ page }) => {
+      const ctx = await boot(page);
+      await loadNamed(ctx, 'portal-frame');
+      await solveFromRibbon(ctx);
+      const before = await diagram(page);
+      await runFn(ctx, 'despiece');
+      await pressBack(page);
+      expect(await diagram(page)).toBe(before);
+    });
+
+    test('D6 moving load: "← Back" leaves the moment diagram the run switched to', async ({ page }) => {
+      const ctx = await boot(page);
+      await loadNamed(ctx, 'portal-frame');
+      await solveFromRibbon(ctx);
+      const before = await diagram(page);
+      await runFn(ctx, 'trainLoad');
+      await FUNCTIONS.find((f) => f.key === 'trainLoad')!.follow!(ctx);
+      await pressBack(page);
+      expect(await diagram(page)).toBe(before);
+    });
+
+    test('D7 explained step by step: opening the catalog and going back re-frames the model view', async ({ page }) => {
+      const ctx = await boot(page);
+      await loadNamed(ctx, 'portal-frame');
+      await openList(ctx);
+      const before = await shot(page);
+      await page.getByTestId('adv-steps').click();
+      await expect(page.getByTestId('steps-catalog')).toBeVisible();
+      await page.getByTestId('steps-catalog-back').click();
+      const d = await diff(page, before, await shot(page));
+      expect(d.changed).toBeLessThan(Math.max(400, d.total * 0.002));
+    });
+
+    test('D8 3D Dynamic: "← Back" on a model never solved hides its loads', async ({ page }) => {
+      const ctx = await boot(page);
+      await loadNamed(ctx, '3d-portal-frame');
+      await openList(ctx);
+      const before = await shot(page);
+      await runFn(ctx, 'modal');
+      await pressBack(page);
+      const d = await diff(page, before, await shot(page));
+      expect(d.changed).toBeLessThan(Math.max(400, d.total * 0.002));
+    });
+
+    test('D9 3D section analysis: "← Back" leaves the picked member selected', async ({ page }) => {
+      const ctx = await boot(page);
+      await loadNamed(ctx, '3d-portal-frame');
       await solveFromRibbon(ctx);
       await runFn(ctx, 'stress');
       await clickOnModel(ctx, (await memberMiddle(page))!);
       await page.waitForTimeout(500);
+      await pressBack(page);
+      expect((await page.evaluate(() => window.__stabileo.selectionByKind())).elements).toEqual([]);
+    });
+
+    test('D10 3D section analysis on a section with no shape: an error, and "← Back" stops working', async ({ page }) => {
+      const ctx = await boot(page);
+      await loadNamed(ctx, '3d-space-truss');
+      await solveFromRibbon(ctx);
+      await runFn(ctx, 'stress');
+      await clickOnModel(ctx, (await memberMiddle(page))!);
+      await page.waitForTimeout(600);
+      await pressBack(page);
       expect(ctx.errors).toEqual([]);
+      await expect(page.getByTestId('adv-running')).toBeHidden();
+    });
+
+    test('D11 Dynamic: the mode shape of a beam whose nodes are all supported does not move', async ({ page }) => {
+      const ctx = await boot(page);
+      await loadNamed(ctx, 'simply-supported');
+      await runFn(ctx, 'modal');
+      await expect(page.getByTestId('adv-running')).toBeVisible();
+      expect(await motion(page)).toBeGreaterThan(400);
+    });
+
+    test.describe('on a phone', () => {
+      test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+      test('D12 a tap on the model logs "Unable to preventDefault inside passive event listener"', async ({ page }) => {
+        const ctx = await boot(page, true);
+        await loadNamed(ctx, 'portal-frame');
+        await solveFromRibbon(ctx);
+        await runFn(ctx, 'stress');
+        await clickOnModel(ctx, (await memberMiddle(page))!);
+        await page.waitForTimeout(500);
+        expect(ctx.errors).toEqual([]);
+      });
+    });
+
+    test('D16 moving load on an unloaded frame never solved: "envelope computed", and nothing is drawn', async ({ page }) => {
+      const ctx = await boot(page);
+      await loadNamed(ctx, 'gen-unloaded-frame');
+      await runFn(ctx, 'trainLoad');
+      expect(await FUNCTIONS.find((f) => f.key === 'trainLoad')!.follow!(ctx)).toBeNull();
+    });
+
+    test('D17 a 2D → 3D → 2D round trip discards the solve', async ({ page }) => {
+      test.fail(!process.env.SWEEP_PINS_STRICT, 'the solved drawing does not come back: the model is shown unsolved. May be intended (the solve belongs to one workspace), but nothing says so');
+      const ctx = await boot(page);
+      await loadNamed(ctx, 'portal-frame');
+      await solveFromRibbon(ctx);
+      await openList(ctx);
+      const before = await shot(page);
+      await flipDimension(ctx, true);
+      await flipDimension(ctx, false);
+      await openList(ctx);
+      const d = await diff(page, before, await shot(page));
+      expect(d.changed).toBeLessThan(Math.max(400, d.total * 0.002));
+    });
+
+    test('D18 Kinematic analysis stays open after switching to 3D, where it is disabled', async ({ page }) => {
+      const ctx = await boot(page);
+      await loadNamed(ctx, 'portal-frame');
+      await runFn(ctx, 'kinematic');
+      await expect(page.getByTestId('adv-running')).toHaveAttribute('data-adv', 'kinematic');
+      await flipDimension(ctx, true);
+      expect(await runningKey(page)).not.toBe('kinematic');
+    });
+
+    test('D19 Dynamic opened in 2D, then 3D: nothing is running and the loads are gone', async ({ page }) => {
+      const ctx = await boot(page);
+      await loadNamed(ctx, 'portal-frame');
+      await openList(ctx);
+      await flipDimension(ctx, true);
+      await openList(ctx);
+      const plain = await shot(page);
+      await flipDimension(ctx, false);
+      await runFn(ctx, 'modal');
+      await flipDimension(ctx, true);
+      expect(await runningKey(page)).toBeNull();
+      const d = await diff(page, plain, await shot(page));
+      expect(d.changed).toBeLessThan(Math.max(400, d.total * 0.002));
     });
   });
-
-  test('D16 moving load on an unloaded frame never solved: "envelope computed", and nothing is drawn', async ({ page }) => {
-    const ctx = await boot(page);
-    await loadNamed(ctx, 'gen-unloaded-frame');
-    await runFn(ctx, 'trainLoad');
-    expect(await FUNCTIONS.find((f) => f.key === 'trainLoad')!.follow!(ctx)).toBeNull();
-  });
-
-  test('D17 a 2D → 3D → 2D round trip discards the solve', async ({ page }) => {
-    test.fail(!process.env.SWEEP_PINS_STRICT, 'the solved drawing does not come back: the model is shown unsolved. May be intended (the solve belongs to one workspace), but nothing says so');
-    const ctx = await boot(page);
-    await loadNamed(ctx, 'portal-frame');
-    await solveFromRibbon(ctx);
-    await openList(ctx);
-    const before = await shot(page);
-    await flipDimension(ctx, true);
-    await flipDimension(ctx, false);
-    await openList(ctx);
-    const d = await diff(page, before, await shot(page));
-    expect(d.changed).toBeLessThan(Math.max(400, d.total * 0.002));
-  });
-
-  test('D18 Kinematic analysis stays open after switching to 3D, where it is disabled', async ({ page }) => {
-    const ctx = await boot(page);
-    await loadNamed(ctx, 'portal-frame');
-    await runFn(ctx, 'kinematic');
-    await expect(page.getByTestId('adv-running')).toHaveAttribute('data-adv', 'kinematic');
-    await flipDimension(ctx, true);
-    expect(await runningKey(page)).not.toBe('kinematic');
-  });
-
-  test('D19 Dynamic opened in 2D, then 3D: nothing is running and the loads are gone', async ({ page }) => {
-    const ctx = await boot(page);
-    await loadNamed(ctx, 'portal-frame');
-    await openList(ctx);
-    await flipDimension(ctx, true);
-    await openList(ctx);
-    const plain = await shot(page);
-    await flipDimension(ctx, false);
-    await runFn(ctx, 'modal');
-    await flipDimension(ctx, true);
-    expect(await runningKey(page)).toBeNull();
-    const d = await diff(page, plain, await shot(page));
-    expect(d.changed).toBeLessThan(Math.max(400, d.total * 0.002));
-  });
-});
+}
