@@ -55,6 +55,7 @@ import {
   shouldProjectModelToXZ,
 } from '../geometry/coordinate-system';
 
+import { loadMemberId, loadNodeId } from '../store/model.svelte';
 import type {
   Node, Element, Support, Load, Material, Section,
   LoadCase, LoadCombination,
@@ -1952,6 +1953,19 @@ export function loadRefusal(err: unknown): string | null {
   return err instanceof PointLoadNeedsCut ? tp('svc.pointMomentOnTruss', { n: err.elementId }) : null;
 }
 
+/**
+ * A load on a member or a node the model does not have (an older file, a paste), said by number.
+ * The solve skipped it, and solved without it as if it had never been there.
+ */
+export function orphanLoadRefusal(model: Pick<ModelData, 'nodes' | 'elements' | 'loads'>): string | null {
+  for (const l of model.loads) {
+    const member = loadMemberId(l), node = loadNodeId(l);
+    if (member !== undefined && !model.elements.has(member)) return tp('svc.loadOnMissingMember', { load: l.data.id, n: member });
+    if (node !== undefined && !model.nodes.has(node)) return tp('svc.loadOnMissingNode', { load: l.data.id, n: node });
+  }
+  return null;
+}
+
 /** Displacements imposed where nothing restrains them, said by node and direction. */
 export function imposedRefusal(model: ModelData): string | null {
   const bad = imposedUnsupported(model.supports, model.loads, shouldEmbedFlat2DModelIn3D(model));
@@ -1970,6 +1984,8 @@ function prepareSolve3D(model: ModelData, includeSelfWeight = false, leftHand = 
   // route through here exactly once) so browser tests can assert that a
   // reinforcement-only edit triggers none. Not part of the solver.
   if (countSolve) noteStructuralSolve();
+  const orphan = orphanLoadRefusal(model);
+  if (orphan) return orphan;
   // Checked on what the engine will see: inactive members and the nodes nothing holds are out.
   // A variable member is its pieces there; a refusal names the member and the model's nodes.
   const pieces = variableExpansionFor(model);
@@ -2409,8 +2425,8 @@ export function solveCombinations3D(
   /** The spectral cases' results (`store/spectral-cases.ts`), by case id. */
   spectral?: Map<number, AnalysisResults3D>,
 ): Bundle3D | string | null {
-  const imposed = imposedRefusal(model);
-  if (imposed) return imposed;
+  const refused = orphanLoadRefusal(model) ?? imposedRefusal(model);
+  if (refused) return refused;
   // Each case with its composition, notional loads and reduction written out (`case-effects.ts`);
   // only the cases listed or taken by a combination solved (`combination-methods.ts`).
   model = withCaseEffects(model, loadCases, { includeSelfWeight, leftHand });
@@ -2915,8 +2931,8 @@ export async function solveCombinations3DParallel(
 ): Promise<Bundle3D | string | null> {
   // The sequential entry's refusals, case effects and plan (`combinationsPlan3D`); only the linear
   // core runs on the workers.
-  const imposed = imposedRefusal(model);
-  if (imposed) return imposed;
+  const refused = orphanLoadRefusal(model) ?? imposedRefusal(model);
+  if (refused) return refused;
   model = withCaseEffects(model, loadCases, { includeSelfWeight, leftHand });
   const solving = casesToSolve(loadCases, combinations);
   const magnitude = magnitudeRefusal3D(model, combinations, loadCases);

@@ -49,7 +49,8 @@ export function expandDefinitions(): Expansion[] {
  *
  * A load marked with a definition the model does not hold (a link or a file that lost it, a paste
  * from another model) stays, as a plain load: its definition is not there to write it again, and
- * deleting it took the floor's whole load away without a word.
+ * deleting it took the floor's whole load away without a word. A definition deleted takes its own
+ * loads with it (`modelStore.removeGroup`), so none of those is kept this way.
  */
 export function syncDefinedLoads(): number | null {
   const exp = expandDefinitions();

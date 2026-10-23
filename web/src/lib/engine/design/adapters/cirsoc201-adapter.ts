@@ -35,7 +35,6 @@ import {
 import {
   transverseSpacingSupportedForEdition,
 } from '../../../codes/cirsoc201/transverse-spacing';
-import { clause } from '../../../codes/regulation';
 import type { RegulationEdition } from '../../../codes/regulation';
 import {
   CIRSOC201_CAPABILITIES_2005, CIRSOC201_CAPABILITIES_2025, CIRSOC201_CLAUSES,

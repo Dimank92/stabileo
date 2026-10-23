@@ -33,7 +33,7 @@
 import type { ModelData } from './solver-service';
 import { materialFamilyOf } from './steel/material-family';
 import { catalogueGradeFamily } from './steel/grade-family';
-import { buildSolverInput3D, caseSolverLoads3D, comboSolverLoads3D, imposedRefusal, loadRefusal } from './solver-service';
+import { buildSolverInput3D, caseSolverLoads3D, comboSolverLoads3D, imposedRefusal, loadRefusal, orphanLoadRefusal } from './solver-service';
 import { solvableModel } from './member-behaviour';
 import { casesWithDisplacements, imposedOf } from './case-displacements';
 import { collapseVariableResults, variableExpansionFor } from './variable-members';
@@ -244,7 +244,7 @@ export async function runDirectAnalysis(
    * inside a span (`variable-members.ts`), so the base is built from the same expanded model as the
    * loads, and the results read back as one member each. Its refusals are the linear solve's.
    */
-  const refused = imposedRefusal(model);
+  const refused = orphanLoadRefusal(model) ?? imposedRefusal(model);
   if (refused) return refused;
   const solvable = solvableModel(model);
   const expansion = variableExpansionFor(model);

@@ -334,7 +334,7 @@ jobs:
   wasm:
     name: WASM
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     needs: [changes]
     if: needs.changes.outputs.web == 'true'
     steps:
@@ -349,6 +349,7 @@ jobs:
           shared-key: wasm
       - name: Build WASM engine
         run: make wasm
+
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: wasm
@@ -482,7 +483,9 @@ jobs:
   determinism:
     name: Determinism
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    # The browser system libraries come from apt on every run (only the browser binaries are
+    # cached); a slow mirror day took the whole 40 minutes once. Headroom for that.
+    timeout-minutes: 75
     needs: [changes, wasm]
     if: needs.changes.outputs.web == 'true'
     steps:

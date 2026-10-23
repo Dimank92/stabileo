@@ -276,6 +276,31 @@ describe('user spectra', () => {
     expect(panel).toMatch(/userSpectrum\.negative/);
     expect(panel).toMatch(/userSpectrum\.duplicate/);
   });
+
+  it('a spectrum deleted leaves its number unused: a new one is not taken by a case on the old', () => {
+    frame(1);
+    const spectrum = (sa: number) => (id: number): UserSpectrum => ({ id, name: `S${id}`, ordinate: 'Sa', unit: 'g', interpolation: 'linear', points: [[0, sa], [5, sa]] });
+    modelStore.addUserSpectrum(spectrum(0.4));
+    const s2 = modelStore.addUserSpectrum(spectrum(0.8));
+    const ex = modelStore.addLoadCase('Ex', 'E');
+    modelStore.updateLoadCaseFields(ex, { spectral: { source: { kind: 'user', spectrumId: s2 }, factors: { x: 1, y: 0, z: 0 }, rule: 'cqc', xi: 0.05, scale: 1 } as never });
+    // Refused while the case is on it, and says which case.
+    expect(modelStore.removeUserSpectrum(s2)).toBe(false);
+    expect(modelStore.casesOnSpectrum(s2).map((c) => c.name)).toEqual(['Ex']);
+    // Off the case, it goes; the next spectrum takes a new number, also after a save and a load.
+    modelStore.updateLoadCaseFields(ex, { spectral: { source: { kind: 'code' }, factors: { x: 1, y: 0, z: 0 }, rule: 'cqc', xi: 0.05, scale: 1 } as never });
+    expect(modelStore.removeUserSpectrum(s2)).toBe(true);
+    const saved = JSON.parse(JSON.stringify(modelStore.snapshot()));
+    modelStore.clear();
+    modelStore.restore(saved);
+    expect(modelStore.addUserSpectrum(spectrum(0.4))).not.toBe(s2);
+    // A file without the counter, whose case names a spectrum it lost: that number is not given.
+    delete saved.nextId.spectrum;
+    saved.loadCases.find((c: { id: number }) => c.id === ex).spectral.source = { kind: 'user', spectrumId: s2 };
+    modelStore.restore(saved);
+    expect(modelStore.addUserSpectrum(spectrum(0.4))).not.toBe(s2);
+    expect(typeof spectralStore.spectralCaseResults()).toBe('string');
+  });
 });
 
 describe('the structure the mode shapes are imposed on', () => {
