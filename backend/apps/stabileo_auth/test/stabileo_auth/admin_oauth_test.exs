@@ -1,7 +1,7 @@
 defmodule StabileoAuth.AdminOAuthTest do
   use StabileoRepo.DataCase, async: false
 
-  alias StabileoAuth.{AdminOAuth, Tokens}
+  alias StabileoAuth.{AdminOAuth, Sessions, Tokens}
   alias StabileoRepo.Factory
   alias StabileoRepo.Schemas.{Account, Session}
 
@@ -46,6 +46,34 @@ defmodule StabileoAuth.AdminOAuthTest do
 
       assert Repo.aggregate(from(a in Account, where: a.email == "staff@example.com"), :count) ==
                1
+    end
+
+    # Whoever signed the address up in the product may not own it.
+    test "an account nobody verified loses its password and its sessions" do
+      existing = Factory.insert(:account, email: "staff@example.com")
+      {:ok, earlier} = Sessions.create_session(existing)
+
+      assert {:ok, _code} = AdminOAuth.sign_in(google())
+
+      saved = Repo.get!(Account, existing.id)
+      refute Account.valid_password?(saved, Factory.password())
+      assert %DateTime{} = Repo.get!(Session, earlier.id).revoked_at
+    end
+
+    test "an account already verified keeps its password and its sessions" do
+      verified_at = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      existing =
+        Factory.insert(:account, email: "staff@example.com")
+        |> Ecto.Changeset.change(email_verified_at: verified_at)
+        |> Repo.update!()
+
+      {:ok, earlier} = Sessions.create_session(existing)
+
+      assert {:ok, _code} = AdminOAuth.sign_in(google())
+
+      assert Account.valid_password?(Repo.get!(Account, existing.id), Factory.password())
+      assert Repo.get!(Session, earlier.id).revoked_at == nil
     end
 
     test "refuses an unverified email" do

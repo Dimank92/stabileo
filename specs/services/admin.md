@@ -115,6 +115,7 @@ Seeds create `admin@stabileo.com` / `stabileo-demo-password` and allowlist it; d
 | Scenario | Expected Result |
 |----------|-----------------|
 | Google callback: verified, allowed `hd`, allowlisted | Redirect with a code; the exchange answers admin tokens; a new account is created verified if none existed |
+| Google callback for an existing account nobody verified (a product sign-up) | The account becomes verified; its password is replaced and its sessions revoked, since whoever signed it up may not own the address |
 | Google callback: not verified / `hd` or email domain not allowed / not allowlisted / disabled account | Redirect with the matching `oauth_error`, no session |
 | Code reused, expired, or of another type | 401 `invalid_or_expired_code` |
 | Password sign-in with `admin_password_login` off | 404 |

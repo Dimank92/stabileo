@@ -7,6 +7,9 @@ defmodule StabileoAuth.AdminOAuth do
   Google must report the email verified and its Workspace domain (`hd`) at an
   allowed domain: an allowed email suffix alone could be a personal Google
   account registered with a company address.
+
+  An existing account nobody verified is the owner's only from here on: whoever
+  signed it up may not be the owner, so its password and sessions end.
   """
 
   alias StabileoAuth.{Accounts, AdminAccess, AdminAllowedEmails, Sessions, Tokens}
@@ -64,7 +67,7 @@ defmodule StabileoAuth.AdminOAuth do
 
     case Accounts.get_account_by_email(user["email"]) do
       %Account{email_verified_at: nil} = account ->
-        account |> Ecto.Changeset.change(email_verified_at: verified_now) |> Repo.update()
+        claim(account, verified_now)
 
       %Account{} = account ->
         {:ok, account}
@@ -73,7 +76,7 @@ defmodule StabileoAuth.AdminOAuth do
         Accounts.register(%{
           email: user["email"],
           name: user["name"] || user["email"],
-          password: :crypto.strong_rand_bytes(48) |> Base.url_encode64(padding: false)
+          password: random_password()
         })
         |> case do
           {:ok, account} ->
@@ -84,6 +87,23 @@ defmodule StabileoAuth.AdminOAuth do
         end
     end
   end
+
+  defp claim(account, verified_now) do
+    Repo.transaction(fn ->
+      with {:ok, account} <-
+             account
+             |> Account.password_changeset(%{password: random_password()})
+             |> Ecto.Changeset.put_change(:email_verified_at, verified_now)
+             |> Repo.update(),
+           {:ok, _count} <- Sessions.revoke_all(account.id) do
+        account
+      else
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+  end
+
+  defp random_password, do: :crypto.strong_rand_bytes(48) |> Base.url_encode64(padding: false)
 
   defp ensure_active(%Account{is_active: true}), do: :ok
   defp ensure_active(_account), do: {:error, :account_disabled}
