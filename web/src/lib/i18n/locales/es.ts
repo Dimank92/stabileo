@@ -7319,20 +7319,13 @@ const es: Record<string, string> = {
 
   // Requerimientos transversales a nivel de piso. Un conjunto vacío es una respuesta real
   // e indica qué cláusula y qué medición lo dejaron vacío.
-  'detailing.transverse.slabNoneRequired':
-    'No se requiere armadura de corte: v_u = {vu} kN/m contra φv_c = {phiVc} kN/m (§7.6.3.1).',
-  'detailing.transverse.slabShearReinforcementNeeded':
-    'Se requiere armadura de corte —v_u = {vu} kN/m supera φv_c = {phiVc} kN/m— y su dimensionamiento en losas no está implementado.',
-  'detailing.transverse.wallNoTiesRequired':
-    'No se requieren estribos: la cuantía vertical ρ_l = {rho} se mantiene por debajo del 0,01 del §11.7.4.1.',
-  'detailing.transverse.wallTiesNeeded':
-    'Se requieren estribos según §10.7.6: la cuantía vertical ρ_l = {rho} supera el 0,01 del §11.7.4.1.',
-  'detailing.transverse.footingNoneRequired':
-    'No se requiere armadura de corte: el corte en una dirección {oneWay} y el punzonado {punching} los toma el hormigón (§13.2.6).',
-  'detailing.transverse.footingShearNotEstablished':
-    'No se puede descartar armadura de corte: la verificación de la base es {status}.',
-  'detailing.transverse.starterTiesRequired':
-    'Estribos de la jaula de arranque sobre el empalme de {lap} m cada {spacing} m (§10.7.6.1.1, §10.7.6.1.2).',
+  'detailing.transverse.slabNoneRequired': 'No se requiere armadura de corte: v_u = {vu} kN/m contra φv_c = {phiVc} kN/m (§7.6.3.1).',
+  'detailing.transverse.slabShearReinforcementNeeded': 'Se requiere armadura de corte —v_u = {vu} kN/m supera φv_c = {phiVc} kN/m— y su dimensionamiento en losas no está implementado.',
+  'detailing.transverse.wallNoTiesRequired': 'No se requieren estribos: la cuantía vertical ρ_l = {rho} se mantiene por debajo del 0,01 del §11.7.4.1.',
+  'detailing.transverse.wallTiesNeeded': 'Se requieren estribos según §10.7.6: la cuantía vertical ρ_l = {rho} supera el 0,01 del §11.7.4.1.',
+  'detailing.transverse.footingNoneRequired': 'No se requiere armadura de corte: el corte en una dirección {oneWay} y el punzonado {punching} los toma el hormigón (§13.2.6).',
+  'detailing.transverse.footingShearNotEstablished': 'No se puede descartar armadura de corte: la verificación de la base es {status}.',
+  'detailing.transverse.starterTiesRequired': 'Estribos de la jaula de arranque sobre el empalme de {lap} m cada {spacing} m (§10.7.6.1.1, §10.7.6.1.2).',
 
   // El adaptador de producción de piso: cada motivo por el que no se diseñó un elemento.
   'detailing.floorRun.missingNodes': 'Cáscara {element}: faltan uno o más nodos en el modelo.',
@@ -8145,8 +8138,7 @@ const es: Record<string, string> = {
    * estados por familia reusan `design.families.census.unknown` y
    * `design.families.state.noElements`, así que esto es sólo el caso de la lista entera.
    */
-  'design.memberList.nothingClassified':
-    'Todavía no se clasificó ningún elemento. Calculá las solicitaciones y las familias se cuentan.',
+  'design.memberList.nothingClassified': 'Todavía no se clasificó ningún elemento. Calculá las solicitaciones y las familias se cuentan.',
   'design.memberList.emptyModel': 'Este modelo todavía no tiene elementos para detallar.',
   'design.export.cannot.onDisk': "No podemos confirmar que el archivo siga en tu disco: el navegador entrega la descarga y la pierde de vista.",
   'design.export.cannot.kept': "No podemos confirmar que lo hayas guardado: pudiste cancelar el diálogo.",
@@ -10354,6 +10346,9 @@ const es: Record<string, string> = {
   'dxf.loadsNotDrawn': 'Cargas no dibujadas',
   'dxf.deformedScale': 'Deformada',
   'dxf.resultsOf': 'Resultados de',
+  'dxf.noDeformedEnvelope': 'Deformada no dibujada: una envolvente no es un estado deformado, cada valor sale de su propia combinación',
+  'dxf.noDeformedMagnitude': 'Deformada no dibujada: los desplazamientos SRSS o ABS son magnitudes sin signo',
+  'dxf.reactionsValuesOnly': 'Reacciones como valores, sin flechas: sus componentes no son una sola fuerza',
   'proExport.grp.geometry': 'Geometría',
   'proExport.grp.properties': 'Materiales y secciones',
   'proExport.grp.loads': 'Cargas',

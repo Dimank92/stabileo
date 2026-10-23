@@ -47,8 +47,9 @@ test.describe('@smoke blog', () => {
     // The three index pages used to share one title, which made them
     // indistinguishable in a result list. Each names its language's copy now.
     await expect(page).toHaveTitle(/Blog — notes on the solver/);
-    // The application stays mounted behind it, as it does behind the landing.
-    await expect(page.locator('.app-container.hidden-behind-landing')).toHaveCount(1);
+    // The application is not loaded behind it: the public pages render on their own
+    // (Root.svelte), and the application and its engine load on the first app route.
+    await expect(page.locator('.app-container')).toHaveCount(0);
   });
 
   test('opens a post and keeps its address', async ({ page }) => {

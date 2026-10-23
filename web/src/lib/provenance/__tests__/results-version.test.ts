@@ -28,10 +28,11 @@ const RELEASED: Record<number, string[]> = {
     'shell-rigid-motions-and-signs', 'shell-edge-load-sign', 'certificate-solver-fixes', 'cirsoc-combinations-and-loads',
     'section-properties-asymmetric', 'feature-matrix-refusals', 'aisi-cold-formed',
   ],
-  // The fixes merged with 0.3.0 (#530) after version 1 was deployed.
+  // The fixes merged with 0.3.0 (#530) after version 1 was deployed, and the first entries added
+  // under the bump rule after it (#582, #597), which took version 2 on main before this branch.
   2: [
     'curved-shell-moments-and-thermal', 'arc-member-local-axes', 'plastic-3d-element-order', 'cable-tension-chord-law',
-    'soil-curves-references', 'frame-thermal-alpha-depth',
+    'soil-curves-references', 'frame-thermal-alpha-depth', 'free-roof-wind-minimum', 'earth-pressure-dead-load-resisting',
   ],
 };
 

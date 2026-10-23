@@ -175,5 +175,5 @@ Paths are under `web/src/lib/`. Test files: **C** = `codes/cirsoc101/__tests__/v
   altitude accepts values below sea level, so Ke > 1 applies there (down to −105 m in the Gran
   Bajo de San Julián). With H, each combination is also generated without its principal load
   (1,2 D + 1,6 H, 0,9 D + 1,6 H), so the envelope reaches the case where D and H oppose
-  whatever sense of H is stated. Advisory: whether a released result was affected (free roofs
-  at low basic speeds; models with H and D opposing) is assessed in #580.
+  whatever sense of H is stated; with neither wind nor earthquake, 0,9 D + H is generated all the
+  same. Released results were affected: SA-2026-021 (free roofs) and SA-2026-022 (H).

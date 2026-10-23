@@ -387,6 +387,14 @@ pub fn generate_combinations(i: &CombinationInputs) -> Vec<Combination> {
     if p.e {
         push(&mut out, 7, String::new(), vec![term(D, 0.9), term(E, 1.0)], vec![ref_basic()], vec![]);
     }
+    // With H and neither W nor E, 6 and 7 with their principal load not acting are 0,9 D + H: the
+    // check where the dead load resists the earth pressure (a retaining wall). Nothing else in the
+    // set reaches it, since every other combination has D at 1,2 or 1,4.
+    if p.h && !p.w && !p.e {
+        let refs = vec![ref_basic(), cref("cirsoc-101", "2025", "2.3.2", "efectos de cargas que no estén actuando")];
+        let notes = vec![note_with("loads.cirsoc101.note.notActing", json!({ "loads": "W, E" }))];
+        push(&mut out, 6, "-noWE".to_string(), vec![term(D, 0.9)], refs, notes);
+    }
 
     // §2.3.2: the effects of one or more loads not acting.
     if i.not_acting.unwrap_or(true) {

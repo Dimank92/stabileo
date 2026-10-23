@@ -7613,8 +7613,7 @@ const pt: Translations = {
    * estados por família reutilizam `design.families.census.unknown` e
    * `design.families.state.noElements`, portanto este é só o caso da lista inteira.
    */
-  'design.memberList.nothingClassified':
-    'Nenhum elemento foi classificado ainda. Calcule os esforços e as famílias serão contadas.',
+  'design.memberList.nothingClassified': 'Nenhum elemento foi classificado ainda. Calcule os esforços e as famílias serão contadas.',
   'design.memberList.emptyModel': 'Este modelo ainda não tem elementos para detalhar.',
   'design.export.cannot.onDisk': "Não podemos confirmar que o arquivo continua no seu disco: o navegador entrega o download e o perde de vista.",
   'design.export.cannot.kept': "Não podemos confirmar que você salvou: o diálogo pode ter sido cancelado.",
@@ -9998,6 +9997,9 @@ const pt: Translations = {
   'dxf.loadsNotDrawn': 'Cargas não desenhadas',
   'dxf.deformedScale': 'Deformada',
   'dxf.resultsOf': 'Resultados de',
+  'dxf.noDeformedEnvelope': 'Deformada não desenhada: uma envoltória não é um estado deformado, cada valor vem de sua própria combinação',
+  'dxf.noDeformedMagnitude': 'Deformada não desenhada: os deslocamentos SRSS ou ABS são magnitudes sem sinal',
+  'dxf.reactionsValuesOnly': 'Reações como valores, sem setas: seus componentes não são uma só força',
   'proExport.grp.geometry': 'Geometria',
   'proExport.grp.properties': 'Materiais e seções',
   'proExport.grp.loads': 'Cargas',

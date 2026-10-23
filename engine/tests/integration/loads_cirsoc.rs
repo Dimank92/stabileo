@@ -111,6 +111,14 @@ fn with_earth_pressure_the_principal_load_not_acting_is_generated() {
         assert!(has(&c, &[(LoadSymbol::D, 1.2), (LoadSymbol::H, 1.6)]), "{action:?}: {:?}", labels(&c));
         assert!(has(&c, &[(LoadSymbol::D, 0.9), (LoadSymbol::H, 1.6)]), "{action:?}: {:?}", labels(&c));
     }
+    // With H and neither wind nor earthquake: 0,9 D + 1,6 H all the same (6 and 7 with W, E not acting).
+    let i = CombinationInputs {
+        present: Present { l: true, h: true, ..Default::default() },
+        earth_pressure_action: Some(EarthPressureAction::Adds),
+        ..Default::default()
+    };
+    let c = generate_combinations(&i);
+    assert!(has(&c, &[(LoadSymbol::D, 0.9), (LoadSymbol::H, 1.6)]), "{:?}", labels(&c));
     // Without H, nothing changes: the principal stays in every combination that prints it.
     let i = CombinationInputs { present: Present { l: true, ..Default::default() }, ..Default::default() };
     assert!(!has(&generate_combinations(&i), &[(LoadSymbol::D, 1.2)]));

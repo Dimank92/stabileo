@@ -44,7 +44,8 @@
  * Taking the principal load away needs no combination of its own: what is left lies between
  * 1,4 D and a combination the set already holds, so its effect is inside their envelope. Except
  * with H: 1,2 D + 1,6 H is not between them when D and H act in opposite senses, so a
- * combination with H is also emitted without its principal load (1,2 D + 1,6 H, 0,9 D + 1,6 H).
+ * combination with H is also emitted without its principal load (1,2 D + 1,6 H, 0,9 D + 1,6 H),
+ * and with neither W nor E there, 0,9 D + H is emitted all the same (6 and 7 with W, E not acting).
  *
  * Seismic combinations. INPRES-CIRSOC 103-2018 Parte I §3.7.1 defines the combinations that
  * include the earthquake as [3.16] 1,2 D ± 1,0 E + f1 L + f2 S and [3.17] 0,9 D ± 1,0 E, f1 and
@@ -320,6 +321,9 @@ export function generateCombinations(inputs: CombinationInputs): LoadCombination
 
   // ── 7. 0,9 D + 1,0 E ──
   if (p.E) push(7, '', [{ symbol: 'D', factor: 0.9 }, { symbol: 'E', factor: 1.0 }], [REF_BASIC], []);
+
+  // ── 6 and 7 with W and E not acting, when H is there and they are not: 0,9 D + H ──
+  if (p.H && !p.W && !p.E) push(6, '-noWE', [{ symbol: 'D', factor: 0.9 }], [REF_BASIC, REF_NOT_ACTING], [msg('loads.cirsoc101.note.notActing', { loads: 'W, E' })]);
 
   // ── §2.3.2, loads not acting ──
   if (inputs.notActing ?? true) {
