@@ -31,7 +31,7 @@ import {
 import { catalogueGradeFamily } from '../engine/steel/grade-family';
 import { runOrientationDiagnostic } from '../engine/design/orientation-diagnostic';
 import { runDesign, designMember, DEFAULT_RUN_MS } from '../engine/design/candidate-search';
-import { getDesignCode, type DesignCodeId } from '../engine/design/code-adapter';
+import { getDesignCode } from '../engine/design/code-adapter';
 import { emptyRunSummary, type DesignRunSummary, type MemberDesignOutcome } from '../engine/design/outcome';
 import type { RunProgress } from '../engine/design/candidate-search';
 import { designDemands, isDesignedMember } from '../engine/design/behaviour-demands';

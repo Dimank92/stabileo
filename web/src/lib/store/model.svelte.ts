@@ -2298,12 +2298,10 @@ function createModelStore() {
         releaseJ: { ...(v.releaseJ ?? NO_RELEASE) },
       }]));
       // Deduplicate supports: keep only the last support per node (legacy cleanup)
-      const supEntries = s.supports.map(([k, v]) => [k, {
-        ...v,
-        type: normalize2DSupportType(v.type as SupportType),
-        dz: canonicalSupportDz(v),
-        dry: canonicalSupportDry(v),
-      }] as [number, Support]);
+      const supEntries = s.supports.map(([k, v]) => {
+        const sup = { ...v, type: normalize2DSupportType(v.type as SupportType) } as Support;
+        return [k, { ...sup, dz: canonicalSupportDz(sup), dry: canonicalSupportDry(sup) }] as [number, Support];
+      });
       const seenNodes = new Set<number>();
       const dedupedEntries: [number, Support][] = [];
       for (let i = supEntries.length - 1; i >= 0; i--) {

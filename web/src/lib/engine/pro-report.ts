@@ -955,7 +955,6 @@ export function generateReportHtml(data: ReportData): string {
     html.push(`<p><span class="status-ok">${escHtml(interp(tr('report.statusOk'), { n: ok }))}</span> · <span class="status-warn">${escHtml(interp(tr('report.statusWarn'), { n: warn }))}</span> · <span class="status-fail">${escHtml(interp(tr('report.statusFail'), { n: fail }))}</span></p>`);
 
     // Summary table — grouped by element with per-combo force rows
-    const hasCombos = data.combinations && data.combinations.length > 0;
     const comboForces = data.comboForces;
     const typeOrd: Record<string, number> = { column: 0, wall: 1, beam: 2 };
     const sortedVerifs = [...verifications].sort((a, b) => {

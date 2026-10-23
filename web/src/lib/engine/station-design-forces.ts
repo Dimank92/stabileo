@@ -22,8 +22,7 @@ import { prepareSection, type Bar as SectionBar, type PreparedSection } from './
  */
 
 import { seatedLongitudinalHalfExtents } from '../codes/cirsoc201/transverse-cage';
-import type { ProvidedReinforcement, RebarGroup, RebarLayer, StirrupDef, BeamRegions, BeamContinuity, LongBarGroup, ColumnReinforcement } from '../store/model.svelte';
-import type { Node, Element, Section, Support } from '../store/model.svelte';
+import type { ProvidedReinforcement, RebarGroup, RebarLayer, StirrupDef, BeamContinuity, LongBarGroup, ColumnReinforcement } from '../store/model.svelte';
 import {
   minClearBetweenLayers, minClearSpacingColumn, minClearSpacingInLayer,
 } from '../codes/cirsoc201/spacing';
@@ -224,8 +223,6 @@ export function computeBeamCriticalSections(
 
 /** Extract governing demands from station-level per-combo data. */
 export function extractGoverningDemands(esr: ElementStationResult): ElementDesignDemands {
-  const demands: GoverningDemand[] = [];
-
   type Cat = GoverningDemand['category'];
   const best = new Map<Cat, GoverningDemand>();
 
@@ -931,7 +928,6 @@ export function computeColumnLayout(
 
   const bars: BarInstance[] = [];
 
-  const faceR = resolved.faceDia / 2000;
   /** Inner face of the transverse steel — what the cover check measures against. */
   const envelope = cover + stirrupDia / 1000;
 

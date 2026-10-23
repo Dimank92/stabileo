@@ -79,7 +79,7 @@
 
 import {
   arcSegment, centrelineRadius, developedLength, minMandrelDiameter, standardHook,
-  straightSegment, type BarPath, type BarSegment, type HookAngle, type HookGeometry,
+  straightSegment, type BarPath, type BarSegment, type HookAngle,
   type Point3,
 } from './bar-geometry';
 import {
