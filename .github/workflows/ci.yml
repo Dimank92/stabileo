@@ -15,6 +15,12 @@ env:
 permissions:
   contents: read
 
+# Self-hosted runners (Stabileo's own server stabileo-ci-1, dotfiles servers/runners-stabileo.sh,
+# label `stabileo`): the Rust and WASM jobs and web-unit run there when the repository variable
+# STABILEO_SELF_HOSTED is 'true', and only for trusted events (the merge queue, pushes to main),
+# never for pull_request: the repo is public. Their build output stays warm on the host
+# (CARGO_TARGET_DIR per runner), so they skip rust-cache, and mold is part of the host. Unset or
+# 'false', every job runs on GitHub's runners as before: the variable is the switch, both ways.
 jobs:
   backend-test:
     runs-on: ubuntu-latest
@@ -26,12 +32,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: 1.99.1
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - if: runner.environment == 'github-hosted'
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Backend tests
         run: cargo test --locked -p dedaliano-backend
 
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ${{ (vars.STABILEO_SELF_HOSTED == 'true' && github.event_name != 'pull_request') && fromJSON('["self-hosted","stabileo"]') || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -51,13 +58,15 @@ jobs:
       # A pinned mold release tarball (wget with retries). apt used to install it here and could
       # stall for an hour on a mirror; the version is the flake's (scripts/check-pins.sh).
       - name: Install mold linker
+        if: runner.environment == 'github-hosted'
         uses: rui314/setup-mold@da13e0b42e392e3a45d1215033a2270b849d7d36 # main, 2026-10-08
         with:
           mold-version: 2.40.4
           make-default: false
         timeout-minutes: 5
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - if: runner.environment == 'github-hosted'
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: engine
 
@@ -71,7 +80,7 @@ jobs:
   # cargo nextest list --profile ci -E '<filter>' | wc -l — suite + gates must
   # equal the old combined filter's count).
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ (vars.STABILEO_SELF_HOSTED == 'true' && github.event_name != 'pull_request') && fromJSON('["self-hosted","stabileo"]') || 'ubuntu-latest' }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -86,13 +95,15 @@ jobs:
       # A pinned mold release tarball (wget with retries). apt used to install it here and could
       # stall for an hour on a mirror; the version is the flake's (scripts/check-pins.sh).
       - name: Install mold linker
+        if: runner.environment == 'github-hosted'
         uses: rui314/setup-mold@da13e0b42e392e3a45d1215033a2270b849d7d36 # main, 2026-10-08
         with:
           mold-version: 2.40.4
           make-default: false
         timeout-minutes: 5
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - if: runner.environment == 'github-hosted'
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: engine
           # One cache for the two jobs that build the same debug test binaries.
@@ -167,7 +178,7 @@ jobs:
   # (they run in the `test` job) and the wall-clock timing benchmarks/perf
   # binaries (validated in their dedicated single-threaded gate steps).
   suite:
-    runs-on: ubuntu-latest
+    runs-on: ${{ (vars.STABILEO_SELF_HOSTED == 'true' && github.event_name != 'pull_request') && fromJSON('["self-hosted","stabileo"]') || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
@@ -185,13 +196,15 @@ jobs:
       # A pinned mold release tarball (wget with retries). apt used to install it here and could
       # stall for an hour on a mirror; the version is the flake's (scripts/check-pins.sh).
       - name: Install mold linker
+        if: runner.environment == 'github-hosted'
         uses: rui314/setup-mold@da13e0b42e392e3a45d1215033a2270b849d7d36 # main, 2026-10-08
         with:
           mold-version: 2.40.4
           make-default: false
         timeout-minutes: 5
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - if: runner.environment == 'github-hosted'
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: engine
           # One cache for the two jobs that build the same debug test binaries.
@@ -213,7 +226,7 @@ jobs:
   # shard's 20 minutes unoptimised (the engine crate's [profile.test] is not
   # applied in this workspace, so the suite builds at opt-level 0).
   metamorphic:
-    runs-on: ubuntu-latest
+    runs-on: ${{ (vars.STABILEO_SELF_HOSTED == 'true' && github.event_name != 'pull_request') && fromJSON('["self-hosted","stabileo"]') || 'ubuntu-latest' }}
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -228,13 +241,15 @@ jobs:
       # A pinned mold release tarball (wget with retries). apt used to install it here and could
       # stall for an hour on a mirror; the version is the flake's (scripts/check-pins.sh).
       - name: Install mold linker
+        if: runner.environment == 'github-hosted'
         uses: rui314/setup-mold@da13e0b42e392e3a45d1215033a2270b849d7d36 # main, 2026-10-08
         with:
           mold-version: 2.40.4
           make-default: false
         timeout-minutes: 5
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - if: runner.environment == 'github-hosted'
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: engine
           key: metamorphic-release
@@ -252,7 +267,7 @@ jobs:
   # times: web-unit ×2, web-build, determinism, e2e ×5). The glue is gitignored, so without it
   # Vite would substitute a stub solver; the e2e readiness gate fails loudly if that happens.
   wasm:
-    runs-on: ubuntu-latest
+    runs-on: ${{ (vars.STABILEO_SELF_HOSTED == 'true' && github.event_name != 'pull_request') && fromJSON('["self-hosted","stabileo"]') || 'ubuntu-latest' }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -271,7 +286,8 @@ jobs:
           tool: wasm-pack@0.13.1
         timeout-minutes: 5
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - if: runner.environment == 'github-hosted'
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: engine
           shared-key: wasm
@@ -371,7 +387,7 @@ jobs:
   # tests need Chromium and the built app, so they stay with the build.
   web-unit:
     needs: wasm
-    runs-on: ubuntu-latest
+    runs-on: ${{ (vars.STABILEO_SELF_HOSTED == 'true' && github.event_name != 'pull_request') && fromJSON('["self-hosted","stabileo"]') || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
