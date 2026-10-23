@@ -21,7 +21,7 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { test, expect, solveModel, designAll, openBasicProjectPanel, acknowledgeRecheck } from './fixtures';
+import { test, expect, solveModel, designAll, openBasicProjectPanel } from './fixtures';
 import type { Page } from '@playwright/test';
 import { validateAgainstSchema } from '../src/lib/export/json-schema-subset';
 import {
@@ -74,8 +74,6 @@ async function openCommittedProject(page: Page) {
   const input = page.getByTestId('project-open-file');
   await expect(input).toBeAttached();
   await input.setInputFiles(FIXTURE);
-  // A committed project, solved with an earlier results version: it raises the re-check notice.
-  await acknowledgeRecheck(page);
 
   // Wait on real state: the restored project carries eight elements and has returned the app to
   // PRO on its own, because that is the mode it was saved in.
