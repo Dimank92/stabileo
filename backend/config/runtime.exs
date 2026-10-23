@@ -9,6 +9,14 @@ if config_env() == :prod do
     ssl: StabileoUtils.fetch_env("DATABASE_SSL") == "true",
     pool_size: StabileoUtils.fetch_env_integer("POOL_SIZE", 10)
 
+  # The proxies whose X-Forwarded-For entries are believed (StabileoRepo.Plugs.RequestMetadata).
+  config :stabileo_repo,
+    trusted_proxies:
+      "TRUSTED_PROXIES"
+      |> StabileoUtils.fetch_env("")
+      |> String.split(",", trim: true)
+      |> Enum.map(&String.trim/1)
+
   secret_key_base =
     StabileoUtils.fetch_env!(
       "SECRET_KEY_BASE",

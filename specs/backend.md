@@ -55,7 +55,7 @@ Every new table answers in its PR: does any operation on it have a concurrency i
 ## Configuration
 
 - Environment variables are read only in `config/runtime.exs`, through `StabileoUtils.fetch_env!/2` and friends (Credo `NoRawEnv` enforces it)
-- Production needs `DATABASE_URL`, `SECRET_KEY_BASE`, `JWT_SECRET`, `PHX_HOST`, `API_URL` (the backend's public URL, for the Google callback) and `ADMIN_FRONTEND_URL`; Google admin sign-in needs `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Optional: `PORT`, `BIND_ADDRESS`, `POOL_SIZE`, `DATABASE_SSL`, `ACCESS_TOKEN_TTL`, `REFRESH_TOKEN_TTL`, `ADMIN_REFRESH_TOKEN_TTL`, and `ADMIN_DOMAINS` and `CORS_ALLOWED_ORIGINS` (both comma-separated; CORS must include the admin site's origin)
+- Production needs `DATABASE_URL`, `SECRET_KEY_BASE`, `JWT_SECRET`, `PHX_HOST`, `API_URL` (the backend's public URL, for the Google callback) and `ADMIN_FRONTEND_URL`; Google admin sign-in needs `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Optional: `PORT`, `BIND_ADDRESS`, `POOL_SIZE`, `DATABASE_SSL`, `ACCESS_TOKEN_TTL`, `REFRESH_TOKEN_TTL`, `ADMIN_REFRESH_TOKEN_TTL`, and `ADMIN_DOMAINS`, `CORS_ALLOWED_ORIGINS` and `TRUSTED_PROXIES` (all comma-separated; CORS must include the admin site's origin; `TRUSTED_PROXIES` are the addresses of the proxies whose `X-Forwarded-For` the backend believes, none by default)
 - Runtime switches admins flip live go in `system_settings` (`StabileoRepo.SystemSettings`, `StabileoRepo.Features`), not environment variables
 - The first production admin: `bin/stabileo eval 'StabileoAuth.Release.allow_admin_email("you@lambdaclass.com")'`
 
