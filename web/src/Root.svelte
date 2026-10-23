@@ -18,6 +18,7 @@
   import { parsePublicPath, publicHref } from './lib/i18n/public-routes';
   import { publicI18n, setLocale } from './lib/i18n/store.svelte';
   import { routeKind } from './lib/public-route';
+  import { modeToPath } from './lib/app-mode';
 
   /** The page this address is (`lib/public-route.ts`, which main.ts reads too). */
   const route = () => routeKind();
@@ -62,9 +63,9 @@
   }
   function onEnterApp() {
     if (app) return;
-    // App.svelte decides its mode from the address, so the address goes first: the one its own
-    // enterApp() pushes from a public page (`modeToPath('basico')`).
-    if (route().kind !== 'app') history.pushState(null, '', '/app/basic');
+    // App.svelte decides its mode from the address, so the address goes first: the one App's own
+    // enterApp() pushes from a public page.
+    if (route().kind !== 'app') history.pushState(null, '', modeToPath('basico'));
     sync();
   }
   function onPopState() {

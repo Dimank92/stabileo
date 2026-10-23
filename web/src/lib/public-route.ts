@@ -14,11 +14,21 @@ const SHARED_MODEL = /^#(data=|embed=|code=)/;
 
 export type RouteKind = 'app' | 'blog' | 'landing';
 
+/** `/app` and everything under it: the application's own addresses. */
+export function isAppPath(pathname: string): boolean {
+  return pathname === '/app' || pathname.startsWith('/app/');
+}
+
+/** `/demo`: the application, on its demo model. */
+export function isDemoPath(pathname: string): boolean {
+  return pathname === '/demo' || pathname === '/demo/';
+}
+
 export function routeKind(loc: Pick<Location, 'pathname' | 'search' | 'hash'> = location): { kind: RouteKind; path: string } {
   const { path } = parsePublicPath(loc.pathname);
   const params = new URLSearchParams(loc.search);
   const p = loc.pathname;
-  if (params.has('embed') || p === '/app' || p.startsWith('/app/') || p === '/demo' || p === '/demo/') return { kind: 'app', path };
+  if (params.has('embed') || isAppPath(p) || isDemoPath(p)) return { kind: 'app', path };
   // A shared model (`/#data=…`, `#embed=…`, `#code=…`) is the application's to restore
   // (`loadFromURLHash`): it used to be mounted behind the landing and read the fragment.
   if (SHARED_MODEL.test(loc.hash)) return { kind: 'app', path };
@@ -27,8 +37,14 @@ export function routeKind(loc: Pick<Location, 'pathname' | 'search' | 'hash'> = 
 }
 
 /**
- * A path 404.html handed over (`/?route=/es/blog/x`), restored as App.svelte does: through the
- * URL builder, with the fragment kept on this address. Before anything reads the route.
+ * A path 404.html handed over (`/?route=/es/blog/x`), restored before anything reads the route.
+ *
+ * Restored through the URL builder, not verbatim. 404.html hands the path over exactly as it was
+ * typed or shared, and putting that straight back in the address bar reinstates whatever shape it
+ * had, including the unslashed form the site no longer publishes: a reader arriving on an old link
+ * would then be looking at an address that disagrees with the page's own canonical. 404.html keeps
+ * the fragment out of `route` (a shared model's `#data=` is too long for the host's request line),
+ * so it is still on this address and goes back after the path.
  */
 export function restoreRedirectedRoute(): void {
   const redirectedRoute = new URLSearchParams(location.search).get('route');
