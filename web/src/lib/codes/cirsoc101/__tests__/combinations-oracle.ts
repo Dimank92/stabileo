@@ -42,7 +42,10 @@
  * effect opposes the principal one (a live load whose moment counters the wind's in a column)
  * lowers the combination, and the printed one alone does not reach the case where it is absent.
  * Taking the principal load away needs no combination of its own: what is left lies between
- * 1,4 D and a combination the set already holds, so its effect is inside their envelope.
+ * 1,4 D and a combination the set already holds, so its effect is inside their envelope. Except
+ * with H: 1,2 D + 1,6 H is not between them when D and H act in opposite senses, so a
+ * combination with H is also emitted without its principal load (1,2 D + 1,6 H, 0,9 D + 1,6 H),
+ * and with neither W nor E there, 0,9 D + H is emitted all the same (6 and 7 with W, E not acting).
  *
  * Seismic combinations. INPRES-CIRSOC 103-2018 Parte I §3.7.1 defines the combinations that
  * include the earthquake as [3.16] 1,2 D ± 1,0 E + f1 L + f2 S and [3.17] 0,9 D ± 1,0 E, f1 and
@@ -140,7 +143,7 @@ const REF_103_COMB = clause('inpres-cirsoc-103-i', '2018', '3.7.1', 'combinació
 
 /** The principal load of each printed combination: the others in it are its companions. */
 const PRINCIPAL: Readonly<Record<number, readonly LoadSymbol[]>> = {
-  2: ['L'], 3: ['Lr', 'S', 'R'], 4: ['W'], 5: ['E'],
+  2: ['L'], 3: ['Lr', 'S', 'R'], 4: ['W'], 5: ['E'], 6: ['W'], 7: ['E'],
 };
 /** Loads a combination can be investigated without: the variable ones. D, F, H stay. */
 const COMPANION: ReadonlySet<LoadSymbol> = new Set(['L', 'Lr', 'S', 'R', 'W', 'E']);
@@ -319,6 +322,9 @@ export function generateCombinations(inputs: CombinationInputs): LoadCombination
   // ── 7. 0,9 D + 1,0 E ──
   if (p.E) push(7, '', [{ symbol: 'D', factor: 0.9 }, { symbol: 'E', factor: 1.0 }], [REF_BASIC], []);
 
+  // ── 6 and 7 with W and E not acting, when H is there and they are not: 0,9 D + H ──
+  if (p.H && !p.W && !p.E) push(6, '-noWE', [{ symbol: 'D', factor: 0.9 }], [REF_BASIC, REF_NOT_ACTING], [msg('loads.cirsoc101.note.notActing', { loads: 'W, E' })]);
+
   // ── §2.3.2, loads not acting ──
   if (inputs.notActing ?? true) {
     const seen = new Set(out.map((c) => termKey(c.terms)));
@@ -327,7 +333,9 @@ export function generateCombinations(inputs: CombinationInputs): LoadCombination
       const c = out[k]!;
       const principal = PRINCIPAL[c.basic ?? 0];
       if (!principal) continue;
-      const companions = c.terms.filter((t) => COMPANION.has(t.symbol) && !principal.includes(t.symbol) && t.factor !== 0);
+      // With H in it, the principal load goes too: 1,2 D + 1,6 H is not inside the envelope.
+      const withH = c.terms.some((t) => t.symbol === 'H' && t.factor !== 0);
+      const companions = c.terms.filter((t) => COMPANION.has(t.symbol) && (withH || !principal.includes(t.symbol)) && t.factor !== 0);
       // Combination 2 with no L takes its roof load as the principal: it has no companion then.
       if (!c.terms.some((t) => principal.includes(t.symbol))) continue;
       for (let mask = 1; mask < 1 << companions.length; mask++) {

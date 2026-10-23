@@ -81,7 +81,10 @@ const en: Record<string, string> = {
   'landing.ebProDesign': 'PRO · DESIGN',
   'landing.badgeDevOpen': 'IN DEVELOPMENT · OPEN ACCESS',
   'landing.proDesignH': 'Code verification and element design.',
-  'landing.proDesignP': 'Once the analysis is done, design the elements you need against the code that applies. Today it works with the Argentine codes (CIRSOC), and it is structured so that other countries’ codes can be added.',
+  'landing.proDesignP': 'Once the analysis is done, check and design members against the code. Today it checks reinforced concrete (CIRSOC 201) and steel (CIRSOC 301, experimental) and generates loads and combinations to CIRSOC 101, 102, 103 and 104; it is structured so that other countries’ codes can be added.',
+  'landing.metaDescription': 'Free, open-source structural analysis: 2D and 3D frames and trusses in your browser, nothing to install, with design checks to CIRSOC 201 and 301.',
+  'landing.metaTitle': 'Stabileo — Free structural analysis software, in your browser',
+  'landing.proDesignCirsocLink': 'What it checks against CIRSOC today',
   'landing.ebAi': 'STABILEO AI',
   'landing.badgeDevPaid': 'IN DEVELOPMENT',
   'landing.aiH': 'An agent that builds, reviews and explains models.',
@@ -106,6 +109,8 @@ const en: Record<string, string> = {
   'landing.footRepo': 'GitHub',
   'landing.footDocs': 'Documentation',
   'landing.footBlog': 'Blog',
+  'landing.footReliability': 'Reliability',
+  'landing.footSap2000': 'SAP2000 alternative',
   'landing.footRights': 'Free software under AGPL-3.0.',
   'landing.footLaunch': 'Open the editor',
   'landing.footSocial': 'Follow us',
@@ -7325,20 +7330,13 @@ const en: Record<string, string> = {
 
   // Floor-level transverse requirements. An empty requirement set is a real answer and
   // says which clause and which measurement made it empty.
-  'detailing.transverse.slabNoneRequired':
-    'No shear reinforcement required: v_u = {vu} kN/m against φv_c = {phiVc} kN/m (§7.6.3.1).',
-  'detailing.transverse.slabShearReinforcementNeeded':
-    'Shear reinforcement is required — v_u = {vu} kN/m exceeds φv_c = {phiVc} kN/m — and sizing it for slabs is not implemented.',
-  'detailing.transverse.wallNoTiesRequired':
-    'No ties required: the vertical ratio ρ_l = {rho} stays under the 0.01 of §11.7.4.1.',
-  'detailing.transverse.wallTiesNeeded':
-    'Ties per §10.7.6 are required: the vertical ratio ρ_l = {rho} exceeds the 0.01 of §11.7.4.1.',
-  'detailing.transverse.footingNoneRequired':
-    'No shear reinforcement required: one-way {oneWay} and punching {punching} are carried by the concrete (§13.2.6).',
-  'detailing.transverse.footingShearNotEstablished':
-    'Shear reinforcement cannot be ruled out: the footing check is {status}.',
-  'detailing.transverse.starterTiesRequired':
-    'Starter cage ties over the {lap} m lap at {spacing} m centers (§10.7.6.1.1, §10.7.6.1.2).',
+  'detailing.transverse.slabNoneRequired': 'No shear reinforcement required: v_u = {vu} kN/m against φv_c = {phiVc} kN/m (§7.6.3.1).',
+  'detailing.transverse.slabShearReinforcementNeeded': 'Shear reinforcement is required — v_u = {vu} kN/m exceeds φv_c = {phiVc} kN/m — and sizing it for slabs is not implemented.',
+  'detailing.transverse.wallNoTiesRequired': 'No ties required: the vertical ratio ρ_l = {rho} stays under the 0.01 of §11.7.4.1.',
+  'detailing.transverse.wallTiesNeeded': 'Ties per §10.7.6 are required: the vertical ratio ρ_l = {rho} exceeds the 0.01 of §11.7.4.1.',
+  'detailing.transverse.footingNoneRequired': 'No shear reinforcement required: one-way {oneWay} and punching {punching} are carried by the concrete (§13.2.6).',
+  'detailing.transverse.footingShearNotEstablished': 'Shear reinforcement cannot be ruled out: the footing check is {status}.',
+  'detailing.transverse.starterTiesRequired': 'Starter cage ties over the {lap} m lap at {spacing} m centers (§10.7.6.1.1, §10.7.6.1.2).',
 
   // The floor-design production adapter — every reason a shell was not designed.
   'detailing.floorRun.missingNodes': 'Shell {element}: one or more nodes are missing from the model.',
@@ -8152,8 +8150,7 @@ const en: Record<string, string> = {
    * per-family states reuse `design.families.census.unknown` and
    * `design.families.state.noElements`, so this is only the whole-list case.
    */
-  'design.memberList.nothingClassified':
-    'No element has been classified yet. Compute the demands and the families will be counted.',
+  'design.memberList.nothingClassified': 'No element has been classified yet. Compute the demands and the families will be counted.',
   'design.memberList.emptyModel': 'This model holds no elements to detail yet.',
   'design.export.cannot.onDisk': "We cannot confirm the file is still on your disk: the browser hands over the download and loses sight of it.",
   'design.export.cannot.kept': 'We cannot confirm you saved it: the dialog may have been canceled.',
@@ -8733,6 +8730,13 @@ const en: Record<string, string> = {
   'wind.other.noDiameter': "The {kind} has levels of a single node, which span no width: give its diameter D. No wind is generated for it.",
   'wind.other.width': "Face width (stick model)",
   'wind.other.diameter': "Diameter D (stick model)",
+  'wind.other.minimumCase': "Wind {dir}, open-building minimum (§2.1.5)",
+  'wind.other.minimumOpen': "§2.1.5 minimum, wind {dir}: F = 0.75 kN/m² × Af = 0.75 × {af} m² = {f} kN, a load case of its own at the roof's nodes.",
+  'wind.other.minimumOpenEnvelope': "§2.1.5 minimum, wind {dir}: F = 0.75 kN/m² × Af = 0.75 × {af} m² = {f} kN, a load case of its own at the roof's nodes. Af is the structure's whole vertical projection, which is never less than the real one; give Af to use the area of the roof, columns and bracing alone.",
+  'wind.other.minimumMissing': "No §2.1.5 minimum for wind {dir}: the structure has no height or width to project. Give Af.",
+  'wind.other.areaX': "Af, wind along X (§2.1.5)",
+  'wind.other.areaY': "Af, wind along Y (§2.1.5)",
+  'wind.other.envelope': "whole projection",
   'wind.other.fromModel': "from the model",
   'wind.other.noSign': "The clearance leaves no face: the sign is not loaded.",
   'wind.other.signCaseC': "B/s ≥ 2: Figure 4.4-1 also asks for case C, which is not generated.",
@@ -9187,7 +9191,10 @@ const en: Record<string, string> = {
   'spec.axial.frame': "Normal (frame)",
   'spec.axial.truss': "Truss (axial only)",
   'spec.axial.cable': "Cable",
-  'spec.axial.cableHint': "A cable works in tension only, and its own weight softens it (Ernst's equivalent modulus) and gives it sag. The results report tension, horizontal thrust, sag and modulus. It has no pretension: its unstretched length is the chord.",
+  'spec.axial.cableHint': "A cable works in tension only, and its own weight softens it (Ernst's equivalent modulus) and gives it sag. The results report tension, horizontal thrust, sag and modulus. Its unstretched length is the chord unless you give its pretension: its tension on the drawn chord under its own weight.",
+  'spec.axial.cablePretension': "Pretension",
+  'spec.axial.cableChord': "none: the chord",
+  'cableDiag.selfWeight': "Up to {pct} % of these cables' tension comes from their own weight, with the drawn chord as their unstressed length, and keeps them taut whatever the loads. Give each its pretension (Specifications › Members), or make it a truss member if it is not a cable.",
   'spec.supports.empty': "Select supports to see and change their specifications.",
   'spec.supports.title': "{n} supports selected",
   'spec.supports.oneForDetail': "Restraints, springs, curves and the inclined support are edited one support at a time: select just one.",
@@ -10354,6 +10361,9 @@ const en: Record<string, string> = {
   'dxf.loadsNotDrawn': 'Loads not drawn',
   'dxf.deformedScale': 'Deformed shape',
   'dxf.resultsOf': 'Results of',
+  'dxf.noDeformedEnvelope': 'Deformed shape not drawn: an envelope is no deflected state, each value comes from its own combination',
+  'dxf.noDeformedMagnitude': 'Deformed shape not drawn: SRSS or ABS displacements are magnitudes without a sign',
+  'dxf.reactionsValuesOnly': 'Reactions as values, without arrows: their components are not one force',
   'proExport.grp.geometry': 'Geometry',
   'proExport.grp.properties': 'Materials and sections',
   'proExport.grp.loads': 'Loads',

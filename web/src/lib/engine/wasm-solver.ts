@@ -1922,7 +1922,7 @@ export interface CableForce3D {
   sag: number;
   /** The equivalent (Ernst) modulus the iteration settled on, kN/m². */
   ernstModulus: number;
-  /** The engine takes the chord as the unstretched length: there is no pretension. */
+  /** The chord, or with a pretension given, the length it sets (#527). */
   unstretchedLength: number;
 }
 
@@ -1943,17 +1943,19 @@ export interface CableAnalysis3D {
  * Solve a 3D cable analysis via WASM: the members typed `cable` carry tension only, and their own
  * weight, from the densities, softens them (Ernst's equivalent modulus) and sets the sag they
  * report. It is not applied to them as a load. The rest of the model is linear. Same payload as
- * the 2D one, `{ solver, densities }`, with densities in kg/m³.
+ * the 2D one, `{ solver, densities, pretension }`, with densities in kg/m³ and a pretension per
+ * cable in kN (element id → its tension on the drawn chord under its own weight; #527).
  */
 export function solveCable3D(
   input: SolverInputCable3D,
   maxIter = 50,
   tolerance = 1e-6,
   densities: Record<string, number> = {},
+  pretension: Record<string, number> = {},
 ): CableAnalysis3D {
   if (!wasmReady || !wasmSolveCable3d) throw new Error('WASM cable 3D solver not available.');
   // The wire form does not look at the member type; it passes `cable` through to the engine.
-  const payload = { solver: JSON.parse(serializeInput3D(input as unknown as SolverInput3D)), densities };
+  const payload = { solver: JSON.parse(serializeInput3D(input as unknown as SolverInput3D)), densities, pretension };
   // As the engine answers: its caller finishes the results (`solve-finish.ts`, member-behaviour.ts).
   return JSON.parse(wasmSolveCable3d(JSON.stringify(payload), maxIter, tolerance)) as CableAnalysis3D;
 }

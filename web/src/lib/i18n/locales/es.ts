@@ -81,7 +81,10 @@ const es: Record<string, string> = {
   'landing.ebProDesign': 'PRO · DISEÑO',
   'landing.badgeDevOpen': 'EN DESARROLLO · ACCESO LIBRE',
   'landing.proDesignH': 'Verificación normativa y diseño de elementos.',
-  'landing.proDesignP': 'Después de calcular y obtener los resultados, diseñá los elementos que quieras según el reglamento que corresponda. Hoy trabaja con la normativa argentina (CIRSOC), y está organizado para poder sumar reglamentos de otros países.',
+  'landing.proDesignP': 'Después de calcular, verificá y diseñá los elementos según el reglamento. Hoy verifica hormigón armado (CIRSOC 201) y acero (CIRSOC 301, experimental), y genera las cargas y combinaciones de CIRSOC 101, 102, 103 y 104; está organizado para sumar reglamentos de otros países.',
+  'landing.metaDescription': 'Programa de cálculo estructural gratis y de código abierto: pórticos y reticulados 2D y 3D en el navegador, sin instalar nada, con verificación según CIRSOC 201 y 301.',
+  'landing.metaTitle': 'Stabileo — Software de cálculo estructural gratis, en el navegador',
+  'landing.proDesignCirsocLink': 'Qué verifica hoy según CIRSOC',
   'landing.ebAi': 'STABILEO IA',
   'landing.badgeDevPaid': 'EN DESARROLLO',
   'landing.aiH': 'Un agente que arma, revisa y explica modelos.',
@@ -106,6 +109,8 @@ const es: Record<string, string> = {
   'landing.footRepo': 'GitHub',
   'landing.footDocs': 'Documentación',
   'landing.footBlog': 'Blog',
+  'landing.footReliability': 'Confiabilidad',
+  'landing.footSap2000': 'Alternativa a SAP2000',
   'landing.footRights': 'Software libre bajo AGPL-3.0.',
   'landing.footLaunch': 'Abrir el editor',
   'landing.footSocial': 'Seguinos',
@@ -7315,20 +7320,13 @@ const es: Record<string, string> = {
 
   // Requerimientos transversales a nivel de piso. Un conjunto vacío es una respuesta real
   // e indica qué cláusula y qué medición lo dejaron vacío.
-  'detailing.transverse.slabNoneRequired':
-    'No se requiere armadura de corte: v_u = {vu} kN/m contra φv_c = {phiVc} kN/m (§7.6.3.1).',
-  'detailing.transverse.slabShearReinforcementNeeded':
-    'Se requiere armadura de corte —v_u = {vu} kN/m supera φv_c = {phiVc} kN/m— y su dimensionamiento en losas no está implementado.',
-  'detailing.transverse.wallNoTiesRequired':
-    'No se requieren estribos: la cuantía vertical ρ_l = {rho} se mantiene por debajo del 0,01 del §11.7.4.1.',
-  'detailing.transverse.wallTiesNeeded':
-    'Se requieren estribos según §10.7.6: la cuantía vertical ρ_l = {rho} supera el 0,01 del §11.7.4.1.',
-  'detailing.transverse.footingNoneRequired':
-    'No se requiere armadura de corte: el corte en una dirección {oneWay} y el punzonado {punching} los toma el hormigón (§13.2.6).',
-  'detailing.transverse.footingShearNotEstablished':
-    'No se puede descartar armadura de corte: la verificación de la base es {status}.',
-  'detailing.transverse.starterTiesRequired':
-    'Estribos de la jaula de arranque sobre el empalme de {lap} m cada {spacing} m (§10.7.6.1.1, §10.7.6.1.2).',
+  'detailing.transverse.slabNoneRequired': 'No se requiere armadura de corte: v_u = {vu} kN/m contra φv_c = {phiVc} kN/m (§7.6.3.1).',
+  'detailing.transverse.slabShearReinforcementNeeded': 'Se requiere armadura de corte —v_u = {vu} kN/m supera φv_c = {phiVc} kN/m— y su dimensionamiento en losas no está implementado.',
+  'detailing.transverse.wallNoTiesRequired': 'No se requieren estribos: la cuantía vertical ρ_l = {rho} se mantiene por debajo del 0,01 del §11.7.4.1.',
+  'detailing.transverse.wallTiesNeeded': 'Se requieren estribos según §10.7.6: la cuantía vertical ρ_l = {rho} supera el 0,01 del §11.7.4.1.',
+  'detailing.transverse.footingNoneRequired': 'No se requiere armadura de corte: el corte en una dirección {oneWay} y el punzonado {punching} los toma el hormigón (§13.2.6).',
+  'detailing.transverse.footingShearNotEstablished': 'No se puede descartar armadura de corte: la verificación de la base es {status}.',
+  'detailing.transverse.starterTiesRequired': 'Estribos de la jaula de arranque sobre el empalme de {lap} m cada {spacing} m (§10.7.6.1.1, §10.7.6.1.2).',
 
   // El adaptador de producción de piso: cada motivo por el que no se diseñó un elemento.
   'detailing.floorRun.missingNodes': 'Cáscara {element}: faltan uno o más nodos en el modelo.',
@@ -8141,8 +8139,7 @@ const es: Record<string, string> = {
    * estados por familia reusan `design.families.census.unknown` y
    * `design.families.state.noElements`, así que esto es sólo el caso de la lista entera.
    */
-  'design.memberList.nothingClassified':
-    'Todavía no se clasificó ningún elemento. Calculá las solicitaciones y las familias se cuentan.',
+  'design.memberList.nothingClassified': 'Todavía no se clasificó ningún elemento. Calculá las solicitaciones y las familias se cuentan.',
   'design.memberList.emptyModel': 'Este modelo todavía no tiene elementos para detallar.',
   'design.export.cannot.onDisk': "No podemos confirmar que el archivo siga en tu disco: el navegador entrega la descarga y la pierde de vista.",
   'design.export.cannot.kept': "No podemos confirmar que lo hayas guardado: pudiste cancelar el diálogo.",
@@ -8722,6 +8719,13 @@ const es: Record<string, string> = {
   'wind.other.noDiameter': "{kind}: sus niveles tienen un solo nodo y no cubren ningún ancho; indicá su diámetro D. No se genera viento para ella.",
   'wind.other.width': "Ancho de la cara (modelo de barra)",
   'wind.other.diameter': "Diámetro D (modelo de barra)",
+  'wind.other.minimumCase': "Viento {dir}, mínimo de edificio abierto (§2.1.5)",
+  'wind.other.minimumOpen': "Mínimo del §2.1.5, viento {dir}: F = 0,75 kN/m² × Af = 0,75 × {af} m² = {f} kN, un estado de carga propio en los nudos de la cubierta.",
+  'wind.other.minimumOpenEnvelope': "Mínimo del §2.1.5, viento {dir}: F = 0,75 kN/m² × Af = 0,75 × {af} m² = {f} kN, un estado de carga propio en los nudos de la cubierta. Af es toda la proyección vertical de la estructura, que nunca es menor que la real; indicá Af para usar solo el área de la cubierta, las columnas y los arriostramientos.",
+  'wind.other.minimumMissing': "Sin mínimo del §2.1.5 para viento {dir}: la estructura no tiene altura ni ancho que proyectar. Indicá Af.",
+  'wind.other.areaX': "Af, viento según X (§2.1.5)",
+  'wind.other.areaY': "Af, viento según Y (§2.1.5)",
+  'wind.other.envelope': "toda la proyección",
   'wind.other.fromModel': "del modelo",
   'wind.other.noSign': "La altura libre bajo el cartel no deja cara: el cartel no se carga.",
   'wind.other.signCaseC': "B/s ≥ 2: la Figura 4.4-1 pide también el caso C, que no se genera.",
@@ -9176,7 +9180,10 @@ const es: Record<string, string> = {
   'spec.axial.frame': "Normal (pórtico)",
   'spec.axial.truss': "Reticulado (sólo axil)",
   'spec.axial.cable': "Cable",
-  'spec.axial.cableHint': "Un cable trabaja sólo a tracción, y su propio peso lo ablanda (módulo equivalente de Ernst) y le da flecha. Los resultados informan tensión, empuje horizontal, flecha y módulo. No tiene pretensado: su largo sin estirar es la cuerda.",
+  'spec.axial.cableHint': "Un cable trabaja sólo a tracción, y su propio peso lo ablanda (módulo equivalente de Ernst) y le da flecha. Los resultados informan tensión, empuje horizontal, flecha y módulo. Su largo sin estirar es la cuerda salvo que indiques su pretensado: su tensión sobre la cuerda dibujada bajo su propio peso.",
+  'spec.axial.cablePretension': "Pretensado",
+  'spec.axial.cableChord': "ninguno: la cuerda",
+  'cableDiag.selfWeight': "Hasta el {pct} % de la tensión de estos cables viene de su propio peso, con la cuerda dibujada como largo sin estirar, y los mantiene tensos con cualquier carga. Indicá el pretensado de cada uno (Especificaciones › Barras), o hacelo una barra de reticulado si no es un cable.",
   'spec.supports.empty': "Seleccioná apoyos para ver y cambiar sus especificaciones.",
   'spec.supports.title': "{n} apoyos seleccionados",
   'spec.supports.oneForDetail': "Las restricciones, resortes, curvas y el apoyo inclinado se editan de a un apoyo: seleccioná uno solo.",
@@ -10343,6 +10350,9 @@ const es: Record<string, string> = {
   'dxf.loadsNotDrawn': 'Cargas no dibujadas',
   'dxf.deformedScale': 'Deformada',
   'dxf.resultsOf': 'Resultados de',
+  'dxf.noDeformedEnvelope': 'Deformada no dibujada: una envolvente no es un estado deformado, cada valor sale de su propia combinación',
+  'dxf.noDeformedMagnitude': 'Deformada no dibujada: los desplazamientos SRSS o ABS son magnitudes sin signo',
+  'dxf.reactionsValuesOnly': 'Reacciones como valores, sin flechas: sus componentes no son una sola fuerza',
   'proExport.grp.geometry': 'Geometría',
   'proExport.grp.properties': 'Materiales y secciones',
   'proExport.grp.loads': 'Cargas',

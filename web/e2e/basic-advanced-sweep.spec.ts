@@ -244,7 +244,7 @@ async function boot(page: Page, mobile = false): Promise<Ctx> {
   });
   await page.goto('/app/basic?e2e=1');
   await page.waitForFunction(() => !!window.__stabileoActions, null, { timeout: 60_000 });
-  await expect.poll(() => page.evaluate(() => window.__stabileo.solverReady()), { timeout: 60_000 }).toBe(true);
+  await expect.poll(() => page.evaluate(() => window.__stabileo?.solverReady() ?? false), { timeout: 60_000 }).toBe(true);
   return ctx;
 }
 
@@ -369,7 +369,7 @@ async function openList(ctx: Ctx): Promise<boolean> {
     flag(ctx, stuck, 'stuck', false, `${ctx.model} [${ctx.cond}] ${stuck}: "← Back" does not leave the function (pressed 4 times)`);
     await page.reload();
     await page.waitForFunction(() => !!window.__stabileoActions, null, { timeout: 60_000 });
-    await expect.poll(() => page.evaluate(() => window.__stabileo.solverReady()), { timeout: 60_000 }).toBe(true);
+    await expect.poll(() => page.evaluate(() => window.__stabileo?.solverReady() ?? false), { timeout: 60_000 }).toBe(true);
     await loadNamed(ctx, ctx.model);
     await press(ctx, page.getByTestId('rb-cmd-advanced'));
   }

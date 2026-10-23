@@ -7,7 +7,7 @@
  * Spanish or Portuguese reader is warned in their language; an id the app does not know yet
  * keeps the engine's English rather than nothing.
  */
-import { t } from '../i18n';
+import { t, tp } from '../i18n';
 
 export function knownIssueMessage(d: { code: string; phase?: string; value?: number; message: string }): string {
   // A thermal load solved with a default it did not state (#407): `phase` names the default.
@@ -15,6 +15,11 @@ export function knownIssueMessage(d: { code: string; phase?: string; value?: num
     const key = `thermalDefault.${d.phase}`;
     const text = t(key);
     return text === key ? d.message : text;
+  }
+  // A cable whose own weight gives most of its tension (#527): `value` the largest share.
+  if (d.code === 'cable_self_weight_tension') {
+    if (t('cableDiag.selfWeight') === 'cableDiag.selfWeight') return d.message;
+    return tp('cableDiag.selfWeight', { pct: Math.round(100 * Math.min(1, d.value ?? 1)) });
   }
   if (d.code !== 'known_issue' || !d.phase) return d.message;
   const key = `knownIssue.${d.phase}`;

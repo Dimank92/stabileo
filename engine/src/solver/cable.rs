@@ -31,6 +31,8 @@ pub struct CableAnalysisResult2D {
     pub iterations: usize,
     pub converged: bool,
     pub cable_forces: Vec<CableElementResult>,
+    /// As `CableAnalysisResult3D::self_weight_tension`.
+    pub self_weight_tension: Vec<(usize, f64)>,
 }
 
 /// Result of a 3D cable analysis.
@@ -41,6 +43,10 @@ pub struct CableAnalysisResult3D {
     pub iterations: usize,
     pub converged: bool,
     pub cable_forces: Vec<CableElementResult>,
+    /// Per cable given no pretension and with weight, the tension its own weight gives it with
+    /// the chord as its unstressed length, kN (`self_weight_warning`).
+    #[serde(skip)]
+    pub self_weight_tension: Vec<(usize, f64)>,
 }
 
 /// Per-cable-element results.
@@ -61,6 +67,10 @@ struct CableGeom {
     node_i_id: usize,
     node_j_id: usize,
     l0: f64,
+    /// The unstressed length: the chord `l0` unless a pretension was given (`unstressed_length`).
+    lu: f64,
+    /// Whether the reader gave the pretension (no self-weight warning then).
+    pretensioned: bool,
     dx: f64,
     dy: f64,
     cos_a: f64,
@@ -77,6 +87,10 @@ struct CableGeom3D {
     node_i_id: usize,
     node_j_id: usize,
     l0: f64,
+    /// The unstressed length: the chord `l0` unless a pretension was given (`unstressed_length`).
+    lu: f64,
+    /// Whether the reader gave the pretension (no self-weight warning then).
+    pretensioned: bool,
     dx: f64,
     dy: f64,
     dz: f64,
@@ -85,6 +99,57 @@ struct CableGeom3D {
     /// Young's modulus, kN/m².
     e: f64,
     w: f64,
+}
+
+/// The share of a cable's tension above which `self_weight_warning` warns that its own weight
+/// gave most of it (#527).
+pub const SELF_WEIGHT_SHARE: f64 = 0.25;
+
+/// A cable's unstressed length: its chord `l0`, or with a pretension `t` given, the length at
+/// which the chord law gives `t` on the drawn chord under the cable's own weight `w` (kN/m) over
+/// the horizontal projection `l_h`: ε = t/EA − (w·l_h)²/(24 t²), L = l0/(1 + ε).
+fn unstressed_length(id: usize, l0: f64, ea: f64, w: f64, l_h: f64, t: Option<f64>) -> Result<f64, String> {
+    let Some(t) = t else { return Ok(l0) };
+    if !(t.is_finite() && t > 0.0) {
+        return Err(format!("Cable {id}: the pretension must be a positive force in kN, not {t}"));
+    }
+    let wl = w * l_h;
+    let eps = t / ea - wl * wl / (24.0 * t * t);
+    if !(eps.is_finite() && 1.0 + eps > 0.0) {
+        return Err(format!("Cable {id}: a pretension of {t} kN gives no unstressed length (too low for its weight)"));
+    }
+    Ok(l0 / (1.0 + eps))
+}
+
+/// A cable whose own weight gives it a large share of its tension (#527). Drawn as its chord, a
+/// cable with weight hangs at T₀³ = EA·(w·l_h)²/24 under nothing else and never goes slack: a
+/// heavy member typed as a cable (a rolled section, say) reports a tension that is mostly that.
+/// Warned, with the cables and their largest share, when T₀ is over `SELF_WEIGHT_SHARE` of the
+/// tension: give a pretension, or make it a truss member.
+fn self_weight_warning(forces: &[CableElementResult], t0: &[(usize, f64)]) -> Option<StructuredDiagnostic> {
+    let mut ids = Vec::new();
+    let mut worst: f64 = 0.0;
+    for &(id, t) in t0 {
+        let Some(f) = forces.iter().find(|f| f.element_id == id) else { continue };
+        if f.tension > 0.0 && t > SELF_WEIGHT_SHARE * f.tension {
+            ids.push(id);
+            worst = worst.max(t / f.tension);
+        }
+    }
+    if ids.is_empty() {
+        return None;
+    }
+    let mut d = StructuredDiagnostic::global(
+        DiagnosticCode::CableSelfWeightTension,
+        Severity::Warning,
+        format!(
+            "Up to {:.0} % of these cables' tension comes from their own weight with the drawn chord as their unstressed length, which keeps them taut whatever the loads: give each its pretension, or make it a truss member if it is not a cable",
+            100.0 * worst.min(1.0)
+        ),
+    );
+    d.value = Some(worst);
+    d.threshold = Some(SELF_WEIGHT_SHARE);
+    Some(d.with_elements(ids))
 }
 
 /// E_eq/E of a cable whose stiffness is assembled at `tension` on iteration `iter`: Ernst's
@@ -268,7 +333,21 @@ pub fn solve_cable_2d(
     max_iter: usize,
     tolerance: f64,
 ) -> Result<CableAnalysisResult2D, String> {
-    let mut r = solve_cable_2d_inner(input, densities, max_iter, tolerance)?;
+    solve_cable_2d_pretensioned(input, densities, &HashMap::new(), max_iter, tolerance)
+}
+
+/// `solve_cable_2d` with a pretension per cable (`pretension`: element id → kN): the tension each
+/// one has on its drawn chord under its own weight alone, from which its unstressed length is set.
+/// A cable not in the map is as long as its chord.
+pub fn solve_cable_2d_pretensioned(
+    input: &SolverInput,
+    densities: &HashMap<String, f64>,
+    pretension: &HashMap<String, f64>,
+    max_iter: usize,
+    tolerance: f64,
+) -> Result<CableAnalysisResult2D, String> {
+    let mut r = solve_cable_2d_inner(input, densities, pretension, max_iter, tolerance)?;
+    r.results.structured_diagnostics.extend(self_weight_warning(&r.cable_forces, &r.self_weight_tension));
     crate::known_issues::attach(&mut r.results.structured_diagnostics, crate::known_issues::for_2d(input, crate::known_issues::Analysis::Cable));
     Ok(r)
 }
@@ -276,6 +355,7 @@ pub fn solve_cable_2d(
 fn solve_cable_2d_inner(
     input: &SolverInput,
     densities: &HashMap<String, f64>,
+    pretension: &HashMap<String, f64>,
     max_iter: usize,
     tolerance: f64,
 ) -> Result<CableAnalysisResult2D, String> {
@@ -305,6 +385,7 @@ fn solve_cable_2d_inner(
             iterations: 1,
             converged: true,
             cable_forces: Vec::new(),
+            self_weight_tension: Vec::new(),
         });
     }
 
@@ -343,22 +424,24 @@ fn solve_cable_2d_inner(
         // Below this the sag term is round-off; the cable is a taut string.
         let w = if w > 1e-15 { w } else { 0.0 };
 
+        let given = pretension.get(&elem.id.to_string()).copied();
+        let lu = unstressed_length(elem.id, l0, e * sec.a, w, dx.abs(), given)?;
         cables.push(CableGeom {
             elem_id: elem.id,
             node_i_id: elem.node_i,
             node_j_id: elem.node_j,
-            l0, dx, dy,
+            l0, lu, pretensioned: given.is_some(), dx, dy,
             cos_a: dx / l0,
             sin_a: dy / l0,
             ea: e * sec.a,
             e,
             w,
         });
-        // The state the first pass linearises about: the undeformed chord (ε = 0), at the
-        // tension the chord law gives it (zero without weight; with weight, the tension at
-        // which a cable as long as its chord hangs between the modelled nodes).
+        // The state the first pass linearises about: the undeformed chord, at the tension the
+        // chord law gives it (the pretension given; otherwise zero without weight and, with
+        // weight, the tension at which a cable as long as its chord hangs between its nodes).
         let ci = cables.last().unwrap();
-        cable_tensions.insert(elem.id, element::cable_chord_tension(ci.ea, ci.w, horizontal_projection_2d(ci), 0.0));
+        cable_tensions.insert(elem.id, element::cable_chord_tension(ci.ea, ci.w, horizontal_projection_2d(ci), (ci.l0 - ci.lu) / ci.lu));
         cable_eps_lin.insert(elem.id, 0.0);
     }
 
@@ -515,7 +598,7 @@ fn solve_cable_2d_inner(
             let dy_def = ci.dy + u_yj - u_yi;
             let l_def = (dx_def * dx_def + dy_def * dy_def).sqrt();
 
-            let strain = (l_def - ci.l0) / ci.l0;
+            let strain = (l_def - ci.lu) / ci.lu;
             let old_tension = cable_tensions[&ci.elem_id];
             // The modulus the displacements were solved with: the one this pass assembled.
             let factor = ernst_factor(ci.w, horizontal_projection_2d(ci), ci.ea, old_tension, iter);
@@ -647,15 +730,18 @@ fn solve_cable_2d_inner(
             horizontal_thrust: h_thrust,
             sag,
             ernst_modulus: e_eq,
-            unstretched_length: ci.l0,
+            unstretched_length: ci.lu,
         }
     }).collect();
 
+    let self_weight_tension = cables.iter().filter(|c| !c.pretensioned && c.w > 0.0)
+        .map(|c| (c.elem_id, element::cable_chord_tension(c.ea, c.w, horizontal_projection_2d(c), 0.0))).collect();
     Ok(CableAnalysisResult2D {
         results,
         iterations: total_iterations,
         converged,
         cable_forces,
+        self_weight_tension,
     })
 }
 
@@ -666,7 +752,19 @@ pub fn solve_cable_3d(
     max_iter: usize,
     tolerance: f64,
 ) -> Result<CableAnalysisResult3D, String> {
-    let mut r = solve_cable_3d_inner(input, densities, max_iter, tolerance)?;
+    solve_cable_3d_pretensioned(input, densities, &HashMap::new(), max_iter, tolerance)
+}
+
+/// 3D twin of `solve_cable_2d_pretensioned`.
+pub fn solve_cable_3d_pretensioned(
+    input: &SolverInput3D,
+    densities: &HashMap<String, f64>,
+    pretension: &HashMap<String, f64>,
+    max_iter: usize,
+    tolerance: f64,
+) -> Result<CableAnalysisResult3D, String> {
+    let mut r = solve_cable_3d_inner(input, densities, pretension, max_iter, tolerance)?;
+    r.results.structured_diagnostics.extend(self_weight_warning(&r.cable_forces, &r.self_weight_tension));
     crate::known_issues::attach(&mut r.results.structured_diagnostics, crate::known_issues::for_3d(input, crate::known_issues::Analysis::Cable));
     Ok(r)
 }
@@ -674,6 +772,7 @@ pub fn solve_cable_3d(
 fn solve_cable_3d_inner(
     input: &SolverInput3D,
     densities: &HashMap<String, f64>,
+    pretension: &HashMap<String, f64>,
     max_iter: usize,
     tolerance: f64,
 ) -> Result<CableAnalysisResult3D, String> {
@@ -702,6 +801,7 @@ fn solve_cable_3d_inner(
             iterations: 1,
             converged: true,
             cable_forces: Vec::new(),
+            self_weight_tension: Vec::new(),
         });
     }
 
@@ -740,21 +840,23 @@ fn solve_cable_3d_inner(
         // Below this the sag term is round-off; the cable is a taut string.
         let w = if w > 1e-15 { w } else { 0.0 };
 
+        let given = pretension.get(&elem.id.to_string()).copied();
+        let lu = unstressed_length(elem.id, l0, e * sec.a, w, (dx * dx + dy * dy).sqrt(), given)?;
         cables.push(CableGeom3D {
             elem_id: elem.id,
             node_i_id: elem.node_i,
             node_j_id: elem.node_j,
-            l0, dx, dy, dz,
+            l0, lu, pretensioned: given.is_some(), dx, dy, dz,
             dir: [dx / l0, dy / l0, dz / l0],
             ea: e * sec.a,
             e,
             w,
         });
-        // The state the first pass linearises about: the undeformed chord (ε = 0), at the
-        // tension the chord law gives it (zero without weight; with weight, the tension at
-        // which a cable as long as its chord hangs between the modelled nodes).
+        // The state the first pass linearises about: the undeformed chord, at the tension the
+        // chord law gives it (the pretension given; otherwise zero without weight and, with
+        // weight, the tension at which a cable as long as its chord hangs between its nodes).
         let ci = cables.last().unwrap();
-        cable_tensions.insert(elem.id, element::cable_chord_tension(ci.ea, ci.w, horizontal_projection_3d(ci), 0.0));
+        cable_tensions.insert(elem.id, element::cable_chord_tension(ci.ea, ci.w, horizontal_projection_3d(ci), (ci.l0 - ci.lu) / ci.lu));
         cable_eps_lin.insert(elem.id, 0.0);
     }
 
@@ -908,7 +1010,7 @@ fn solve_cable_3d_inner(
             let dz_def = ci.dz + u_j[2] - u_i[2];
             let l_def = (dx_def * dx_def + dy_def * dy_def + dz_def * dz_def).sqrt();
 
-            let strain = (l_def - ci.l0) / ci.l0;
+            let strain = (l_def - ci.lu) / ci.lu;
             let old_tension = cable_tensions[&ci.elem_id];
             // The modulus the displacements were solved with: the one this pass assembled.
             let factor = ernst_factor(ci.w, horizontal_projection_3d(ci), ci.ea, old_tension, iter);
@@ -1039,14 +1141,17 @@ fn solve_cable_3d_inner(
             sag,
             // kN/m²; this used to report EA/L.
             ernst_modulus: ci.e * assembled_factor.get(&ci.elem_id).copied().unwrap_or(1.0),
-            unstretched_length: ci.l0,
+            unstretched_length: ci.lu,
         }
     }).collect();
 
+    let self_weight_tension = cables.iter().filter(|c| !c.pretensioned && c.w > 0.0)
+        .map(|c| (c.elem_id, element::cable_chord_tension(c.ea, c.w, horizontal_projection_3d(c), 0.0))).collect();
     Ok(CableAnalysisResult3D {
         results,
         iterations: total_iterations,
         converged,
         cable_forces,
+        self_weight_tension,
     })
 }

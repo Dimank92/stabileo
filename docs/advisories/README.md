@@ -31,6 +31,8 @@ re-check registry where the app could produce the result.
 | [SA-2026-018](SA-2026-018-mitc9-curved-rigid-motion.md) | MITC9 shells (engine/WASM only) on curved geometry strained by rigid-body motion (101 MPa from a 1 mrad rotation) | Medium | [#411](https://github.com/lambdaclass/stabileo/issues/411) | #528 | 0.3.0 | Published 2026-10-21 |
 | [SA-2026-019](SA-2026-019-frame-thermal-alpha-depth.md) | Frame and truss temperature loads assumed steel's α and a solid rectangle's depth (gradient moments up to ~30 % low on I sections) | Medium | [#407](https://github.com/lambdaclass/stabileo/issues/407) | #531 | 0.3.0 | Published 2026-10-21 |
 | [SA-2026-020](SA-2026-020-material-nonlinear-3d-yield-surface.md) | 3D material-nonlinear solver (engine/WASM only) used a yield surface less conservative than 2D (first yield up to 15 % late at N = 0.5·Np) | Medium | [#429](https://github.com/lambdaclass/stabileo/issues/429) | #529 | 0.3.0 | Published 2026-10-21 |
+| [SA-2026-021](SA-2026-021-free-roof-wind-minimum.md) | Free roofs: no wind along the ridge, and less than the §2.1.5 minimum across it (17 % of it at 20 m/s) | High | [#580](https://github.com/lambdaclass/stabileo/issues/580) | #581 | next release | Fixed on main, to publish |
+| [SA-2026-022](SA-2026-022-earth-pressure-dead-load-resisting.md) | With earth pressure H, the combination where the dead load resists it was missing (27–45 % low in an example) | High | [#580](https://github.com/lambdaclass/stabileo/issues/580) | #581 and this PR | next release | Fixed on main, to publish |
 
 Other open `safety` issues (the derivation-review findings #406–#433, #338, #439) get an advisory
 or a recorded "no advisory needed" when they are triaged; the list is on the

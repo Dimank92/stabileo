@@ -1,4 +1,7 @@
 <script lang="ts">
+  // First: every dictionary entry, before anything here renders (the store starts with the public
+  // pages' entries only; Root.svelte loads this component on the first app route).
+  import './lib/i18n/full-dictionaries';
   import { seedProStarterLibrary } from './lib/pro/pro-starter-library';
   import ProQuickEdit from './components/pro/ProQuickEdit.svelte';
   import { is3DWorkspace } from './lib/utils/workspace';
@@ -336,6 +339,7 @@
   import { runLiveCalc, runGlobalSolve } from './lib/engine/live-calc';
   import LandingPage from './components/LandingPage.svelte';
   import BlogPage from './components/blog/BlogPage.svelte';
+  import { findStandingPage } from './lib/blog/pages';
   import { parsePublicPath, publicHref } from './lib/i18n/public-routes';
   import { publicI18n } from './lib/i18n/store.svelte';
   import AiDrawer from './components/AiDrawer.svelte';
@@ -391,7 +395,8 @@
   function isBlogRoute(pathname: string) {
     const { path } = publicRoute(pathname);
     // `/blog/` is covered by the prefix test; only the bare form needs naming.
-    return path === '/blog' || path.startsWith('/blog/');
+    // Standing pages (/cirsoc, /reliability, …) are rendered by the same component as the blog.
+    return path === '/blog' || path.startsWith('/blog/') || !!findStandingPage(path);
   }
 
   /**

@@ -1,7 +1,7 @@
 {
   "$comment": "Registry of result-affecting changes. Read by web/src/lib/provenance/registry.ts; schema and rules in docs/verification/PROVENANCE.md. Add an entry whenever a change makes the same saved model give different numbers, and bump currentResultsVersion when the entry's resultsVersion is new. Feature ids are defined in web/src/lib/provenance/model-features.ts.",
   "schema": 1,
-  "currentResultsVersion": 1,
+  "currentResultsVersion": 2,
   "changes": [
     {
       "id": "curved-shell-moments-and-thermal",
@@ -805,6 +805,44 @@
         "pt": "F2.1 usa √(1+X), o cisalhamento G2.1 foi corrigido (o ramo de escoamento dava até 51 % a mais), a interação é linear e uma capacidade nula fica não avaliada e reprova."
       },
       "changelog": { "file": "docs/MERGE_PLAN_SAFETY_WAVE.md", "heading": "Design checks" }
+    },
+    {
+      "id": "free-roof-wind-minimum",
+      "resultsVersion": 2,
+      "date": "2026-10-22",
+      "prs": [581],
+      "area": "loads",
+      "when": { "any": ["wind"] },
+      "title": {
+        "en": "Free roofs get the open-building minimum wind force",
+        "es": "Las cubiertas aisladas reciben el viento mínimo de edificio abierto",
+        "pt": "As coberturas isoladas recebem o vento mínimo de edifício aberto"
+      },
+      "explanation": {
+        "en": "A free roof got no horizontal wind along its ridge and, across it, less than CIRSOC 102 §2.1.5's 0.75 kN/m² × Af at low and moderate speeds (17 % of it at 20 m/s on a pitched shed); each direction now has a minimum load case (SA-2026-021). It concerns automatic wind loads on free roofs.",
+        "es": "Una cubierta aislada no recibía viento horizontal en la dirección de la cumbrera y, en la otra, menos que los 0,75 kN/m² × Af del §2.1.5 del CIRSOC 102 a velocidades bajas y medias (el 17 % a 20 m/s en un galpón a dos aguas); ahora cada dirección tiene un estado de carga mínimo (SA-2026-021). Afecta a las cargas de viento automáticas sobre cubiertas aisladas.",
+        "pt": "Uma cobertura isolada não recebia vento horizontal na direção da cumeeira e, na outra, menos que os 0,75 kN/m² × Af do §2.1.5 do CIRSOC 102 a velocidades baixas e médias (17 % a 20 m/s num galpão de duas águas); agora cada direção tem um caso de carga mínimo (SA-2026-021). Afeta as cargas de vento automáticas sobre coberturas isoladas."
+      },
+      "changelog": { "file": "docs/advisories/SA-2026-021-free-roof-wind-minimum.md", "heading": "SA-2026-021: free roofs got no wind along their ridge, and less than the §2.1.5 minimum across it" }
+    },
+    {
+      "id": "earth-pressure-dead-load-resisting",
+      "resultsVersion": 2,
+      "date": "2026-10-22",
+      "prs": [581],
+      "area": "loads",
+      "when": { "any": ["cirsocCombinations"] },
+      "title": {
+        "en": "With earth pressure, the combination where the dead load resists it",
+        "es": "Con empuje de suelo, la combinación en que el peso propio lo resiste",
+        "pt": "Com empuxo de solo, a combinação em que o peso próprio o resiste"
+      },
+      "explanation": {
+        "en": "With H loads, 0.9 D + 1.6 H and 1.2 D + 1.6 H were never generated, so where the dead load resists the earth pressure (a wall's overturning or sliding) the effect came out low: 27 % in an example where D gives −0.8 of H (SA-2026-022). It concerns models with H loads and CIRSOC combinations.",
+        "es": "Con cargas H nunca se generaban 0,9 D + 1,6 H ni 1,2 D + 1,6 H, así que donde el peso propio resiste el empuje (vuelco o deslizamiento de un muro) el efecto salía bajo: un 27 % en un ejemplo en que D da −0,8 de lo que da H (SA-2026-022). Afecta a modelos con cargas H y combinaciones CIRSOC.",
+        "pt": "Com cargas H nunca se geravam 0,9 D + 1,6 H nem 1,2 D + 1,6 H, então onde o peso próprio resiste ao empuxo (tombamento ou deslizamento de um muro) o efeito saía baixo: 27 % num exemplo em que D dá −0,8 do que H dá (SA-2026-022). Afeta modelos com cargas H e combinações CIRSOC."
+      },
+      "changelog": { "file": "docs/advisories/SA-2026-022-earth-pressure-dead-load-resisting.md", "heading": "SA-2026-022: with earth pressure (H), the combination where the dead load resists it was missing" }
     }
   ]
 }

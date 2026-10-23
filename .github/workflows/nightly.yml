@@ -98,13 +98,16 @@ jobs:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
-          toolchain: nightly
+          toolchain: 1.99.1
           components: rust-src
       # engine/.cargo/config.toml links with clang + mold.
+      # A pinned mold release tarball (wget with retries). apt used to install it here and could
+      # stall for an hour on a mirror; the version is the flake's (scripts/check-pins.sh).
       - name: Install mold linker
-        run: |
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y mold
+        uses: rui314/setup-mold@da13e0b42e392e3a45d1215033a2270b849d7d36 # main, 2026-10-08
+        with:
+          mold-version: 2.40.4
+          make-default: false
         timeout-minutes: 5
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Large certificate tests
@@ -131,11 +134,14 @@ jobs:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
-          toolchain: nightly
+          toolchain: 1.99.1
+      # A pinned mold release tarball (wget with retries). apt used to install it here and could
+      # stall for an hour on a mirror; the version is the flake's (scripts/check-pins.sh).
       - name: Install mold linker
-        run: |
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y mold
+        uses: rui314/setup-mold@da13e0b42e392e3a45d1215033a2270b849d7d36 # main, 2026-10-08
+        with:
+          mold-version: 2.40.4
+          make-default: false
         timeout-minutes: 5
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
@@ -178,7 +184,7 @@ jobs:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
-          toolchain: nightly
+          toolchain: 1.99.1
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -226,7 +232,7 @@ jobs:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
-          toolchain: nightly
+          toolchain: 1.99.1
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Install Code_Aster (pins as in tools/differential/codeaster/setup.sh)
         uses: mamba-org/setup-micromamba@v3
@@ -281,13 +287,16 @@ jobs:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
-          toolchain: nightly
+          toolchain: nightly-2026-10-15
           components: rust-src
       # engine/.cargo/config.toml links with clang + mold.
+      # A pinned mold release tarball (wget with retries). apt used to install it here and could
+      # stall for an hour on a mirror; the version is the flake's (scripts/check-pins.sh).
       - name: Install mold linker
-        run: |
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y mold
+        uses: rui314/setup-mold@da13e0b42e392e3a45d1215033a2270b849d7d36 # main, 2026-10-08
+        with:
+          mold-version: 2.40.4
+          make-default: false
         timeout-minutes: 5
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
@@ -302,12 +311,12 @@ jobs:
         run: cargo run --release --example fuzz_seeds
       - name: Build target
         working-directory: engine
-        run: cargo fuzz build --target "$FUZZ_TARGET_TRIPLE" ${{ matrix.target }}
+        run: cargo +nightly-2026-10-15 fuzz build --target "$FUZZ_TARGET_TRIPLE" ${{ matrix.target }}
       - name: Fuzz (30 min)
         working-directory: engine
         run: |
           mkdir -p fuzz/corpus/${{ matrix.target }}
-          cargo fuzz run --target "$FUZZ_TARGET_TRIPLE" ${{ matrix.target }} -- \
+          cargo +nightly-2026-10-15 fuzz run --target "$FUZZ_TARGET_TRIPLE" ${{ matrix.target }} -- \
             -max_total_time=1800 -rss_limit_mb=2048 -timeout=60 \
             -print_final_stats=1
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -340,11 +349,14 @@ jobs:
       # engine/.cargo/config.toml (build-std, nightly-only) does not apply.
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
-          toolchain: stable
+          toolchain: 1.99.1
+      # A pinned mold release tarball (wget with retries). apt used to install it here and could
+      # stall for an hour on a mirror; the version is the flake's (scripts/check-pins.sh).
       - name: Install mold linker
-        run: |
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y mold
+        uses: rui314/setup-mold@da13e0b42e392e3a45d1215033a2270b849d7d36 # main, 2026-10-08
+        with:
+          mold-version: 2.40.4
+          make-default: false
         timeout-minutes: 5
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
@@ -394,12 +406,15 @@ jobs:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
-          toolchain: nightly
+          toolchain: 1.99.1
           components: rust-src
+      # A pinned mold release tarball (wget with retries). apt used to install it here and could
+      # stall for an hour on a mirror; the version is the flake's (scripts/check-pins.sh).
       - name: Install mold linker
-        run: |
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y mold
+        uses: rui314/setup-mold@da13e0b42e392e3a45d1215033a2270b849d7d36 # main, 2026-10-08
+        with:
+          mold-version: 2.40.4
+          make-default: false
         timeout-minutes: 5
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Benchmarks compile

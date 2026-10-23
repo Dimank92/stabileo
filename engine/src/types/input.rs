@@ -920,6 +920,18 @@ pub struct ModalInput3D {
     pub densities: HashMap<String, f64>,
 }
 
+/// Cable analysis input: the model, the material densities (material id → kg/m³) that give the
+/// cables their weight, and an optional pretension per cable (element id → kN, #527).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CableInput<S> {
+    pub solver: S,
+    #[serde(default)]
+    pub densities: HashMap<String, f64>,
+    #[serde(default)]
+    pub pretension: HashMap<String, f64>,
+}
+
 /// Plastic analysis input.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
