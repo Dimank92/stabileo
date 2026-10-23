@@ -3,13 +3,14 @@ name: CI
 on:
   push:
     branches: [main]
+  # Every base branch: PRs stacked on another PR get CI too.
   pull_request:
-    branches: [main]
   merge_group:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push to a PR makes its older run moot; every run on main is kept.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -60,6 +61,9 @@ jobs:
               - *tooling
               - 'web/**'
               - 'engine/**'
+              # The engine's dependencies (wasm-bindgen, serde) are locked here.
+              - 'Cargo.toml'
+              - 'Cargo.lock'
             backend:
               - *tooling
               - 'backend/**'
@@ -467,6 +471,8 @@ jobs:
         run: nix develop --command bash -c "cd web && npx playwright install-deps chromium"
       - name: Build and production-build tests
         run: make test.web.build
+      - name: Admin site build
+        run: make admin.build
 
   # The WASM engine must give bit-identical results in every runtime it ships to
   # (docs/verification/TRUSTED_BASE.md): fixed solves and certificates in Chromium,
@@ -596,3 +602,39 @@ jobs:
           include-hidden-files: true
           retention-days: 14
           if-no-files-found: warn
+
+  # The one required check. Path filters skip jobs, and a skipped required check counts as
+  # passing, so branch protection requires this job instead of each job by name: it fails
+  # when any job failed or was cancelled, and a skipped job is fine.
+  ci-ok:
+    name: CI OK
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - changes
+      - lint-repo
+      - test-ci-scripts
+      - lint-engine
+      - test-engine-gates
+      - test-engine-suite
+      - test-engine-metamorphic
+      - test-ai-backend
+      - lint-backend
+      - test-backend
+      - check-migrations-immutable
+      - check-migrations
+      - wasm
+      - site-e2e
+      - web-unit
+      - web-build
+      - determinism
+      - e2e
+    steps:
+      - name: Every job passed or was skipped
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "$RESULTS"
+          for r in $RESULTS; do
+            case "$r" in success|skipped) ;; *) exit 1 ;; esac
+          done
