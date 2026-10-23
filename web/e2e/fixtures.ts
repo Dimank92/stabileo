@@ -233,6 +233,23 @@ export async function bootPro(page: Page, appLocale = 'en'): Promise<void> {
  */
 export const test = base.extend<{ pro: Page; appLocale: string }>({
   appLocale: ['en', { option: true }],
+  /**
+   * `page.goto` to the application, with the test hooks asked for, returns once the hooks are
+   * there. The application is loaded on demand (main.ts imports it for an app address), so it can
+   * finish after the page's load event; specs that call `window.__stabileo…` straight after
+   * `goto` used to find it already installed beside an application that mounted at once.
+   */
+  page: async ({ page }, use) => {
+    const goto = page.goto.bind(page);
+    page.goto = async (url, options) => {
+      const response = await goto(url, options);
+      if (/[?&]e2e=1/.test(url) && /^\/?(app\b|demo\b|\?)|[?&]embed\b|#(data|embed|code)=/.test(url.replace(/^https?:\/\/[^/]+/, ''))) {
+        await page.waitForFunction(() => !!(window as { __stabileoActions?: unknown }).__stabileoActions, null, { timeout: 60_000 });
+      }
+      return response;
+    };
+    await use(page);
+  },
   pro: async ({ page, appLocale }, use) => {
     const consoleErrors: string[] = [];
     const pageErrors: string[] = [];
