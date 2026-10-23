@@ -74,9 +74,17 @@ it.runIf(!!process.env.STABILEO_CONTINUITY_EXPERIMENT)('repairs beam continuity 
     expect(after.output.blockingConflicts).toBeLessThan(1542);
     expect(continuitySearch.termination).toBe('sweepComplete');
     if (catalogRuns === 64) {
-      expect(after.verifiedIds).toHaveLength(140);
-      expect(after.output.blockingConflicts).toBe(1101);
-      expect(after.verifiedIds.filter(id => verificationStore.contexts.get(id)?.elementType === 'beam')).toHaveLength(26);
+      // All 140 approvals from the 1101-blocker audit, not just the previous total.
+      expect(after.verifiedIds).toEqual(expect.arrayContaining([2, 4, 6, 7, 8, 9, 10, 12, 13, 14,
+        16, 17, 18, 19, 20, 32, 34, 38, 40, 42, 43, 45, 48, 50, 51, 52, 53, 54, 55, 58, 62,
+        63, 65, 66, 68, 70, 72, 73, 74, 76, 77, 78, 79, 81, 82, 83, 84, 85, 86, 87, 88, 89,
+        90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108,
+        109, 110, 111, 113, 114, 115, 118, 119, 120, 121, 122, 123, 124, 125, 126, 130, 131,
+        135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151,
+        152, 153, 154, 155, 156, 157, 158, 159, 160, 185, 201, 202, 211, 212, 213, 285, 286,
+        287, 288, 289, 290, 291, 292, 293, 294, 295, 296, 316, 317, 318, 319, 320, 321, 322, 323]));
+      expect(after.output.blockingConflicts).toBeLessThanOrEqual(1092);
+      expect(after.verifiedIds.filter(id => verificationStore.contexts.get(id)?.elementType === 'beam').length).toBeGreaterThanOrEqual(26);
     }
   } else if (line && maxDetailingRuns >= 80) {
     expect(after.verifiedIds.length).toBeGreaterThanOrEqual(81);

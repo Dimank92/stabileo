@@ -6,6 +6,67 @@ entre las alternativas que explora el diseño y las geometrías que finalmente c
 La prioridad es cerrar esa distancia y medir todos los bloqueos físicos antes de ampliar
 presupuestos de búsqueda.
 
+## Correcciones del generador — 23 de octubre
+
+Tres errores reproducidos en la generación de geometría:
+
+- **Zonas transversales de pocos milímetros.** Las intersecciones de requisitos de corte y
+  terminación de barras dejaban intervalos de 1–3,75 mm. Distribuir estaciones uniformemente
+  dentro de cada intervalo no evita colocar dos jaulas demasiado cerca de su límite. Ahora
+  una zona más corta que la envolvente axial del conjunto se integra con una contigua de
+  igual diámetro, ramas, límite transversal y fila, aplicando el paso más exigente a toda
+  la unión. Se prefiere el vecino que agrega menos conjuntos. No se unen huecos ni jaulas
+  incompatibles. La instrucción resultante alimenta tanto la generación como el conteo
+  independiente de cobertura; no se elimina un estribo después de comprobarlo.
+- **Alternativa simétrica alrededor de una pareja asimétrica.** La coordinación puede
+  desplazar una barra superior exterior hacia adentro para atravesar un nudo. Si el resto
+  del grupo requería su disposición propia, el generador usaba el mayor semiancho de la
+  pareja y lo reflejaba al otro lado. Conservaba la barra exterior desplazada, dejando sólo
+  20,02 mm libres con la siguiente en 235/238, frente a 26,67 mm requeridos. La distribución
+  alternativa ahora usa el ancho y el centro entre las dos barras reales. La traza antes
+  y después de coordinar el piso confirma que el déficit nacía en el generador.
+- **Separación de otro diámetro.** `placeGroup` aplicaba a todos los grupos el mínimo calculado
+  para las barras inferiores. Con inferiores Ø12 y superiores Ø32 podía colocar seis barras
+  superiores en una fila cuyo hueco era menor que 32 mm. Cada grupo ahora consulta la regla
+  con su propio diámetro. El caso de regresión en una viga de 400 mm usa cinco barras en la
+  primera fila y una en la segunda, conservando las seis. Este error no aporta una reducción
+  al audit retenido: sus grupos superiores no llegan a Ø32.
+
+La reconstrucción independiente del armado de `d605bc305` distingue el efecto de los cambios:
+
+| Cambio acumulado sobre el mismo armado | Aprobados | Bloqueantes |
+| --- | ---: | ---: |
+| Audit anterior | 140 | 1101 |
+| Integración de zonas transversales diminutas | 140 | 1097 |
+| Distribución superior entre los extremos reales | 140 | 1092 |
+| Otro barrido del operador inferior existente, 16 detallados como máximo | 140 | 1086 |
+
+Las tres reconstrucciones conservan todas las identidades aprobadas y reproducen exactamente
+sus resultados al regenerar. Desaparecen los cuatro choques transversal/transversal y las
+cinco separaciones superiores del mismo miembro diagnosticadas abajo. El barrido inferior
+acepta otra vez el cambio 6+5 de 227; sigue rechazando 225 por los nuevos choques con la
+columna 43. Sus nuevas barras centrales coinciden con una barra vertical: además de conservar
+las cantidades por fila, la próxima propuesta debe coordinar sus posiciones con ambos nudos.
+No se relajan los controles para aceptar esa regresión.
+
+La secuencia completa desde cero, con los mismos presupuestos anteriores, también termina
+en **140 aprobados y 1092 bloqueantes**. Conserva exactamente las 140 identidades: 114 columnas
+y 26 vigas. Quedan 220 fallidos, 35 búsquedas agotadas y 13 provisionales. Ningún aprobado
+participa en un conflicto bloqueante y la regeneración sin búsqueda reproduce exactamente
+veredictos y conflictos. El catálogo ejecuta 64 detallados y 322 verificaciones nominales,
+sin nuevos análisis estructurales. La prueba completa pasa en 525,06 s en esta ejecución local.
+El resultado 1086 de la tabla sigue siendo una continuación adicional, no el benchmark desde cero.
+
+Pasan 155 pruebas dirigidas en diez suites; las seis regresiones nuevas fallan contra
+el generador de `43605a150` y pasan con las correcciones. Typecheck sin errores nuevos
+(442 existentes, baseline 443). La integración desde cero exige conservar las 140 identidades
+del audit anterior.
+
+La [CI de la revisión anterior `43605a150`](https://github.com/lambdaclass/stabileo/actions/runs/39852428018)
+ya presenta fallos en las suites web: exportación CAD/contención, conservación de barras al
+tomar como dibujado y expectativas de estados de verificación. Las pruebas dirigidas de esta
+sección no sustituyen esa CI ni implican que esos fallos estén resueltos.
+
 ## Diagnóstico de los 1101 bloqueos retenidos
 
 Sobre el armado final de `d605bc305`, con fuerzas resueltas nuevamente y regeneración exacta.
