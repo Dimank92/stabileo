@@ -7,44 +7,20 @@
    * engine (3 MB of WASM) before the page could settle: Lighthouse measured 6 s of blocked main
    * thread and, on the blog, 19 s to the largest paint. They need none of it.
    *
-   * Here they render on their own, and the application is loaded on the first route that needs
-   * it: an app route on arrival, or the landing's "enter the app". From then on App.svelte owns
-   * every route, public ones included, exactly as before, so nothing changes once it is up.
+   * Here they render on their own. An address that is the application's on arrival never gets
+   * here: main.ts mounts App.svelte directly, as it always did. From a public page, the
+   * application is loaded on the first route that needs it (the landing's "enter the app", a
+   * link to /app); from then on App.svelte owns every route, public ones included, as before.
    */
   import { tick } from 'svelte';
   import LandingPage from './components/LandingPage.svelte';
   import BlogPage from './components/blog/BlogPage.svelte';
   import { parsePublicPath, publicHref } from './lib/i18n/public-routes';
   import { publicI18n, setLocale } from './lib/i18n/store.svelte';
-  import { findStandingPage } from './lib/blog/pages';
+  import { routeKind } from './lib/public-route';
 
-  // A path 404.html handed over (`/?route=/es/blog/x`), restored as App.svelte does: through
-  // the URL builder, with the fragment kept on this address.
-  const redirectedRoute = new URLSearchParams(location.search).get('route');
-  if (redirectedRoute) {
-    const { locale, path } = parsePublicPath(redirectedRoute.split('?')[0]);
-    const normalised = locale ? publicHref(path, locale) : redirectedRoute;
-    history.replaceState(null, '', normalised + (redirectedRoute.includes('#') ? '' : location.hash));
-  }
-
-  /**
-   * The fragments `lib/utils/url-sharing.ts` restores a model from (`CODE_HASH` is '#code=';
-   * not imported, so the public pages do not load the compression code it brings).
-   */
-  const SHARED_MODEL = /^#(data=|embed=|code=)/;
-
-  /** The routes App.svelte calls public: the landing, the blog and the standing pages. */
-  function route() {
-    const { path } = parsePublicPath(location.pathname);
-    const params = new URLSearchParams(location.search);
-    const p = location.pathname;
-    if (params.has('embed') || p === '/app' || p.startsWith('/app/') || p === '/demo' || p === '/demo/') return { kind: 'app' as const, path };
-    // A shared model (`/#data=…`, `#embed=…`, `#code=…`) is the application's to restore
-    // (`loadFromURLHash`): it used to be mounted behind the landing and read the fragment.
-    if (SHARED_MODEL.test(location.hash)) return { kind: 'app' as const, path };
-    if (path === '/blog' || path.startsWith('/blog/') || findStandingPage(path)) return { kind: 'blog' as const, path };
-    return { kind: 'landing' as const, path };
-  }
+  /** The page this address is (`lib/public-route.ts`, which main.ts reads too). */
+  const route = () => routeKind();
 
   function adoptLocaleFromPath() {
     const { locale } = parsePublicPath(location.pathname);

@@ -9,10 +9,9 @@ import './styles/touch-density.css';
 import './styles/pro-kit.css';
 import './styles/panel-scrollbars.css';
 import 'katex/dist/katex.min.css';
-// The public pages render without the application, which loads on the first app route
-// (Root.svelte): they used to download and run all of it.
 import Root from './Root.svelte';
 import { mount } from 'svelte';
+import { routeKind, restoreRedirectedRoute } from './lib/public-route';
 
 /*
  * The prerendered page steps aside as the application takes over.
@@ -30,10 +29,6 @@ import { mount } from 'svelte';
  */
 document.getElementById('prerender')?.remove();
 
-const app = mount(Root, {
-  target: document.getElementById('app')!,
-});
-
 // Browser-test hooks — BUILD-TIME GATED.
 //
 // `import.meta.env.VITE_E2E` is statically replaced by Vite, so in a normal
@@ -44,14 +39,31 @@ const app = mount(Root, {
 //
 // The hooks additionally require `?e2e=1` at runtime (see e2e-hooks.ts), so both gates
 // must hold. Playwright's webServer sets VITE_E2E=1 for its build.
-//
-// They are installed when the application is up (Root.svelte loads it on the first app route
-// and says so), so a spec that waits for them is waiting for the application, as it was when
-// the application mounted at once.
-if (import.meta.env.VITE_E2E === '1') {
-  window.addEventListener('stabileo-app-ready', () => {
+function installTestHooks() {
+  if (import.meta.env.VITE_E2E === '1') {
     void import('./lib/utils/e2e-hooks').then((m) => m.installE2EHooks());
-  }, { once: true });
+  }
+}
+
+/*
+ * The application, or the public pages without it.
+ *
+ * An address that is the application's (`/app/…`, `?embed`, a shared model) mounts App.svelte
+ * at once, as it always did, and the browser-test hooks with it. Any other address mounts
+ * Root.svelte, which renders the landing and the blog without downloading the application
+ * (3 MB of JavaScript and 3 MB of WASM they used to wait on) and loads it when asked.
+ */
+restoreRedirectedRoute();
+const target = document.getElementById('app')!;
+let app: ReturnType<typeof mount>;
+if (routeKind().kind === 'app') {
+  const { default: App } = await import('./App.svelte');
+  app = mount(App, { target });
+  installTestHooks();
+} else {
+  app = mount(Root, { target });
+  // From a public page the application loads in place (Root.svelte), and says so when it is up.
+  window.addEventListener('stabileo-app-ready', installTestHooks, { once: true });
 }
 
 export default app;

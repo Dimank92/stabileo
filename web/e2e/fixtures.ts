@@ -217,7 +217,7 @@ export async function bootPro(page: Page, appLocale = 'en'): Promise<void> {
   await page.waitForFunction(() => !!window.__stabileo, null, { timeout: 60_000 });
   // The REAL WASM solver must be live; the Vite stub fails here.
   await expect
-    .poll(() => page.evaluate(() => window.__stabileo.solverReady()), { timeout: 60_000, message: 'real WASM solver must be initialised (not the Vite stub)' })
+    .poll(() => page.evaluate(() => window.__stabileo?.solverReady() ?? false), { timeout: 60_000, message: 'real WASM solver must be initialised (not the Vite stub)' })
     .toBe(true);
 
   // The RC Design tab must be the active PRO tab for its table to exist.
