@@ -51,8 +51,10 @@ function specFiles(dir = E2E) {
 /** Seconds per spec file from Playwright JSON reports, first attempts only. */
 function durationsFrom(reports) {
   const secs = {};
+  // The OUTERMOST suite's file: a describe declared in a helper (the Basic advanced sweep's
+  // harness) reports the helper as its file, and its time belongs to the spec that ran it.
   const walk = (suite, file) => {
-    const f = suite.file ?? file;
+    const f = file ?? suite.file;
     for (const s of suite.suites ?? []) walk(s, f);
     for (const spec of suite.specs ?? []) {
       for (const t of spec.tests) {

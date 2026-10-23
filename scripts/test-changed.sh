@@ -156,8 +156,12 @@ run() {     # run <label> <dir> <command...>
 
 skipped=()
 
+# A deleted web module leaves its importers broken, and `vitest related` cannot start from a
+# file that is gone: the typecheck is what sees it.
+web_deleted=$(printf '%s\n' "$deleted" | grep -E '^web/.*\.(ts|js|mjs|cjs|svelte|json)$' | grep -v '^web/e2e/' || true)
+
 # ── web ───────────────────────────────────────────────────────────────
-if [ "${#web_related[@]}" -gt 0 ] || [ "${#web_config[@]}" -gt 0 ]; then
+if [ "${#web_related[@]}" -gt 0 ] || [ "${#web_config[@]}" -gt 0 ] || [ -n "$web_deleted" ]; then
   if [ ! -d web/node_modules ]; then
     echo "test-changed: web/node_modules is missing (cd web && npm ci)" >&2
     exit 2
@@ -169,6 +173,10 @@ fi
 if [ "${#web_related[@]}" -gt 0 ]; then
   run "web: unit tests related to ${#web_related[@]} changed file(s)" web \
     npx vitest related "${web_related[@]}" --run --project unit --passWithNoTests
+fi
+if [ -n "$web_deleted" ]; then
+  [ "$typecheck" = 0 ] && skipped+=("$(echo "$web_deleted" | wc -l | tr -d ' ') web file(s) deleted: their importers are checked by \`cd web && npm run typecheck\` (the pre-push hook runs it)")
+  skipped+=("web file(s) deleted: no related tests can start from a deleted file; the whole unit pass is \`cd web && npm run test:unit\`")
 fi
 [ "${#web_config[@]}" -gt 0 ] && skipped+=("web config changed (${web_config[*]}): related tests cannot see a config change; the whole unit pass is \`cd web && npm run test:unit\`")
 [ "${#e2e_specs[@]}" -gt 0 ] && skipped+=("e2e specs (Playwright, slow): cd web && npx playwright test ${e2e_specs[*]#web/}")
