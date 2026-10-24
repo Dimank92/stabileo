@@ -198,8 +198,12 @@ fn check_certificate(name: &str, path: &str, c: &Value) {
 pub fn check_equilibrium_2d(input: &SolverInput, results: &AnalysisResults, cert: &Certificate) -> bool {
     let Certificate::Certified { residual_norm, .. } = cert else { return false };
     let plain_supports = input.supports.values().all(|s| {
-        s.kx.is_none() && s.ky.is_none() && s.kz.is_none() && s.angle.is_none()
+        s.kx.is_none()
+            && s.ky.is_none()
+            && s.kz.is_none()
+            && s.angle.is_none()
             && matches!(s.support_type.as_str(), "fixed" | "pinned" | "rollerX" | "rollerZ")
+            && [s.dx, s.dz, s.dry].into_iter().all(|d| d.is_none() || d == Some(0.0))
     });
     if !plain_supports || !input.constraints.is_empty() || !input.connectors.is_empty() {
         return false;
@@ -236,9 +240,13 @@ pub fn check_equilibrium_2d(input: &SolverInput, results: &AnalysisResults, cert
 pub fn check_equilibrium_3d(input: &SolverInput3D, results: &AnalysisResults3D, cert: &Certificate) -> bool {
     let Certificate::Certified { residual_norm, .. } = cert else { return false };
     let plain_supports = input.supports.values().all(|s| {
-        [s.kx, s.ky, s.kz, s.krx, s.kry, s.krz, s.kw, s.normal_x, s.normal_y, s.normal_z]
-            .iter()
-            .all(Option::is_none)
+        !s.is_inclined.unwrap_or(false)
+            && [s.kx, s.ky, s.kz, s.krx, s.kry, s.krz, s.kw, s.normal_x, s.normal_y, s.normal_z]
+                .iter()
+                .all(Option::is_none)
+            && [s.dx, s.dy, s.dz, s.drx, s.dry, s.drz]
+                .iter()
+                .all(|d| d.is_none() || *d == Some(0.0))
     });
     if !plain_supports || !input.constraints.is_empty() || !input.connectors.is_empty() {
         return false;
@@ -271,4 +279,129 @@ pub fn check_equilibrium_3d(input: &SolverInput3D, results: &AnalysisResults3D, 
         );
     }
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn check_equilibrium_skips_supports_with_settlement() {
+        let mut supports_3d = HashMap::new();
+        supports_3d.insert(
+            "1".to_string(),
+            SolverSupport3D {
+                node_id: 1,
+                rx: true,
+                ry: true,
+                rz: true,
+                rrx: true,
+                rry: true,
+                rrz: true,
+                kx: None,
+                ky: None,
+                kz: None,
+                krx: None,
+                kry: None,
+                krz: None,
+                dx: Some(-0.001),
+                dy: None,
+                dz: None,
+                drx: None,
+                dry: None,
+                drz: None,
+                rw: None,
+                kw: None,
+                normal_x: None,
+                normal_y: None,
+                normal_z: None,
+                is_inclined: None,
+            },
+        );
+        let input_3d = SolverInput3D {
+            nodes: HashMap::new(),
+            materials: HashMap::new(),
+            sections: HashMap::new(),
+            elements: HashMap::new(),
+            supports: supports_3d,
+            loads: vec![],
+            constraints: vec![],
+            left_hand: None,
+            plates: HashMap::new(),
+            quads: HashMap::new(),
+            quad9s: HashMap::new(),
+            solid_shells: HashMap::new(),
+            curved_shells: HashMap::new(),
+            curved_beams: vec![],
+            connectors: HashMap::new(),
+            solver_options: None,
+            masses: Default::default(),
+        };
+        let results_3d = AnalysisResults3D {
+            displacements: vec![],
+            reactions: vec![],
+            element_forces: vec![],
+            plate_stresses: vec![],
+            quad_stresses: vec![],
+            quad_nodal_stresses: vec![],
+            constraint_forces: vec![],
+            diagnostics: vec![],
+            solver_diagnostics: vec![],
+            timings: None,
+            structured_diagnostics: vec![],
+            equilibrium: None,
+            result_summary: None,
+            solver_run_meta: None,
+        };
+        let cert = Certificate::Certified {
+            abs_bound: 1e-14,
+            rel_bound: 1e-11,
+            sigma: 1e-9,
+            residual_norm: 1e-23,
+        };
+        assert!(!check_equilibrium_3d(&input_3d, &results_3d, &cert));
+
+        let mut supports_2d = HashMap::new();
+        supports_2d.insert(
+            "1".to_string(),
+            SolverSupport {
+                id: 1,
+                node_id: 1,
+                support_type: "fixed".to_string(),
+                kx: None,
+                ky: None,
+                kz: None,
+                dx: Some(-0.001),
+                dz: None,
+                dry: None,
+                angle: None,
+            },
+        );
+        let input_2d = SolverInput {
+            nodes: HashMap::new(),
+            materials: HashMap::new(),
+            sections: HashMap::new(),
+            elements: HashMap::new(),
+            supports: supports_2d,
+            loads: vec![],
+            constraints: vec![],
+            connectors: HashMap::new(),
+            solver_options: None,
+            masses: Default::default(),
+        };
+        let results_2d = AnalysisResults {
+            displacements: vec![],
+            reactions: vec![],
+            element_forces: vec![],
+            constraint_forces: vec![],
+            diagnostics: vec![],
+            solver_diagnostics: vec![],
+            structured_diagnostics: vec![],
+            equilibrium: None,
+            result_summary: None,
+            solver_run_meta: None,
+        };
+        assert!(!check_equilibrium_2d(&input_2d, &results_2d, &cert));
+    }
 }
