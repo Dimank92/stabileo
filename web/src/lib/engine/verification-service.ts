@@ -23,8 +23,8 @@ import type { AnalysisResults3D, BeamStationInput3D, GroupedBeamStationResult3D,
 import { decodeStationBuffer } from './station-buffer';
 import { steelSectionConstants } from './steel/section-constants';
 import type { LoadCombination } from '../store/model.svelte';
+import { EngineUnavailableError } from './engine-unavailable';
 import {
-  extractElementStations,
   extractGoverningDemands,
   type ElementDesignDemands,
   type ElementStationResult,
@@ -32,7 +32,7 @@ import {
 } from './station-design-forces';
 import { extractBeamStationBuffer3D, extractBeamStationsGrouped3D, isSolverReady } from './wasm-solver';
 import { autoVerifyFromResults, type AutoVerifyModelData } from './auto-verify';
-import { classifyElement, type ElementVerification } from './codes/argentina/cirsoc201';
+import type { ElementVerification } from './codes/argentina/cirsoc201';
 import {
   checkSteelInteraction, interactionRatios, steelShapeOf, verifyByFlange, withUndeclaredData, worseSteelVerification,
   type SteelVerification, type SteelDesignParams, type TensionConnection,
@@ -45,7 +45,7 @@ import { steelCheckerFor } from './steel/member-checkers';
 import { momentGradient, type StationMoment } from './steel/moment-gradient';
 import { memberNetArea, memberEndsFor, type MemberEnd, type TensionSectionInput } from './steel/tension-connection';
 import type { GoverningPerElement3D } from './governing-case';
-import type { CheckStatus, MemberDesignResult, DesignCheckSummary } from './design-check-results';
+import type { MemberDesignResult, DesignCheckSummary } from './design-check-results';
 import { isDesigned, isDesignedMember, maskAxialDemand } from './design/behaviour-demands';
 import { isVariableMember, memberSectionAt } from '../section/variable';
 
@@ -63,8 +63,11 @@ export function setCompactStationTransfer(enabled: boolean): void { compactStati
 /**
  * Compute station-based demands for all elements from per-combination 3D results.
  *
- * Primary path: compact WASM station force buffer (solver-side station interpolation).
- * Fallback: JS `extractElementStations` (app-side reimplementation, used when WASM unavailable).
+ * The engine's compact station force buffer (solver-side station interpolation), or its grouped
+ * JSON path on an older build. There is no TypeScript fallback: without the engine, or without
+ * the model the engine needs, this throws `EngineUnavailableError`, and the screen that asked
+ * says "engine not available". (It used to compute the stations with a TypeScript copy,
+ * `extractElementStations`, and say nothing; that copy is now the tests' oracle.)
  *
  * The WASM path evaluates beam diagrams at interior stations natively in Rust,
  * eliminating ~300 LOC of JS station interpolation logic.
@@ -83,27 +86,8 @@ export function computeStationDemands(
 
   if (perCombo3D.size === 0) return { demands, stations };
 
-  // Primary path: WASM solver-backed station extraction. Fallback to JS only when
-  // WASM is genuinely unavailable (init not finished, vitest-without-wasm, no model).
-  // Real WASM call errors propagate so future regressions don't hide silently.
-  if (model && isSolverReady()) {
-    const wasmResult = computeStationDemandsWasm(perCombo3D, combinations, model);
-    if (wasmResult) return wasmResult;
-  }
-
-  // JS fallback — only reached when WASM not ready or model unavailable
-  const comboNames = new Map<number, string>();
-  for (const c of combinations) comboNames.set(c.id, c.name);
-  const firstCombo = perCombo3D.values().next().value;
-  if (!firstCombo) return { demands, stations };
-  for (const ef of firstCombo.elementForces) {
-    const esr = extractElementStations(ef.elementId, perCombo3D, comboNames);
-    if (esr) {
-      stations.set(ef.elementId, esr);
-      demands.set(ef.elementId, extractGoverningDemands(esr));
-    }
-  }
-  return { demands, stations };
+  if (!model || !isSolverReady()) throw new EngineUnavailableError('the station design forces');
+  return computeStationDemandsWasm(perCombo3D, combinations, model);
 }
 
 /**
@@ -114,7 +98,7 @@ function computeStationDemandsWasm(
   perCombo3D: Map<number, AnalysisResults3D>,
   combinations: LoadCombination[],
   model: AutoVerifyModelData,
-): StationDemandData | null {
+): StationDemandData {
   // Build member list from model
   const members: Array<{ elementId: number; sectionId: number; materialId: number; length: number }> = [];
   for (const [id, elem] of model.elements) {
@@ -1178,7 +1162,7 @@ export function getCodeDetail(v: ElementVerification | undefined | null): CodeDe
     });
   }
   if (v.biaxial?.steps?.length) {
-    memos.push({ title: 'Biaxial (Bresler)', titleKey: 'design.memo.biaxial', steps: v.biaxial.steps });
+    memos.push({ title: 'Biaxial (load contour)', titleKey: 'design.memo.biaxial', steps: v.biaxial.steps });
   }
 
   const interactionParams = v.column ? {

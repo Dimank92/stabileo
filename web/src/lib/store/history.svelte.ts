@@ -103,7 +103,7 @@ export interface ModelSnapshot {
    * `setFootingMatPreferences` is what pushes the entry.
    */
   footingMatPreferences?: FootingMatPreferences;
-  nextId: { node: number; material: number; section: number; element: number; support: number; load: number; loadCase?: number; combination?: number; plate?: number; quad?: number; group?: number; connector?: number; footing?: number; soilProfile?: number };
+  nextId: { node: number; material: number; section: number; element: number; support: number; load: number; loadCase?: number; combination?: number; plate?: number; quad?: number; group?: number; connector?: number; footing?: number; soilProfile?: number; spectrum?: number };
   /** Jurisdiction, adopted regulation editions and concrete data. Absent on
    *  models saved before this existed — see migrateCodeSettings. */
   codeSettings?: ProjectCodeSettings;
@@ -128,6 +128,12 @@ export interface ModelSnapshot {
    */
   exports?: ExportRecord[];
   manualEdits?: number[];
+  /**
+   * Which build last solved the project (`provenance/solve-stamp.ts`). Absent: not known — a
+   * project saved before stamps existed, read as solved with the oldest version. Adopted on open
+   * like `exports`, never by undo.
+   */
+  solvedWith?: import('../provenance/solve-stamp').SolveStamp;
   /**
    * The joint designs the project carries — the bolts, plate, weld and battens chosen per node.
    *

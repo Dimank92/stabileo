@@ -154,9 +154,16 @@ npm test           # the web test suite
 npm run build:only # production build -> web/dist/
 ```
 
-Requires Node.js 18 or later. `npm run build` also prerenders every public route by driving the
+Requires Node.js 22 (`.nvmrc`). With nix, `nix develop` gives the pinned Rust, Node, wasm-pack and
+sccache; `make worktree NAME=fix-x` makes a worktree ready to test in seconds (dependencies cloned,
+the WASM engine from a cache keyed by its sources) and `make worktree-prune` removes the finished
+ones. `npm run build` also prerenders every public route by driving the
 page in headless Chromium, so it needs `npx playwright install chromium` first; `dev`, `test` and
 `build:only` do not.
+
+`make test-changed` runs only the tests your branch most likely affects (related web unit tests,
+the engine's unit tests and the changed test targets) and says what it skipped; `make hooks` adds
+a pre-push hook that runs the web typecheck and related unit tests (`git push --no-verify` skips it).
 
 ## Contributing
 
@@ -190,9 +197,12 @@ To report a vulnerability, email security@lambdaclass.com.
 
 ## Built by
 
+Stabileo is backed by [Ergodic Group](https://ergodicgroup.com/) and developed by
+[LambdaClass](https://lambdaclass.com), its development arm.
+
 - **Bautista Chesta**: Civil Engineer (FIUBA), UX/UI and project management
 - **Diego Kingston**: Ph.D. in Engineering (UBA), product–solver integration
-- **Federico Carrone**: Founder of [Lambda Class](https://lambdaclass.com), solver lead
+- **Federico Carrone**: Founder of [LambdaClass](https://lambdaclass.com), solver lead
 
 With contributions from mathematicians, physicists, computer engineers and computer scientists at
-[Lambda Class](https://lambdaclass.com).
+LambdaClass.

@@ -29,6 +29,7 @@
  */
 
 import { viewportCanvas } from './viewport-canvas';
+import { discretizationStore } from '../store/discretization.svelte';
 import { drawState } from '../store/draw-state.svelte';
 import { projectWorld } from '../viewport3d/camera-probe';
 import { projectNodeToScene } from '../geometry/coordinate-system';
@@ -56,6 +57,8 @@ import { autosaveRevisions as storedAutosaveRevisions } from '../store/autosave-
 import { autosaveFingerprint, clearAutosave, deserializeProject, loadAutosave, serializeProject, type DedalFile } from '../store/file';
 import { lastAutosaveOutcome, requestAutosave } from '../store/autosave-service';
 import { loadFixture } from '../templates/load-fixture';
+import { currentResultProvenance, provenanceForExport, captureProvenanceToken } from '../store/result-provenance';
+import { recheckStore } from '../store/recheck.svelte';
 
 export const E2E_QUERY_FLAG = 'e2e';
 
@@ -88,6 +91,8 @@ export interface StabileoTestHooks {
   baselineRevision(): number;
   isBaselineStale(): boolean;
   solveCount(): number;
+  /** The discretization store (`store/discretization.svelte.ts`): estimate status, whether it applies to what is on screen, study status. */
+  discretizationState(): { estimate: string; reason: string | null; idle: string | null; applies: boolean; study: string };
   modelVersion(): number;
   designRunId(): string | null;
   displayStatus(elementId: number): string;
@@ -412,6 +417,12 @@ export interface StabileoTestHooks {
   }>;
   /** The last write attempt: what triggered it, whether it landed, and on which backend. */
   autosaveOutcome(): unknown;
+  /** The provenance record of the results on screen (`store/result-provenance.ts`). */
+  resultProvenance(): unknown;
+  /** The record as an export writes it: engine hashes awaited, bound to the state (`provenanceForExport`). */
+  exportProvenance(): Promise<unknown>;
+  /** The re-check state: notice up, results stale, the registered changes listed. */
+  recheck(): { noticeOpen: boolean; stale: boolean; changes: string[]; solvedVersion: number | null; stampVersion: number | null };
 }
 
 /**
@@ -443,6 +454,12 @@ export interface StabileoTestActions {
   clearSelection(): void;
   /** Runs the same global solve the toolbar button triggers. */
   solve(): Promise<void>;
+  /**
+   * Solve the base case on the MAIN THREAD (`modelStore.solve3D`/`solve`) and publish it as a
+   * solve does; returns the published results' provenance hash. With `solve()` (the worker pool
+   * in PRO) it is how a spec checks that the thread does not change a single bit.
+   */
+  solveOnMainThread(): string | null;
   /** Activate the RC Design tab (the table only exists while it is selected). */
   openDesignTab(): void;
   seedDetailing(assemblies: unknown): void;
@@ -550,6 +567,16 @@ export function installE2EHooks(): void {
     baselineRevision: () => verificationStore.baselineRevision,
     isBaselineStale: () => verificationStore.isBaselineStale,
     solveCount: () => getStructuralSolveCount(),
+    discretizationState: () => {
+      const e = discretizationStore.estimate, st = discretizationStore.study;
+      return {
+        estimate: e.status,
+        reason: e.status === 'failed' ? e.reason : st.status === 'failed' ? st.reason : null,
+        idle: discretizationStore.idleReason,
+        applies: discretizationStore.applies(),
+        study: st.status,
+      };
+    },
     modelVersion: () => modelStore.modelVersion,
     designRunId: () => {
       const s = verificationStore.runSummary;
@@ -793,6 +820,15 @@ export function installE2EHooks(): void {
       };
     },
     autosaveOutcome: () => JSON.parse(JSON.stringify(lastAutosaveOutcome())),
+    resultProvenance: () => JSON.parse(JSON.stringify(currentResultProvenance())),
+    exportProvenance: async () => JSON.parse(JSON.stringify(await provenanceForExport(captureProvenanceToken()))),
+    recheck: () => ({
+      noticeOpen: recheckStore.noticeOpen,
+      stale: recheckStore.stale,
+      changes: recheckStore.assessment?.changes.map((c) => c.id) ?? [],
+      solvedVersion: recheckStore.assessment?.solvedVersion ?? null,
+      stampVersion: recheckStore.stamp?.resultsVersion ?? null,
+    }),
   };
   const actions: StabileoTestActions = {
     /** Seed a coordinated assembly — the same shape the pipeline writes. */
@@ -854,6 +890,19 @@ export function installE2EHooks(): void {
     /** Reset the selection between gestures — the position, not the subject. */
     clearSelection: () => { uiStore.clearSelection(); },
     solve: async () => { await runGlobalSolve(); },
+    solveOnMainThread: () => {
+      const isPro = uiStore.analysisMode === 'pro';
+      if (uiStore.is3DWorkspace) {
+        const r = modelStore.solve3D(uiStore.includeSelfWeight, uiStore.axisConvention3D === 'leftHand', isPro);
+        if (!r || typeof r === 'string') return null;
+        resultsStore.setResults3D(r);
+      } else {
+        const r = modelStore.solve(uiStore.includeSelfWeight, uiStore.drawPlane2D);
+        if (!r || typeof r === 'string') return null;
+        resultsStore.setResults(r);
+      }
+      return currentResultProvenance().resultsHash;
+    },
     openDesignTab: () => { uiStore.proActiveTab = 'design'; },
     computeDemands: () => designRunStore.computeDemands(),
     codeCheck: () => designRunStore.runCodeCheck(),

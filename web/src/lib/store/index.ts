@@ -3,6 +3,7 @@ import { modelStore } from './model.svelte';
 import { uiStore } from './ui.svelte';
 import { resultsStore } from './results.svelte';
 import { certificateStore } from './certificate.svelte';
+import { discretizationStore } from './discretization.svelte';
 import { historyStore } from './history.svelte';
 import { dsmStepsStore } from './dsmSteps.svelte';
 import { fmStepsStore } from './fmSteps.svelte';
@@ -18,6 +19,8 @@ import '../engine/design/adapters/unsupported-adapter';
 import { connectionPrompt } from './connection-prompt.svelte';
 import { scheduleDefinedLoadsSync, flushDefinedLoadsSync } from './defined-loads';
 import { viewVisibility } from './view-state.svelte';
+import { recheckStore } from './recheck.svelte';
+import { noteBaseSolve } from './result-provenance';
 
 // Wire model mutations to automatically clear stale results.
 // This ensures results never persist after the model changes,
@@ -39,6 +42,8 @@ modelStore._setOnReplaced(() => connectionPrompt.clear());
 modelStore._setOnNewProject(() => {
   viewVisibility.showAll();
   uiStore.selfWeightCaseId = null;
+  // A new project was made in this build: nothing of it is stale.
+  recheckStore.reset();
 });
 
 // An analysis reads the definitions' loads current, even inside the moment a rewrite waits for.
@@ -131,8 +136,20 @@ resultsStore._setNormalise3D(
 );
 
 // Each base linear solve published is certified in the background (`certificate.svelte.ts`).
-resultsStore._setOnStaticPublish((r, dim) => certificateStore.track(r, dim));
-resultsStore._setOnComboPublish((pc, pco, dim) => certificateStore.trackCombinations(pc, pco, dim));
+// Every solve published also stamps the project with the build that produced it
+// (`recheck.svelte.ts`): a project solved here no longer reads as stale; and its discretization
+// error is estimated (`discretization.svelte.ts`: an estimate, not certified).
+resultsStore._setOnStaticPublish((r, dim) => {
+  certificateStore.track(r, dim);
+  discretizationStore.track(r, dim);
+  noteBaseSolve(r);
+  if (r) recheckStore.noteSolved('linear');
+});
+resultsStore._setOnComboPublish((pc, pco, dim) => {
+  certificateStore.trackCombinations(pc, pco, dim);
+  recheckStore.noteSolved('linear');
+});
+resultsStore._setOnAnalysisPublish((kind) => recheckStore.noteSolved(kind));
 
 resultsStore._setOnResultsPublish(() => {
   verificationStore.bumpSolveGeneration();

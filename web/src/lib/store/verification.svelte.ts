@@ -32,7 +32,7 @@ import type { DesignRunSummary, MemberDesignOutcome } from '../engine/design/out
 import { utilizationStatus } from '../engine/design/outcome';
 import { steelMemberStatus, steelUtilization } from '../engine/steel/steel-utilization';
 import { rebarHash } from '../engine/design/rebar-hash';
-import { getDesignCode, type DesignCodeId } from '../engine/design/code-adapter';
+import { getDesignCode } from '../engine/design/code-adapter';
 import type { OrientationIssue } from '../engine/design/orientation-diagnostic';
 import { failingLimits, isKnownBiaxialLimitation }
   from '../engine/detailing/element-status';
