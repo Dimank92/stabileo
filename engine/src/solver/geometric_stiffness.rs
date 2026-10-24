@@ -394,6 +394,66 @@ pub(crate) fn mean_axial_forces_2d(
     out
 }
 
+/// Each 3D element's mean axial force (tension positive) at displacements `u`:
+/// EA·(δ/L − α·ΔT), the force the geometric stiffness is built from. Under an
+/// axial span load N varies along the member and its end values can both be zero
+/// while the member is in compression; δ/L is the mean of N/EA over the length.
+pub(crate) fn mean_axial_forces_3d(
+    input: &SolverInput3D,
+    dof_num: &DofNumbering,
+    u: &[f64],
+) -> std::collections::HashMap<usize, f64> {
+    let left_hand = input.left_hand.unwrap_or(false);
+    let node_by_id: std::collections::HashMap<usize, &SolverNode3D> = crate::ordered::values(&input.nodes).map(|n| (n.id, n)).collect();
+    let mat_by_id: std::collections::HashMap<usize, &SolverMaterial> = crate::ordered::values(&input.materials).map(|m| (m.id, m)).collect();
+    let sec_by_id: std::collections::HashMap<usize, &SolverSection3D> = crate::ordered::values(&input.sections).map(|s| (s.id, s)).collect();
+    let dt_by_elem = uniform_dt_3d(input);
+    let mut out = std::collections::HashMap::new();
+
+    for elem in crate::ordered::values(&input.elements) {
+        let (Some(node_i), Some(node_j)) = (node_by_id.get(&elem.node_i), node_by_id.get(&elem.node_j)) else { continue };
+        let (Some(mat), Some(sec)) = (mat_by_id.get(&elem.material_id), sec_by_id.get(&elem.section_id)) else { continue };
+
+        let dx = node_j.x - node_i.x;
+        let dy = node_j.y - node_i.y;
+        let dz = node_j.z - node_i.z;
+        let l = (dx * dx + dy * dy + dz * dz).sqrt();
+        if l < 1e-15 {
+            continue;
+        }
+        let e = mat.e * 1000.0;
+        let (alpha, dt) = dt_by_elem.get(&elem.id).copied().unwrap_or((DEFAULT_FRAME_THERMAL_ALPHA, 0.0));
+
+        if elem.elem_type == "truss" || elem.elem_type == "cable" {
+            let dir = [dx / l, dy / l, dz / l];
+            let ui: Vec<f64> = (0..3).map(|i| dof_num.global_dof(elem.node_i, i).map(|d| u[d]).unwrap_or(0.0)).collect();
+            let uj: Vec<f64> = (0..3).map(|i| dof_num.global_dof(elem.node_j, i).map(|d| u[d]).unwrap_or(0.0)).collect();
+            let delta: f64 = (0..3).map(|i| (uj[i] - ui[i]) * dir[i]).sum();
+            let axial_force = e * sec.a * (delta / l - alpha * dt);
+            out.insert(elem.id, axial_force);
+        } else {
+            let (ex, ey, ez) = crate::element::compute_local_axes_3d(
+                node_i.x, node_i.y, node_i.z,
+                node_j.x, node_j.y, node_j.z,
+                elem.local_yx, elem.local_yy, elem.local_yz,
+                elem.roll_angle, left_hand,
+            );
+            let t = crate::element::frame_transform_3d(&ex, &ey, &ez);
+            let elem_dofs = dof_num.element_dofs(elem.node_i, elem.node_j);
+
+            let u_12: Vec<f64> = if dof_num.dofs_per_node >= 7 {
+                DOF_MAP_12_TO_14.iter().map(|&i| u[elem_dofs[i]]).collect()
+            } else {
+                elem_dofs.iter().map(|&d| u[d]).collect()
+            };
+            let u_local = transform_displacement(&u_12, &t, 12);
+            let axial_force = e * sec.a * ((u_local[6] - u_local[0]) / l - alpha * dt);
+            out.insert(elem.id, axial_force);
+        }
+    }
+    out
+}
+
 /// The 2D geometric stiffness of every element, emitted entry by entry: the
 /// sparse P-Delta tangent collects it as triplets instead of a dense matrix.
 /// Mirrors `emit_geometric_stiffness_3d`.

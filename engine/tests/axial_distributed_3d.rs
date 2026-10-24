@@ -98,3 +98,20 @@ fn axial_load_assembly_dense_sparse_and_parallel_agree() {
         }
     }
 }
+
+/// Issue #456: a cantilever under an axial load q_x = 10 − 5x (q_xi = 10, q_xj = -10)
+/// has N(0) = N(L) = 0 but N < 0 inside, mean −20/3. 3D buckling's compression gate
+/// read the end average and refused it ("No compressed elements — buckling not applicable"),
+/// though Kg is built from the displacement-based mean force.
+#[test]
+fn buckling_3d_sees_compression_from_an_axial_span_load_with_zero_end_forces() {
+    let input = column(10.0, -10.0, 0.0, 4.0);
+    let lin = solve_3d(&input).unwrap();
+    let ef = &lin.element_forces[0];
+    assert!(ef.n_start.abs() < 1e-9 && ef.n_end.abs() < 1e-9, "ends {} {}", ef.n_start, ef.n_end);
+    let r = dedaliano_engine::solver::buckling::solve_buckling_3d(&input, 1).expect("compressed inside the span");
+    assert!(r.modes[0].load_factor > 0.0);
+    let d = r.element_data.iter().find(|d| d.element_id == 1).expect("the member is reported as compressed");
+    assert!((d.axial_force + 20.0 / 3.0).abs() < 1e-6, "mean N {}", d.axial_force);
+}
+

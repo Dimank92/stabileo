@@ -251,6 +251,8 @@ pub struct BucklingSystem3D {
     pub neg_kg_csc: CscMatrix,
     /// Inclined supports: K and −Kg are in each one's (normal, tangent) frame.
     pub inclined_transforms: Vec<InclinedTransformData>,
+    /// Each element's mean axial force at the linear solution (what Kg is built from).
+    pub mean_n: HashMap<usize, f64>,
 }
 
 #[doc(hidden)]
@@ -267,9 +269,22 @@ pub fn buckling_system_3d(input: &SolverInput3D) -> Result<BucklingSystem3D, Str
 
     if nf == 0 { return Err("No free DOFs".into()); }
 
-    let has_frame_compression = linear.element_forces.iter().any(|ef| {
-        (ef.n_start + ef.n_end) / 2.0 < -1e-6
-    });
+    // The displacement vector of the linear solution, which every member and
+    // surface family reads its prestress from.
+    let mut u_full = vec![0.0; n];
+    for d in &linear.displacements {
+        let vals = [d.ux, d.uy, d.uz, d.rx, d.ry, d.rz];
+        for (i, &v) in vals.iter().enumerate() {
+            if let Some(&dof) = dof_num.map.get(&(d.node_id, i)) {
+                u_full[dof] = v;
+            }
+        }
+    }
+
+    // The mean force Kg is built from, not the end average: under an axial
+    // span load both end forces can be 0 with the member compressed.
+    let mean_n = super::geometric_stiffness::mean_axial_forces_3d(input, &dof_num, &u_full);
+    let has_frame_compression = mean_n.values().any(|&n| n < -1e-6);
     let has_surfaces = !input.quads.is_empty()
         || !input.plates.is_empty()
         || !input.quad9s.is_empty()
@@ -289,17 +304,6 @@ pub fn buckling_system_3d(input: &SolverInput3D) -> Result<BucklingSystem3D, Str
     // rotated the same way once the surfaces are in.
     let SparseAssemblyResult3D { k_ff, inclined_transforms, .. } = assemble_sparse_3d(input, &dof_num, false);
 
-    // The displacement vector of the linear solution, which every member and
-    // surface family reads its prestress from.
-    let mut u_full = vec![0.0; n];
-    for d in &linear.displacements {
-        let vals = [d.ux, d.uy, d.uz, d.rx, d.ry, d.rz];
-        for (i, &v) in vals.iter().enumerate() {
-            if let Some(&dof) = dof_num.map.get(&(d.node_id, i)) {
-                u_full[dof] = v;
-            }
-        }
-    }
     let mut kg = KgTriplets::new(if inclined_transforms.is_empty() { nf } else { n });
     emit_geometric_stiffness_3d(input, &dof_num, &u_full, &mut |i, j, v| if i >= j { kg.add(i, j, v) });
 
@@ -333,7 +337,7 @@ pub fn buckling_system_3d(input: &SolverInput3D) -> Result<BucklingSystem3D, Str
     if !has_frame_compression && !has_shell_kg {
         return Err("No compressed elements — buckling not applicable".into());
     }
-    Ok(BucklingSystem3D { linear, dof_num, k_ff, neg_kg_csc, inclined_transforms })
+    Ok(BucklingSystem3D { linear, dof_num, k_ff, neg_kg_csc, inclined_transforms, mean_n })
 }
 
 /// 3D buckling analysis result.
@@ -382,7 +386,7 @@ pub fn solve_buckling_3d(
     let sec_by_id: HashMap<usize, &SolverSection3D> =
         crate::ordered::values(&input.sections).map(|s| (s.id, s)).collect();
 
-    let BucklingSystem3D { linear, dof_num, k_ff, neg_kg_csc, inclined_transforms } = buckling_system_3d(input)?;
+    let BucklingSystem3D { linear, dof_num, k_ff, neg_kg_csc, inclined_transforms, mean_n } = buckling_system_3d(input)?;
     let nf = dof_num.n_free;
     let n = dof_num.n_total;
 
@@ -440,7 +444,7 @@ pub fn solve_buckling_3d(
     let lambda_cr = modes[0].load_factor;
     let mut element_data = Vec::new();
     for ef in &linear.element_forces {
-        let n_avg = (ef.n_start + ef.n_end) / 2.0;
+        let n_avg = mean_n.get(&ef.element_id).copied().unwrap_or((ef.n_start + ef.n_end) / 2.0);
         if n_avg >= -1e-6 { continue; }
         let elem = elem_by_id[&ef.element_id];
         let sec = sec_by_id[&elem.section_id];
