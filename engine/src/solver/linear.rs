@@ -4239,6 +4239,66 @@ fn reject_unimposed_settlements_3d(input: &SolverInput3D) -> Result<(), String> 
     Ok(())
 }
 
+/// Issue #504: refuse contradictory input: a support cannot have both a rigid
+/// restraint and an elastic spring on the same DOF.
+fn reject_contradictory_supports_2d(input: &SolverInput) -> Result<(), String> {
+    let mut sups: Vec<&SolverSupport> = crate::ordered::values(&input.supports).collect();
+    sups.sort_by_key(|s| (s.node_id, s.id));
+    for sup in sups {
+        let what = format!("Support {} (node {}, {})", sup.id, sup.node_id, sup.support_type);
+        if sup.support_type == "spring" || sup.support_type == "free" || sup.support_type == "inclinedRoller" {
+            continue;
+        }
+        // In 2D, support springs map to:
+        // kx -> translation X (local_dof 0)
+        // ky -> translation Z (local_dof 1, vertical)
+        // kz -> rotation about Y (local_dof 2)
+        let pairs: [(usize, &str, Option<f64>); 3] = [
+            (0, "kx", sup.kx),
+            (1, "ky", sup.ky),
+            (2, "kz", sup.kz),
+        ];
+        for (dof, spring_name, spring) in pairs {
+            if super::dof::is_dof_restrained_2d(sup, dof) && spring.unwrap_or(0.0) > 0.0 {
+                return Err(format!(
+                    "{what}: contradictory input on {spring_name}: this support type rigidly restrains that DOF but also defines an elastic spring ({spring_name} = {}). Remove the spring or choose a support type that leaves that direction free.",
+                    spring.unwrap()
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Issue #504: refuse contradictory input: a support cannot have both a rigid
+/// restraint flag and an elastic spring on the same DOF.
+fn reject_contradictory_supports_3d(input: &SolverInput3D) -> Result<(), String> {
+    let mut sups: Vec<(&String, &SolverSupport3D)> = input.supports.iter().collect();
+    sups.sort_by_key(|(k, s)| (s.node_id, (*k).clone()));
+    for (key, sup) in sups {
+        let what = format!("Support {key} (node {})", sup.node_id);
+        let inclined = sup.is_inclined.unwrap_or(false);
+        let pairs: [(&str, &str, bool, Option<f64>); 7] = [
+            ("rx", "kx", !inclined && sup.rx, sup.kx),
+            ("ry", "ky", !inclined && sup.ry, sup.ky),
+            ("rz", "kz", !inclined && sup.rz, sup.kz),
+            ("rrx", "krx", sup.rrx, sup.krx),
+            ("rry", "kry", sup.rry, sup.kry),
+            ("rrz", "krz", sup.rrz, sup.krz),
+            ("rw", "kw", sup.rw.unwrap_or(false), sup.kw),
+        ];
+        for (flag_name, spring_name, flag, spring) in pairs {
+            if flag && spring.unwrap_or(0.0) > 0.0 {
+                return Err(format!(
+                    "{what}: contradictory input on DOF {flag_name}/{spring_name}: both rigidly restrained ({flag_name}: true) and elastic ({spring_name} = {}). Remove the spring or unflag the restraint.",
+                    spring.unwrap()
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_input_2d(input: &SolverInput) -> Result<(), String> {
     // 0. Non-finite input rejection (NaN/Inf). Note: JSON cannot carry NaN, so
     // this primarily protects native/Rust API callers and internally-built inputs.
@@ -4283,6 +4343,7 @@ pub(crate) fn validate_input_2d(input: &SolverInput) -> Result<(), String> {
     }
     reject_ambiguous_shared_supports(input.supports.iter().map(|(k, s)| (s.node_id, k.as_str(), plain_rigid_2d(s))))?;
     reject_unimposed_settlements_2d(input)?;
+    reject_contradictory_supports_2d(input)?;
     // In 2D the model plane is the only diaphragm plane: the model lies in
     // X–Z, and "XY" is its historical name. Both map to the 2D DOFs (ux, uz,
     // ry) since #397 (constraints::diaphragm_dofs); "YZ" names DOFs that do
@@ -4638,6 +4699,7 @@ pub(crate) fn validate_input_3d(input: &SolverInput3D) -> Result<(), String> {
         }
     }
     reject_unimposed_settlements_3d(input)?;
+    reject_contradictory_supports_3d(input)?;
     for load in &input.loads {
         let finite = match load {
             SolverLoad3D::Nodal(l) => l.fx.is_finite() && l.fy.is_finite() && l.fz.is_finite()

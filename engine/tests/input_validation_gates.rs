@@ -617,3 +617,120 @@ fn the_stable_defaults_still_run() {
         assert!(time_integration::solve_time_history_2d(&i2).is_ok(), "alpha={good}");
     }
 }
+
+// ─── #504: refuse contradictory input (rigid restraint + spring on same DOF) ─────
+
+#[test]
+fn support_3d_with_rigid_and_spring_on_same_dof_is_refused() {
+    let make_base = || {
+        make_3d_input(
+            vec![(1, 0.0, 0.0, 0.0), (2, 4.0, 0.0, 0.0)],
+            vec![(1, 200_000.0, 0.3)],
+            vec![(1, 0.01, 1e-4, 1e-4, 2e-4)],
+            vec![(1, "frame", 1, 2, 1, 1)],
+            vec![(1, vec![true; 6])],
+            vec![SolverLoad3D::Nodal(SolverNodalLoad3D {
+                node_id: 2, fx: 0.0, fy: 0.0, fz: -10.0, mx: 0.0, my: 0.0, mz: 0.0, bw: None,
+            })],
+        )
+    };
+
+    // rx & kx
+    let mut i = make_base();
+    let s = i.supports.get_mut("1").unwrap();
+    s.rx = true;
+    s.kx = Some(1e5);
+    let err = linear::solve_3d(&i).expect_err("rx + kx should be refused");
+    assert!(err.contains("rx") && err.contains("kx"), "error was: {err}");
+
+    // ry & ky
+    let mut i = make_base();
+    let s = i.supports.get_mut("1").unwrap();
+    s.ry = true;
+    s.ky = Some(1e5);
+    let err = linear::solve_3d(&i).expect_err("ry + ky should be refused");
+    assert!(err.contains("ry") && err.contains("ky"), "error was: {err}");
+
+    // rz & kz
+    let mut i = make_base();
+    let s = i.supports.get_mut("1").unwrap();
+    s.rz = true;
+    s.kz = Some(1e5);
+    let err = linear::solve_3d(&i).expect_err("rz + kz should be refused");
+    assert!(err.contains("rz") && err.contains("kz"), "error was: {err}");
+
+    // rrx & krx
+    let mut i = make_base();
+    let s = i.supports.get_mut("1").unwrap();
+    s.rrx = true;
+    s.krx = Some(1e5);
+    let err = linear::solve_3d(&i).expect_err("rrx + krx should be refused");
+    assert!(err.contains("rrx") && err.contains("krx"), "error was: {err}");
+
+    // rry & kry
+    let mut i = make_base();
+    let s = i.supports.get_mut("1").unwrap();
+    s.rry = true;
+    s.kry = Some(1e5);
+    let err = linear::solve_3d(&i).expect_err("rry + kry should be refused");
+    assert!(err.contains("rry") && err.contains("kry"), "error was: {err}");
+
+    // rrz & krz
+    let mut i = make_base();
+    let s = i.supports.get_mut("1").unwrap();
+    s.rrz = true;
+    s.krz = Some(1e5);
+    let err = linear::solve_3d(&i).expect_err("rrz + krz should be refused");
+    assert!(err.contains("rrz") && err.contains("krz"), "error was: {err}");
+
+    // rw & kw
+    let mut i = make_base();
+    let s = i.supports.get_mut("1").unwrap();
+    s.rw = Some(true);
+    s.kw = Some(1e5);
+    let err = linear::solve_3d(&i).expect_err("rw + kw should be refused");
+    assert!(err.contains("rw") && err.contains("kw"), "error was: {err}");
+}
+
+#[test]
+fn support_2d_with_rigid_and_spring_on_same_dof_is_refused() {
+    // fixed has ux, uz, ry rigid
+    let mut i = tiny_beam_2d();
+    i.supports.get_mut("1").unwrap().kx = Some(1e5);
+    let err = linear::solve_2d(&i).expect_err("fixed + kx");
+    assert!(err.contains("kx"), "error was: {err}");
+
+    let mut i = tiny_beam_2d();
+    i.supports.get_mut("1").unwrap().ky = Some(1e5);
+    let err = linear::solve_2d(&i).expect_err("fixed + ky");
+    assert!(err.contains("ky"), "error was: {err}");
+
+    let mut i = tiny_beam_2d();
+    i.supports.get_mut("1").unwrap().kz = Some(1e5);
+    let err = linear::solve_2d(&i).expect_err("fixed + kz");
+    assert!(err.contains("kz"), "error was: {err}");
+
+    // pinned has ux, uz rigid
+    let mut i = tiny_beam_2d();
+    let s = i.supports.get_mut("1").unwrap();
+    s.support_type = "pinned".to_string();
+    s.kx = Some(1e5);
+    let err = linear::solve_2d(&i).expect_err("pinned + kx");
+    assert!(err.contains("kx"), "error was: {err}");
+
+    // rollerX has uz rigid (ky in 2D is uz)
+    let mut i = tiny_beam_2d();
+    let s = i.supports.get_mut("1").unwrap();
+    s.support_type = "rollerX".to_string();
+    s.ky = Some(1e5);
+    let err = linear::solve_2d(&i).expect_err("rollerX + ky");
+    assert!(err.contains("ky"), "error was: {err}");
+
+    // rollerX with kx is a valid free DOF spring!
+    let mut i = tiny_beam_2d();
+    let s = i.supports.get_mut("1").unwrap();
+    s.support_type = "rollerX".to_string();
+    s.kx = Some(1e5);
+    assert!(linear::solve_2d(&i).is_ok(), "rollerX with kx should be accepted");
+}
+
