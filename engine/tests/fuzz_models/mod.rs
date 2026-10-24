@@ -955,11 +955,13 @@ pub fn random_3d_model_rich(seed: u64) -> (SolverInput3D, HashMap<String, f64>) 
             s.rx = rng.gen_bool(0.5); s.ry = rng.gen_bool(0.5); s.rz = rng.gen_bool(0.5);
             s.rrx = rng.gen_bool(0.3); s.rry = rng.gen_bool(0.3); s.rrz = rng.gen_bool(0.3);
             if warping { s.rw = Some(rng.gen_bool(0.3)); }
-            let ks = [&mut s.kx, &mut s.ky, &mut s.kz, &mut s.krx, &mut s.kry, &mut s.krz];
-            for k in ks {
-                if rng.gen_bool(0.15) { *k = Some(spring_k(&mut rng)); }
-            }
-            if warping && rng.gen_bool(0.2) { s.kw = Some(spring_k(&mut rng)); }
+            if !s.rx && rng.gen_bool(0.15) { s.kx = Some(spring_k(&mut rng)); }
+            if !s.ry && rng.gen_bool(0.15) { s.ky = Some(spring_k(&mut rng)); }
+            if !s.rz && rng.gen_bool(0.15) { s.kz = Some(spring_k(&mut rng)); }
+            if !s.rrx && rng.gen_bool(0.15) { s.krx = Some(spring_k(&mut rng)); }
+            if !s.rry && rng.gen_bool(0.15) { s.kry = Some(spring_k(&mut rng)); }
+            if !s.rrz && rng.gen_bool(0.15) { s.krz = Some(spring_k(&mut rng)); }
+            if warping && !s.rw.unwrap_or(false) && rng.gen_bool(0.2) { s.kw = Some(spring_k(&mut rng)); }
             if s.rx && rng.gen_bool(0.3) { s.dx = Some(small_disp(&mut rng)); }
             if s.ry && rng.gen_bool(0.3) { s.dy = Some(small_disp(&mut rng)); }
             if s.rz && rng.gen_bool(0.3) { s.dz = Some(small_disp(&mut rng)); }

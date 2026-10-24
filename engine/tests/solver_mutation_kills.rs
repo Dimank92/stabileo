@@ -39,7 +39,7 @@ fn warping_spring_makes_the_warping_dof_elastic() {
     };
     let (free, _) = twist(json!({ "rw": false }));
     let (fixed, w_fixed) = twist(json!({ "rw": true }));
-    let (spring, w_spring) = twist(json!({ "rw": true, "kw": 1e-3 }));
+    let (spring, w_spring) = twist(json!({ "rw": false, "kw": 1e-3 }));
     assert!(free > 0.0 && fixed > 0.0 && fixed < free, "free {free}, fixed {fixed}");
     assert_eq!(w_fixed, 0.0);
     assert!(w_spring.abs() > 0.0, "a warping spring must let the root warp");
