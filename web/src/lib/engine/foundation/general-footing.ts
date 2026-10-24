@@ -121,7 +121,7 @@ export function designGeneralFooting(i: GeneralFootingInput): GeneralFootingDesi
     const col = i.columnAt(ids[k]!);
     return { cx: col?.b ?? 0.3, cy: col?.h ?? 0.3 };
   };
-  const postsFor = (combo: number, sign: 1 | -1): Post[] => at.map((p, k) => {
+  const nodePosts = (combo: number, sign: 1 | -1): Post[] => at.map((p, k) => {
     const s = service[k]!, u = factoredOf(k, combo);
     const sm = fr.moments(s.mx, s.my), um = fr.moments(u?.mx ?? 0, u?.my ?? 0);
     return {
@@ -130,6 +130,28 @@ export function designGeneralFooting(i: GeneralFootingInput): GeneralFootingDesi
       factored: { N: Math.abs(u?.fz ?? 0), Mx: sign * um.Mx, My: sign * um.My },
     };
   });
+  /**
+   * A strip under a wall carries the wall, not its feet one by one: the wall, stiff in its own
+   * plane, spreads along the strip what the analysis gave its feet (more under a column, less
+   * between), as a wall footing is designed per metre of wall. Its feet are one length of wall
+   * over the whole strip, at their resultant across it; what lay along it is the wall's.
+   */
+  const wallSpread = strip && i.wallThickness !== undefined;
+  const postsFor = (combo: number, sign: 1 | -1): Post[] => {
+    const posts = nodePosts(combo, sign);
+    if (!wallSpread || posts.length === 0) return posts;
+    const one = (key: 'service' | 'factored') => {
+      const N = posts.reduce((t, p) => t + p[key].N, 0);
+      const y = N > 0 ? posts.reduce((t, p) => t + p[key].N * p.y, 0) / N : posts.reduce((t, p) => t + p.y, 0) / posts.length;
+      return { N, y, Mx: posts.reduce((t, p) => t + p[key].Mx + p[key].N * (p.y - y), 0) };
+    };
+    const s = one('service'), u = one('factored');
+    return [{
+      id: 'wall', x: 0, y: s.y, cx: f.B, cy: i.wallThickness!, wall: true,
+      service: { N: s.N, Mx: s.Mx, My: 0 },
+      factored: { N: u.N, Mx: u.Mx + u.N * (u.y - s.y), My: 0 },
+    }];
+  };
 
   let best: { util: number; name: string; result: GeneralFootingDesign['result'] } | null = null;
   let need = { bx: 0, by: 0, tx: 0, ty: 0 };

@@ -9980,6 +9980,7 @@ const en: Record<string, string> = {
   'footing.assumption.strapCentred': 'Foundation {footing}: its strap beams take the offset and the column\'s moments both ways; it is checked centred, under a reaction of {factor}·P.',
   'footing.assumption.balanced': 'Foundation {footing}: its offset across, {e} m, and the wall foot\'s moment across are balanced by the structure it carries; it is checked centred, under its load alone. The wall has to take M = {m} kN·m/m at its foot.',
   'footing.assumption.balancedProp': 'Foundation {footing}: its offset across, {e} m, and the wall foot\'s moment across are balanced by the wall propped by the floor at its head; it is checked centred, under its load alone. The wall takes M = {m} kN·m/m at its foot and the floor a force of {h} kN/m.',
+  'footing.assumption.wallSpreads': 'Foundation {footing}: the wall it carries, stiff in its plane, spreads its load along it; it is checked under that load spread over its {B} m, as a wall footing.',
   'footing.ui.balanced': 'Offset balanced by the structure',
   'footing.run.strapNoPartner': 'Foundation {footing}: the foundation its strap beam runs to is not in the model; it is checked as eccentric.',
   'footing.run.strapNotToward': 'Foundation {footing}: its offset does not point to the foundation of its strap beam; it is checked as eccentric.',

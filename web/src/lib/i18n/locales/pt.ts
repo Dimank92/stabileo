@@ -4069,6 +4069,7 @@ const pt: Translations = {
   'footing.assumption.strapCentred': 'Fundação {footing}: suas vigas de equilíbrio recebem a excentricidade e os momentos do pilar nas duas direções; é verificada centrada, com uma reação de {factor}·P.',
   'footing.assumption.balanced': 'Fundação {footing}: sua excentricidade transversal, {e} m, e o momento transversal da base da parede são equilibrados pela estrutura que ela apoia; é verificada centrada, só com sua carga. A parede precisa resistir em sua base a M = {m} kN·m/m.',
   'footing.assumption.balancedProp': 'Fundação {footing}: sua excentricidade transversal, {e} m, e o momento transversal da base da parede são equilibrados pela parede escorada pela laje no topo; é verificada centrada, só com sua carga. A parede resiste em sua base a M = {m} kN·m/m e a laje a uma força de {h} kN/m.',
+  'footing.assumption.wallSpreads': 'Fundação {footing}: a parede que ela apoia, rígida no seu plano, distribui sua carga ao longo dela; é verificada com a carga distribuída nos seus {B} m, como uma sapata corrida sob parede.',
   'footing.ui.balanced': 'Excentricidade equilibrada pela estrutura',
   'footing.run.strapNoPartner': 'Fundação {footing}: a fundação até a qual vai sua viga de equilíbrio não está no modelo; é verificada como excêntrica.',
   'footing.run.strapNotToward': 'Fundação {footing}: sua excentricidade não aponta para a fundação de sua viga de equilíbrio; é verificada como excêntrica.',

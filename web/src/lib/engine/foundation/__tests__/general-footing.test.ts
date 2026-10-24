@@ -127,4 +127,20 @@ describe('a strip footing under a wall', () => {
     expect(r.y.mPos).toBeCloseTo(87.5, 0);
     expect(r.punching).toHaveLength(0);
   });
+
+  it('takes its feet as the wall spreads them: one end loaded four times the rest is no tilt along', () => {
+    // The same strip, the first foot carrying 400 kN service (560 factored) and the rest 100: the
+    // wall spreads the 900 kN along the 6 m, so the service field is (900 + 72)/7,2 = 135 kPa
+    // everywhere; read foot by foot it tilted toward the heavy end.
+    const ids = [1, 2, 3, 4, 5, 6];
+    const f: Footing = { ...newFooting(9, 1, 'C1', OPTS), kind: 'strip', B: 6, L: 1.2, thickness: 0.4, cover: 0.05, eccentricityB: 2.5, supportedNodeIds: ids.slice(1), wallGroupId: 3 };
+    const d = designGeneralFooting({
+      footing: f, nodes: new Map(ids.map((id, k) => [id, { x: -2.5 + k, y: 0 }])),
+      reactions: new Map(ids.map((id) => [id, id === 1 ? reaction(560, 400) : reaction(140, 100)])), columnAt: () => undefined, wallThickness: 0.2,
+      fc: 25, fy: 420, allowable: 150, barDiameterMm: { x: 12, y: 12 }, edition: '2025',
+    });
+    if ('refused' in d || !('rigid' in d.result)) throw new Error('refused');
+    expect(d.result.rigid.bearing.qMax).toBeCloseTo(135, 1);
+    expect(d.result.rigid.bearing.ok).toBe(true);
+  });
 });

@@ -9964,6 +9964,7 @@ const es: Record<string, string> = {
   'footing.assumption.strapCentred': 'Fundación {footing}: sus vigas centradoras toman la excentricidad y los momentos de la columna en las dos direcciones; se verifica centrada, con una reacción de {factor}·P.',
   'footing.assumption.balanced': 'Fundación {footing}: su excentricidad transversal, {e} m, y el momento transversal del pie del muro los equilibra la estructura que apoya en ella; se verifica centrada, con su carga sola. El muro tiene que tomar en su pie M = {m} kN·m/m.',
   'footing.assumption.balancedProp': 'Fundación {footing}: su excentricidad transversal, {e} m, y el momento transversal del pie del muro los equilibra el muro apuntalado por la losa en su cabeza; se verifica centrada, con su carga sola. El muro toma en su pie M = {m} kN·m/m y la losa, una fuerza de {h} kN/m.',
+  'footing.assumption.wallSpreads': 'Fundación {footing}: el muro que apoya en ella, rígido en su plano, reparte su carga a lo largo; se verifica con la carga repartida en sus {B} m, como una zapata bajo muro.',
   'footing.ui.balanced': 'Excentricidad equilibrada por la estructura',
   'footing.run.strapNoPartner': 'Fundación {footing}: la fundación hacia la que va su viga centradora no está en el modelo; se verifica como excéntrica.',
   'footing.run.strapNotToward': 'Fundación {footing}: su excentricidad no va hacia la fundación de su viga centradora; se verifica como excéntrica.',

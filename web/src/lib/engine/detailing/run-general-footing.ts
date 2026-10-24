@@ -35,6 +35,10 @@ export function runGeneralFooting(a: {
   unsupported: EngineMessage[]; assumptions: EngineMessage[]; draft: Draft;
 }): GeneralOutcome {
   const { f, input } = a;
+  // A strip under a wall is checked under the wall's load spread along it (`general-footing.ts`).
+  if (f.kind === 'strip' && f.wallGroupId !== undefined && input.wallThickness?.has(f.wallGroupId)) {
+    a.assumptions.push(msg('footing.assumption.wallSpreads', { footing: f.name, B: +f.B.toFixed(2) }));
+  }
   const g = designGeneralFooting({
     footing: f, nodes: input.nodes, reactions: input.reactions,
     columnAt: (n) => (n === f.nodeId && f.columnElementId !== undefined ? input.columns.get(f.columnElementId) : undefined) ?? input.columnAt?.(n),
