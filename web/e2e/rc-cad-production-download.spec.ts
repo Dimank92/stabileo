@@ -34,7 +34,7 @@
  * identity, and never the prose.
  */
 
-import { test, expect, openBasicProjectPanel, acknowledgeRecheck } from './fixtures';
+import { test, expect, openBasicProjectPanel } from './fixtures';
 import type { Page } from '@playwright/test';
 import { CIRSOC_VERIFIER_ID } from '../src/lib/engine/design/adapters/cirsoc201-adapter';
 
@@ -62,8 +62,6 @@ async function openProject(page: Page) {
   const input = page.getByTestId('project-open-file');
   await expect(input).toBeAttached();
   await input.setInputFiles(FIXTURE);
-  // A committed project, solved with an earlier results version: it raises the re-check notice.
-  await acknowledgeRecheck(page);
   await expect
     .poll(() => page.evaluate(() => window.__stabileo.elementIds().length), { timeout: 60_000 })
     .toBe(8);
