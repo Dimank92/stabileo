@@ -232,4 +232,23 @@ describe('CIRSOC 301: engine against the independent TypeScript statement', () =
       expect(c.certifiedOk && !e.pass).toBe(false);
     }), { numRuns: 1500, seed: 3011 });
   });
+
+  it('pinned: slender box with non-positive Q is refused and never passes (#467)', () => {
+    const p = {
+      Fy: 235, Fu: 352.5, E: 200000, A: 0.004154258317613479,
+      Iz: 0.00018670605799131143, Iy: 0.00018670373863284803,
+      h: 0.52128444, b: 0.5212801394033699, tw: 0.002, tf: 0.00417027552,
+      L: 0.5, Lb: 0, shape: 'box' as const, builtUp: false, elementId: 1,
+    };
+    const f = { elementId: 1, Nu: 0.003, Muz: 0, Muy: 0, Vu: 0 };
+    const out = engineCheckMembers([p], [f]);
+    expect(out).not.toBeNull();
+    const e = out![0]!;
+    expect(e.compression).toBeDefined();
+    expect(e.compression!.notEvaluated).toBeDefined();
+    expect(e.compression!.notEvaluated!.key).toBe('c301.refuse.qNonPositive');
+    expect(e.unevaluated).toContain('compression');
+    expect(e.pass).toBe(false);
+  });
 });
+

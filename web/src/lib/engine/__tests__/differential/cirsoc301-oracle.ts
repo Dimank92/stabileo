@@ -610,7 +610,11 @@ function slenderReduction(
     }
   }
   const Qa = (p.A - lostArea) / p.A; // E.7.16
-  return { Q: Qs * Qa, Qs, Qa, slender };
+  const Q = Qs * Qa;
+  if (!(Q > 0) || !Number.isFinite(Q)) {
+    return { Q: 0, Qs, Qa, slender: true, refused: `el factor de reducción resulta Q = ${fmt(Q, 3)} ≤ 0` };
+  }
+  return { Q, Qs, Qa, slender };
 }
 
 // ---------------------------------------------------------------------------
@@ -742,7 +746,8 @@ export function checkSteelCompression(params: SteelDesignParams, Pu: number): St
    */
   const fcrOf = (Q: number, fe = Fe) => {
     const lam2 = Fy / fe;
-    return Math.sqrt(Q * lam2) <= 1.5 ? Q * Math.pow(0.658, Q * lam2) * Fy : (0.877 / lam2) * Fy;
+    const fcr = Math.sqrt(Q * lam2) <= 1.5 ? Q * Math.pow(0.658, Q * lam2) * Fy : (0.877 / lam2) * Fy;
+    return Math.min(fcr, Fy);
   };
 
   /*
