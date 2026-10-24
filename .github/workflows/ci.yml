@@ -264,7 +264,7 @@ jobs:
         timeout-minutes: 30
 
   # The WASM engine, built once per run and shared by every web job (they used to build it nine
-  # times: web-unit ×2, web-build, determinism, e2e ×5). The glue is gitignored, so without it
+  # times: web-unit ×2, web-build, determinism, e2e ×5; with ten e2e shards it would be fourteen). The glue is gitignored, so without it
   # Vite would substitute a stub solver; the e2e readiness gate fails loudly if that happens.
   wasm:
     runs-on: ${{ (vars.STABILEO_SELF_HOSTED == 'true' && github.event_name != 'pull_request') && fromJSON('["self-hosted","stabileo"]') || 'ubuntu-latest' }}
@@ -523,12 +523,18 @@ jobs:
         working-directory: web
         run: npx playwright test -c determinism/playwright.config.ts
 
-  # Five shards, each running whole spec files chosen by measured duration
+  # Ten shards, each running whole spec files chosen by measured duration
   # (web/scripts/e2e-shard.mjs). One runner took 40 min for the smoke suite:
   # 569 tests of ~3 s each, serially — `workers: 1` stays, for the WebGL
   # determinism the config explains, so the parallelism is across runners.
   # `playwright --shard` splits by test count in file order and put the three
-  # heaviest files in one shard (12.6 vs 7.8 min); by duration it is 7.5 each.
+  # heaviest files in one shard (12.6 vs 7.8 min); by duration it is 7.5 each
+  # over five shards, 5.7 over ten. Five shards took 16–22 min each on a PR
+  # and up to 55 in the queue, so the queue's critical path was one shard.
+  #
+  # The shard count is in the required checks: `e2e (1)` … `e2e (10)` in the
+  # branch protection of main. Change both together, or the queue waits for a
+  # check that never reports.
   e2e:
     needs: [wasm, site-e2e]
     runs-on: ubuntu-latest
@@ -537,7 +543,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -594,17 +600,25 @@ jobs:
       # The blog spec is tagged `@smoke` directly, so the public pages are not
       # entirely unguarded here. `npx playwright test --grep @landing` is the
       # local command for the rest.
-      - name: E2E smoke suite (shard ${{ matrix.shard }}/5)
+      #
+      # `@flaky` tests are quarantined (web/e2e/README.md): left out here, run by `e2e-flaky`.
+      - name: E2E smoke suite (shard ${{ matrix.shard }}/10)
         working-directory: web
-        run: npx playwright test --grep @smoke $(node scripts/e2e-shard.mjs ${{ matrix.shard }} 5)
+        env:
+          E2E_JSON_REPORT: e2e/.results/smoke.json
+        run: npx playwright test --grep @smoke --grep-invert @flaky $(node scripts/e2e-shard.mjs ${{ matrix.shard }} 10)
 
       # Heavier suite (408-member model): in the merge queue, so it runs on exactly what lands on
-      # main, before it lands; on a PR only with the `run-e2e` label. Split five ways: on one
-      # shard it took 1.5 to 2.3 hours, after the merge, and main stayed red when it failed.
-      - name: E2E slow suite (shard ${{ matrix.shard }}/5)
+      # main, before it lands; on a PR only with the `run-e2e` label. On one shard it took 1.5 to
+      # 2.3 hours. `--shard=N/5` split it by test count and left the Basic advanced sweep, 54 of
+      # its 120 minutes, in shard 1 (49 min there, 6 in the lightest); it is balanced by duration
+      # now, like the smoke suite, from its own table.
+      - name: E2E slow suite (shard ${{ matrix.shard }}/10)
         if: github.event_name == 'merge_group' || contains(github.event.pull_request.labels.*.name, 'run-e2e')
         working-directory: web
-        run: npx playwright test --grep "@slow" --grep-invert "visual baselines" --shard=${{ matrix.shard }}/5
+        env:
+          E2E_JSON_REPORT: e2e/.results/slow.json
+        run: npx playwright test --grep "@slow" --grep-invert "visual baselines|@flaky" $(node scripts/e2e-shard.mjs --suite slow ${{ matrix.shard }} 10)
 
       # NON-BLOCKING on this first landing (approved decision O7): pixel gates that
       # block on day one are how e2e suites end up disabled. Promote once the Linux
@@ -650,6 +664,71 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-artifacts-${{ matrix.shard }}
+          path: |
+            web/e2e/.report
+            web/e2e/.artifacts
+            web/e2e/.results
+          include-hidden-files: true
+          retention-days: 14
+          if-no-files-found: warn
+
+  # The quarantined tests (`@flaky`, each with its issue: web/e2e/README.md), smoke and slow
+  # alike, with two retries. NOT a required check: a red here is the issue's evidence, not a
+  # reason to hold a merge. It keeps the quarantine visible, and it is where a fix shows it
+  # held before the tag comes off.
+  e2e-flaky:
+    needs: [wasm, site-e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      E2E_PREBUILT: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: WASM engine (from the wasm job)
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: wasm
+          path: web/src/lib/wasm
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: E2E site (from the site-e2e job)
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: site-e2e
+          path: web/dist
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('web/package-lock.json') }}
+
+      - name: Install Chromium
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
+      # --pass-with-no-tests: an empty quarantine is the goal, not an error.
+      - name: E2E quarantined (@flaky) tests, two retries
+        working-directory: web
+        run: npx playwright test --grep @flaky --retries=2 --pass-with-no-tests
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-artifacts-flaky
           path: |
             web/e2e/.report
             web/e2e/.artifacts
