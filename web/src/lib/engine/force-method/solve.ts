@@ -29,12 +29,13 @@
  */
 import type { SolverInput, SolverLoad } from '../types';
 import { solveDetailed, type DSMStepData } from '../solver-detailed';
+import { loadAlpha, loadDepth } from '../thermal-alpha';
 import {
-  countIndeterminacy, candidates, buildPrimary, restrainedComponents,
+  countIndeterminacy, candidates, buildPrimary, restrainedComponents, removedBarEnds,
   type Redundant,
 } from './primary';
 import {
-  barLoadsOf, internalAt, breakpoints, integrate, sampleDiagram, NO_LOADS, solveSystem, type BarLoads,
+  barLoadsOf, axialLoadsOnly, internalAt, breakpoints, integrate, sampleDiagram, NO_LOADS, solveSystem, type BarLoads,
 } from './internal';
 import type { BarState, StateResult, TermRow, Geometry, ForceMethodResult } from './result-types';
 import { chooseRedundants, restraintCarries, fallbackBudget, FM_MAX_GH } from './redundants';
@@ -43,8 +44,6 @@ export type { Redundant, IndeterminacyCount } from './primary';
 export type { BarState, StateResult, TermRow, Geometry, ForceMethodResult } from './result-types';
 export { numbered, chooseRedundants, restraintCarries, FM_MAX_GH, fallbackBudget } from './redundants';
 export { solveSystem } from './internal';
-
-const ALPHA = 1.2e-5;
 
 // ─── Small helpers ──────────────────────────────────────────────
 
@@ -266,7 +265,7 @@ export function solveForceMethod(input: SolverInput): ForceMethodResult {
     const L = lenOf(p0.input, e.nodeI, e.nodeJ);
     return {
       e, L, EI: mat.e * 1000 * sec.iz, EA: mat.e * 1000 * sec.a, sec, mat,
-      loads: e.type === 'frame' ? barLoadsOf(p0.input, e.id, L) : NO_LOADS,
+      loads: e.type === 'frame' ? barLoadsOf(p0.input, e.id, L) : axialLoadsOnly(barLoadsOf(p0.input, e.id, L)),
     };
   });
   const endAt = (f: number[]) => ({ N: f[0], V: f[1], M: f[2] });
@@ -278,15 +277,16 @@ export function solveForceMethod(input: SolverInput): ForceMethodResult {
       const fa = a.forces(bar.e.id);
       const fb = b.forces(bar.e.id);
       if (!fa || !fb) continue;
-      if (bar.e.type === 'truss') {
-        rows.push({ elementId: bar.e.id, source: 'axial', value: ((-fa[0]) * (-fb[0]) * bar.L) / bar.EA });
-        continue;
-      }
       const A = la(bar.e.id);
       const B = lb(bar.e.id);
       const pts = breakpoints(bar.L, A, B);
       const ia = (x: number) => internalAt(endAt(fa), A, x);
       const ib = (x: number) => internalAt(endAt(fb), B, x);
+      if (bar.e.type === 'truss') {
+        /* Constant along the bar unless a load acts along it. */
+        rows.push({ elementId: bar.e.id, source: 'axial', value: integrate(pts, (x) => ia(x).n * ib(x).n) / bar.EA });
+        continue;
+      }
       rows.push({ elementId: bar.e.id, source: 'bending', value: integrate(pts, (x) => ia(x).m * ib(x).m) / bar.EI });
       rows.push({ elementId: bar.e.id, source: 'axial', value: integrate(pts, (x) => ia(x).n * ib(x).n) / bar.EA });
     }
@@ -330,12 +330,20 @@ export function solveForceMethod(input: SolverInput): ForceMethodResult {
     }
   }
 
+  /* The free thermal strain α·ΔT and curvature α·ΔTg/h of a bar, each load with its own α and
+     depth as the analysis reads them (`thermal-alpha.ts`). */
   const thermalOf = (elementId: number) => {
-    let dtU = 0, dtG = 0;
+    let epsU = 0, kapG = 0;
+    const e = input.elements.get(elementId);
+    const sec = e && input.sections.get(e.sectionId);
     for (const l of input.loads) {
-      if (l.type === 'thermal' && l.data.elementId === elementId) { dtU += l.data.dtUniform; dtG += l.data.dtGradient; }
+      if (l.type === 'thermal' && l.data.elementId === elementId) {
+        const alpha = loadAlpha(l.data);
+        epsU += alpha * l.data.dtUniform;
+        if (l.data.dtGradient && sec) kapG += (alpha * l.data.dtGradient) / loadDepth(l.data.depth, sec.a, sec.iz);
+      }
     }
-    return { dtU, dtG };
+    return { epsU, kapG };
   };
 
   const delta0Terms: TermRow[][] = [];
@@ -344,27 +352,26 @@ export function solveForceMethod(input: SolverInput): ForceMethodResult {
     const rows = mohr(unit[i], none, s0, realLoads);
     /* Temperature: the unit state's forces working through the free thermal strains. */
     for (const bar of bars) {
-      const { dtU, dtG } = thermalOf(bar.e.id);
-      if (!dtU && !dtG) continue;
+      const { epsU, kapG } = thermalOf(bar.e.id);
+      if (!epsU && !kapG) continue;
       const f = unit[i].forces(bar.e.id)!;
       let v = 0;
-      if (dtU) v += (-f[0]) * ALPHA * dtU * bar.L;
-      if (dtG && bar.e.type === 'frame') {
-        const h = Math.sqrt((12 * bar.sec.iz) / bar.sec.a);
+      if (epsU) v += (-f[0]) * epsU * bar.L;
+      if (kapG && bar.e.type === 'frame') {
         /* A hotter top face curves the bar so that, in the diagrams' sign, it
            works against a positive m — hence the minus. Pinned by the test
            that reads δᵢ₀ both ways on a heated fixed-fixed beam. */
-        const kappa = -(ALPHA * dtG) / h;
+        const kappa = -kapG;
         v += integrate([0, bar.L], (x) => internalAt(endAt(f), NO_LOADS, x).m) * kappa;
       }
       rows.push({ elementId: bar.e.id, source: 'thermal', value: v });
     }
     const ri = redundants[i];
     if (ri.kind === 'barForce') {
-      const { dtU } = thermalOf(ri.elementId!);
-      if (dtU) {
+      const { epsU } = thermalOf(ri.elementId!);
+      if (epsU) {
         const e = input.elements.get(ri.elementId!)!;
-        rows.push({ elementId: e.id, source: 'thermal', value: ALPHA * dtU * lenOf(input, e.nodeI, e.nodeJ) });
+        rows.push({ elementId: e.id, source: 'thermal', value: epsU * lenOf(input, e.nodeI, e.nodeJ) });
       }
     }
     /* Settlements of the supports that stayed: −Σ Rₖ⁽ⁱ⁾·Δₖ. */
@@ -403,12 +410,13 @@ export function solveForceMethod(input: SolverInput): ForceMethodResult {
   for (const bar of bars) {
     const f = [...s0.forces(bar.e.id)!];
     unit.forEach((u, j) => { const fj = u.forces(bar.e.id)!; for (let k = 0; k < 6; k++) f[k] += X[j] * fj[k]; });
-    finalBars.push(barState(bar.e.id, bar.L, f, bar.e.type === 'frame' ? bar.loads : NO_LOADS));
+    finalBars.push(barState(bar.e.id, bar.L, f, bar.loads));
   }
   redundants.forEach((r, i) => {
     if (r.kind !== 'barForce') return;
     const e = input.elements.get(r.elementId!)!;
-    finalBars.push(barState(e.id, lenOf(input, e.nodeI, e.nodeJ), [-X[i], 0, 0, X[i], 0, 0], NO_LOADS));
+    const L = lenOf(input, e.nodeI, e.nodeJ);
+    finalBars.push(barState(e.id, L, removedBarEnds(input, e.id, X[i]), axialLoadsOnly(barLoadsOf(input, e.id, L))));
   });
   const finalReactions = s0.reactions.map((r) => {
     let v = r.value;
@@ -480,7 +488,8 @@ function stateOf(s: Solved, loads: SolverLoad[]): StateResult {
   return {
     bars: [...s.input.elements.values()].map((e) => {
       const L = lenOf(s.input, e.nodeI, e.nodeJ);
-      return barState(e.id, L, s.forces(e.id)!, e.type === 'frame' ? barLoadsOf(withLoads, e.id, L) : NO_LOADS);
+      const loads = barLoadsOf(withLoads, e.id, L);
+      return barState(e.id, L, s.forces(e.id)!, e.type === 'frame' ? loads : axialLoadsOnly(loads));
     }),
     reactions: s.reactions,
   };

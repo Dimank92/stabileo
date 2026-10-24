@@ -223,8 +223,18 @@ pub(super) fn lm_pieces(loads: &[ElemLoad], l: Option<&Q>, l2: &Q, bps: &[Q]) ->
     Ok(pieces)
 }
 
+/// Magnitude range of the input numbers the exact certificates accept
+/// (zero is always accepted).
+pub const EXACT_MIN_ABS: f64 = 1e-30;
+pub const EXACT_MAX_ABS: f64 = 1e30;
+
 /// Translate the solver input into the exact rigid-plastic model, or refuse.
 pub fn build_model(input: &PlasticInput) -> Result<PlasticModel, String> {
+    // Exact rational arithmetic: its cost grows with the bit length of the
+    // data, and an input value of ±1e300 or a subnormal made it run for
+    // minutes (issue #335 property tests). Models in any unit system stay far
+    // inside this range; outside it the certificate is refused, not slow.
+    super::finite::check_magnitudes(input, EXACT_MIN_ABS, EXACT_MAX_ABS)?;
     let s = &input.solver;
     if !s.constraints.is_empty() {
         return Err("constraints are not supported by the plastic certificate".into());
@@ -235,7 +245,7 @@ pub fn build_model(input: &PlasticInput) -> Result<PlasticModel, String> {
     if s.elements.len() > MAX_PLASTIC_ELEMENTS {
         return Err(format!("more than {MAX_PLASTIC_ELEMENTS} members: too large for the exact check"));
     }
-    let mut node_list: Vec<&SolverNode> = s.nodes.values().collect();
+    let mut node_list: Vec<&SolverNode> = crate::ordered::values(&s.nodes).collect();
     node_list.sort_by_key(|n| n.id);
     let idx: HashMap<usize, usize> = node_list.iter().enumerate().map(|(i, n)| (n.id, i)).collect();
     let coords: Vec<(Q, Q)> = node_list
@@ -245,7 +255,7 @@ pub fn build_model(input: &PlasticInput) -> Result<PlasticModel, String> {
     let nn = node_list.len();
 
     let mut restrained = vec![[false; 3]; nn];
-    let mut sups: Vec<&SolverSupport> = s.supports.values().collect();
+    let mut sups: Vec<&SolverSupport> = crate::ordered::values(&s.supports).collect();
     sups.sort_by_key(|x| x.id);
     for sup in sups {
         let n = *idx.get(&sup.node_id).ok_or("support on unknown node")?;
@@ -272,7 +282,7 @@ pub fn build_model(input: &PlasticInput) -> Result<PlasticModel, String> {
         mp_by_sec.insert(sec_id, mp_interval(sec, fy, over)?);
     }
 
-    let mut elem_list: Vec<&SolverElement> = s.elements.values().collect();
+    let mut elem_list: Vec<&SolverElement> = crate::ordered::values(&s.elements).collect();
     elem_list.sort_by_key(|e| e.id);
     let eidx: HashMap<usize, usize> = elem_list.iter().enumerate().map(|(i, e)| (e.id, i)).collect();
     let mut elems = Vec::with_capacity(elem_list.len());
@@ -366,6 +376,11 @@ pub fn build_model(input: &PlasticInput) -> Result<PlasticModel, String> {
                 }
                 let ta = frac(e, pl.a, "point load")?;
                 elems[ei].loads.push(ElemLoad::Point { ta, p, px, my });
+            }
+            SolverLoad::AxialDistributed(al) => {
+                if al.q_i != 0.0 || al.q_j != 0.0 {
+                    return Err("axial span loads are not part of the plastic certificate".into());
+                }
             }
             SolverLoad::Thermal(tl) => {
                 if tl.dt_uniform != 0.0 || tl.dt_gradient != 0.0 {
@@ -1615,6 +1630,16 @@ pub struct CertifiedPlastic2D {
     pub certificate: PlasticCertificate,
 }
 
+impl super::finite::Guarded for PlasticCertificate {
+    fn claims(&self) -> bool {
+        self.certified || self.lambda_lower.is_some() || self.lambda_upper.is_some()
+    }
+
+    fn downgrade(&mut self, reason: String) {
+        *self = refused(reason, self.solver_collapse_factor.filter(|x| x.is_finite()));
+    }
+}
+
 fn refused(reason: String, solver: Option<f64>) -> PlasticCertificate {
     PlasticCertificate {
         certified: false,
@@ -1631,7 +1656,18 @@ fn refused(reason: String, solver: Option<f64>) -> PlasticCertificate {
 
 /// Certify the collapse load factor of a 2D plastic input (solver result
 /// optional, used as an extra static candidate and compared with the bounds).
+/// Withdrawn when the input, the solver result or a bound is not finite.
 pub fn certify_collapse_2d(input: &PlasticInput, solver: Option<&PlasticResult>) -> PlasticCertificate {
+    let sval = solver.map(|r| r.collapse_factor);
+    if let Err(e) = super::finite::check_input(input).and_then(|()| super::finite::check_results(&solver)) {
+        return refused(e, sval.filter(|x| x.is_finite()));
+    }
+    let mut c = collapse_2d(input, solver);
+    super::finite::guard(&mut c);
+    c
+}
+
+fn collapse_2d(input: &PlasticInput, solver: Option<&PlasticResult>) -> PlasticCertificate {
     let sval = solver.map(|r| r.collapse_factor);
     let model = match build_model(input) {
         Ok(m) => m,
@@ -1683,7 +1719,9 @@ pub fn certify_collapse_2d(input: &PlasticInput, solver: Option<&PlasticResult>)
 
 /// Run the incremental plastic solver and certify its collapse load factor.
 pub fn certify_plastic_2d(input: &PlasticInput) -> Result<CertifiedPlastic2D, String> {
+    super::finite::check_input(input)?;
     let results = solve_plastic_2d(input)?;
+    super::finite::check_results(&results)?;
     let certificate = certify_collapse_2d(input, Some(&results));
     Ok(CertifiedPlastic2D { results, certificate })
 }

@@ -88,10 +88,13 @@ describe('directions', () => {
     const s = spectral('Es', { x: 1, y: 0.3, z: 0 }, { directions: 'srss' });
     const r = results();
     const n = (id: number) => ef(r.get(id)!, 1).nStart;
-    expect(Math.abs(n(ex))).toBeCloseTo(2.828, 3);
-    expect(Math.abs(n(ey))).toBeCloseTo(4.236, 3);
+    // Engine values (snapshots), with the support-coupled mass in the participation since
+    // #434 (they were 2.828 / 4.236 / 4.099 with the free block only). The rule is what is
+    // asserted: |Ex| + 0.3·|Ey|.
+    expect(Math.abs(n(ex))).toBeCloseTo(2.869, 3);
+    expect(Math.abs(n(ey))).toBeCloseTo(4.332, 3);
     expect(Math.abs(n(e))).toBeCloseTo(Math.abs(n(ex)) + 0.3 * Math.abs(n(ey)), 9);
-    expect(Math.abs(n(e))).toBeCloseTo(4.099, 3);
+    expect(Math.abs(n(e))).toBeCloseTo(4.168, 3);
     // The sense across does not matter; the sign is the main direction's.
     expect(n(minus)).toBeCloseTo(n(e), 9);
     expect(Math.sign(n(e))).toBe(Math.sign(n(ex)));
@@ -270,6 +273,31 @@ describe('user spectra', () => {
     expect(panel).toMatch(/parseSpectrumTable/);
     expect(panel).toMatch(/userSpectrum\.negative/);
     expect(panel).toMatch(/userSpectrum\.duplicate/);
+  });
+
+  it('a spectrum deleted leaves its number unused: a new one is not taken by a case on the old', () => {
+    frame(1);
+    const spectrum = (sa: number) => (id: number): UserSpectrum => ({ id, name: `S${id}`, ordinate: 'Sa', unit: 'g', interpolation: 'linear', points: [[0, sa], [5, sa]] });
+    modelStore.addUserSpectrum(spectrum(0.4));
+    const s2 = modelStore.addUserSpectrum(spectrum(0.8));
+    const ex = modelStore.addLoadCase('Ex', 'E');
+    modelStore.updateLoadCaseFields(ex, { spectral: { source: { kind: 'user', spectrumId: s2 }, factors: { x: 1, y: 0, z: 0 }, rule: 'cqc', xi: 0.05, scale: 1 } as never });
+    // Refused while the case is on it, and says which case.
+    expect(modelStore.removeUserSpectrum(s2)).toBe(false);
+    expect(modelStore.casesOnSpectrum(s2).map((c) => c.name)).toEqual(['Ex']);
+    // Off the case, it goes; the next spectrum takes a new number, also after a save and a load.
+    modelStore.updateLoadCaseFields(ex, { spectral: { source: { kind: 'code' }, factors: { x: 1, y: 0, z: 0 }, rule: 'cqc', xi: 0.05, scale: 1 } as never });
+    expect(modelStore.removeUserSpectrum(s2)).toBe(true);
+    const saved = JSON.parse(JSON.stringify(modelStore.snapshot()));
+    modelStore.clear();
+    modelStore.restore(saved);
+    expect(modelStore.addUserSpectrum(spectrum(0.4))).not.toBe(s2);
+    // A file without the counter, whose case names a spectrum it lost: that number is not given.
+    delete saved.nextId.spectrum;
+    saved.loadCases.find((c: { id: number }) => c.id === ex).spectral.source = { kind: 'user', spectrumId: s2 };
+    modelStore.restore(saved);
+    expect(modelStore.addUserSpectrum(spectrum(0.4))).not.toBe(s2);
+    expect(typeof spectralStore.spectralCaseResults()).toBe('string');
   });
 });
 

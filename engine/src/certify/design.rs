@@ -32,7 +32,7 @@ use crate::postprocess::ec3_check::{
 };
 use crate::postprocess::cirsoc201_check::{
     ductility_applies as cirsoc201_ductility_applies, ductility_strain_r as cirsoc201_ductility_strain,
-    min_shear_missing as cirsoc201_min_shear_missing, nominal_flexure_r as cirsoc201_nominal_flexure,
+    min_shear_missing as cirsoc201_min_shear_missing, nominal_flexure_axial_r as cirsoc201_nominal_flexure,
     phi_flexure_r as cirsoc201_phi, shear_inputs_valid as cirsoc201_shear_valid,
     shear_strength_r as cirsoc201_shear_strength, Cirsoc201DesignForces, Cirsoc201MemberData, CIRSOC201_DUCTILITY,
     CIRSOC201_FLEXURE, CIRSOC201_MIN_SHEAR, CIRSOC201_SHEAR,
@@ -202,7 +202,7 @@ fn uncertified(element_id: usize, reason: String, demand_count: usize) -> Certif
 
 /// Per member, the enclosure of the utilization maximized over every demand
 /// set given for it. `enclose` returns one enclosure per check name.
-fn certify_members<M, D>(
+fn certify_members<M: Serialize, D: Serialize>(
     members: &[M],
     member_id: impl Fn(&M) -> usize,
     demands: &[D],
@@ -222,9 +222,17 @@ fn certify_members<M, D>(
             if demands.is_empty() {
                 return uncertified(eid, "no demands for this member".into(), 0);
             }
+            // Nothing is certified from non-finite member data or demands;
+            // a non-finite ratio would vanish in the f64::max below.
+            if let Err(e) = super::finite::check_input(&(m, demands)) {
+                return uncertified(eid, e, demands.len());
+            }
             let mut acc = vec![Interval::ZERO; names.len()];
             for d in demands {
                 match enclose(m, d) {
+                    Ok(r) if r.iter().any(|x| !x.is_finite()) => {
+                        return uncertified(eid, "non-finite ratio enclosure".into(), demands.len())
+                    }
                     Ok(r) if r.len() == names.len() => {
                         for (a, r) in acc.iter_mut().zip(&r) {
                             // max over demand sets: componentwise max of endpoints
@@ -567,7 +575,7 @@ pub fn cirsoc201_ratio_enclosures(
     let vu = around(f.vu.unwrap_or(0.0), b.vy, "Vu")?.abs();
     let nu = around(f.axial_compression.unwrap_or(0.0), if f.axial_compression.is_some() { b.n } else { 0.0 }, "Nu")?;
     let es = m.es.unwrap_or(200e9);
-    let flex = cirsoc201_nominal_flexure::<Interval>(m)
+    let flex = cirsoc201_nominal_flexure::<Interval>(m, nu, f.axial_compression.unwrap_or(0.0))
         .ok_or_else(|| format!("section data outside the certified domain: {m:?}"))?;
     if !(flex.mn.is_finite() && flex.epsilon_t.is_finite()) {
         return Err("neutral axis not certified".into());
@@ -1040,6 +1048,9 @@ pub fn cfs_ratio_enclosures(m: &CfsMemberData, f: &CfsDesignForces, b: &DemandBo
     let caps: CfsCapacities<Interval> = cfs_capacities(m);
     let phi = |x: f64, c: Interval| Interval::lit(x) * c;
     let compression = loaded_ratio(names[0], (-n).max(zero), phi(CFS_PHI_C, caps.pn))?;
+    if m.xo.is_none() && n.lo < 0.0 {
+        return Err(format!("{}: no xo for flexural-torsional buckling (E2.2)", names[0]));
+    }
     let tension = loaded_ratio(names[1], n.max(zero), phi(CFS_PHI_T, caps.tn))?;
     let flex_x = loaded_ratio(names[2], mx, phi(CFS_PHI_B, caps.mn_x))?;
     let flex_y = loaded_ratio(names[3], my, phi(CFS_PHI_B, caps.mn_y))?;
@@ -1233,6 +1244,7 @@ mod tests {
                 AiscElement { kind: AiscElementKind::RolledFlange, b: 0.1525, t: 0.0154, count: Some(4.0), kc: None },
                 AiscElement { kind: AiscElementKind::Web, b: 0.255, t: 0.0099, count: None, kc: None },
             ]),
+            lcz: None,
             load_position: None,
         }
     }
@@ -1698,6 +1710,8 @@ mod tests {
             fyt: if g.unit() < 0.2 { Some(500e6) } else { None },
             ag: None,
             lambda: if g.unit() < 0.2 { Some(0.75) } else { None },
+            bf: if g.unit() < 0.3 { Some(b * g.range(1.0, 4.0)) } else { None },
+            hf: Some(g.range(0.05, 0.15)),
             edition: if g.unit() < 0.5 { Cirsoc201Edition::E2005 } else { Cirsoc201Edition::E2025 },
         }
     }
@@ -1798,7 +1812,7 @@ mod tests {
             s_stirrup: Some(0.15),
             fyt: None,
             ag: None,
-            lambda: None,
+            lambda: None, bf: None, hf: None,
             edition: Cirsoc201Edition::E2005,
         };
         let f = Cirsoc201DesignForces { element_id: 1, mu: Some(1e5), vu: Some(1e5), axial_compression: None };
@@ -2066,6 +2080,8 @@ mod tests {
             d,
             le: g.range(0.5, 6.0),
             lu: opt(g, 0.3, 6.0),
+            le_b: opt(g, 0.0, 6.0),
+            le_bending: opt(g, 0.3, 10.0),
             cd: opt(g, 0.9, 1.6),
             cm: opt(g, 0.8, 1.0),
             ct: opt(g, 0.7, 1.0),
@@ -2214,6 +2230,9 @@ mod tests {
             lb: g.range(0.3, 6.0),
             lc: g.range(0.3, 6.0),
             k: opt(g, 0.5, 2.0),
+            xo: Some(-g.range(0.0, 0.04) * s.sqrt()),
+            kx_lx: opt(g, 0.3, 6.0),
+            kt_lt: opt(g, 0.3, 6.0),
             cb: opt(g, 1.0, 2.3),
             fcrd: opt(g, 50e6, 900e6),
             fcrd_flex: opt(g, 50e6, 900e6),
@@ -2321,6 +2340,12 @@ mod tests {
         assert!(cfs_ratio_enclosures(&m, &f, &ZERO_BOUND).is_err());
         let f0 = CfsDesignForces { shear: None, ..f.clone() };
         assert!(cfs_ratio_enclosures(&m, &f0, &ZERO_BOUND).is_ok());
+        // No xo: flexural-torsional buckling unknown, compression refused
+        // (the f64 check flags it); tension alone is still certified.
+        let no_xo = CfsMemberData { xo: None, ..m.clone() };
+        assert!(cfs_ratio_enclosures(&no_xo, &f0, &ZERO_BOUND).is_err());
+        let tension = CfsDesignForces { axial: Some(1e3), ..f0.clone() };
+        assert!(cfs_ratio_enclosures(&no_xo, &tension, &ZERO_BOUND).is_ok());
         let res = certify_cfs_members(&CertifiedCfsCheckInput {
             members: vec![CfsMemberData { ry: 0.0, ..m }],
             demands: vec![BoundedCfsDemand { forces: f0, bound: ZERO_BOUND }],
@@ -2349,3 +2374,34 @@ mod tests {
         }
     }
 }
+
+// ==================== Isolated footings (CIRSOC 201) ====================
+
+const FOOTING_CHECK_NAMES: [&str; 3] = ["Bearing", "One-way shear", "Punching"];
+
+/// Certified CIRSOC 201 isolated footings (`postprocess::isolated_footing`): per footing, the
+/// enclosure of the bearing, one-way shear and punching utilizations, evaluated through the same
+/// generic formulas as the ordinary check. A footing the check refuses (uplift, a significant or
+/// unformed unbalanced moment, not isolated) is not certified.
+pub fn certify_isolated_footings(
+    input: &crate::postprocess::isolated_footing::IsolatedFootingInput,
+) -> Vec<CertifiedMemberResult> {
+    use crate::postprocess::isolated_footing::footing_ratio_enclosures;
+    certify_members(
+        &input.footings,
+        |f| f.footing_id,
+        &input.footings,
+        |f| f.footing_id,
+        &FOOTING_CHECK_NAMES,
+        |f, _| {
+            let r = footing_ratio_enclosures::<Interval>(f)?;
+            for (e, name) in r.iter().zip(FOOTING_CHECK_NAMES) {
+                if !e.is_finite() {
+                    return Err(format!("{name}: enclosure not finite"));
+                }
+            }
+            Ok(r.to_vec())
+        },
+    )
+}
+
