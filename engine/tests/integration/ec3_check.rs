@@ -281,3 +281,62 @@ fn ec3_multiple_members() {
         "Longer column should have higher ratio"
     );
 }
+
+/// Issue #566: Class 1 IPE 300 in double curvature with end cross-section overloaded
+/// beyond EN 1993-1-1 6.2.9.1 plastic M-N resistance MN,y,Rd = 86.53 kN·m.
+/// Previously, ec3_interaction hardcoded section = 0.0 for Class 1 and Class 2,
+/// letting an overloaded section falsely pass.
+#[test]
+fn repro_ec3_class1_end_section_overloaded_passes() {
+    let m = Ec3MemberData {
+        element_id: 1,
+        fy: 275e6,
+        e: Some(210e9),
+        a: 53.8e-4,
+        a_eff: None,
+        wpl_y: 628e-6,
+        wel_y: 557e-6,
+        weff_y: None,
+        wpl_z: 96.9e-6,
+        wel_z: 63.2e-6,
+        weff_z: None,
+        e_n_y: None,
+        e_n_z: None,
+        iy: 8356e-8,
+        iz: 604e-8,
+        it: 20.1e-8,
+        iw: 126e-9,
+        lcr_y: 1.0,
+        lcr_z: 1.0,
+        lb: 0.0,
+        section_class: SectionClass::Class1,
+        buckling_curve_y: BucklingCurve::A,
+        buckling_curve_z: BucklingCurve::B,
+        buckling_curve_lt: BucklingCurve::B,
+        gamma_m0: Some(1.0),
+        gamma_m1: Some(1.0),
+        c1: Some(1.0),
+        av: Some(25.7e-4),
+        interaction: Some(Ec3InteractionData {
+            cmy: Some(0.4),
+            cmz: Some(1.0),
+            cm_lt: Some(1.0),
+            hollow: Some(false),
+        }),
+        geometry: Some(Ec3Geometry::I { h: 0.300, b: 0.150, tw: 0.0071, tf: 0.0107, r: 0.015 }),
+        ltb: None,
+    };
+    let r = &check_ec3_members(&Ec3CheckInput {
+        members: vec![m],
+        forces: vec![Ec3DesignForces {
+            element_id: 1,
+            n_ed: Some(-887_700.0),
+            my_ed: Some(146_795.0),
+            mz_ed: None,
+            v_ed: None,
+        }],
+    })[0];
+    // End cross-section exceeds EN 1993-1-1 6.2.9.1 MN,y,Rd = 86.53 kN·m by +69.6%,
+    // so interaction_ratio_section must be ~1.279 > 1.0 and pass must be false.
+    assert!(r.interaction_ratio_section > 1.25 && !r.pass, "{r:?}");
+}

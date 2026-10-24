@@ -694,9 +694,9 @@ pub(crate) fn ec3_capacities<T: Real>(m: &Ec3MemberData) -> Ec3Capacities<T> {
     let lambda_z = (area * fy).dv(ncr_z).sqrt();
     let chi_z = compute_chi(lambda_z, T::lit(m.buckling_curve_z.alpha()));
     let chi_min = chi_y.min(chi_z);
-    let nb_rd = (chi_min * area * fy).dv(gamma_m1);
-    let nb_y_rd = (chi_y * area * fy).dv(gamma_m1);
-    let nb_z_rd = (chi_z * area * fy).dv(gamma_m1);
+    let nb_rd = ((chi_min * area * fy).dv(gamma_m1)).min(nc_rd);
+    let nb_y_rd = ((chi_y * area * fy).dv(gamma_m1)).min(nc_rd);
+    let nb_z_rd = ((chi_z * area * fy).dv(gamma_m1)).min(nc_rd);
 
     // Lateral-torsional buckling (EC3 6.3.2): elastic critical moment Mcr of
     // a doubly symmetric section with the load height zg, NCCI SN003b eq. (2).
@@ -717,11 +717,11 @@ pub(crate) fn ec3_capacities<T: Real>(m: &Ec3MemberData) -> Ec3Capacities<T> {
         let lambda_lt = (w_y * fy).dv(mcr).sqrt();
         (compute_chi(lambda_lt, T::lit(m.buckling_curve_lt.alpha())), Some(mcr))
     };
-    let mb_rd = (chi_lt * w_y * fy).dv(gamma_m1);
+    let mb_rd = ((chi_lt * w_y * fy).dv(gamma_m1)).min(mc_y_rd);
 
     // Weak axis flexure (no LTB)
     let mc_z_rd = (w_z * fy).dv(gamma_m0);
-    let mz_rd_m1 = (w_z * fy).dv(gamma_m1);
+    let mz_rd_m1 = ((w_z * fy).dv(gamma_m1)).min(mc_z_rd);
 
     // Shear (EC3 6.2.6)
     let av = match m.av {
@@ -872,8 +872,25 @@ pub(crate) fn ec3_interaction<T: Real>(
     let mz_term = branch(zero.lt(mz), || mz.dv(caps.mz_rd_m1), || zero);
     let eq_661 = n.dv(caps.nb_y_rd) + kyy * my_term + kyz * mz_term;
     let eq_662 = n.dv(caps.nb_z_rd) + kzy * my_term + kzz * mz_term;
+    let (c_my, c_mz) = match m.geometry {
+        Some(Ec3Geometry::I { b, tf, .. }) => {
+            let a = ((m.a - 2.0 * b * tf) / m.a).max(0.0).min(0.5);
+            (T::exact(1.0 - 0.5 * a), T::exact(1.0))
+        }
+        Some(Ec3Geometry::Rhs { h, b, t }) => {
+            let aw = ((m.a - 2.0 * b * t) / m.a).max(0.0).min(0.5);
+            let af = ((m.a - 2.0 * h * t) / m.a).max(0.0).min(0.5);
+            (T::exact(1.0 - 0.5 * aw), T::exact(1.0 - 0.5 * af))
+        }
+        _ => (T::exact(1.0), T::exact(1.0)),
+    };
     let section = if plastic {
-        zero
+        let linear = n.dv(caps.nc_rd)
+            + branch(zero.lt(my), || c_my * my.dv(caps.mc_y_rd), || zero)
+            + branch(zero.lt(mz), || c_mz * mz.dv(caps.mc_z_rd), || zero);
+        let my_ratio = branch(zero.lt(my), || my.dv(caps.mc_y_rd), || zero);
+        let mz_ratio = branch(zero.lt(mz), || mz.dv(caps.mc_z_rd), || zero);
+        linear.max(my_ratio).max(mz_ratio).max(n.dv(caps.nc_rd))
     } else {
         n.dv(caps.nc_rd)
             + branch(zero.lt(my), || my.dv(caps.mc_y_rd), || zero)
@@ -943,10 +960,12 @@ fn check_single_ec3_member(m: &Ec3MemberData, f: &Ec3DesignForces) -> Ec3CheckRe
         if n_ed < 0.0 && !(class_props.e_n_y.is_finite() && class_props.e_n_z.is_finite()) {
             ledger.flag("Class 4 eN (6.3.3(4)): give eNY/eNZ or geometry");
         }
-        if my_ed != 0.0 && !class_props.w_y.is_finite() {
+        let has_my = my_ed != 0.0 || (n_ed < 0.0 && class_props.e_n_y.abs() > 0.0);
+        if has_my && !class_props.w_y.is_finite() {
             ledger.flag("Class 4 Weff,y (EN 1993-1-5 4.3): give weffY or geometry");
         }
-        if mz_ed != 0.0 && !class_props.w_z.is_finite() {
+        let has_mz = mz_ed != 0.0 || (n_ed < 0.0 && class_props.e_n_z.abs() > 0.0);
+        if has_mz && !class_props.w_z.is_finite() {
             ledger.flag("Class 4 Weff,z (EN 1993-1-5 4.3): give weffZ or geometry");
         }
     }
@@ -982,7 +1001,11 @@ fn check_single_ec3_member(m: &Ec3MemberData, f: &Ec3DesignForces) -> Ec3CheckRe
             let (e, kk) = ec3_interaction(m, &caps, n_ed.abs(), my_ed.abs(), mz_ed.abs());
             eqs = e;
             k = kk;
-            e[0].max(e[1]).max(e[2])
+            if e.iter().any(|v| !v.is_finite()) {
+                f64::NAN
+            } else {
+                e[0].max(e[1]).max(e[2])
+            }
         } else {
             f64::NAN // refused below: a Cm outside Table B.3's [0.4, 1]
         }
