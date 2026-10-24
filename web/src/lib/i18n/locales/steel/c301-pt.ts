@@ -128,6 +128,7 @@ const c301Pt: Record<string, string> = {
   'c301.refuse.unknownShape': 'forma de seção «{shape}» sem classificação na Tabela B.4.1a',
   'c301.refuse.elementInvalid': 'elemento comprimido «{kind}» inválido para a Tabela B.4.1a',
   'c301.refuse.chsTooSlender': 'D/t = {Dt} > 0,45·E/Fy = {lim}: E.7.2(c) não cobre este tubo',
+  'c301.refuse.qNonPositive': 'o fator de redução resulta Q = {Q} ≤ 0',
   'c301.refuse.e4NoJCw': '§E.4: kz·Lz > ky·L e faltam J ou Cw para a flambagem por torção',
   'c301.refuse.e4NoJ': '§E.4: falta J para a flambagem por flexo-torção',
   'c301.refuse.e4ShearCentre': '§E.4: centro de cisalhamento desconhecido',

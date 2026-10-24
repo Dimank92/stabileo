@@ -139,6 +139,7 @@ const c301Es: Record<string, string> = {
   'c301.refuse.unknownShape': 'forma de sección «{shape}» sin clasificación según la Tabla B.4.1a',
   'c301.refuse.elementInvalid': 'elemento comprimido «{kind}» no válido para la Tabla B.4.1a',
   'c301.refuse.chsTooSlender': 'D/t = {Dt} > 0,45·E/Fy = {lim}: E.7.2(c) no cubre este tubo',
+  'c301.refuse.qNonPositive': 'el factor de reducción resulta Q = {Q} ≤ 0',
   'c301.refuse.e4NoJCw': '§E.4: kz·Lz > ky·L y faltan J o Cw para el pandeo torsional',
   'c301.refuse.e4NoJ': '§E.4: falta J para el pandeo flexotorsional',
   'c301.refuse.e4ShearCentre': '§E.4: centro de corte desconocido',

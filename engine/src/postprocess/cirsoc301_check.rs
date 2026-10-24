@@ -759,6 +759,9 @@ fn slender_reduction<T: Real>(
     let qa: T = if lost_any { q(ex::<T>(area) - lost, ex(area)) } else { one };
     let unit = !qs_reduced && !lost_any;
     let qv = if unit { one } else { qs * qa };
+    if qv.mid() <= 0.0 || !qv.mid().is_finite() {
+        return Err(refuse("qNonPositive", &[("Q", n(qv.mid(), 3))]));
+    }
     Ok(QResult { q: qv, qs, qa, slender, unit })
 }
 
@@ -769,11 +772,12 @@ fn slender_reduction<T: Real>(
 ///   λe·√Q > 1,5: Fcr = (0,877/λe²)·Fy       (E.7.3; E.3.3)
 fn fcr_of<T: Real>(fy: f64, qv: T, fe: T) -> T {
     let lam2 = q(ex::<T>(fy), fe);
-    branch(
+    let fcr = branch(
         (qv * lam2).sqrt().le(lit(1.5)),
         || qv * lit::<T>(0.658).powf(qv * lam2) * ex(fy),
         || q(lit::<T>(0.877), lam2) * ex(fy),
-    )
+    );
+    fcr.min(ex(fy))
 }
 
 enum Torsional<T> {
@@ -917,6 +921,9 @@ fn finish_compression<T: Real>(
 ) -> Result<CompressionCap<T>, Refusal> {
     let fy = m.fy;
     let qv = qr.q;
+    if qv.mid() <= 0.0 || !qv.mid().is_finite() {
+        return Err(refuse("qNonPositive", &[("Q", n(qv.mid(), 3))]));
+    }
     if qr.slender {
         st.push("e.slenderQ", &[("Qs", n(qr.qs.mid(), 3)), ("Qa", n(qr.qa.mid(), 3)), ("Q", n(qv.mid(), 3))]);
     } else {

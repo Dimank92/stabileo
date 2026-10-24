@@ -128,6 +128,7 @@ const c301En: Record<string, string> = {
   'c301.refuse.unknownShape': 'section shape «{shape}» has no classification in Table B.4.1a',
   'c301.refuse.elementInvalid': 'compression element «{kind}» not valid for Table B.4.1a',
   'c301.refuse.chsTooSlender': 'D/t = {Dt} > 0.45·E/Fy = {lim}: E.7.2(c) does not cover this tube',
+  'c301.refuse.qNonPositive': 'the reduction factor comes out Q = {Q} ≤ 0',
   'c301.refuse.e4NoJCw': '§E.4: kz·Lz > ky·L and J or Cw is missing for torsional buckling',
   'c301.refuse.e4NoJ': '§E.4: J is missing for flexural-torsional buckling',
   'c301.refuse.e4ShearCentre': '§E.4: shear centre unknown',

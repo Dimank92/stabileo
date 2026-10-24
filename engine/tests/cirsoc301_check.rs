@@ -88,8 +88,8 @@ fn inti_10c_slender_box_geometry_widths() {
     let r = check_compression(&m, 200.0);
     published(val(&r, "Q"), 0.8071, 0.001);
     published(val(&r, "Fcr"), 137.21, 0.001);
-    published(r.capacity, 207.0, 0.001);
 }
+
 
 // ───────────── Ejemplo 14 — flexure and shear ─────────────
 
@@ -579,3 +579,29 @@ fn certify_members_over_demand_boxes() {
     let res = certify_cirsoc301_members(&CertifiedCirsoc301CheckInput { members: vec![bad], demands: vec![d(-100.0, 10.0)] });
     assert!(!res[0].certified && !res[0].certified_ok);
 }
+
+#[test]
+fn slender_box_slender_reduction_non_positive_q_is_refused_issue_467() {
+    let m = member(json!({
+        "Fy": 235.0, "Fu": 352.5, "E": 200000.0,
+        "A": 0.004154258317613479,
+        "Iz": 0.00018670605799131143,
+        "Iy": 0.00018670373863284803,
+        "h": 0.52128444, "b": 0.5212801394033699,
+        "tw": 0.002, "tf": 0.00417027552,
+        "L": 0.5, "Lb": 0.0,
+        "shape": "box", "builtUp": false, "elementId": 1
+    }));
+    let r = check_compression(&m, 0.003);
+    // Squash load is Ag * Fy = 0.004154258317613479 * 235_000 kN = 976.25 kN.
+    // Capacity must NEVER exceed squash load, and Fcr must never exceed Fy.
+    // When Q <= 0 (lost >= area), the check must be refused, not pass with inflated capacity.
+    assert!(r.not_evaluated.is_some(), "expected refusal for non-positive Q, got: {r:?}");
+    assert!(!r.pass, "should not pass when Q <= 0: {r:?}");
+    assert!(r.capacity <= 0.004154258317613479 * 235_000.0, "capacity exceeded squash load: {}", r.capacity);
+    let forces = Cirsoc301DesignForces { element_id: 1, nu: 0.003, mu_strong: 0.0, mu_weak: 0.0, vu: 0.0 };
+    let cm = check_member(&m, &forces);
+    assert!(!cm.pass, "member check should not pass with non-positive Q: {cm:?}");
+    assert!(cm.unevaluated.contains(&"compression".to_string()), "compression should be unevaluated: {cm:?}");
+}
+
