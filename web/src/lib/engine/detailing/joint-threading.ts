@@ -20,7 +20,7 @@
 import { generateLayoutCandidates, candidateClears, type KeepOut, type LayoutCandidate } from './candidates';
 import { cornerSeatHold, seatedLongitudinalHalfExtents } from '../../codes/cirsoc201/transverse-cage';
 import { columnBarPositions } from './generate-column';
-import { centrelineRadius, minMandrelDiameter } from '../../codes/cirsoc201/bar-geometry';
+import { centrelineRadius, minMandrelDiameter, standardHook } from '../../codes/cirsoc201/bar-geometry';
 import { yieldsTo } from './support-anchorage';
 export { yieldsTo };
 import { DEFAULT_LIMITS } from './coordination-search';
@@ -105,18 +105,18 @@ export interface TailRow {
  * design's threading check and the detailing's coordination alike.
  *
  *   - Every tail stands vertical on the crossing beam's tail plane, `at·k` across this beam: this
- *     beam's horizontal bars cross it, in contact, so it bars its own diameter.
- *   - Where this beam ends here too its tails stand beside the crossing beam's, parallel, and the
- *     two need the clear distance between them (§25.2.1). In plan they are points: this beam's
- *     row at its plane `P` along this beam and the bars of its layer across it, the crossing
- *     row at its plane `T` across this beam and its bars along it. Two come within the clear only
- *     if a bar of each stands within it of the other's plane, so of each pair of rows one keeps
- *     its layer off the other's plane and the other is free: the one that can (a first layer
- *     keeps its corner seat, so it cannot clear a plane within the clear of that seat), and of
- *     two that can, the one facing the outer plane, which costs it only bars near its corner;
- *     of two at one plane, the one that gives way (`yieldsTo`). Read for every row of both, a
- *     corner of two beams ending kept each one's bars off the other's planes twice over: qa-8's
- *     300 mm beams kept four slots of the six their rows fit, both layers full on the corners.
+ *     beam's horizontal bars cross it, in contact, so it bars its own diameter. A bottom tail,
+ *     turned up, crosses this beam's top bars only where it reaches up to them, which depends on
+ *     how the two mats are ranked (`joint-layers`); where this beam's bottom bars at the joint
+ *     stand on their corner seats alone (`ourBottomSeated`) it bars no slot until then, and is
+ *     read with the ranks, layer by layer (`run-detailing`, as the bends of the mats above).
+ *     Read as a keep-out of every layer, measured on the span fixture's 40×40 corners with the
+ *     hooks taking ψcc (§25.4.3.2, tried and withdrawn): the bottom tails of the beams along y,
+ *     17 mm past the node and 150 mm below the top bars of the beams along x, barred those
+ *     beams' middle top bar from the one slot the column's centre bar and the joint's crosstie
+ *     leave it, and the coordination laid it through the crosstie.
+ *   - Where this beam ends here too its tails stand beside the crossing beam's of the same face
+ *     (`besideTailPosts`).
  */
 export function crossingTailPosts(o: {
   theirs: readonly TailRow[]; k: number; theirSeat: number;
@@ -126,10 +126,46 @@ export function crossingTailPosts(o: {
   clearedAtMm: number;
   /** This beam's top bar, mm: the one that crosses the tails. */
   ourTopMm: number;
+  /** This beam's bottom bars at the joint are its first row of two, on the corner seats. */
+  ourBottomSeated?: boolean;
 }): KeepOut[] {
   const out: KeepOut[] = [];
   // The tails cross this beam's top bars: cleared at that bar, not the member's largest.
-  for (const t of o.theirs) out.push({ at: t.at * o.k, halfWidth: t.diameterMm / 2000 + o.ourTopMm / 2000 - o.clearedAtMm / 2000 + o.placement });
+  for (const t of o.theirs) {
+    if (t.position === 'bottom' && o.ourBottomSeated) continue;
+    out.push({ at: t.at * o.k, halfWidth: t.diameterMm / 2000 + o.ourTopMm / 2000 - o.clearedAtMm / 2000 + o.placement });
+  }
+  out.push(...besideTailPosts({ ...o, beside: (r, t) => r.position === t.position }));
+  return out;
+}
+
+/**
+ * Where this beam ends at the joint too, its tails beside the crossing beam's: the rows `beside`
+ * pairs (the same face, or a top and a bottom row whose tails meet in height, `postsMeet`).
+ *
+ * Parallel, the two need the clear distance between them (§25.2.1). In plan they are points: this
+ * beam's row at its plane `P` along this beam and the bars of its layer across it, the crossing
+ * row at its plane `T` across this beam and its bars along it. Two come within the clear only if
+ * a bar of each stands within it of the other's plane, so of each pair of rows one keeps its
+ * layer off the other's plane and the other is free: the one that can (a first layer keeps its
+ * corner seat, so it cannot clear a plane within the clear of that seat), and of two that can,
+ * the one facing the outer plane, which costs it only bars near its corner; of two at one plane,
+ * the one that gives way (`yieldsTo`). Read for every row of both, a corner of two beams ending
+ * kept each one's bars off the other's planes twice over: qa-8's 300 mm beams kept four slots of
+ * the six their rows fit, both layers full on the corners.
+ */
+export function besideTailPosts(o: {
+  theirs: readonly TailRow[]; k: number; theirSeat: number;
+  ours?: readonly TailRow[]; ourSeat: number; gives: boolean;
+  clear: number; placement: number; clearedAtMm: number;
+  beside: (ours: TailRow, theirs: TailRow) => boolean;
+  /**
+   * Each row's own corner seat, m, where known: a bottom row's bars seat as its own face's do,
+   * not as the top row's (`theirSeat`, `ourSeat`). A top tail beside a bottom one is read so.
+   */
+  seatOf?: { ours: (r: TailRow) => number; theirs: (t: TailRow) => number };
+}): KeepOut[] {
+  const out: KeepOut[] = [];
   const eps = 1e-6;
   for (const r of o.ours ?? []) {
     // A first bottom row of two bars stands on its corner seats, whatever the slots (the
@@ -140,18 +176,39 @@ export function crossingTailPosts(o: {
     // fixture at 40×40 (undeclared) left no layout through six corner joints of the half-metre mesh.
     if (r.position === 'bottom' && r.row === 0 && r.count !== undefined && r.count <= 2) continue;
     for (const t of o.theirs) {
-      if (t.position !== r.position) continue;
+      if (!o.beside(r, t)) continue;
       const R = r.diameterMm / 2000 + t.diameterMm / 2000 + o.clear;
+      const ourSeat = o.seatOf ? o.seatOf.ours(r) : o.ourSeat, theirSeat = o.seatOf ? o.seatOf.theirs(t) : o.theirSeat;
       // No bar of either reaches within the clear of the other's plane: nothing to keep.
-      if (!(r.at < o.theirSeat + R - eps && t.at < o.ourSeat + R - eps)) continue;
-      const weCan = !(r.row === 0 && Math.abs(o.ourSeat - t.at) < R - eps);
-      const theyCan = !(t.row === 0 && Math.abs(o.theirSeat - r.at) < R - eps);
+      if (!(r.at < theirSeat + R - eps && t.at < ourSeat + R - eps)) continue;
+      const weCan = !(r.row === 0 && Math.abs(ourSeat - t.at) < R - eps);
+      const theyCan = !(t.row === 0 && Math.abs(theirSeat - r.at) < R - eps);
       const weKeep = weCan && (!theyCan || t.at > r.at + 1e-4 || (Math.abs(t.at - r.at) <= 1e-4 && o.gives));
       // The clear is the row's own: `candidateClears` adds the member's largest bar, so it is taken off.
       if (weKeep) out.push({ at: t.at * o.k, halfWidth: R - o.clearedAtMm / 2000 + o.placement, layers: [r.row] });
     }
   }
   return out;
+}
+
+/**
+ * A hook's tail as a vertical post: from its tip to where its bend turns it (the straight
+ * extension, Tabla 25.3.1), for a bar whose centre lies at `z` in its mat, in the same frame.
+ */
+export function tailPost(z: number, diameterMm: number, position: 'top' | 'bottom'): { lo: number; hi: number } {
+  const h = standardHook(diameterMm, 90, 'longitudinal');
+  return position === 'top'
+    ? { lo: z - h.centrelineRadius - h.extension, hi: z - h.centrelineRadius }
+    : { lo: z + h.centrelineRadius, hi: z + h.centrelineRadius + h.extension };
+}
+
+/**
+ * Whether two tails stand beside each other in height: unless one stops short of the other by
+ * the clear between parallel bars, tip to tip (`besideTailPosts`, read in `run-detailing` with
+ * the mats' ranks).
+ */
+export function postsMeet(a: { lo: number; hi: number }, b: { lo: number; hi: number }, clear: number): boolean {
+  return Math.max(a.lo - b.hi, b.lo - a.hi) < clear - 1e-9;
 }
 
 /**
@@ -190,11 +247,11 @@ export function bendCrossing(tail: number, r: number, rho: number, delta: number
  *
  * And the joint's ties: every interior line of the cage carries a crosstie (`buildColumnTieSet`,
  * framed on the global axes at the joint), its shaft beside the line's bars on the side toward
- * the column's centre, one bend radius off (the centreline line: the positive side). The one
- * along this beam runs through the band the tails stand in, and they cross it, in contact: they
- * keep off its shaft. Measured on qa-8, a tail beside the face bar ran through it by 2 mm. Read on
- * both sides of the bar, it barred a 20 cm beam's middle bar from the one gap the column's
- * centre bar leaves it.
+ * the column's centre, one bend radius off (`crosstieShafts`); on the centreline, on the side the
+ * joint passes it (`centreSide`, `crosstieCentreSides`). The one along this beam runs through the
+ * band the tails stand in, and they cross it, in contact: they keep off its shaft. Measured on
+ * qa-8, a tail beside the face bar ran through it by 2 mm. Read on both sides of the bar, it
+ * barred a 20 cm beam's middle bar from the one gap the column's centre bar leaves it.
  */
 export function columnTailPosts(o: {
   bars: ReadonlyArray<{ along: number; across: number; diameterMm: number }>;
@@ -207,27 +264,16 @@ export function columnTailPosts(o: {
   tieDiaMm: number;
   /** The bar the slots are cleared at (`candidateClears`), mm: the member's largest. */
   clearedAtMm: number;
+  /**
+   * The side of its line the centreline crosstie along this beam passes on (`crosstieCentreSides`).
+   * Absent: the positive one, the tie set's own default.
+   */
+  centreSide?: 1 | -1;
 }): KeepOut[] {
   const out: KeepOut[] = [];
-  const r = centrelineRadius(minMandrelDiameter(o.tieDiaMm, 'transverse').value, o.tieDiaMm);
-  // The crossties along this beam: along global x for a beam nearer x, along y otherwise; each
-  // through an interior line of bars standing on both faces it spans.
+  // The crossties along this beam: along global x for a beam nearer x, along y otherwise.
   const alongX = Math.abs(o.u.x) >= Math.abs(o.u.y);
-  const lineOf = (p: { x: number; y: number }) => (alongX ? p.y : p.x);
-  const spanOf = (p: { x: number; y: number }) => (alongX ? p.x : p.y);
-  const maxLine = Math.max(0, ...o.plan.map((p) => Math.abs(lineOf(p))));
-  const maxSpan = Math.max(0, ...o.plan.map((p) => Math.abs(spanOf(p))));
-  const lines = new Map<string, { at: number; diameterMm: number }>();
-  for (const p of o.plan) {
-    const a = lineOf(p);
-    // A face line, corners included: the corner bars sit a few mm in from the face bars, in the
-    // ties' bends. Interior lines stand well inside.
-    if (Math.abs(a) >= maxLine - 0.03) continue;
-    const both = [1, -1].every((side) => o.plan.some((q) => Math.abs(lineOf(q) - a) <= 0.006 && Math.sign(spanOf(q)) === side && Math.abs(spanOf(q)) >= maxSpan - 0.03));
-    if (both) lines.set(a.toFixed(4), { at: a, diameterMm: Math.max(p.diameterMm, lines.get(a.toFixed(4))?.diameterMm ?? 0) });
-  }
-  for (const line of lines.values()) {
-    const shaft = line.at + (line.at > 1e-9 ? -1 : 1) * Math.max(line.diameterMm / 2000 + o.tieDiaMm / 2000, r);
+  for (const { shaft } of crosstieShafts(o.plan, alongX, o.tieDiaMm, o.centreSide ?? 1)) {
     const across = alongX ? shaft * o.t.y : shaft * o.t.x;
     for (const row of o.ours) out.push({ at: across, halfWidth: o.tieDiaMm / 2000 + row.diameterMm / 2000 - o.clearedAtMm / 2000 + o.placement, layers: [row.row] });
   }
@@ -240,6 +286,80 @@ export function columnTailPosts(o: {
     }
   }
   return out;
+}
+
+/**
+ * The joint's crossties along global x (`alongX`, their shafts at a y) or along y (at an x), in
+ * plan about the node: one through every interior line of the cage that carries a bar on both
+ * faces it spans (`buildColumnTieSet`), its shaft beside the line's bars on the side toward the
+ * column's centre, one bend radius off; the centreline's (`centre`) on `centreSide`. The joint's
+ * ties are framed on the global axes, as the tie set builds them.
+ */
+export function crosstieShafts(
+  plan: ReadonlyArray<{ x: number; y: number; diameterMm: number }>, alongX: boolean, tieDiaMm: number, centreSide: 1 | -1,
+): Array<{ shaft: number; centre: boolean }> {
+  const r = centrelineRadius(minMandrelDiameter(tieDiaMm, 'transverse').value, tieDiaMm);
+  const lineOf = (p: { x: number; y: number }) => (alongX ? p.y : p.x);
+  const spanOf = (p: { x: number; y: number }) => (alongX ? p.x : p.y);
+  const maxLine = Math.max(0, ...plan.map((p) => Math.abs(lineOf(p))));
+  const maxSpan = Math.max(0, ...plan.map((p) => Math.abs(spanOf(p))));
+  const lines = new Map<string, { at: number; diameterMm: number }>();
+  for (const p of plan) {
+    const a = lineOf(p);
+    // A face line, corners included: the corner bars sit a few mm in from the face bars, in the
+    // ties' bends. Interior lines stand well inside.
+    if (Math.abs(a) >= maxLine - 0.03) continue;
+    const both = [1, -1].every((side) => plan.some((q) => Math.abs(lineOf(q) - a) <= 0.006 && Math.sign(spanOf(q)) === side && Math.abs(spanOf(q)) >= maxSpan - 0.03));
+    if (both) lines.set(a.toFixed(4), { at: a, diameterMm: Math.max(p.diameterMm, lines.get(a.toFixed(4))?.diameterMm ?? 0) });
+  }
+  return [...lines.values()].map((line) => {
+    const centre = Math.abs(line.at) <= 1e-9;
+    const side = line.at > 1e-9 ? -1 : centre ? centreSide : 1;
+    return { shaft: line.at + side * Math.max(line.diameterMm / 2000 + tieDiaMm / 2000, r), centre };
+  });
+}
+
+/**
+ * The side of its line each centreline crosstie of a joint passes on: `alongX` the one along
+ * global x (+1: at +y), `alongY` the one along y (+1: at +x).
+ *
+ * The one free choice of the joint's ties (`StirrupSetInput.centreSides`), and two readers need
+ * it: the coordination keeps the beams' bars off the crosstie along them (`columnTailPosts`) and
+ * the tie set lays it. The coordination read it on the positive side and the tie set took the
+ * other wherever the positive one ran through a hook tail, so a beam's bar laid on the negative
+ * side, clear of where the crosstie was read, had it run through its tail: measured on the span
+ * fixture at 40×40, undeclared, with the hooks taking ψcc (§25.4.3.2, tried and withdrawn), the
+ * bottom tails of the beams along y stood 17 mm past the node, on the positive line, and the crosstie moved onto the middle
+ * top bar of the beam along x (8 mm into it at two corners). Decided here, once, from what fixes
+ * it before any bar is laid: the hook tails of the beams ending at the joint, each a row of posts
+ * on a plane across the crosstie that no slot moves (`TailRow.at` along the beam's outward
+ * direction `out`). The positive side unless it runs through more of them than the other.
+ */
+export function crosstieCentreSides(o: {
+  plan: ReadonlyArray<{ x: number; y: number; diameterMm: number }>;
+  tieDiaMm: number;
+  tails: ReadonlyArray<{ out: { x: number; y: number }; rows: readonly TailRow[] }>;
+}): { alongX: 1 | -1; alongY: 1 | -1 } {
+  const sideOf = (alongX: boolean): 1 | -1 => {
+    const hits = (side: 1 | -1) => {
+      let n = 0;
+      for (const { shaft, centre } of crosstieShafts(o.plan, alongX, o.tieDiaMm, side)) {
+        if (!centre) continue;
+        for (const beam of o.tails) {
+          // The tails across this crosstie: a beam framing in along the other axis.
+          const k = alongX ? beam.out.y : beam.out.x;
+          if (Math.abs(k) <= Math.abs(alongX ? beam.out.x : beam.out.y)) continue;
+          for (const row of beam.rows) {
+            // In contact, a millimetre clear, as `planSupportEnd` keeps a tail off a bar it crosses.
+            if (Math.abs(row.at * k - shaft) < o.tieDiaMm / 2000 + row.diameterMm / 2000 + 0.001) n += row.count ?? 1;
+          }
+        }
+      }
+      return n;
+    };
+    return hits(1) > hits(-1) ? -1 : 1;
+  };
+  return { alongX: sideOf(true), alongY: sideOf(false) };
 }
 
 /** Whether one of the layouts the search would consider clears a joint's cage, and by how much the best misses. */
