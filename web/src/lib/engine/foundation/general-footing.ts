@@ -38,6 +38,8 @@ export interface GeneralFootingInput {
   fc: number; fy: number;
   /** Soil allowable pressure, kPa; null for a pile cap. */
   allowable: number | null;
+  /** The edge pressure may reach this many times the allowable while the mean stays under it. */
+  edgeFactor?: number;
   /** One pile's allowable capacity, kN, for a pile cap. */
   pileCapacity?: number;
   barDiameterMm: { x: number; y: number };
@@ -152,7 +154,7 @@ export function designGeneralFooting(i: GeneralFootingInput): GeneralFootingDesi
     if (!(i.allowable! > 0)) return { refused: 'noBearing' };
     for (const [combo, name] of combos) for (const sign of [1, -1] as const) {
       const r = checkRigidFooting({
-        B: f.B, L: f.L, thickness: f.thickness, cover: f.cover, fc: i.fc, fy: i.fy, allowable: i.allowable!,
+        B: f.B, L: f.L, thickness: f.thickness, cover: f.cover, fc: i.fc, fy: i.fy, allowable: i.allowable!, ...(i.edgeFactor ? { edgeFactor: i.edgeFactor } : {}),
         posts: postsFor(combo, sign), surcharge: 25 * f.thickness,
       });
       need = { bx: Math.max(need.bx, r.x.asBottom), by: Math.max(need.by, r.y.asBottom), tx: Math.max(need.tx, r.x.asTop), ty: Math.max(need.ty, r.y.asTop) };

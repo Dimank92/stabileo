@@ -12087,6 +12087,8 @@ const es: Record<string, string> = {
   'footing.ui.field.pedestalL': 'Pedestal L',
   'footing.ui.field.pedestalHeight': 'Altura del pedestal',
   'geotechnical.ui.field.allowableBearing': 'Tensión admisible',
+  'geotechnical.ui.field.edgeFactor': "Tensión de borde (× la admisible)",
+  'geotechnical.ui.field.edgeFactorHint': "Con 1, la tensión de borde no supera la admisible. Con un factor mayor, como permiten muchos estudios de suelos (1,25 es usual), la tensión media no supera la admisible y la de borde no supera ese múltiplo.",
   'geotechnical.ui.field.unitWeight': 'Peso unitario',
   'geotechnical.ui.field.subgradeModulus': 'Módulo de balasto',
   'geotechnical.ui.field.groundwater': 'Profundidad de la napa',

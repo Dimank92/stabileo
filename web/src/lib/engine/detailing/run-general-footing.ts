@@ -31,7 +31,7 @@ export interface GeneralOutcome {
 
 export function runGeneralFooting(a: {
   f: Footing; input: RunFootingDesignInput; level: number;
-  allowable: number | null; pileCapacity?: number;
+  allowable: number | null; pileCapacity?: number; edgeFactor?: number;
   unsupported: EngineMessage[]; assumptions: EngineMessage[]; draft: Draft;
 }): GeneralOutcome {
   const { f, input } = a;
@@ -39,7 +39,7 @@ export function runGeneralFooting(a: {
     footing: f, nodes: input.nodes, reactions: input.reactions,
     columnAt: (n) => (n === f.nodeId && f.columnElementId !== undefined ? input.columns.get(f.columnElementId) : undefined) ?? input.columnAt?.(n),
     ...(f.wallGroupId !== undefined && input.wallThickness?.has(f.wallGroupId) ? { wallThickness: input.wallThickness.get(f.wallGroupId)! } : {}),
-    fc: input.fc, fy: input.fy, allowable: a.allowable,
+    fc: input.fc, fy: input.fy, allowable: a.allowable, ...(a.edgeFactor ? { edgeFactor: a.edgeFactor } : {}),
     ...(a.pileCapacity !== undefined ? { pileCapacity: a.pileCapacity } : {}),
     barDiameterMm: { x: input.matPreferences.bottomMatDiameterXmm, y: input.matPreferences.bottomMatDiameterYmm },
     edition: input.edition,

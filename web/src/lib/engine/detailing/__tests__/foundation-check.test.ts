@@ -31,6 +31,17 @@ describe('bearing pressure', () => {
     expect(r.uplift).toBe(false);
   });
 
+  it('with an edge factor, holds the mean to the allowable and the edge to k times it', () => {
+    // 1250 kN on 2,5 × 2,5: mean 200 kPa; e = 250/1250 = 0,2 m: qmax = 200·(1 + 6·0,2/2,5) = 296 kPa.
+    const ecc = { serviceAxial: 1250, serviceMomentB: 250 };
+    expect(checkBearing(footing(ecc)).status).toBe('FAIL');
+    const r = checkBearing(footing({ ...ecc, edgeFactor: 1.25 }));
+    expect(r.status).toBe('OK');
+    expect(r.utilization).toBeCloseTo(296 / 312.5, 6);
+    // The mean still governs: 1700 kN is 272 kPa over the whole base.
+    expect(checkBearing(footing({ serviceAxial: 1700, edgeFactor: 1.25 })).status).toBe('FAIL');
+  });
+
   it('fails when the peak exceeds the allowable', () => {
     expect(checkBearing(footing({ serviceAxial: 2000 })).status).toBe('FAIL');
   });

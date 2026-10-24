@@ -528,13 +528,14 @@ export function runFootingDesign(given: RunFootingDesignInput): RunFootingDesign
       continue;
     }
     const allowableBearing = profile.bearing.kind === 'allowablePressure' ? profile.bearing.allowableBearingKPa : 0;
+    const edgeFactor = profile.bearing.kind === 'allowablePressure' ? profile.bearing.edgeFactor : undefined;
     /** The general path, and what it leaves on the run. */
     const general = (): void => {
       const cap = f.kind === 'pileCap' && f.piles && profile.strata?.length
         ? pileCapacity(profile.strata, f.piles.diameter, f.piles.length).total : undefined;
       if (f.kind === 'pileCap' && cap === undefined) unsupported.push(msg('footing.general.noStrata', { footing: f.name }));
       const g = runGeneralFooting({
-        f, input, level, allowable: f.kind === 'pileCap' ? null : allowableBearing,
+        f, input, level, allowable: f.kind === 'pileCap' ? null : allowableBearing, ...(edgeFactor ? { edgeFactor } : {}),
         ...(cap !== undefined ? { pileCapacity: cap } : {}), unsupported, assumptions, draft: draftRecord,
       });
       if (!g.outcome || !g.entry) { fail(demand?.governingCombination ?? null, 'footing.design'); return; }
@@ -683,6 +684,7 @@ export function runFootingDesign(given: RunFootingDesignInput): RunFootingDesign
       columnB: column.b, columnH: column.h,
       fc: input.fc,
       allowableBearing,
+      ...(edgeFactor ? { edgeFactor } : {}),
       serviceAxial,
       factoredAxial: Math.abs(c.fz),
       serviceMomentB, serviceMomentL,

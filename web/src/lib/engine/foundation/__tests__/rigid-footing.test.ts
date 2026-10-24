@@ -25,6 +25,15 @@ describe('rigid footings', () => {
     expect(r.bearing.contact).toBe(1);
   });
 
+  it('with an edge factor, the mean against the allowable and the edge against k times it', () => {
+    // 400 kN on 2 × 2: mean 100 kPa; e = 100/400 = 0,25 m: qmax = 100·(1 + 6·0,25/2) = 175 kPa.
+    const base = { B: 2, L: 2, thickness: 0.5, cover: 0.05, fc: 25, fy: 420, allowable: 150, posts: [post('c', 0, 560, { service: { N: 400, Mx: 0, My: 100 }, factored: { N: 560, Mx: 0, My: 140 } })] };
+    expect(checkRigidFooting(base).bearing.ok).toBe(false);
+    const r = checkRigidFooting({ ...base, edgeFactor: 1.25 });
+    expect(r.bearing.ok).toBe(true);
+    expect(r.bearing.utilization).toBeCloseTo(175 / 187.5, 6);
+  });
+
   it('a combined footing hogs between its columns', () => {
     const r = checkRigidFooting({ B: 6, L: 2, thickness: 0.6, cover: 0.05, fc: 25, fy: 420, allowable: 300, posts: [post('a', -2, 800), post('b', 2, 800)] });
     expect(r.x.mNeg).toBeCloseTo(-400, 0);

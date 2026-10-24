@@ -11731,6 +11731,8 @@ const pt: Translations = {
   'footing.ui.field.pedestalL': 'Pedestal L',
   'footing.ui.field.pedestalHeight': 'Altura do pedestal',
   'geotechnical.ui.field.allowableBearing': 'Tensão admissível',
+  'geotechnical.ui.field.edgeFactor': "Tensão de borda (× a admissível)",
+  'geotechnical.ui.field.edgeFactorHint': "Com 1, a tensão de borda não supera a admissível. Com um fator maior, como muitos estudos de solo permitem (1,25 é usual), a tensão média não supera a admissível e a de borda não supera esse múltiplo.",
   'geotechnical.ui.field.unitWeight': 'Peso específico',
   'geotechnical.ui.field.subgradeModulus': 'Módulo de reação do solo',
   'geotechnical.ui.field.groundwater': 'Profundidade do lençol freático',

@@ -43,8 +43,12 @@ export const GEOTECHNICAL_SCHEMA_VERSION = 1;
  * would be a menu entry that produces no numbers.
  */
 export type BearingResistance =
-  /** Service-level allowable bearing pressure, kPa. The ordinary case. */
-  | { kind: 'allowablePressure'; allowableBearingKPa: number }
+  /**
+   * Service-level allowable bearing pressure, kPa. The ordinary case. `edgeFactor`: under an
+   * eccentric load the edge pressure may reach this many times it while the mean stays under it,
+   * as many reports allow (1 to 1,5; absent, the edge pressure is held to the allowable itself).
+   */
+  | { kind: 'allowablePressure'; allowableBearingKPa: number; edgeFactor?: number }
   /**
    * Not stated. A footing founded on this profile cannot be verified for bearing, and
    * says so. This is the initial state of a new profile — not an error condition.
@@ -299,7 +303,8 @@ export function migrateGeotechnical(raw: unknown): GeotechnicalMigration {
     if (rawBearing && rawBearing.kind === 'allowablePressure') {
       const v = rawBearing.allowableBearingKPa;
       if (typeof v === 'number' && Number.isFinite(v)) {
-        bearing = { kind: 'allowablePressure', allowableBearingKPa: v };
+        const k = rawBearing.edgeFactor;
+        bearing = { kind: 'allowablePressure', allowableBearingKPa: v, ...(typeof k === 'number' && k > 1 && k <= 1.5 ? { edgeFactor: k } : {}) };
       } else {
         // A stored pressure that is not a finite number is dropped to `unstated` and the
         // user is told, rather than carried as NaN into a utilisation.

@@ -12098,6 +12098,8 @@ const en: Record<string, string> = {
   'footing.ui.field.pedestalL': 'Pedestal L',
   'footing.ui.field.pedestalHeight': 'Pedestal height',
   'geotechnical.ui.field.allowableBearing': 'Allowable bearing',
+  'geotechnical.ui.field.edgeFactor': "Edge pressure (× the allowable)",
+  'geotechnical.ui.field.edgeFactorHint': "At 1, the edge pressure stays under the allowable. With a larger factor, as many soil reports allow (1.25 is usual), the mean pressure stays under the allowable and the edge pressure under that multiple.",
   'geotechnical.ui.field.unitWeight': 'Unit weight',
   'geotechnical.ui.field.subgradeModulus': 'Subgrade modulus',
   'geotechnical.ui.field.groundwater': 'Groundwater depth',

@@ -265,10 +265,20 @@
                          modelStore.updateSoilProfile(p.id, {
                            bearing: v === null
                              ? { kind: 'unstated' }
-                             : { kind: 'allowablePressure', allowableBearingKPa: v },
+                             : { kind: 'allowablePressure', allowableBearingKPa: v, ...(p.bearing.kind === 'allowablePressure' && p.bearing.edgeFactor ? { edgeFactor: p.bearing.edgeFactor } : {}) },
                          });
                        }} />
               </label>
+              {#if p.bearing.kind === 'allowablePressure'}
+                {@const b = p.bearing}
+                <label title={t('geotechnical.ui.field.edgeFactorHint')}>{t('geotechnical.ui.field.edgeFactor')}
+                  <input type="number" min="1" max="1.5" step="0.05" value={b.edgeFactor ?? 1} data-testid={`soil-${p.id}-edge`}
+                         onchange={(e) => {
+                           const k = Number(e.currentTarget.value);
+                           modelStore.updateSoilProfile(p.id, { bearing: { kind: 'allowablePressure', allowableBearingKPa: b.allowableBearingKPa, ...(k > 1 && k <= 1.5 ? { edgeFactor: k } : {}) } });
+                         }} />
+                </label>
+              {/if}
               <label>{t('geotechnical.ui.source')}
                 <select data-testid={`soil-${p.id}-source`}
                         onchange={(e) => modelStore.updateSoilProfile(p.id, {

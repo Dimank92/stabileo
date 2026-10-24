@@ -36,6 +36,8 @@ export interface RigidFootingInput {
   fc: number; fy: number;
   /** Allowable bearing, kPa (service). */
   allowable: number;
+  /** The edge pressure may reach this many times the allowable while the mean stays under it. */
+  edgeFactor?: number;
   posts: readonly Post[];
   /** Footing and soil above it, kPa added to the service field (weight acts at the centroid). */
   surcharge?: number;
@@ -120,7 +122,10 @@ export function checkRigidFooting(f: RigidFootingInput): RigidFootingResult {
   const service = pressureField(f.B, f.L, s.N + W, s.My, s.Mx);
   const factored = pressureField(f.B, f.L, u.N, u.My, u.Mx);
   const contactOk = service.contact >= 0.5 - 1e-9;
-  const bearing = { qMax: service.qMax, allowable: f.allowable, contact: service.contact, utilization: service.qMax / f.allowable, ok: !service.overturns && contactOk && service.qMax <= f.allowable + 1e-9 };
+  // The mean held to the allowable and the edge to k times it (k = 1 unless the soil states more).
+  const edgeK = f.edgeFactor && f.edgeFactor > 1 ? f.edgeFactor : 1;
+  const bearingUse = Math.max((s.N + W) / (f.B * f.L) / f.allowable, service.qMax / (edgeK * f.allowable));
+  const bearing = { qMax: service.qMax, allowable: f.allowable, contact: service.contact, utilization: bearingUse, ok: !service.overturns && contactOk && bearingUse <= 1 + 1e-9 };
   const overturns = service.overturns || factored.overturns;
   const x = along('x', f, factored, d), y = along('y', f, factored, d);
   const punching = f.posts.filter((p) => !p.wall && p.cx < f.B - 1e-9 && p.cy < f.L - 1e-9).map((p) => {

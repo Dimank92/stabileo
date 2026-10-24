@@ -63,6 +63,8 @@ export interface FootingInput {
   fc: number;
   /** Allowable bearing pressure, kPa. Service-level. */
   allowableBearing: number;
+  /** The edge pressure may reach this many times the allowable while the mean stays under it (`BearingResistance`). */
+  edgeFactor?: number;
   /** Axial load from the column, kN (service level for bearing). */
   serviceAxial: number;
   /** Factored axial load, kN, for strength checks. */
@@ -201,14 +203,20 @@ export function checkBearing(f: FootingInput): BearingResult {
       `del momento aplicado ±${act.b.momentEccentricity.toFixed(3)} / ` +
       `±${act.l.momentEccentricity.toFixed(3)} m (envolvente de ambos signos).`);
   }
-  memo.push(
-    `qmax = ${qMax.toFixed(1)} kPa, qmin = ${qMin.toFixed(1)} kPa contra ` +
-    `qadm = ${f.allowableBearing.toFixed(1)} kPa.`);
+  // With an edge factor the mean is held to the allowable and the edge to k times it.
+  const k = f.edgeFactor && f.edgeFactor > 1 ? f.edgeFactor : 1;
+  const qMean = N / A;
+  const utilization = Math.max(qMean / f.allowableBearing, qMax / (k * f.allowableBearing));
+  memo.push(k > 1
+    ? `qmedia = ${qMean.toFixed(1)} kPa contra qadm = ${f.allowableBearing.toFixed(1)} kPa; ` +
+      `qmax = ${qMax.toFixed(1)} kPa, qmin = ${qMin.toFixed(1)} kPa contra ${k}·qadm = ${(k * f.allowableBearing).toFixed(1)} kPa.`
+    : `qmax = ${qMax.toFixed(1)} kPa, qmin = ${qMin.toFixed(1)} kPa contra ` +
+      `qadm = ${f.allowableBearing.toFixed(1)} kPa.`);
 
   if (!act.fullContact) {
     return {
       status: 'UNSUPPORTED', qMax, qMin, eB, eL, ...common, uplift: true,
-      utilization: qMax / f.allowableBearing,
+      utilization,
       memo: [...memo,
         'La resultante cae fuera del núcleo central: la base se despega parcialmente y la ' +
         'distribución lineal deja de ser válida. El área efectiva reducida no está ' +
@@ -223,9 +231,9 @@ export function checkBearing(f: FootingInput): BearingResult {
   }
 
   return {
-    status: qMax <= f.allowableBearing ? 'OK' : 'FAIL',
+    status: utilization <= 1 + 1e-9 ? 'OK' : 'FAIL',
     qMax, qMin, eB, eL, ...common, uplift: false,
-    utilization: qMax / f.allowableBearing,
+    utilization,
     memo, refs,
   };
 }
