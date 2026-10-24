@@ -72,6 +72,8 @@ let returnTab = 'nodes';
  * always lands on the same place. Without a place, design opens where it was left.
  */
 export function openDeskAt(place?: DeskTab): void {
+  // Off in PRO's settings, design has no places to open (`uiStore.designInPro`).
+  if (!uiStore.designInPro) return;
   if (!isDesignTab(uiStore.proActiveTab)) returnTab = uiStore.proActiveTab;
   if (place) deskUi.tab = place;
   const tab = designTabFor(deskUi.tab);
@@ -93,6 +95,12 @@ export function leaveDesign(): void {
  * shown in.
  */
 export function syncDeskWithTab(tab: string): void {
+  // A design view named with design off (a link, a restored session, a URL) lands on the model.
+  if (isDesignTab(tab) && !uiStore.designInPro) {
+    if (deskUi.open) deskUi.open = false;
+    uiStore.proActiveTab = isDesignTab(returnTab) ? 'nodes' : returnTab;
+    return;
+  }
   if (isDesignTab(tab)) {
     const place = DESK_PLACE_OF_TAB[tab];
     if (place) deskUi.tab = place;
@@ -104,6 +112,7 @@ export function syncDeskWithTab(tab: string): void {
 
 /** The desk was opened or closed directly: the panel view follows, so the stage bar agrees. */
 export function syncTabWithDesk(open: boolean): void {
+  if (open && !uiStore.designInPro) { deskUi.open = false; return; }
   if (open && !isDesignTab(uiStore.proActiveTab)) {
     returnTab = uiStore.proActiveTab;
     uiStore.proActiveTab = designTabFor(deskUi.tab);

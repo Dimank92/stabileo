@@ -108,7 +108,7 @@
   <div class="bk-row">
     <label class="bk-field">{t('building.col.kStrong')} <input type="number" min="0.5" max="3" step="0.05" bind:value={kStrong} data-testid="building-col-k-strong" /></label>
     <label class="bk-field">{t('building.col.kWeak')} <input type="number" min="0.5" max="3" step="0.05" bind:value={kWeak} data-testid="building-col-k-weak" /></label>
-    <label class="bk-field">{t('building.col.cover')} <input type="number" min="10" step="5" placeholder={t('building.col.coverProject')} value={cover ?? ''} onchange={(e) => (cover = e.currentTarget.value === '' ? null : Number(e.currentTarget.value))} data-testid="building-col-cover" /></label>
+    {#if uiStore.designInPro}<label class="bk-field">{t('building.col.cover')} <input type="number" min="10" step="5" placeholder={t('building.col.coverProject')} value={cover ?? ''} onchange={(e) => (cover = e.currentTarget.value === '' ? null : Number(e.currentTarget.value))} data-testid="building-col-cover" /></label>{/if}
   </div>
 
   <h5 class="bk-h">{t('building.betweenAxesTitle')}</h5>

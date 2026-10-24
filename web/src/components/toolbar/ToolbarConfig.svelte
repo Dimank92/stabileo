@@ -486,6 +486,28 @@
       </div>
     {/if}
 
+    <!--
+      ── The normative design, offered from PRO ──────────────────────
+      PRO's modelling and analysis stand on their own; the normative design (members,
+      reinforcement, detailing, drawings) is still being built. Off by default and remembered per
+      browser, as Basic's Educational; on, the Design stage and its desk appear. What a project
+      holds of design is kept either way.
+    -->
+    {#if uiStore.appMode === 'pro'}
+      <div class="input-group">
+        <label class="cfg-check">
+          <input
+            type="checkbox"
+            checked={uiStore.designInPro}
+            onchange={(e) => { uiStore.designInPro = e.currentTarget.checked; }}
+            data-testid="cfg-design-in-pro"
+          />
+          <span>{t('config.designInPro')}</span>
+        </label>
+        <p class="cfg-hint">{t('config.designInProHint')}</p>
+      </div>
+    {/if}
+
     {#if !inline}
     <button class="config-action-btn live-calc-btn" class:live-calc-active={uiStore.liveCalc}
       onclick={() => uiStore.liveCalc = !uiStore.liveCalc}

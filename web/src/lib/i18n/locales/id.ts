@@ -3653,6 +3653,8 @@ const id: Translations = {
   'design.stagePurpose.design': "Chooses the reinforcement for beams and columns against the code in force. The optional floor pass runs inside it.",
   'design.stagePurpose.floorsNotVerified': '{n} footing(s) not verified',
   'design.stagePurpose.detailing': 'Coordinates the bars the design produced into assemblies. The drawings, the schedule, the report and the 3-D view are projections of it.',
+  'design.heldWhileOff': "The project holds normative design (reinforcement or detailing), which is off in PRO's settings. It is kept either way.",
+  'design.enable': "Turn on design",
   // ─── Certified results (docs/verification/CERTIFY.md) ───
   'certificate.certified': 'Tersertifikasi: galat perpindahan ≤ {abs} ({rel} relatif)',
   'certificate.notCertified': 'Tidak tersertifikasi: {reason}',

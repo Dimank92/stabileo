@@ -21,6 +21,7 @@
   import { t, tp } from '../../../lib/i18n';
   import { identifyMessages } from '../../../lib/codes/message';
   import { modelStore } from '../../../lib/store/model.svelte';
+  import { uiStore } from '../../../lib/store/ui.svelte';
   import {
     validateFooting, FOOTING_LAYER_ORDER_PREFERENCES, SUPPORTED_MAT_DIAMETERS_MM,
   } from '../../../lib/model/footing';
@@ -144,9 +145,12 @@
           `FootingMatPanel` was split out before it, and the same boundary: this file owns footing
           geometry and the ground, that one owns what follows from them.
         -->
-        <FootingCadHandoffPanel footingId={f.id} />
+        <!-- The footing's design (its mat and its drawing) with design on; its geometry and ground either way. -->
+        {#if uiStore.designInPro}
+          <FootingCadHandoffPanel footingId={f.id} />
 
-        <FootingMatPanel footingId={f.id} />
+          <FootingMatPanel footingId={f.id} />
+        {/if}
 
         <button class="danger" data-testid="footing-delete"
                 onclick={() => { modelStore.removeFooting(f.id); selectedId = null; }}>
@@ -165,6 +169,7 @@
     check in the project and that no user could see. The note says out loud what it is — a
     preference — so nobody reads Ø16 as something the design chose.
   -->
+  {#if uiStore.designInPro}
   <section class="mat-prefs" data-testid="footing-mat-prefs">
     <header><h4>{t('footing.ui.matTitle')}</h4></header>
     <p class="note">{t('footing.ui.matNote')}</p>
@@ -229,6 +234,7 @@
       </label>
     </div>
   </section>
+  {/if}
 
   <!--
     The ground. A PROJECT entity referenced by footings, never copied into them: a bearing

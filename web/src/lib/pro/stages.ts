@@ -5,6 +5,7 @@ import { openDeskAt } from './design-navigation';
 const deskOn = (place: DeskTab): boolean => deskUi.open && deskUi.tab === place;
 import { TWO_D_INTERNAL_FORCE_LABELS as F2D } from '../geometry/coordinate-system';
 import { resultsStore } from '../store/results.svelte';
+import { uiStore } from '../store/ui.svelte';
 
 /**
  * PRO's command tree — ONE definition, read by every surface that shows it.
@@ -128,9 +129,17 @@ export type ProStageContext = {
   canRebar3D: () => boolean;
   /** Which steps that workspace is still waiting on, as i18n keys. */
   rebar3DMissingSteps: () => string[];
+  /** Whether the Design stage is offered (`uiStore.designInPro`); absent, the setting decides. */
+  design?: boolean;
 };
 
 export function buildProStages(ctx: ProStageContext): ProStage[] {
+  const stages = allProStages(ctx);
+  // The normative design is offered only when PRO's settings turn it on (`uiStore.designInPro`).
+  return (ctx.design ?? uiStore.designInPro) ? stages : stages.filter((s) => s.id !== 'design');
+}
+
+function allProStages(ctx: ProStageContext): ProStage[] {
   const {
     solved, canSolve, canReport, onSolve, onReport,
     onRebar3D, canRebar3D, rebar3DMissingSteps,

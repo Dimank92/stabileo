@@ -37,6 +37,8 @@ async function bootWithStoredLocale(page: Page, locale: string): Promise<void> {
   await page.addInitScript((loc) => {
     try {
       localStorage.clear();
+      // Cleared with the rest: the normative design is turned back on, as the specs use it.
+      localStorage.setItem('stabileo-design-in-pro', '1');
       localStorage.setItem('stabileo-lang', loc);
       localStorage.setItem('stabileo-lang-manual', '1');
     } catch { /* private mode */ }

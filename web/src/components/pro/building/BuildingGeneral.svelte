@@ -6,7 +6,7 @@
    * use are the project's design data, opened here in place (`ProDesignDataPanel`, the same panel
    * the design desk shows).
    */
-  import { modelStore } from '../../../lib/store';
+  import { modelStore, uiStore } from '../../../lib/store';
   import { t, tp } from '../../../lib/i18n';
   import { te } from '../../../lib/i18n/engine-text';
   import { buildingUi } from '../../../lib/store/building-ui.svelte';
@@ -47,12 +47,15 @@
         {#each concretes as m (m.id)}<option value={m.id}>{m.name}</option>{/each}
       </select>
     </label>
-    <label>{t('building.general.rebar')}
-      <select value={d.rebarGrade} onchange={(e) => grade(e.currentTarget.value)} data-testid="building-rebar-grade">
-        {#each REBAR_GRADES as g (g.name)}<option value={g.name}>{g.name}</option>{/each}
-        {#if !REBAR_GRADES.some((g) => g.name === d.rebarGrade)}<option value={d.rebarGrade}>{d.rebarGrade}</option>{/if}
-      </select>
-    </label>
+    <!-- The reinforcement's grade is design's: offered with it (`uiStore.designInPro`). -->
+    {#if uiStore.designInPro}
+      <label>{t('building.general.rebar')}
+        <select value={d.rebarGrade} onchange={(e) => grade(e.currentTarget.value)} data-testid="building-rebar-grade">
+          {#each REBAR_GRADES as g (g.name)}<option value={g.name}>{g.name}</option>{/each}
+          {#if !REBAR_GRADES.some((g) => g.name === d.rebarGrade)}<option value={d.rebarGrade}>{d.rebarGrade}</option>{/if}
+        </select>
+      </label>
+    {/if}
     {#if steels.length > 0}
       <label>{t('building.general.steel')}
         <select value={buildingUi.steelId} onchange={(e) => (buildingUi.steelId = Number(e.currentTarget.value))} data-testid="building-steel">
@@ -73,10 +76,12 @@
     </div>
   {/if}
   {#if applied !== null}<p class="pk-hint" role="status">{tp('building.general.applied', { n: applied })}</p>{/if}
-  <details class="bg-more" data-testid="building-general-more">
-    <summary>{t('building.general.more')} <span class="pk-hint">· {tp('building.general.moreSummary', { c: Math.round(d.covers.beam * 1000), e: t(`designData.exp.${d.exposure.beam}`) })}</span></summary>
-    <ProDesignDataPanel />
-  </details>
+  {#if uiStore.designInPro}
+    <details class="bg-more" data-testid="building-general-more">
+      <summary>{t('building.general.more')} <span class="pk-hint">· {tp('building.general.moreSummary', { c: Math.round(d.covers.beam * 1000), e: t(`designData.exp.${d.exposure.beam}`) })}</span></summary>
+      <ProDesignDataPanel />
+    </details>
+  {/if}
 </section>
 
 <style>

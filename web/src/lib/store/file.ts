@@ -1,5 +1,6 @@
 // File operations: save/load projects, export results, autosave
 
+import { noteDesignHeldIfOff } from './design-presence';
 import { adoptLoadCases } from './load-cases-mode';
 import { modelStore } from './model.svelte';
 import { resultsStore } from './results.svelte';
@@ -315,6 +316,8 @@ export function deserializeProject(text: string): boolean {
   resultsStore.clear(); // stale results dropped — the model must be re-solved
   resultsStore.forgetView();
   noteAxisConventionMigrationIfNeeded(data.snapshot, data.analysisMode);
+  // Design kept in the file while it is off in PRO's settings: offered, not switched on.
+  noteDesignHeldIfOff();
   return true;
 }
 

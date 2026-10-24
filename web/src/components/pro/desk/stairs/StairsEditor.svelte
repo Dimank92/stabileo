@@ -88,7 +88,7 @@
       {#each checks as c (c.entry.id)}
         <tr class:on={selected === c.entry.id} onclick={() => pick(c.entry.id)} data-testid="stair-row-{c.entry.id}">
           <td>{c.entry.name}</td><td>{tp('stair.ui.flight', { n: c.entry.steps, r: (c.entry.riser * 100).toFixed(1), t: (c.entry.tread * 100).toFixed(1) })}</td>
-          <td>{c.design.geometry.span.toFixed(2)} m</td><td>{t(stateKey(c.status))}</td>
+          <td>{c.design.geometry.span.toFixed(2)} m</td>{#if uiStore.designInPro}<td>{t(stateKey(c.status))}</td>{/if}
         </tr>
       {/each}
     </tbody>
@@ -127,6 +127,9 @@
       ? tp('stair.ui.modelled', { n: plates.length })
       : t('stair.ui.notModelled')}
       {#if plates.length}<button class="link" onclick={() => { uiStore.setSelection(new Set(), new Set(), false, new Set(plates.map((q) => `q${q}`))); }} data-testid="stair-select-plates">{t('stair.ui.selectPlates')}</button>{/if}</p>
+    <!-- Its design (moments, the member sheet and the bars) with design on; its geometry, its plates
+         and the reactions it puts on the beams either way. -->
+    {#if uiStore.designInPro}
     <p class="muted" data-testid="stair-summary">{tp('stair.ui.summary', { ang: d.geometry.angleDeg.toFixed(1), L: d.geometry.span.toFixed(2), wf: d.loads.wuFlight.toFixed(2), wl: d.loads.wuLanding.toFixed(2), mu: d.mu.toFixed(1), mn: d.muNeg.toFixed(1) })}</p>
     <SteelMemberSheet rows={current.rows} note={t(current.entry.ends === 'simple' ? 'stair.note.simple' : 'stair.note.monolithic')} />
     <table class="sf-t" data-testid="stair-bars">
@@ -135,6 +138,7 @@
         {#each d.bars as b (b.mark)}<tr><td>{b.mark} · {t(`stair.bar.${b.role}`)}</td><td>{b.diameterMm}</td><td>{b.count}</td><td>{Math.round(b.spacing * 1000)} mm</td><td>{b.length.toFixed(2)}</td></tr>{/each}
       </tbody>
     </table>
+    {/if}
     <details class="sf-sec" data-testid="stair-reactions">
       <summary>{t('stair.ui.reactions')} <span class="muted">· {tp('stair.ui.reactionsSummary', { fd: d.reactions.foot.dead.toFixed(2), fl: d.reactions.foot.live.toFixed(2), hd: d.reactions.head.dead.toFixed(2), hl: d.reactions.head.live.toFixed(2) })}</span></summary>
       <div class="sf-form">
@@ -147,7 +151,7 @@
     </details>
     <button class="link" onclick={() => { removeStair(current.entry.id); fresh(); }} data-testid="stair-remove">{t('mat.timber.drop')}</button>
   {/if}
-  <FamilyBatch family="stair" />
+  {#if uiStore.designInPro}<FamilyBatch family="stair" />{/if}
 </div>
 
 <style>

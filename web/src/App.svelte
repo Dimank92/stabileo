@@ -335,6 +335,20 @@
     const open = deskUi.open;
     untrack(() => { if (uiStore.appMode === 'pro') syncTabWithDesk(open); });
   });
+  /*
+   * Design switched off in PRO's settings (or restored off from storage): its desk, its 3-D
+   * reinforcement workspace and its verification colouring go, and a design view goes back to the
+   * model. What the project holds of design stays as it was.
+   */
+  $effect(() => {
+    if (uiStore.designInPro) return;
+    untrack(() => {
+      if (deskUi.open) deskUi.open = false;
+      if (rebarWorkspace.open) rebarWorkspace.close();
+      if (resultsStore.diagramType === 'verification') resultsStore.diagramType = 'none';
+      if (uiStore.appMode === 'pro') syncDeskWithTab(uiStore.proActiveTab);
+    });
+  });
   import ProProjectFileActions from './components/pro/ProProjectFileActions.svelte';
   import ProRibbon from './components/pro/ProRibbon.svelte';
   import ProDrawBar from './components/pro/ProDrawBar.svelte';
@@ -2249,6 +2263,11 @@
           <!-- The one command that connects members to the nodes they pass (Edit › Cut). -->
           <button class="toast-action" data-testid="toast-split-at-nodes" onclick={() => { splitAtNodesFromToast(); uiStore.dismissToast(toast.id); }}>
             {t('app.splitAtNodesAction')}
+          </button>
+        {/if}
+        {#if toast.actionId === 'enable-design'}
+          <button class="toast-action" data-testid="toast-enable-design" onclick={() => { uiStore.designInPro = true; uiStore.dismissToast(toast.id); }}>
+            {t('design.enable')}
           </button>
         {/if}
         {#if toast.actionId === 'kinematic'}

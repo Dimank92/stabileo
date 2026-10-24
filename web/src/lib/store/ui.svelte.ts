@@ -158,6 +158,18 @@ function createUIStore() {
   let eduInBasic = $state(
     hasLocalStorage() ? localStorage.getItem('stabileo-edu-in-basic') === '1' : false,
   );
+  /**
+   * Whether PRO offers the normative design (members, reinforcement, detailing, drawings).
+   *
+   * It is still being built, and PRO's modelling and analysis stand on their own: a model is
+   * drawn or imported, solved, read and exported without it. So it is off by default and turned
+   * on from PRO's settings, as Basic's Educational is, and remembered per browser for the same
+   * reason. Off, its stage, desk and places are not offered and nothing of it runs; what a project
+   * holds of it (bars, decisions, sheets) stays in the file untouched.
+   */
+  let designInPro = $state(
+    hasLocalStorage() ? localStorage.getItem('stabileo-design-in-pro') === '1' : false,
+  );
   let supportType = $state<SupportTool>('pinned');
   let loadType = $state<LoadTool>('nodal');
   let nodalLoadDir = $state<NodalLoadDir>('fz'); // direction for nodal load placement
@@ -739,6 +751,12 @@ function createUIStore() {
     set eduInBasic(v: boolean) {
       eduInBasic = v;
       try { localStorage.setItem('stabileo-edu-in-basic', v ? '1' : '0'); } catch { /* private mode */ }
+    },
+
+    get designInPro() { return designInPro; },
+    set designInPro(v: boolean) {
+      designInPro = v;
+      try { localStorage.setItem('stabileo-design-in-pro', v ? '1' : '0'); } catch { /* private mode */ }
     },
 
     get moveMode() { return moveMode; },

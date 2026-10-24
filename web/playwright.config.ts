@@ -145,6 +145,13 @@ export default defineConfig({
     : [['list'], ['html', { outputFolder: './e2e/.report', open: 'on-failure' }]],
   use: {
     baseURL: BASE_URL,
+    /*
+     * The normative design is off by default in PRO (`uiStore.designInPro`, a per-browser
+     * preference) and most PRO specs exercise it: every browser starts with it turned on, as a
+     * reader turns it on. A spec that clears the storage restores it (`bootPro`, and the few that
+     * boot on their own); `design-optional.spec.ts` starts from an empty storage for the default.
+     */
+    storageState: { cookies: [], origins: [{ origin: BASE_URL, localStorage: [{ name: 'stabileo-design-in-pro', value: '1' }] }] },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

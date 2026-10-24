@@ -198,6 +198,10 @@ export async function bootPro(page: Page, appLocale = 'en'): Promise<void> {
       // English text would otherwise depend on the browser's language.
       localStorage.setItem('stabileo-lang', loc);
       localStorage.setItem('stabileo-lang-manual', '1');
+      // The normative design is off by default in PRO (`uiStore.designInPro`); the PRO specs
+      // exercise it, so it is turned on as a reader turns it on. `design-optional.spec.ts` covers
+      // the default.
+      localStorage.setItem('stabileo-design-in-pro', '1');
     } catch { /* private mode */ }
   }, appLocale);
 
