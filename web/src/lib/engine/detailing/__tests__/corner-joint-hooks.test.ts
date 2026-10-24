@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 import { bottomHookInboard, planSupportEnd, type SupportBar, type SupportCage } from '../support-anchorage';
 import { crossingSeatsOf } from '../../design/end-support-anchorage';
 import { allocateLayers, type LineForLayering } from '../joint-layers';
-import { crossingTailPosts } from '../joint-threading';
+import { besideTailPosts, crossingTailPosts, crosstieCentreSides, crosstieShafts, postsMeet, tailPost } from '../joint-threading';
 import { buildColumnTieSet, type StirrupSetInput } from '../../../codes/cirsoc201/transverse-cage';
 
 const cage = (o: Partial<SupportCage> = {}): SupportCage => ({
@@ -136,3 +136,71 @@ describe('the joint\'s centreline crossties', () => {
     expect(shafts({ centreSides: { up: -1 } })).toEqual([['along x', 0.02], ['along y', -0.02]]);
   });
 });
+
+describe('the side the joint passes its centreline crossties on', () => {
+  // The 40×40 cage of 8Ø16 about the node: corners and face-centre bars, Ø8 ties.
+  const plan = [
+    [-0.159, -0.159], [0.159, -0.159], [0.159, 0.159], [-0.159, 0.159],
+    [0, -0.159], [0, 0.159], [-0.159, 0], [0.159, 0],
+  ].map(([x, y]) => ({ x: x!, y: y!, diameterMm: 16 }));
+  // A beam along y ending here with its bottom tails 17 mm past the node: the yielding beam's
+  // bottom bars pushed in past the crossing corner (the span fixture's 40×40 corners with ψcc, tried and withdrawn).
+  const tails = (outY: 1 | -1) => [{ out: { x: 0, y: outY }, rows: [
+    { at: 0.105, diameterMm: 12, row: 0, position: 'top' as const, count: 3 },
+    { at: 0.0172, diameterMm: 16, row: 0, position: 'bottom' as const, count: 2 },
+  ] }];
+
+  it('reads the centreline crossties a bend radius beside the centre bars, as the tie set lays them', () => {
+    expect(crosstieShafts(plan, true, 8, 1).map((s) => [r4(s.shaft), s.centre])).toEqual([[0.02, true]]);
+    expect(crosstieShafts(plan, true, 8, -1).map((s) => [r4(s.shaft), s.centre])).toEqual([[-0.02, true]]);
+  });
+
+  it('takes the side away from the tails that stand across it', () => {
+    // No tail across either: the positive side, the tie set's default.
+    expect(crosstieCentreSides({ plan, tieDiaMm: 8, tails: [] })).toEqual({ alongX: 1, alongY: 1 });
+    // Ending toward −y, its tails stand at y = −0,017: the positive side is clear.
+    expect(crosstieCentreSides({ plan, tieDiaMm: 8, tails: tails(-1) })).toEqual({ alongX: 1, alongY: 1 });
+    // Toward +y they stand at +0,017, 3 mm from the positive shaft. Before: the coordination read
+    // the crosstie there and laid the crossing beam's middle top bar on the negative side, and the
+    // tie set, finding the positive side through these tails, took the negative one onto that bar.
+    expect(crosstieCentreSides({ plan, tieDiaMm: 8, tails: tails(1) })).toEqual({ alongX: -1, alongY: 1 });
+  });
+});
+
+describe('the tails of two crossing beams, in height', () => {
+  it('two tails stand beside each other unless one stops short of the other by the clear', () => {
+    // Ø16 tails reach 56 + 192 mm from the bar: in a 50 cm beam a top and a bottom one overlap 78 mm.
+    expect(postsMeet(tailPost(0.2, 16, 'top'), tailPost(-0.2, 16, 'bottom'), 0.025)).toBe(true);
+    expect(postsMeet({ lo: 0.1, hi: 0.3 }, { lo: -0.2, hi: 0.076 }, 0.025)).toBe(true);
+    expect(postsMeet({ lo: 0.1, hi: 0.3 }, { lo: -0.2, hi: 0.075 }, 0.025)).toBe(false);
+  });
+
+  it('a crossing bottom tail bars no slot of a beam whose bottom bars stand on their seats alone', () => {
+    const o = {
+      theirs: [{ at: 0.105, diameterMm: 12, row: 0, position: 'top' as const }, { at: 0.0172, diameterMm: 16, row: 0, position: 'bottom' as const }],
+      k: 1, theirSeat: 0.0612, ourSeat: 0.0598, gives: false, clear: 0.025, placement: 0, clearedAtMm: 16, ourTopMm: 16,
+    };
+    // Before, with ψcc (tried and withdrawn): a keep-out of every layer, 17 mm across this beam: with the column's centre bar and
+    // the crosstie it left the middle top bar of a 20 cm beam no slot (the span fixture, 1 m mesh).
+    expect(crossingTailPosts(o).map((k) => r4(k.at))).toEqual([0.105, 0.0172]);
+    // Read later, with the mats' ranks, against the top layers it reaches (`run-detailing`).
+    expect(crossingTailPosts({ ...o, ourBottomSeated: true }).map((k) => r4(k.at))).toEqual([0.105]);
+  });
+
+  it('a top tail beside a crossing bottom one keeps the clear, each read at its own corner seat', () => {
+    // The span fixture at 40×40, 2 m mesh, with ψcc (tried and withdrawn): this beam's second top row of Ø10 turned down 45,8 mm
+    // past the node; the crossing beam's Ø16 bottom row turned up 46,2 mm past it, its corners at
+    // 59,8 mm. Before: no pair of a top and a bottom row was read, and the two tails stood 12 mm
+    // clear, 29 mm side by side in height, where 25 mm of clear are due.
+    const posts = besideTailPosts({
+      theirs: [{ at: 0.0462, diameterMm: 16, row: 0, position: 'bottom', count: 2 }], k: -1, theirSeat: 0.0619,
+      ours: [{ at: 0.0458, diameterMm: 10, row: 1, position: 'top' }], ourSeat: 0.0619, gives: true,
+      clear: 0.025, placement: 0, clearedAtMm: 12,
+      seatOf: { ours: () => 0.0619, theirs: () => 0.0598 },
+      beside: (r, t) => r.position !== t.position,
+    }).map((k) => [r4(k.at), r4(k.halfWidth), k.layers]);
+    // The second row keeps off the other's plane by both radii and the clear: 5 + 8 + 25 − 6 mm.
+    expect(posts).toEqual([[-0.0462, 0.032, [1]]]);
+  });
+});
+

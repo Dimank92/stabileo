@@ -58,7 +58,7 @@ import {
 } from './generate-column';
 import { candidateClears, generateLayoutCandidates, type KeepOut } from './candidates';
 import { beamGroups, envelopeStations, hoggingAtSupports, resolveTopSteelFor } from './beam-groups';
-import { beamLayoutDomain, beamRow, beamSeat as sharedBeamSeat, bendCrossing, columnBarsOf, columnTailPosts, crossingTailPosts, yieldsTo, type TailRow } from './joint-threading';
+import { beamLayoutDomain, beamRow, beamSeat as sharedBeamSeat, besideTailPosts, bendCrossing, columnBarsOf, columnTailPosts, crossingTailPosts, crosstieCentreSides, postsMeet, tailPost, yieldsTo, type TailRow } from './joint-threading';
 import {
   cageKeepOuts, generateColumnCandidates, type ColumnLayoutCandidate,
 } from './column-candidates';
@@ -1063,13 +1063,31 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
    * The hooks other beams turn into a support, as keep-outs across `id`: each crossing beam's
    * hook tails stand at a known distance past the node (`supportPlanOf`), on a line across that
    * beam, so along `id` they are posts its bars must thread past, as past the column's bars.
+   * Those that depend on the mats' ranks are read with them (`crossingPostsRanked`).
    */
   function crossingHookTails(id: number, nodeId: number, t: { x: number; y: number }, placement: number, clearedAtMm: number): KeepOut[] {
+    const out: KeepOut[] = [];
+    for (const c of crossingsAt(id, nodeId, t)) {
+      out.push(...crossingTailPosts({
+        theirs: c.theirs, k: c.k, theirSeat: c.theirSeat, ...(c.ours ? { ours: c.ours } : {}), ourSeat: c.ourSeat, gives: c.gives, placement, clearedAtMm,
+        ourTopMm: ourTopOf(id) || clearedAtMm, clear: c.clear, ourBottomSeated: bottomSeatedAt(id, nodeId),
+      }));
+    }
+    return out;
+  }
+
+  /**
+   * The beams crossing `id` that hook into the support at `nodeId`, each with what the posts of
+   * its tails across `id` are read from: `k` its outward direction onto `id`'s transverse axis
+   * `t`, its tails and `id`'s own where `id` ends here too (`crossingTailPosts`), the two rows'
+   * corner seats, and which of the two gives way (`yieldsTo`).
+   */
+  function crossingsAt(id: number, nodeId: number, t: { x: number; y: number }) {
     const el = input.elements.get(id);
     const a = el && input.nodes.get(el.nodeI), b = el && input.nodes.get(el.nodeJ);
     if (!el || !a || !b) return [];
     const u = unit(nodePoint(a), nodePoint(b));
-    const out: KeepOut[] = [];
+    const out: Array<{ other: number; k: number; theirs: TailRow[]; ours?: TailRow[]; theirSeat: number; ourSeat: number; gives: boolean; clear: number }> = [];
     for (const other of beams) {
       if (other === id) continue;
       const o = input.elements.get(other);
@@ -1095,16 +1113,28 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
       const own = input.contexts.get(id)!;
       const ourDia = Math.max(0, ...(ours ?? []).filter((x) => x.position === 'top').map((x) => x.diameterMm));
       const ourSeat = ourDia > 0 ? seatedLongitudinalHalfExtents(own.section.b, own.section.h, own.material.cover, own.material.stirrupDia, ourDia).corner.halfAcross : 0;
-      out.push(...crossingTailPosts({
-        theirs, k, theirSeat, ...(ours ? { ours } : {}), ourSeat, gives: yieldsTo({ x: u.x, y: u.y }, { x: v.x, y: v.y }), placement, clearedAtMm,
-        ourTopMm: ourTopOf(id) || clearedAtMm,
+      out.push({
+        other, k, theirs, ...(ours ? { ours } : {}), theirSeat, ourSeat, gives: yieldsTo({ x: u.x, y: u.y }, { x: v.x, y: v.y }),
         clear: minClearSpacingInLayer(input.edition, { barDiameterMm: 0, maxAggregateSizeMm: input.maxAggregateSizeMm }).minClear,
-      }));
+      });
     }
     return out;
   }
 
-
+  /**
+   * Whether `id`'s bottom bars at the support are its first row of two alone, on the corner seats
+   * (`supportRows`): then no slot of the member's row carries a bottom bar there, and a crossing
+   * beam's bottom tail meets its slots only where it reaches its top bars (`crossingTailPosts`).
+   * Not where the line continues: its bottom bars run on through the joint.
+   */
+  function bottomSeatedAt(id: number, nodeId: number): boolean {
+    const el = input.elements.get(id);
+    if (!el || lineContinuesAt(id, nodeId)) return false;
+    const rows = supportPlanOf(id)?.rows[el.nodeI === nodeId ? 'I' : 'J'];
+    if (!rows) return false;
+    const bottom = rows.filter((r) => r.position === 'bottom');
+    return bottom.every((r) => r.row === 0 && r.count <= 2);
+  }
 
   /** A beam's top bar, mm (its larger top group's). */
   function ourTopOf(id: number): number {
@@ -1124,15 +1154,54 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
     const L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
     const out = el.nodeI === nodeId ? { x: -(b.x - a.x) / L, y: -(b.y - a.y) / L } : { x: (b.x - a.x) / L, y: (b.y - a.y) / L };
     const near = columnBarsNear(n, Z(n) + axisOffsetAt(id, nodeId).z);
+    const sides = centreSidesAt(nodeId);
     return columnTailPosts({
       bars: near.map((c) => ({ along: (c.x - n.x) * out.x + (c.y - n.y) * out.y, across: (c.x - n.x) * t.x + (c.y - n.y) * t.y, diameterMm: c.diameterMm })),
       plan: near.map((c) => ({ x: c.x - n.x, y: c.y - n.y, diameterMm: c.diameterMm })),
       u: { x: (b.x - a.x) / L, y: (b.y - a.y) / L }, t,
-      // The joint's ties are the column's (`run-detailing` joint pass: the column's tie bar).
-      ours, placement, clearedAtMm, tieDiaMm: Math.max(0, ...columns.filter((cid) => { const c = input.elements.get(cid); return !!c && (c.nodeI === nodeId || c.nodeJ === nodeId); })
-        .map((cid) => input.contexts.get(cid)?.material.stirrupDia ?? 0)) || 8,
+      ours, placement, clearedAtMm, tieDiaMm: jointTieDiaAt(nodeId),
+      // The crosstie along this beam on the side the joint passes it (`crosstieCentreSides`).
+      centreSide: Math.abs(b.x - a.x) >= Math.abs(b.y - a.y) ? sides.alongX : sides.alongY,
       clear: (d) => minClearSpacingColumn(input.edition, { barDiameterMm: d, maxAggregateSizeMm: input.maxAggregateSizeMm }).minClear,
     });
+  }
+
+  /** The joint's tie bar at a node, mm: the column's (the joint pass ties it with the column's tie bar). */
+  function jointTieDiaAt(nodeId: number): number {
+    return Math.max(0, ...columns.filter((cid) => { const c = input.elements.get(cid); return !!c && (c.nodeI === nodeId || c.nodeJ === nodeId); })
+      .map((cid) => input.contexts.get(cid)?.material.stirrupDia ?? 0)) || 8;
+  }
+
+  /**
+   * The side each centreline crosstie of the joint at a node passes on, from the hook tails of
+   * the beams ending there (`crosstieCentreSides`): read by the coordination (`ownTailsByColumn`)
+   * and laid by the joint's tie set (`tieSetAt`), so the two agree where it stands.
+   */
+  const centreSidesMemo = new Map<number, { alongX: 1 | -1; alongY: 1 | -1 }>();
+  function centreSidesAt(nodeId: number): { alongX: 1 | -1; alongY: 1 | -1 } {
+    const known = centreSidesMemo.get(nodeId);
+    if (known) return known;
+    const n = input.nodes.get(nodeId);
+    let sides: { alongX: 1 | -1; alongY: 1 | -1 } = { alongX: 1, alongY: 1 };
+    if (n) {
+      const tails: Array<{ out: { x: number; y: number }; rows: readonly TailRow[] }> = [];
+      for (const bid of beams) {
+        const el = input.elements.get(bid);
+        if (!el || (el.nodeI !== nodeId && el.nodeJ !== nodeId) || lineContinuesAt(bid, nodeId)) continue;
+        const a = input.nodes.get(el.nodeI), b = input.nodes.get(el.nodeJ);
+        if (!a || !b) continue;
+        const L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        const out = el.nodeI === nodeId ? { x: -(b.x - a.x) / L, y: -(b.y - a.y) / L } : { x: (b.x - a.x) / L, y: (b.y - a.y) / L };
+        const rows = supportPlanOf(bid)?.hookTails(el.nodeI === nodeId ? 'I' : 'J') ?? [];
+        if (rows.length) tails.push({ out, rows });
+      }
+      sides = crosstieCentreSides({
+        plan: columnBarsNear(n).map((c) => ({ x: c.x - n.x, y: c.y - n.y, diameterMm: c.diameterMm })),
+        tieDiaMm: jointTieDiaAt(nodeId), tails,
+      });
+    }
+    centreSidesMemo.set(nodeId, sides);
+    return sides;
   }
 
   /**
@@ -2110,6 +2179,18 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
         return axisOffsetAt(id, nodeId).z + halfUp(dMm)
           - (layerDropOf.get(id) ?? 0) - supportRowInto(rows, 'top', layer, dMm, (d) => -halfUp(d), input.edition);
       };
+      /** A bottom row's centre, from the node line, as `zTop` reads a top row's: raised by its rank. */
+      const zBottom = (id: number, dMm: number, layer: number, nodeId: number) => {
+        const c = input.contexts.get(id)!;
+        const halfUp = (d: number) => seatedLongitudinalHalfExtents(c.section.b, c.section.h, c.material.cover, c.material.stirrupDia, d).corner.halfUp;
+        const el = input.elements.get(id);
+        const rows = (el ? supportPlanOf(id)?.rows[el.nodeI === nodeId ? 'I' : 'J'] : undefined) ?? [];
+        return axisOffsetAt(id, nodeId).z - halfUp(dMm)
+          + (layerRaiseOf.get(id) ?? 0) + supportRowInto(rows, 'bottom', layer, dMm, (d) => -halfUp(d), input.edition);
+      };
+      /** A row's tail as a post, from the node line (`tailPost`). */
+      const postOf = (id: number, t: TailRow, nodeId: number) =>
+        tailPost(t.position === 'top' ? zTop(id, t.diameterMm, t.row, nodeId) : zBottom(id, t.diameterMm, t.row, nodeId), t.diameterMm, t.position);
       const extra = new Map<number, KeepOut[]>();
       for (const j of joints) {
         const nodeId = Number(j.jointId.slice(1));
@@ -2140,6 +2221,53 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
           if (posts.length === 0) continue;
           const onOurs = onAxis(id, nodeId, info.t, posts);
           j.keepOutsFor.set(id, [...(j.keepOutsFor.get(id) ?? []), ...onOurs]);
+          extra.set(id, [...(extra.get(id) ?? []), ...onOurs]);
+        }
+      }
+      // ── And the crossing beams' tails whose meeting with this beam's bars the ranks decide ──
+      //
+      // A crossing beam's bottom tail, turned up, where this beam's bottom bars stand on their
+      // corner seats alone (`bottomSeatedAt`): it crosses the top layers it reaches up to and
+      // passes under the rest (`crossingTailPosts` `ourBottomSeated`). And where this beam ends
+      // here too, its top tails stand beside the crossing beam's bottom ones, and its bottom
+      // tails beside the top ones, wherever the two meet in height (`postsMeet`), and need the
+      // clear between parallel bars (`besideTailPosts`). Measured on the span fixture at 40×40,
+      // undeclared, on the 2 m mesh with the hooks taking ψcc (§25.4.3.2, tried and withdrawn):
+      // a second top row's Ø10 tail turned down 46 mm past the node stood 12 mm clear of the
+      // crossing beam's Ø16 bottom tail, turned up 46 mm past it, the two overlapping 29 mm in
+      // height, where 25 mm of clear are due.
+      for (const [id, info] of perBeam) {
+        const el = input.elements.get(id);
+        if (!el) continue;
+        for (const nodeId of [el.nodeI, el.nodeJ]) {
+          const posts: KeepOut[] = [];
+          for (const c of crossingsAt(id, nodeId, info.t)) {
+            if (info.topDia > 0 && bottomSeatedAt(id, nodeId)) {
+              for (const t of c.theirs) {
+                if (t.position !== 'bottom') continue;
+                const tip = postOf(c.other, t, nodeId).hi;
+                for (const layer of [0, 1, 2]) {
+                  // Crossing bars may touch (`joint-layers`): only a tail reaching into the layer bars it.
+                  if (tip + (t.diameterMm + info.topDia) / 2000 <= zTop(id, info.topDia, layer, nodeId) + 1e-9) continue;
+                  posts.push({ at: t.at * c.k, halfWidth: t.diameterMm / 2000 + info.topDia / 2000 - info.dia / 2000 + placement, layers: [layer] });
+                }
+              }
+            }
+            if (c.ours) {
+              const seat = (bid: number) => (row: TailRow) => {
+                const bc = input.contexts.get(bid)!;
+                return seatedLongitudinalHalfExtents(bc.section.b, bc.section.h, bc.material.cover, bc.material.stirrupDia, row.diameterMm).corner.halfAcross;
+              };
+              posts.push(...besideTailPosts({
+                ...c, placement, clearedAtMm: info.dia, seatOf: { ours: seat(id), theirs: seat(c.other) },
+                beside: (r, t) => r.position !== t.position && postsMeet(postOf(id, r, nodeId), postOf(c.other, t, nodeId), c.clear),
+              }));
+            }
+          }
+          if (posts.length === 0) continue;
+          const onOurs = onAxis(id, nodeId, info.t, posts);
+          const j = joints.find((x) => x.jointId === `n${nodeId}`);
+          if (j) j.keepOutsFor.set(id, [...(j.keepOutsFor.get(id) ?? []), ...onOurs]);
           extra.set(id, [...(extra.get(id) ?? []), ...onOurs]);
         }
       }
@@ -2937,14 +3065,15 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
     /**
      * The joint's tie set at a station, its centreline crossties on the side that runs through
      * fewest of the beams' bars. A crosstie on the cage's centreline may pass on either side of
-     * the bars it grips (`buildCrosstie` `centreSides`), and the search reads it on the positive
-     * one (`columnTailPosts`): where that side runs through a beam's hook tail, which stands on a
-     * plane across the crosstie no slot of that beam can move, the other side is taken where it
-     * runs through fewer. Measured on the span fixture at 40×40, its beams' role not declared:
-     * the end beams' bottom tails stood 22 mm past the node and the crosstie's shaft at 20 mm,
-     * 5,7 mm into each of them; on the other side it touched none. Chosen by the bars as laid,
-     * a flip only ever removes an interpenetration of the tie: the search's slots are untouched.
+     * the bars it grips (`buildCrosstie` `centreSides`): first on the side the coordination read
+     * it on (`centreSidesAt`), away from the hook tails of the beams ending here, which stand on
+     * planes across the crosstie no slot can move. Measured on the span fixture at 40×40, its
+     * beams' role not declared: the end beams' bottom tails stood 22 mm past the node and the
+     * crosstie's shaft at 20 mm, 5,7 mm into each of them; on the other side it touched none.
+     * The other sides are still tried on the bars as laid, and taken only where they run through
+     * fewer: a flip only ever removes an interpenetration of the tie.
      */
+    const decided = centreSidesAt(top.id);
     const tieSetAt = (station: number, si: number) => {
       const build = (centreSides?: { across: 1 | -1; up: 1 | -1 }) => buildColumnTieSet({
         closureCache,
@@ -2969,7 +3098,7 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
         maxAggregateSizeMm: input.maxAggregateSizeMm,
         ...(centreSides ? { centreSides } : {}),
       });
-      const first = build();
+      const first = build({ across: decided.alongX, up: decided.alongY });
       if (first.unsupported.length > 0 || throughBars.length === 0) return first;
       // Interpenetrations of the crossties (every piece but the perimeter tie) with the beams'
       // bars, and how deep: fewer first, then shallower.
@@ -2985,7 +3114,8 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
       };
       let best = first, bestCost = cost(first);
       if (bestCost.n === 0) return first;
-      for (const sides of [{ across: -1, up: 1 }, { across: 1, up: -1 }, { across: -1, up: -1 }] as const) {
+      const all = [{ across: 1, up: 1 }, { across: -1, up: 1 }, { across: 1, up: -1 }, { across: -1, up: -1 }] as const;
+      for (const sides of all.filter((x) => x.across !== decided.alongX || x.up !== decided.alongY)) {
         const alt = build(sides);
         if (alt.unsupported.length > 0) continue;
         const c = cost(alt);
