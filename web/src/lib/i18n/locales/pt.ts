@@ -4060,6 +4060,7 @@ const pt: Translations = {
   'pro.bmShape': 'Forma',
   'pro.bmSheet': 'Marcas',
   'pro.bmStirrup': 'Estribo',
+  'pro.bmCrosstie': "Grampo",
   'pro.bmStraight': 'Reta',
   'pro.bmTitle': 'Marcas de Barras — Comprimentos de Corte Estimados',
   'pro.bmTotalLen': 'C. total',

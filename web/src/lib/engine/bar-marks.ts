@@ -10,7 +10,7 @@ import type { ElementVerification, DetailingResult } from './codes/argentina/cir
 export interface BarMark {
   mark: string;
   diameter: number;        // mm
-  shape: 'straight' | 'hooked' | 'stirrup';
+  shape: 'straight' | 'hooked' | 'stirrup' | 'crosstie';
   cuttingLength: number;   // m
   count: number;           // total bars
   elementsUsing: number[];
@@ -68,7 +68,8 @@ export function computeBarMarks(
   const groupMap = new Map<string, Group>();
   for (const v of verifications) {
     const mainBars = v.column ? v.column.bars : v.flexure.bars;
-    const stirrups = `eØ${v.shear.stirrupDia} c/${(v.shear.spacing * 100).toFixed(0)}`;
+    // The legs too: a 4-leg stirrup is not the same cage as a 2-leg one of the same bar.
+    const stirrups = `eØ${v.shear.stirrupDia} c/${(v.shear.spacing * 100).toFixed(0)} ×${v.shear.stirrupLegs ?? 2}`;
     const key = `${v.elementType}_${(v.b * 100).toFixed(0)}x${(v.h * 100).toFixed(0)}_${mainBars}_${stirrups}`;
     const existing = groupMap.get(key);
     if (existing) {
@@ -172,6 +173,28 @@ export function computeBarMarks(
       needsStockSplice: false,
       nStockSplices: 0,
     });
+
+    // ── Crossties: the legs beyond the closed hoop's two ──
+    // A 4-leg stirrup is a hoop and two more legs. They used to be dropped: the legs were read
+    // and never used, so the schedule and the steel weight counted a 2-leg hoop.
+    if (legs > 2) {
+      const tieLength = (v.h - 2 * v.cover) + 2 * hookExt;   // across the depth, hooked at both ends
+      const nTies = nStirrups * (legs - 2);
+      marks.push({
+        mark: `S${stirIdx++}`,
+        diameter: stDia,
+        shape: 'crosstie',
+        cuttingLength: Math.round(tieLength * 100) / 100,
+        count: nTies,
+        elementsUsing: [...g.elementIds],
+        totalLength: Math.round(tieLength * nTies * 100) / 100,
+        weight: Math.round(tieLength * nTies * barArea(stDia) * STEEL_DENSITY * 10) / 10,
+        overStock: false,
+        stockLength: getStockLength(stDia),
+        needsStockSplice: false,
+        nStockSplices: 0,
+      });
+    }
   }
 
   return marks;
