@@ -656,7 +656,6 @@ export function generateFrameLineElevationSvg(opts: FrameLineElevationOpts): str
   const spliceWord = labels?.splice ?? 'splice';
 
   // Geometry
-  const totalLength = spans.reduce((s, sp) => s + sp.length, 0);
   const maxSpans = Math.min(spans.length, 8);
   const drawnSpans = spans.slice(0, maxSpans);
   const drawnNodes = nodes.slice(0, maxSpans + 1);

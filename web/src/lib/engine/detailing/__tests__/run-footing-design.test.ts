@@ -104,7 +104,10 @@ describe('runFootingDesign — the production path', () => {
     })]]) });
     const o = r.outcomes[0];
     expect(o.governingCombination).toBe('1.2D + W');
-    expect(o.check!.punching!.momentTransfer.status).toBe('EVALUATED');
+    // The engine that checks isolated footings does not evaluate 8.4.4.2 yet: a significant
+    // moment leaves the punching unverified, which is what governs here (the design stack's
+    // TypeScript evaluation applies to slabs; see foundation-check.test.ts).
+    expect(o.check!.punching!.momentTransfer.status).toBe('UNSUPPORTED_MOMENT_TRANSFER_NOT_EVALUATED');
     // Gravity alone still checks.
     const alone = run({ reactions: new Map([[10, reactions({
       factored: [{ combinationId: 1, combinationName: '1.2D + 1.6L', fz: -900, mx: 0, my: 0 }],

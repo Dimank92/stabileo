@@ -102,9 +102,12 @@ describe('RC design baseline — the flagship frame, member by member', () => {
      * the 22 reach a passing arrangement that threads the cages (see the fingerprint).
      */
     // 383 and 12 since the minimum shear reinforcement of §9.6.3.1 (see the fingerprint).
-    expect(summary.verified).toBe(383);
-    // The 12 congested beams are an exhausted search, not a proven section (`section-bounds.ts`).
-    expect(summary.searchExhausted).toBe(12);
+    // 372 and 23 since the design met main's concrete in the engine (see the fingerprint): the
+    // columns are read on the engine's load contour and carry bars on every face, and 11 more
+    // edge beams find no layout through those cages.
+    expect(summary.verified).toBe(372);
+    // The 23 congested beams are an exhausted search, not a proven section (`section-bounds.ts`).
+    expect(summary.searchExhausted).toBe(23);
     expect(summary.provisionalBiaxial).toBe(13);
     expect(summary.sectionInadequate).toBe(0);
     expect(summary.demandUnavailable).toBe(0);
@@ -199,6 +202,23 @@ describe('RC design baseline — the flagship frame, member by member', () => {
      * reach arrangements it used to cut off: the four that now verify, and lighter Ø6 sets in
      * place of Ø8 c/30 on the ten that move up.
      */
+    /*
+     * And again for refactor/concrete-in-engine (#390), which IS that branch's change: the
+     * station verifier's beam flexure takes the axial force acting with each moment (finding
+     * 17), its biaxial columns are checked on the engine's load contour instead of Bresler with
+     * Nu·φMn/Mu estimates, and the column's axial cap and φ come from the engine. Measured, not
+     * reasoned: the dump below was taken on a detached worktree of the base (5b1482c7, which
+     * reproduces the previous fingerprint f8a66e1b74ca71f1 exactly) and on the branch, all 408:
+     *
+     *   outcome changed               0
+     *   limiting constraint changed   0
+     *   utilisation changed          65  (51 up, 14 down; −0,065 to +0,049)
+     *   worst utilisation after   0,9980 — the gate above still holds
+     *
+     * Up: beams in tension now lose the flexural strength the tension takes, and biaxial columns
+     * are read on the real contour. Down: compressed beams below balance gain some, and the
+     * contour credits what the Bresler estimate did not. No verdict moved.
+     */
     expect(actual).toBe(RECORDED_FINGERPRINT);
   });
 
@@ -213,7 +233,10 @@ describe('RC design baseline — the flagship frame, member by member', () => {
     // 16 of them since the ductility check (see the fingerprint): 169–172, 197 and 198 verify.
     // 12 since the minimum shear reinforcement (§9.6.3.1, see the fingerprint): 165–168 verify.
     const congested = [...summary.outcomes.values()].filter((o) => o.outcome === 'SEARCH_EXHAUSTED');
-    expect(congested.map((o) => o.elementId).sort((a, b) => a - b)).toEqual([161, 164, 180, 181, 182, 183, 184, 186, 187, 188, 196, 199]);
+    // 23 since main's concrete in the engine (see the fingerprint): 162, 163, 165–172 and 185.
+    expect(congested.map((o) => o.elementId).sort((a, b) => a - b)).toEqual([
+      161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 180, 181, 182, 183, 184, 185, 186, 187, 188, 196, 199,
+    ]);
     for (const o of congested) {
       expect(o.limiting).toContain('congestion');
       expect(o.insufficiency).toBeUndefined();
@@ -373,4 +396,19 @@ describe('RC design baseline — the flagship frame, member by member', () => {
 // several Ø8 c/30 → Ø6 c/17,5, lighter and meeting it); utilization moves on 135, 125 down (to
 // −0,363: more Vs) and 10 up (to +0,251, the Ø8 → Ø6 ones, all ≤ 0,974); the worst stays 0,998.
 // The counts are 383 verified, 12 exhausted, 13 provisional.
-const RECORDED_FINGERPRINT = '43cfaf49844937cb';
+// And (was `43cfaf49844937cb` on the design stack and `fa8e6e36ba649044` on main) when the design
+// stack met main's concrete in the engine: flexure, shear and columns sized against the engine,
+// the station verifier's beam flexure with the axial force acting with each moment, and columns
+// checked on the engine's load contour instead of Bresler. Compared line by line against the
+// stack before it (a6013dcf1): 11 members SEARCH_EXHAUSTED ← VERIFIED (162, 163, 165–172, 185),
+// and on 4 that were already exhausted «anchorage» comes or goes (161, 164, 180, 186). The cause
+// is the columns: 2, 3, 4, 6, 10 and 18 take main's longitudinal steel (6 and 10: 4Ø32 → 24Ø16;
+// 2 and 4: 16Ø20 → 28Ø16; 18: 8Ø20 → 24Ø12; 3: 24Ø16 → 16Ø20), because the stack's bars fail
+// the load contour (4Ø32 on 6 and 10 at Nu = 2 923 kN, Mu = 345,9 kN·m). Cages with bars on
+// every face leave the edge beams that cross them no layout through: run alone, 162, 165 and
+// 185 verify, and the stack's own bars pass the merged verifier, so it is the cage. 169–172
+// also lose the flexural strength their axial tension takes: with that check off they verify
+// and the other seven stay exhausted. 173, 347 and 350 change bars and stay verified (347 and
+// 350: bottom 7Ø12 → 5Ø25). Utilization moved on 85 (57 up, 28 down, −0,224 to +0,032); the
+// worst stays 0,998. The counts are 372 verified, 23 exhausted, 13 provisional.
+const RECORDED_FINGERPRINT = '71413f54c7416874';

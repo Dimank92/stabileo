@@ -1,8 +1,10 @@
 import { migrateDesignData } from '../model/design-data';
 import { migrateStoredDecisions } from '../design-contract/decisions';
+import { migrateArcLocalAxes } from '../model/curved-member';
 import {
   defaultCodeSettings, migrateCodeSettings, type ProjectCodeSettings,
 } from '../codes/project-code-settings';
+import { engineFailureMessage } from '../engine/engine-unavailable';
 import { loadCasesInUse } from '../model/loads/load-cases-in-use';
 import { refreshRatios } from '../section/drawn';
 import {
@@ -18,6 +20,7 @@ import {
   type Footing, type FootingMatPreferences,
 } from '../model/footing';
 import { DEFAULT_COVER } from '../engine/design/member-context';
+import { DOF_SPRING, dofRestraintsOfType3D, is3DSupportType, type SpringKey } from '../model/support-3d';
 import {
   emptyGeotechnical, migrateGeotechnical, newSoilProfile,
   type ProjectGeotechnical, type SoilProfile,
@@ -47,9 +50,9 @@ import { getFixture, is2DFixture, is3DFixture } from '../templates/fixture-index
 import { loadFixture } from '../templates/load-fixture';
 import { inferLoadCaseType } from '../engine/combinations-service';
 import { addsLoop, singleSolveModel } from '../engine/case-effects';
-import { t } from '../i18n';
+import { t, tp } from '../i18n';
 import { GRAVITY_SELF_WEIGHT, planSelfWeight, type SelfWeightLoad } from '../engine/analysis-settings';
-import { type ModelData, shouldEmbedFlat2DModelIn3D, validateAndSolve2D, validateAndSolve2DAsync, buildSolverInput2D, validateAndSolve3D, validateAndSolve3DAsync, buildSolverInput3D as buildSolverInput3DFn, solveCombinations2D, solveCombinations3D as solveCombinations3DFn, solveCombinations3DParallel as solveCombinations3DParallelFn } from '../engine/solver-service';
+import { type ModelData, shouldEmbedFlat2DModelIn3D, validateAndSolve2D, validateAndSolve2DAsync, buildSolverInput2D, validateAndSolve3D, validateAndSolve3DAsync, linearSolveInput3D, buildSolverInput3D as buildSolverInput3DFn, solveCombinations2D, solveCombinations3D as solveCombinations3DFn, solveCombinations3DParallel as solveCombinations3DParallelFn } from '../engine/solver-service';
 import { computeInfluenceLine as computeInfluenceLineFn } from '../engine/influence-service';
 import { checkStretch, checkPosition, editKeepsPlace, loadedLength } from '../model/loads/load-stretch';
 import { to2D, remapNodalLoad2D, remapMoment2D, type DrawPlane } from '../geometry/plane-projection';
@@ -81,6 +84,8 @@ export interface Material {
   nu: number;
   rho: number; // kN/m³
   fy?: number; // MPa (yield stress for stress verification)
+  /** MPa: ultimate tensile strength. The steel checks read it (rupture, bearing, net section). */
+  fu?: number;
   /**
    * A concrete's specified compressive strength f'c, MPa. Older projects kept it in `fy`, and
    * `concreteFc` (`model/design-data.ts`) reads `fy` when this is absent.
@@ -380,6 +385,11 @@ export interface Element extends Element3DMetadata {
   /** Inactive, tension only or compression only (`engine/member-behaviour.ts`). Absent: linear. */
   behaviour?: import('../engine/member-behaviour').MemberBehaviour;
   /**
+   * A cable's pretension, kN: its tension on the drawn chord under its own weight alone, from
+   * which the engine sets its unstressed length (#527). Absent: the chord is the unstressed length.
+   */
+  cablePretension?: number;
+  /**
    * The members this one lies over and was kept with ("Keep both" on the overlap question,
    * `model/edit/connection-questions.ts`): not asked about again, on this open or the next.
    * Read only by that question; the analysis and the diagnostics do not look at it.
@@ -401,7 +411,16 @@ export interface Element extends Element3DMetadata {
    * See `lib/model/curved-member.ts`. Carries no analysis meaning: the solver
    * sees straight members and is not told about this.
    */
-  arc?: { id: number; spec: import('../model/curved-member').ArcSpec };
+  arc?: {
+    id: number; spec: import('../model/curved-member').ArcSpec;
+    /**
+     * 1: the member's local axes were set by the arc rule of #418 (`arcMemberLocalY`) — when it
+     * was built, or by the one-time read-migration of an arc saved before. Absent: an arc from
+     * before #418, which `migrateArcLocalAxes` migrates once. Never migrated again after that, so
+     * a member set back to automatic axes stays automatic through undo, redo and reopening.
+     */
+    axes?: 1;
+  };
   /**
    * Stated unbraced length for lateral-torsional buckling, m — where the member is braced
    * against it more often than its geometry shows. Replaces the deduced `Lb`, never `L`; see
@@ -694,6 +713,26 @@ export type Load =
   | { type: 'thermalQuad3d'; data: ThermalLoadQuad3D }
   | { type: 'prestress3d'; data: PrestressLoad3D }
   | { type: 'displacement3d'; data: NodeDisplacement3D };
+
+/**
+ * What each type of load stands on, by the number it carries: a node (`nodeId`), a member
+ * (`elementId`) or a shell (`quadId`, a plate's with `on: 'plate'`). One table for whatever
+ * deletes, renumbers or checks what a load names, so a new type of load says here where it sits.
+ * Each delete kept its own list, and the lists written before tendons and imposed displacements
+ * left those on a number the next member or node drawn would take.
+ */
+export const LOAD_TARGET: Record<Load['type'], 'node' | 'member' | 'shell'> = {
+  nodal: 'node', nodal3d: 'node', displacement3d: 'node',
+  distributed: 'member', pointOnElement: 'member', thermal: 'member',
+  distributed3d: 'member', pointOnElement3d: 'member', prestress3d: 'member',
+  surface3d: 'shell', thermalQuad3d: 'shell',
+};
+/** The node a load stands on; undefined for one on a member or a shell. */
+export const loadNodeId = (l: Load): number | undefined =>
+  LOAD_TARGET[l.type] === 'node' ? (l.data as { nodeId: number }).nodeId : undefined;
+/** The member a load stands on; undefined for one on a node or a shell. */
+export const loadMemberId = (l: Load): number | undefined =>
+  LOAD_TARGET[l.type] === 'member' ? (l.data as { elementId: number }).elementId : undefined;
 
 export type LoadCaseType = string;
 
@@ -1026,7 +1065,7 @@ export type InfluenceDirection = 'vertical' | 'horizontal';
  * without retiring the solve (`restoreViewsOnly`). A setter that records through that channel
  * adds its field here.
  */
-const VIEW_CHANNEL_FIELDS = ['views', 'grid', 'dynamics', 'notes', 'underlays', 'designData', 'projectInfo', 'deflectionLimits'] as const;
+const VIEW_CHANNEL_FIELDS = ['views', 'grid', 'notes', 'underlays', 'designData', 'projectInfo', 'deflectionLimits'] as const;
 
 /** Whether a floor-load definition wrote the load (`model/loads/floor-definitions.ts` `isDefinedLoad`). */
 const isDefinedLoadData = (l: Load | undefined): boolean => (l?.data as { fromDef?: number } | undefined)?.fromDef !== undefined;
@@ -1043,7 +1082,7 @@ function createModelStore() {
    * store already solves it for its other cross-store hooks.
    */
   let _captureProvenance:
-    (() => Pick<ModelSnapshot, 'exports' | 'manualEdits'>) | null = null;
+    (() => Pick<ModelSnapshot, 'exports' | 'manualEdits' | 'solvedWith'>) | null = null;
 
   const normalize2DSupportType = (type: SupportType): SupportType =>
     type === 'rollerY' ? 'rollerZ' : type;
@@ -1259,7 +1298,20 @@ function createModelStore() {
     connector: 1,
     footing: 1,
     soilProfile: 1,
+    spectrum: 1,
   });
+
+  /**
+   * The first spectrum number no spectrum and no spectral case uses. A spectrum's number is never
+   * given again: a case on a deleted one (an older file, a spectrum set without `addUserSpectrum`)
+   * would otherwise solve on whatever spectrum took it.
+   */
+  function firstUnusedSpectrumId(): number {
+    let max = 0;
+    for (const s of model.dynamics?.spectra ?? []) max = Math.max(max, s.id);
+    for (const c of model.loadCases) if (c.spectral?.source.kind === 'user') max = Math.max(max, c.spectral.source.spectrumId);
+    return max + 1;
+  }
 
 
 
@@ -1271,6 +1323,10 @@ function createModelStore() {
     nu: 0.3,
     rho: 78.5,
     fy: 250,
+    // ASTM A36's minimum, as the grade catalogue has it (`data/structural-grades.ts`). Without it
+    // every steel check of a new model, the bundled examples included, read "not evaluated: the
+    // material lacks Fu", which is what a first user met on opening the steel design.
+    fu: 400,
   };
 
   const defaultSection: Section = {
@@ -1867,6 +1923,12 @@ function createModelStore() {
         if (JSON.stringify(m[k] ?? null) === JSON.stringify(next ?? null)) continue;
         m[k] = next;
       }
+      // The spectra and time history were recorded here before they were known to be analysis
+      // inputs; a session saved then still holds such entries. Undoing one is a model edit.
+      if (JSON.stringify(s.dynamics ?? null) !== JSON.stringify(model.dynamics ?? null)) {
+        model.dynamics = s.dynamics ? JSON.parse(JSON.stringify(s.dynamics)) : undefined;
+        this.bumpModelVersion();
+      }
       // Names of nodes and members travel on this channel too: the analysis reads neither.
       const named = <T extends { name?: string }>(map: Map<number, T>, entries: ReadonlyArray<[number, { name?: string }]> | undefined): Map<number, T> | null => {
         let out: Map<number, T> | null = null;
@@ -2202,7 +2264,7 @@ function createModelStore() {
       return result;
     },
 
-    _setCaptureProvenance(fn: () => Pick<ModelSnapshot, 'exports' | 'manualEdits'>): void {
+    _setCaptureProvenance(fn: () => Pick<ModelSnapshot, 'exports' | 'manualEdits' | 'solvedWith'>): void {
       _captureProvenance = fn;
     },
 
@@ -2257,12 +2319,10 @@ function createModelStore() {
         releaseJ: { ...(v.releaseJ ?? NO_RELEASE) },
       }]));
       // Deduplicate supports: keep only the last support per node (legacy cleanup)
-      const supEntries = s.supports.map(([k, v]) => [k, {
-        ...v,
-        type: normalize2DSupportType(v.type as SupportType),
-        dz: canonicalSupportDz(v),
-        dry: canonicalSupportDry(v),
-      }] as [number, Support]);
+      const supEntries = s.supports.map(([k, v]) => {
+        const sup = { ...v, type: normalize2DSupportType(v.type as SupportType) } as Support;
+        return [k, { ...sup, dz: canonicalSupportDz(sup), dry: canonicalSupportDry(sup) }] as [number, Support];
+      });
       const seenNodes = new Set<number>();
       const dedupedEntries: [number, Support][] = [];
       for (let i = supEntries.length - 1; i >= 0; i--) {
@@ -2297,6 +2357,20 @@ function createModelStore() {
           }
         }
       }
+      // Arcs drawn before #418 (SP-15) left their members on the default local axes, which turn
+      // the near-vertical members of an arch by 90°: they take the arc's own orientation. Not a
+      // member any load or support refers to: its local data would change direction with it.
+      const referenced = new Set<number>();
+      for (const l of model.loads) {
+        const d = l.data as { elementId?: unknown; elementIds?: unknown } | undefined;
+        if (typeof d?.elementId === 'number') referenced.add(d.elementId);
+        if (Array.isArray(d?.elementIds)) for (const id of d.elementIds) if (typeof id === 'number') referenced.add(id);
+      }
+      for (const sp of model.supports.values()) {
+        const id = (sp as { dofLocalElementId?: unknown }).dofLocalElementId;
+        if (typeof id === 'number') referenced.add(id);
+      }
+      migrateArcLocalAxes(model.elements, model.nodes, (id) => referenced.has(id));
       model.loadCases = s.loadCases
         ? s.loadCases.map(c => ({ type: (c as any).type ?? inferLoadCaseType(c.name), ...c }))
         : [{ id: 1, type: 'D' as LoadCaseType, name: 'Dead Load' }, { id: 2, type: 'L' as LoadCaseType, name: 'Live Load' }, { id: 3, type: 'W' as LoadCaseType, name: 'Wind' }, { id: 4, type: 'E' as LoadCaseType, name: 'Earthquake' }];
@@ -2435,6 +2509,9 @@ function createModelStore() {
         ?? (Math.max(0, ...model.footings.keys()) + 1);
       nextId.soilProfile = s.nextId.soilProfile
         ?? (Math.max(0, ...(model.geotechnical?.profiles ?? []).map((p) => p.id)) + 1);
+      // Older files have no spectrum counter, and a saved one is never behind what is in use.
+      const savedSpectrumId = s.nextId.spectrum;
+      nextId.spectrum = Math.max(firstUnusedSpectrumId(), Number.isSafeInteger(savedSpectrumId) ? savedSpectrumId! : 1);
     },
 
     /** Explicit user action: clear the CAD-draft "unreviewed" tag. */
@@ -2667,9 +2744,14 @@ function createModelStore() {
         model.footings = new Map([...model.footings].map(([id, f]) => [id, to.has(f.nodeId) || f.supportedNodeIds?.some((n) => to.has(n))
           ? { ...f, nodeId: r(f.nodeId), ...(f.supportedNodeIds ? { supportedNodeIds: f.supportedNodeIds.map(r) } : {}), revision: f.revision + 1 } : f]));
       }
+      // A point mass follows its node; two merged onto one node both stay (their masses add).
+      const points = model.massSource?.points;
+      if (points?.some((p) => to.has(p.nodeId))) {
+        model.massSource = { ...model.massSource!, points: points.map((p) => (to.has(p.nodeId) ? { ...p, nodeId: r(p.nodeId) } : p)) };
+      }
     },
 
-    /** Node ids named by constraints, connectors and footings. */
+    /** Node ids named by constraints, connectors, footings and point masses. */
     referencedNodeIds(): Set<number> {
       const out = new Set<number>();
       for (const c of model.constraints) {
@@ -2678,6 +2760,7 @@ function createModelStore() {
       }
       for (const c of model.connectors.values()) { out.add(c.nodeI); out.add(c.nodeJ); }
       for (const f of model.footings.values()) { out.add(f.nodeId); for (const n of f.supportedNodeIds ?? []) out.add(n); }
+      for (const p of model.massSource?.points ?? []) out.add(p.nodeId);
       return out;
     },
 
@@ -2917,8 +3000,8 @@ function createModelStore() {
         }
       }
       model.supports = new Map(model.supports);
-      const keepLoad = (l: Load) =>
-        !((l.type === 'nodal' || l.type === 'nodal3d') && l.data.nodeId === id);
+      // Every load on the node, an imposed displacement too (`LOAD_TARGET`).
+      const keepLoad = (l: Load) => loadNodeId(l) !== id;
       model.loads = model.loads.filter(keepLoad);
       if (_bulkLoadBuffer) _bulkLoadBuffer = _bulkLoadBuffer.filter(keepLoad);
       // Cascade to connectors/constraints: a dangling node reference is worse
@@ -2946,6 +3029,10 @@ function createModelStore() {
         }
       }
       if (footingsChanged) model.footings = new Map(model.footings);
+      // A point mass goes with its node, as a nodal load does: left, it named a number the next
+      // node drawn would take.
+      const pts = model.massSource?.points;
+      if (pts?.some((p) => p.nodeId === id)) model.massSource = { ...model.massSource!, points: pts.filter((p) => p.nodeId !== id) };
       const pruneConstraints = (arr: Constraint3D[]) => arr
         .map((c): Constraint3D | null => {
           if (c.type === 'diaphragm') {
@@ -3057,6 +3144,12 @@ function createModelStore() {
             : r)),
         };
       }
+      // The loads a floor-load definition wrote go with it (`defined-loads.ts`). The rewrite after
+      // keeps a marked load whose definition is missing as a plain load, so they stayed in every
+      // solve with nothing to say where they came from.
+      const keepLoad = (l: Load) => (l.data as { fromDef?: number }).fromDef !== id;
+      if (!model.loads.every(keepLoad)) model.loads = model.loads.filter(keepLoad);
+      if (_bulkLoadBuffer) _bulkLoadBuffer = _bulkLoadBuffer.filter(keepLoad);
       model.groups.delete(id);
       model.groups = new Map(model.groups);
       return 'removed';
@@ -3088,11 +3181,10 @@ function createModelStore() {
        */
       replaceInGroups('elements', id);
       replaceInSelfWeight(id);
-      model.loads = model.loads.filter(l =>
-        !((l.type === 'distributed' || l.type === 'pointOnElement' || l.type === 'thermal'
-          || l.type === 'distributed3d' || l.type === 'pointOnElement3d') &&
-          (l.data as any).elementId === id)
-      );
+      // Every load on the member, a tendon too (`LOAD_TARGET`).
+      const keepLoad = (l: Load) => loadMemberId(l) !== id;
+      model.loads = model.loads.filter(keepLoad);
+      if (_bulkLoadBuffer) _bulkLoadBuffer = _bulkLoadBuffer.filter(keepLoad);
       // A footing SURVIVES the loss of its column: its node, its dimensions and its soil
       // are all still there, and its bearing and thickness are still checkable. What it
       // loses is the punching perimeter and the dowel geometry, so the reference is cleared
@@ -3511,14 +3603,24 @@ function createModelStore() {
           }
         }
       }
+      // A 3D support keeps springs only on the DOFs it leaves free: switching
+      // a spring support to fixed (or ticking a DOF) used to keep the spring,
+      // and the engine then solved the "fixed" DOF as elastic (#488).
+      const nextType = data.type ? normalize2DSupportType(data.type) : sup.type;
+      const nextDofs = data.dofRestraints ?? sup.dofRestraints;
+      const restrained = nextDofs ?? (is3DSupportType(nextType) ? dofRestraintsOfType3D(nextType) : undefined);
+      const spring = (key: SpringKey, value: number | undefined) => {
+        const dof = DOF_SPRING.find(([, k]) => k === key)![0];
+        return restrained?.[dof] ? undefined : value;
+      };
       // Replace entire object to guarantee Svelte 5 reactivity
       model.supports.set(id, {
         id: sup.id,
         nodeId: data.nodeId ?? sup.nodeId,
         type: data.type ? normalize2DSupportType(data.type) : sup.type,
-        kx: data.kx ?? sup.kx,
-        ky: data.ky ?? sup.ky,
-        kz: data.kz ?? sup.kz,
+        kx: spring('kx', data.kx ?? sup.kx),
+        ky: spring('ky', data.ky ?? sup.ky),
+        kz: spring('kz', data.kz ?? sup.kz),
         dx: data.dx ?? sup.dx,
         dz: data.dz ?? data.dy ?? sup.dz ?? sup.dy,
         dry: data.dry ?? data.drz ?? sup.dry ?? sup.drz,
@@ -3526,9 +3628,9 @@ function createModelStore() {
         isGlobal: 'isGlobal' in data ? data.isGlobal : sup.isGlobal,
         // 3D fields
         drx: data.drx ?? sup.drx,
-        krx: data.krx ?? sup.krx,
-        kry: data.kry ?? sup.kry,
-        krz: data.krz ?? sup.krz,
+        krx: spring('krx', data.krx ?? sup.krx),
+        kry: spring('kry', data.kry ?? sup.kry),
+        krz: spring('krz', data.krz ?? sup.krz),
         // Per-DOF 3D configuration
         dofRestraints: data.dofRestraints ?? sup.dofRestraints,
         dofFrame: data.dofFrame ?? sup.dofFrame,
@@ -3737,6 +3839,7 @@ function createModelStore() {
       nextId.group = 1;
       nextId.footing = 1;
       nextId.soilProfile = 1;
+      nextId.spectrum = 1;
       model.provenance = undefined;
       lastKinematicResult = null;
       uiStore.useNative3DPresentation();
@@ -4036,7 +4139,8 @@ function createModelStore() {
       // And from the mass source, where a stale case id would come to mean whatever case
       // takes that number next.
       if (model.massSource?.kind === 'custom') {
-        model.massSource = { kind: 'custom', factors: model.massSource.factors.filter(f => f.caseId !== id) };
+        // Only the removed case's row goes: the weights and point masses stay.
+        model.massSource = { ...model.massSource, factors: model.massSource.factors.filter(f => f.caseId !== id) };
       }
       // And the self-weight rule: a row for a case that no longer exists would still load the
       // single solve (which takes every stated row) and not the combinations.
@@ -4086,7 +4190,6 @@ function createModelStore() {
       model.grid = grid && (grid.axes.length > 0 || grid.levels.length > 0) ? JSON.parse(JSON.stringify(grid)) : undefined;
     },
 
-    /** State the project's dynamic analysis settings. Undoable; the solve survives it. */
     /**
      * State the project's design data, or withdraw it (null: the defaults). Undoable on the views
      * channel: the solve survives it; the design it changes is retired by `store/design-data.ts`.
@@ -4101,7 +4204,6 @@ function createModelStore() {
       if (!_undoBatching) _pushUndoView?.();
       model.underlays = list.length ? JSON.parse(JSON.stringify(list)) : undefined;
     },
-
     /** State the notes in the view. Undoable; they touch no result. */
     setNotes(notes: import('../model/annotations').ViewNote[]): void {
       if (!_undoBatching) _pushUndoView?.();
@@ -4142,9 +4244,17 @@ function createModelStore() {
       model.deflectionLimits = d && d.rules.length > 0 ? JSON.parse(JSON.stringify(d)) : undefined;
     },
 
+    /**
+     * State the project's spectra and time history. They change what a solve computes (a user
+     * spectrum feeds the spectral load cases, the time history its run), so this is a model edit:
+     * undoable, and the results on hand are retired. A write that changes nothing takes no step.
+     */
     setDynamics(d: { timeHistory?: import('../engine/dynamics/time-history-spec').TimeHistorySpec; spectra?: import('../engine/spectral-case').UserSpectrum[] } | null): void {
-      if (!_undoBatching) _pushUndoView?.();
-      model.dynamics = d && (d.timeHistory || d.spectra?.length) ? JSON.parse(JSON.stringify(d)) : undefined;
+      const next = d && (d.timeHistory || d.spectra?.length) ? JSON.parse(JSON.stringify(d)) : undefined;
+      if (JSON.stringify(next ?? null) === JSON.stringify(model.dynamics ?? null)) return;
+      if (!_undoBatching) _pushUndo?.();
+      model.dynamics = next;
+      this.bumpModelVersion();
     },
 
     /** State the project's combination rules; an empty list withdraws them. */
@@ -4167,9 +4277,12 @@ function createModelStore() {
      */
     setMassSource(ms: MassSource | null): void {
       if (!_undoBatching) _pushUndo?.();
-      // The weights stay through a change of the case factors unless the change names them.
+      // The weights and point masses stay through a change of the case factors unless the
+      // change names them.
       const kept = model.massSource?.weights;
       if (kept?.length && (!ms || !('weights' in ms))) ms = ms ? { ...ms, weights: kept } : { kind: 'custom', factors: [], weights: kept };
+      const keptPoints = model.massSource?.points;
+      if (keptPoints?.length && (!ms || !('points' in ms))) ms = ms ? { ...ms, points: keptPoints } : { kind: 'custom', factors: [], points: keptPoints };
       model.massSource = normalizeMassSource(ms ? JSON.parse(JSON.stringify(ms)) : undefined);
       this.bumpModelVersion();
     },
@@ -4288,6 +4401,30 @@ function createModelStore() {
       return true;
     },
 
+    /**
+     * A spectrum of the project's own (`ProUserSpectra.svelte`), under a number never given before:
+     * as the highest in use plus one, a spectrum deleted and a new one added had the same number,
+     * and a case still on the old one solved on the new one's table without a word.
+     */
+    addUserSpectrum(make: (id: number) => import('../engine/spectral-case').UserSpectrum): number {
+      const id = Math.max(nextId.spectrum, firstUnusedSpectrumId());
+      nextId.spectrum = id + 1;
+      this.setDynamics({ ...model.dynamics, spectra: [...(model.dynamics?.spectra ?? []), { ...make(id), id }] });
+      return id;
+    },
+
+    /** The spectral cases on a spectrum. */
+    casesOnSpectrum(id: number): LoadCase[] {
+      return model.loadCases.filter((c) => c.spectral?.source.kind === 'user' && c.spectral.source.spectrumId === id);
+    },
+
+    /** Remove a spectrum; false, and nothing removed, while a spectral case is on it (`casesOnSpectrum`). */
+    removeUserSpectrum(id: number): boolean {
+      if (this.casesOnSpectrum(id).length > 0) return false;
+      this.setDynamics({ ...model.dynamics, spectra: (model.dynamics?.spectra ?? []).filter((s) => s.id !== id) });
+      return true;
+    },
+
     updateLoadCaseId(loadId: number, caseId: number): void {
       // A definition's load is in the definition's case (`removeLoad`).
       if (isDefinedLoadData(model.loads.find(l => l.data.id === loadId))) return;
@@ -4350,6 +4487,20 @@ function createModelStore() {
 
     /** Async 3D solve via the worker pool (UI stays responsive). Same result
      *  shape and string-error semantics as solve3D(). */
+    /** The engine input of a direct single solve of the model, without solving (`linearSolveInput3D`). */
+    singleSolveInput3D(includeSelfWeight = false, leftHand = false, isPro = false) {
+      if (this.hasSlidingJoints()) return null;
+      return linearSolveInput3D(
+        singleSolveModel({ nodes: model.nodes, elements: model.elements, supports: model.supports,
+          loads: model.loads, materials: model.materials, sections: model.sections, analysis: analysisFor(isPro, includeSelfWeight), groups: model.groups,
+          plates: isPro ? model.plates : undefined,
+          quads: isPro ? model.quads : undefined,
+          constraints: isPro ? model.constraints : undefined,
+          connectors: isPro ? model.connectors : undefined }, model.loadCases),
+        includeSelfWeight, leftHand,
+      );
+    },
+
     async solve3DAsync(includeSelfWeight = false, leftHand = false, isPro = false): Promise<AnalysisResults3D | string | null> {
       if (this.hasSlidingJoints()) return t('advanced.sliding3dUnsupported');
       return validateAndSolve3DAsync(
@@ -4367,15 +4518,24 @@ function createModelStore() {
      *  Shell elements are only included when isPro=true. */
     solveCombinations3D(includeSelfWeight = false, leftHand = false, isPro = false, spectral?: Map<number, AnalysisResults3D>): { perCase: Map<number, AnalysisResults3D>; perCombo: Map<number, AnalysisResults3D>; envelope: FullEnvelope3D; unstable?: number[] } | string | null {
       if (this.hasSlidingJoints()) return t('advanced.sliding3dUnsupported');
-      const r = solveCombinations3DFn(
-        { nodes: model.nodes, elements: model.elements, supports: model.supports,
-          loads: model.loads, materials: model.materials, sections: model.sections, analysis: analysisFor(isPro, includeSelfWeight), groups: model.groups,
-          plates: isPro ? model.plates : undefined,
-          quads: isPro ? model.quads : undefined,
-          constraints: isPro ? model.constraints : undefined,
-          connectors: isPro ? model.connectors : undefined },
-        model.loadCases, model.combinations, includeSelfWeight, leftHand, spectral,
-      );
+      // Shell recombination is the engine's kernel: its absence or refusal is the solve's
+      // error message, as every other solve failure is, never an exception past the button.
+      let r;
+      try {
+        r = solveCombinations3DFn(
+          { nodes: model.nodes, elements: model.elements, supports: model.supports,
+            loads: model.loads, materials: model.materials, sections: model.sections, analysis: analysisFor(isPro, includeSelfWeight), groups: model.groups,
+            plates: isPro ? model.plates : undefined,
+            quads: isPro ? model.quads : undefined,
+            constraints: isPro ? model.constraints : undefined,
+            connectors: isPro ? model.connectors : undefined },
+          model.loadCases, model.combinations, includeSelfWeight, leftHand, spectral,
+        );
+      } catch (err) {
+        const m = engineFailureMessage(err);
+        if (!m) throw err;
+        return tp(m.key, m.params ?? {});
+      }
       // The active list is a PRO definition; Basic keeps enveloping every combination.
       return isPro ? scopeBundle3D(r, model.resultScopes, model.combinations) : r;
     },
@@ -4383,15 +4543,24 @@ function createModelStore() {
     /** Async parallel version of solveCombinations3D — uses Web Workers for parallel solving. */
     async solveCombinations3DParallel(includeSelfWeight = false, leftHand = false, isPro = false, spectral?: Map<number, AnalysisResults3D>): Promise<{ perCase: Map<number, AnalysisResults3D>; perCombo: Map<number, AnalysisResults3D>; envelope: FullEnvelope3D; unstable?: number[] } | string | null> {
       if (this.hasSlidingJoints()) return t('advanced.sliding3dUnsupported');
-      const r = await solveCombinations3DParallelFn(
-        { nodes: model.nodes, elements: model.elements, supports: model.supports,
-          loads: model.loads, materials: model.materials, sections: model.sections, analysis: analysisFor(isPro, includeSelfWeight), groups: model.groups,
-          plates: isPro ? model.plates : undefined,
-          quads: isPro ? model.quads : undefined,
-          constraints: isPro ? model.constraints : undefined,
-          connectors: isPro ? model.connectors : undefined },
-        model.loadCases, model.combinations, includeSelfWeight, leftHand, spectral,
-      );
+      // Shell recombination is the engine's kernel: its absence or refusal is the solve's
+      // error message, as every other solve failure is, never an exception past the button.
+      let r;
+      try {
+        r = await solveCombinations3DParallelFn(
+          { nodes: model.nodes, elements: model.elements, supports: model.supports,
+            loads: model.loads, materials: model.materials, sections: model.sections, analysis: analysisFor(isPro, includeSelfWeight), groups: model.groups,
+            plates: isPro ? model.plates : undefined,
+            quads: isPro ? model.quads : undefined,
+            constraints: isPro ? model.constraints : undefined,
+            connectors: isPro ? model.connectors : undefined },
+          model.loadCases, model.combinations, includeSelfWeight, leftHand, spectral,
+        );
+      } catch (err) {
+        const m = engineFailureMessage(err);
+        if (!m) throw err;
+        return tp(m.key, m.params ?? {});
+      }
       // The active list is a PRO definition; Basic keeps enveloping every combination.
       return isPro ? scopeBundle3D(r, model.resultScopes, model.combinations) : r;
     },

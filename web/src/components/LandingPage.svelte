@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { tPublic as t, publicI18n } from '../lib/i18n/store.svelte';
-  import { applyPageMeta, restorePageMeta } from '../lib/page-meta';
+  import { applyPageMeta, restorePageMeta, STABILEO_ORGANIZATION, ERGODIC_GROUP, LAMBDA_CLASS } from '../lib/page-meta';
+  import { publicUrl } from '../lib/i18n/public-routes';
   import LandingNav from './landing/LandingNav.svelte';
   import LandingHero from './landing/LandingHero.svelte';
   import LandingPricing from './landing/LandingPricing.svelte';
@@ -9,6 +10,7 @@
   import LandingProCalc from './landing/LandingProCalc.svelte';
   import LandingProDesign from './landing/LandingProDesign.svelte';
   import LandingAi from './landing/LandingAi.svelte';
+  import LandingVerification from './landing/LandingVerification.svelte';
   import LandingEducation from './landing/LandingEducation.svelte';
   import LandingBlog from './landing/LandingBlog.svelte';
   import LandingFooter from './landing/LandingFooter.svelte';
@@ -28,10 +30,37 @@
    */
   function syncMetadata() {
     applyPageMeta({
-      title: `Stabileo — ${t('landing.heroH')}`,
-      description: t('landing.heroP'),
+      // What someone searching would type: "free structural analysis software", "in the browser",
+      // "CIRSOC". The hero's own line stays the page's heading.
+      title: t('landing.metaTitle'),
+      description: t('landing.metaDescription'),
       locale: publicI18n.locale,
       path: '/',
+      // What the site is, for search engines: the site itself, who makes it, and the application
+      // (free to use, runs in the browser).
+      graph: [
+        {
+          '@type': 'WebSite',
+          '@id': 'https://stabileo.com/#website',
+          name: 'Stabileo',
+          url: 'https://stabileo.com/',
+          inLanguage: publicI18n.locale,
+          publisher: { '@id': STABILEO_ORGANIZATION['@id'] },
+        },
+        STABILEO_ORGANIZATION,
+        {
+          '@type': 'SoftwareApplication',
+          '@id': 'https://stabileo.com/#software',
+          name: 'Stabileo',
+          description: t('landing.metaDescription'),
+          url: publicUrl('/', publicI18n.locale),
+          applicationCategory: 'EngineeringApplication',
+          operatingSystem: 'Web browser',
+          inLanguage: ['es', 'en', 'pt'],
+          publisher: ERGODIC_GROUP,
+          author: LAMBDA_CLASS,
+        },
+      ],
     });
   }
 
@@ -162,6 +191,7 @@
   <LandingProCalc />
   <LandingProDesign />
   <LandingAi />
+  <LandingVerification />
   <LandingEducation />
   <LandingPricing />
   <LandingBlog />

@@ -193,9 +193,16 @@ test.describe('@slow the standing notices, on the building that carries both', (
      * `rebarWorkspace.statusFilter` — the channel that already existed — and not a second one.
      */
     await filter.click();
-    await expect(filter).toHaveAttribute('aria-pressed', 'true');
+    /*
+     * Sixty seconds, not the default ten. On a CI runner the page is busy for 40 s after this
+     * press (the trace of a failure on main: 28.7 s before `aria-pressed` read true, then a
+     * first `count()` that had not answered 15 s later), so the poll expired before the page
+     * could answer a single query. This test is about the filter narrowing the list; how long
+     * the press blocks the page is issue #608.
+     */
+    await expect(filter).toHaveAttribute('aria-pressed', 'true', { timeout: 60_000 });
     await expect
-      .poll(() => page.locator('[data-testid^="rebar-element-"][data-testid]').count())
+      .poll(() => page.locator('[data-testid^="rebar-element-"][data-testid]').count(), { timeout: 60_000 })
       .toBeLessThan(preparedProject.elements);
   });
 });

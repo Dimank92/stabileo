@@ -13,7 +13,7 @@
  */
 
 import { concreteFc } from '../model/design-data';
-import type { AnalysisResults3D, ElementForces3D } from './types-3d';
+import type { AnalysisResults3D } from './types-3d';
 import type { GoverningPerElement3D } from './governing-case';
 import type { ElementDesignDemands } from './station-design-forces';
 import { verifyElement, classifyElement, computeJointPsiFromModel } from './codes/argentina/cirsoc201';
@@ -21,6 +21,7 @@ import type { ElementVerification, VerificationInput } from './codes/argentina/c
 import { isDesignedMember } from './design/behaviour-demands';
 import { engineRecheckElement } from './codes/argentina/cirsoc201-engine-gate';
 import { CIRSOC201_DESIGN_EDITION } from './codes/argentina/cirsoc201-basis';
+import type { RegulationEdition } from '../codes/regulation';
 
 // ─── Input/Output types ─────────────────────────────────────
 
@@ -38,6 +39,8 @@ export interface AutoVerifyOptions {
   /** The clear cover of a column, m; absent: `cover`. */
   columnCover?: number;
   stirrupDia?: number; // mm, default 8
+  /** Edition the designer sizes to and the engine re-check applies. Default: `CIRSOC201_DESIGN_EDITION`. */
+  edition?: RegulationEdition;
 }
 
 // ─── Which members this verifier can check, and why not ──────────
@@ -130,6 +133,7 @@ export function autoVerifyFromResults(
   const rebarFy = options?.rebarFy ?? 420;
   const cover = options?.cover ?? 0.025;
   const stirrupDia = options?.stirrupDia ?? 8;
+  const edition = options?.edition ?? CIRSOC201_DESIGN_EDITION;
   const verifs: ElementVerification[] = [];
 
   for (const ef of results.elementForces) {
@@ -167,6 +171,9 @@ export function autoVerifyFromResults(
     let NuMax: number, VzMax: number, TuMax: number;
     // Axial force for shear, + = compression. See where it is set.
     let NuShear: number;
+    // The signed axial forces the member sees, + = compression: the column is checked under
+    // each (a member in tension is not checked as if compressed).
+    let axialLoads: number[];
     // Station-based governing combo refs (richer than endpoint-only governing-case.ts)
     let stationGovCombos: ElementVerification['governingCombos'] | undefined;
 
@@ -193,6 +200,11 @@ export function autoVerifyFromResults(
       const nComp = demandMap.get('N_compression');
       const nTens = demandMap.get('N_tension');
       NuMax = Math.max(nComp?.absValue ?? 0, nTens?.absValue ?? 0);
+      axialLoads = [
+        ...((nComp?.absValue ?? 0) > 0 ? [nComp!.absValue] : []),
+        ...((nTens?.absValue ?? 0) > 0 ? [-nTens!.absValue] : []),
+      ];
+      if (axialLoads.length === 0) axialLoads = [0];
       /*
        * The shear check reads its axial force as + = compression, and compression raises Vc.
        * `NuMax` is a magnitude: a member in tension was given the compression credit. A member
@@ -232,6 +244,7 @@ export function autoVerifyFromResults(
       VyAbs = Math.max(Math.abs(ef.vyStart), Math.abs(ef.vyEnd));
       VzMax = Math.max(Math.abs(ef.vzStart), Math.abs(ef.vzEnd));
       NuMax = Math.max(Math.abs(ef.nStart), Math.abs(ef.nEnd));
+      axialLoads = [...new Set([-ef.nStart, -ef.nEnd])];
       // Same rule from the two ends: any tension governs; otherwise the smaller compression.
       const tension = Math.max(ef.nStart, ef.nEnd, 0);
       NuShear = tension > 0 ? -tension : Math.min(-ef.nStart, -ef.nEnd);
@@ -299,7 +312,7 @@ export function autoVerifyFromResults(
 
     const input: VerificationInput = {
       elementId: ef.elementId, elementType: elemType,
-      Mu: MuMax, Vu: VuMax, Nu: NuMax, NuShear,
+      Mu: MuMax, Vu: VuMax, Nu: NuMax, NuShear, axialLoads, edition,
       // Axis-correct section orientation for the governing beam axis (columns
       // keep their real b/h since they always use Mz).
       b: bFlex, h: hFlex, fc, fy: rebarFy, cover: isVertical ? options?.columnCover ?? cover : cover, stirrupDia,
@@ -311,10 +324,10 @@ export function autoVerifyFromResults(
 
     // The TypeScript designs and checks; the engine re-checks what it settled on, and a pass the
     // engine does not confirm is a failure (cirsoc201-engine-gate.ts). The re-check reads the
-    // edition the designer sized with (`CIRSOC201_DESIGN_EDITION`), never another one: a gate in
+    // edition the designer sized with (`edition` above), never another one: a gate in
     // 2025 over a 2005 design, or the other way round, would confirm or refuse a different design.
     const v: ElementVerification = engineRecheckElement(verifyElement(input), {
-      edition: CIRSOC201_DESIGN_EDITION, stirrupDia, NuShear,
+      edition, stirrupDia, NuShear, axialLoads,
     });
     v.flexureAxis = flexureAxis;
 
