@@ -66,10 +66,26 @@ export const sheetSvg = (s: SetSheet) => sheetToSvg(s.width, s.height, s.primiti
 export const sheetDxf = (s: SetSheet) => sheetToDxf(s.primitives);
 
 /** Every sheet's DXF in one zip, named by number. */
-export function sheetSetDxfZip(sheets: readonly SetSheet[]): Uint8Array {
-  return zipSync(Object.fromEntries(sheets.map((s) => [`${s.number}.dxf`, strToU8(sheetDxf(s))])));
+/**
+ * The results' provenance a set carries (`export/provenance-attach.ts`): the DXF of each sheet as
+ * its 999 comments (`dxf`), the PDF as a closing page of `key: value` lines, the status line first.
+ */
+export interface SetProvenance { dxf: (dxf: string) => string; title: string; lines: ReadonlyArray<readonly [string, string]> }
+
+export function sheetSetDxfZip(sheets: readonly SetSheet[], provenance?: SetProvenance): Uint8Array {
+  const wrap = provenance?.dxf ?? ((d: string) => d);
+  return zipSync(Object.fromEntries(sheets.map((s) => [`${s.number}.dxf`, strToU8(wrap(sheetDxf(s)))])));
 }
 
-export function sheetSetPdf(sheets: readonly SetSheet[], title: string): Uint8Array {
-  return sheetsToPdf(sheets.map((s) => ({ width: s.width, height: s.height, primitives: s.primitives })), title);
+export function sheetSetPdf(sheets: readonly SetSheet[], title: string, provenance?: SetProvenance): Uint8Array {
+  const pages = sheets.map((s) => ({ width: s.width, height: s.height, primitives: s.primitives }));
+  if (provenance) {
+    // An A4 page (mm), its lines from the top margin down.
+    const text = (y: number, s: string, height: number) => ({ kind: 'text' as const, layer: 'RC-TITLE', at: { x: 20, y }, text: s, height });
+    pages.push({ width: 210, height: 297, primitives: [
+      text(277, provenance.title, 4),
+      ...provenance.lines.map(([k, v], i) => text(265 - i * 6, `${k}: ${v}`.slice(0, 120), 2.4)),
+    ] as never });
+  }
+  return sheetsToPdf(pages, title);
 }

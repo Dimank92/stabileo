@@ -24,6 +24,8 @@ import { writeIfc, type IfcExportInput, type ProfileSpec, type V3 } from '../ifc
 import { verificationStore } from './verification.svelte';
 import type { SpanRef } from '../engine/design/design-spans';
 import { memberOffsetAt } from '../engine/member-offsets';
+import { provenanceLines } from '../export/provenance-attach';
+import type { ResultProvenance } from '../provenance/result-provenance';
 
 /** The `LateralSystem` property of a beam, by the reading its design used (`model/lateral-system.ts`). */
 const IFC_LATERAL: Record<'lateral' | 'gravity' | 'undeclared', string> = {
@@ -227,6 +229,16 @@ export function projectIfcInput(tr: Tr, locale: string, projectName: string): If
   return { project: { name: projectName, time: new Date().toISOString().slice(0, 19), app: 'Stabileo' }, buildingProps, storeys, members, slabs, walls, footings, bars, parts };
 }
 
-export function exportProjectIfc(tr: Tr, locale: string, projectName: string): string {
-  return writeIfc(projectIfcInput(tr, locale, projectName));
+/**
+ * The IFC of the project. With the results' provenance (`export/provenance-attach.ts`), the building
+ * carries it as properties, the status line (STALE or current) first, as every export of results
+ * carries it: the members' utilizations and design states are read from those results.
+ */
+export function exportProjectIfc(tr: Tr, locale: string, projectName: string, provenance?: ResultProvenance): string {
+  const input = projectIfcInput(tr, locale, projectName);
+  if (provenance) {
+    const lines = provenanceLines(provenance);
+    input.buildingProps = { ...input.buildingProps, ...Object.fromEntries(lines.map(([k, v], i) => [`Provenance_${String(i + 1).padStart(2, '0')}_${k.replace(/[^\w]+/g, '_')}`, v])) };
+  }
+  return writeIfc(input);
 }

@@ -8808,6 +8808,7 @@ const pt: Translations = {
   'verdict.detailing.clash': 'interferência de barras',
   'verdict.hold.detailing': 'o detalhamento deixou {n} condição(ões) em aberto: {what}',
   'verdict.hold.refused': 'o dimensionamento o recusou: {outcome}',
+  'verdict.hold.stale': 'os resultados mudaram depois deste dimensionamento: é preciso verificá-lo de novo',
   'verdict.hold.analysis': 'laje ligada aos pilares por um só nó no nível {level} m: a divisão da carga da laje entre vigas e pilares não está estabelecida (com esta malha {share} % vai direto aos pilares)',
   'verdict.hold.deflection': 'a flecha excede o limite (Tabela 24.2.2)',
   'verdict.hold.seismic': 'suas verificações sísmicas rodam apenas como substituto (ACI 318-19 cap. 18) e não o verificam',
