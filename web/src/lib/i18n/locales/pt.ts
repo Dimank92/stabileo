@@ -13539,5 +13539,6 @@ const pt: Translations = {
   "convert.apply": "Criar {n} elementos",
   "convert.applied": "Criadas {members} barras ({arcs} vigas curvas) e {columns} pilares. Ficam agrupadas como conversão deste modelo.",
   "plates.sidesSummary": "{n}, {curved} curvos",
+  "plates.resultsError": "Erro de discretização estimado: até {pct} % no elemento",
 };
 export default pt;

@@ -13888,5 +13888,6 @@ const es: Record<string, string> = {
   "convert.apply": "Crear {n} elementos",
   "convert.applied": "Creadas {members} barras ({arcs} vigas curvas) y {columns} columnas. Quedan agrupadas como conversión de esta plantilla.",
   "plates.sidesSummary": "{n}, {curved} curvos",
+  "plates.resultsError": "Error de discretización estimado: hasta {pct} % en el elemento",
 };
 export default es;

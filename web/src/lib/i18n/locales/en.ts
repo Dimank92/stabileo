@@ -13899,5 +13899,6 @@ const en: Record<string, string> = {
   "convert.apply": "Make {n} elements",
   "convert.applied": "Made {members} members ({arcs} curved) and {columns} columns. They are grouped as this template's conversion.",
   "plates.sidesSummary": "{n}, {curved} curved",
+  "plates.resultsError": "Estimated discretization error: up to {pct} % at element",
 };
 export default en;
