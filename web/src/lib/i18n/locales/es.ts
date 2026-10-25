@@ -13968,5 +13968,6 @@ const es: Record<string, string> = {
   "finishes.column": "Terminación",
   "useZones.role.live": "sobrecarga",
   "useZones.role.finish": "terminaciones",
+  "plates.sidesSummary": "{n}, {curved} curvos",
 };
 export default es;

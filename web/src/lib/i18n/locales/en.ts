@@ -13979,5 +13979,6 @@ const en: Record<string, string> = {
   "finishes.column": "Finish",
   "useZones.role.live": "live load",
   "useZones.role.finish": "finishes",
+  "plates.sidesSummary": "{n}, {curved} curved",
 };
 export default en;

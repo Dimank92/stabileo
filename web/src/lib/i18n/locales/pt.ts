@@ -13619,5 +13619,6 @@ const pt: Translations = {
   "finishes.column": "Acabamento",
   "useZones.role.live": "sobrecarga",
   "useZones.role.finish": "acabamentos",
+  "plates.sidesSummary": "{n}, {curved} curvos",
 };
 export default pt;
