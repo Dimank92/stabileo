@@ -17,6 +17,7 @@
  * Local axes: x along B, y along L, origin at the footing's centroid. Loads: N compression
  * positive, kN; My about y and Mx about x, kN·m, signs as in `pressure-field.ts`.
  */
+import { shearSqrtFc } from '../codes/argentina/cirsoc201-basis';
 import { pressureField, type PressureField } from './pressure-field';
 import { checkPunchingShear, type ColumnPosition, type PunchingCheck } from '../detailing/punching-shear';
 
@@ -102,7 +103,9 @@ function along(dir: 'x' | 'y', f: RigidFootingInput, field: PressureField, d: nu
     if (m > mPos) { mPos = m; atPos = s; }
     if (m < mNeg) { mNeg = m; atNeg = s; }
   }
-  const phiVc = 0.75 * 0.17 * Math.sqrt(Math.min(f.fc, 70)) * W * d * 1000;
+  // §13.2.6.2(a): a shallow foundation on the soil, designed rigid, may take Vc = 0,17·λ·√f'c·bw·d,
+  // with √f'c ≤ 8,3 MPa (§22.5.3.1). It read √f'c up to √70 = 8,37.
+  const phiVc = 0.75 * 0.17 * shearSqrtFc(f.fc) * W * d * 1000;
   let shear = { vu: 0, phiVc, utilization: 0, at: 0 };
   for (const p of f.posts) for (const s of [posU(p) - half(p) - d, posU(p) + half(p) + d]) {
     if (s <= -S / 2 || s >= S / 2) continue;
