@@ -184,15 +184,24 @@ describe('qa-8: centred, top-flush beams, a column placed by its corner', () => 
     // cover, stirrup and half bar.
     expect(zf.length).toBe(zc.length);
     expect(Math.max(...zf)).toBeCloseTo(Math.max(...zc) - E, 9);
-    expect(Math.min(...zf)).toBeCloseTo(Math.min(...zc) - E, 9);
+    /*
+     * The bottom bars rise over the crossing beams' bottom mats (`seatsOf`), and those differ:
+     * centred, beams 5 and 6 are designed with 7Ø10 (the compression they carry lifts their φMn,
+     * the verifier's axial force with each moment); top-flush, with 6Ø12. Beam 7's bottom layer
+     * rises 10,0 mm over the Ø10 and 11,7 mm over the Ø12, so it sits 1,7 mm higher top-flush.
+     */
+    expect(Math.min(...zf)).toBeCloseTo(Math.min(...zc) - E + (0.011707106781186555 - 0.010000000000000009), 9);
     expect(Math.max(...zc)).toBeLessThan(TOP + E - 0.025 - 0.006);
     expect(Math.max(...zf)).toBeLessThan(TOP - 0.025 - 0.006);
     expect(Math.min(...zf)).toBeGreaterThan(TOP - 2 * E + 0.025 + 0.006);
     // Joint 5's ties: in the band the beams make, [2,65, 3,2], a depth lower than centred.
     const ties = (r: RunDetailingResult) => bars(r).filter((b) => b.id.startsWith('joint-5:')).map((b) => b.segments[0]!.start.z);
     expect(ties(f).length).toBe(ties(c).length);
-    expect(Math.min(...ties(f))).toBeCloseTo(Math.min(...ties(c)) - E, 9);
-    expect(Math.max(...ties(f))).toBeCloseTo(Math.max(...ties(c)) - E, 9);
+    // The lowest tie sits on that bottom layer: 1,7 mm higher top-flush, for the same reason.
+    expect(Math.min(...ties(f))).toBeCloseTo(Math.min(...ties(c)) - E + (0.011707106781186555 - 0.010000000000000009), 9);
+    // The band's floor moved, so its stations (laid to the micrometre, `stirrupStations`) round apart by
+    // up to half a micrometre at the top.
+    expect(Math.max(...ties(f))).toBeCloseTo(Math.max(...ties(c)) - E, 6);
     expect(Math.min(...ties(f))).toBeGreaterThan(TOP - 2 * E);
     // Column 1's roof bars rise to the beams' top cover: 3,2 − 0,025, not 3,475 − 0,025.
     const col = (r: RunDetailingResult) => zsOf(bars(r).filter((b) => b.role === 'longitudinal' && b.ownerElementIds.length === 1 && b.ownerElementIds[0] === 1));

@@ -1,6 +1,8 @@
 <script lang="ts">
   import { downloadReport } from '../../lib/export/report-download';
   import type { DocBlock } from '../../lib/export/docx';
+  import { captureProvenanceToken, provenanceForExport } from '../../lib/store/result-provenance';
+  import { htmlWithProvenance, reportProvenance } from '../../lib/export/provenance-attach';
   import { activePerCombo3D } from '../../lib/store/active-results';
   /**
    * The raw forces report, configured and generated.
@@ -100,10 +102,12 @@
     URL.revokeObjectURL(url);
   }
 
-  function generate() {
+  async function generate() {
     lastError = null;
     const results = resultsStore.results3D;
     if (!results || blockers.length > 0) return;
+    // What the report is taken from, checked again once its provenance is ready.
+    const token = captureProvenanceToken();
 
     const at = new Date().toISOString();
     const doc = buildForcesReport(cfg, {
@@ -117,12 +121,12 @@
     try {
       if (format === 'xlsx') {
         const filename = `${stem}.xlsx`;
-        exportToExcel({
+        const written = await exportToExcel({
           filename,
           onlyExtras: true,
           extraSheets: doc.sheets.map((s) => ({ name: s.name, rows: s.aoa })),
         });
-        lastExport = { filename, at };
+        if (written) lastExport = { filename, at };
         return;
       }
 
@@ -140,24 +144,34 @@
         },
       });
       const filename = `${stem}.html`;
+      // The print tab is opened inside the click, before the await (pop-up blockers).
+      const w = format === 'pdf' ? window.open('', '_blank') : null;
+      let record;
+      try {
+        record = await provenanceForExport(token);
+      } catch (e) {
+        w?.close();
+        throw e;
+      }
+      const withProv = htmlWithProvenance(html, record);
       if (format === 'docx' || format === 'csv') {
         // The same document as blocks: its scope and notes, a heading and a table per sheet.
         const blocks: DocBlock[] = [
           { kind: 'paragraph', text: doc.scopeLine }, ...(doc.stationNote ? [{ kind: 'paragraph' as const, text: doc.stationNote }] : []),
           ...doc.sheets.flatMap((sh) => [{ kind: 'heading' as const, text: sh.name, level: 2 as const }, { kind: 'table' as const, head: (sh.aoa[0] ?? []).map(String), rows: sh.aoa.slice(1).map((r) => r.map((c) => (c === null || c === undefined ? '' : String(c)))) }]),
         ];
-        void downloadReport(format, { title: t('design.forcesReport.title'), html, stem, blocks }).then((fn) => { if (fn) lastExport = { filename: fn, at }; });
+        const fn = await downloadReport(format, { title: t('design.forcesReport.title'), html: withProv, stem, blocks, provenance: reportProvenance(record) });
+        if (fn) lastExport = { filename: fn, at };
         return;
       }
       if (format === 'html') {
-        downloadBlob(filename, 'text/html', html);
+        downloadBlob(filename, 'text/html', withProv);
       } else {
         // Printed through the browser rather than a bundled PDF writer — the audit in
         // `rc-forces-report.ts` found no PDF writer in this tree. A blocked popup falls back
         // to the same HTML as a file, which is a real deliverable and not a silent failure.
-        const w = window.open('', '_blank');
-        if (w) { w.document.write(html); w.document.close(); w.focus(); w.print(); }
-        else downloadBlob(filename, 'text/html', html);
+        if (w) { w.document.write(withProv); w.document.close(); w.focus(); w.print(); }
+        else downloadBlob(filename, 'text/html', withProv);
       }
       lastExport = { filename, at };
     } catch (e) {

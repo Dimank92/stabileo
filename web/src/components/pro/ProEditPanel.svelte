@@ -103,9 +103,12 @@
     const only = renumberOnlySel ? { nodes: new Set(uiStore.selectedNodes), elements: new Set(uiStore.selectedElements), shells: new Set(uiStore.selectedShells) } : undefined;
     const r = renumber({ nodes: renumberNodes, members: renumberMembers, shells: renumberShells, order, only, ...(renumberFrom && renumberFrom > 0 ? { start: Math.floor(renumberFrom) } : {}) });
     if ('refused' in r) {
+      const ids = (ids: number[]) => ids.slice(0, 12).join(', ') + (ids.length > 12 ? '…' : '');
       message = r.refused === 'hasDesignDocuments'
         ? tp('edit.renumberRefused', { fields: r.fields.join(', ') })
-        : tp('edit.renumberCollision', { kind: t(`edit.kind.${r.kind}`), ids: r.ids.slice(0, 12).join(', ') + (r.ids.length > 12 ? '…' : '') });
+        : r.refused === 'orphanLoads'
+          ? tp('edit.renumberOrphanLoads', { ids: ids(r.ids) })
+          : tp('edit.renumberCollision', { kind: t(`edit.kind.${r.kind}`), ids: ids(r.ids) });
       return;
     }
     message = tp('edit.renumbered', { nodes: r.changedNodes, members: r.changedMembers }) + (r.changedShells ? ` ${tp('edit.renumberedShells', { n: r.changedShells })}` : '');

@@ -4,7 +4,7 @@
    * Sd against period, pasted or typed one row per line, read linearly or on log axes. Kept with the
    * project (`model.dynamics.spectra`), used by the spectral analysis and by spectral load cases.
    */
-  import { modelStore } from '../../../lib/store';
+  import { modelStore, uiStore } from '../../../lib/store';
   import { t, tp } from '../../../lib/i18n';
   import { parseSpectrumTable, userSa, G, type UserSpectrum } from '../../../lib/engine/spectral-case';
 
@@ -16,8 +16,8 @@
   const save = (list: UserSpectrum[]) => modelStore.setDynamics({ ...modelStore.model.dynamics, spectra: list });
 
   function add() {
-    const id = Math.max(0, ...spectra.map((s) => s.id)) + 1;
-    save([...spectra, { id, name: tp('userSpectrum.defaultName', { n: id }), ordinate: 'Sa', unit: 'g', interpolation: 'linear', points: [[0, 0.4], [0.5, 1], [1, 0.5], [3, 0.17]] }]);
+    // A number never given before (`addUserSpectrum`): a case on a deleted spectrum does not take this one.
+    const id = modelStore.addUserSpectrum((id) => ({ id, name: tp('userSpectrum.defaultName', { n: id }), ordinate: 'Sa', unit: 'g', interpolation: 'linear', points: [[0, 0.4], [0.5, 1], [1, 0.5], [3, 0.17]] }));
     open(id);
   }
   function open(id: number) {
@@ -36,7 +36,11 @@
     update(id, { points: p.points });
   }
   function remove(id: number) {
-    save(spectra.filter((s) => s.id !== id));
+    // Not while a spectral case is on it: the case would have no spectrum, and say so only at the solve.
+    if (!modelStore.removeUserSpectrum(id)) {
+      uiStore.toast(tp('userSpectrum.inUse', { cases: modelStore.casesOnSpectrum(id).map((c) => c.name).join(', ') }), 'error');
+      return;
+    }
     if (editing === id) editing = null;
   }
 

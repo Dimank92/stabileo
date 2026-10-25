@@ -1,8 +1,7 @@
 //! Gates: every solver entry point must reject degenerate input with a clean
 //! Err instead of panicking or silently computing garbage.
 
-#[path = "common/mod.rs"]
-mod common;
+use crate::common;
 
 use common::make_3d_input;
 use dedaliano_engine::solver::{harmonic, linear, modal, spectral, staged, time_integration};
@@ -34,7 +33,7 @@ fn tiny_beam_2d() -> SolverInput {
         constraints: vec![],
         connectors: HashMap::new(),
 
-        solver_options: None,    }
+        solver_options: None, masses: Default::default(),    }
 }
 
 fn densities_1() -> HashMap<String, f64> {

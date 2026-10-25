@@ -1,4 +1,17 @@
+import { readFileSync } from 'node:fs';
 import { test as base, expect, type Page } from '@playwright/test';
+
+/**
+ * A project a spec writes stands for one made in this build: stamped as solved with it, so opening
+ * it raises no re-check notice (`src/lib/store/recheck.svelte.ts`). A spec about that notice
+ * (`recheck-provenance.spec.ts`) leaves the stamp out on purpose.
+ */
+export const CURRENT_STAMP = {
+  id: 'e2e-current',
+  resultsVersion: (JSON.parse(readFileSync(new URL('../src/lib/provenance/result-changes.json', import.meta.url), 'utf8')) as { currentResultsVersion: number }).currentResultsVersion,
+  analyses: [] as string[],
+};
+
 
 /**
  * Shared Playwright fixtures for the RC Design suite.
@@ -210,7 +223,7 @@ export async function bootPro(page: Page, appLocale = 'en'): Promise<void> {
   await page.waitForFunction(() => !!window.__stabileo, null, { timeout: 60_000 });
   // The REAL WASM solver must be live; the Vite stub fails here.
   await expect
-    .poll(() => page.evaluate(() => window.__stabileo.solverReady()), { timeout: 60_000, message: 'real WASM solver must be initialised (not the Vite stub)' })
+    .poll(() => page.evaluate(() => window.__stabileo?.solverReady() ?? false), { timeout: 60_000, message: 'real WASM solver must be initialised (not the Vite stub)' })
     .toBe(true);
 
   // The RC Design tab must be the active PRO tab for its table to exist.
@@ -224,8 +237,39 @@ export async function bootPro(page: Page, appLocale = 'en'): Promise<void> {
  * needs Spanish sets `test.use({ appLocale: 'es' })` — which is how the bilingual journeys
  * prove that engine output is translated rather than pasted.
  */
-export const test = base.extend<{ pro: Page; appLocale: string }>({
+export const test = base.extend<{ pro: Page; appLocale: string; recheckNotice: 'acknowledge' | 'assert' }>({
   appLocale: ['en', { option: true }],
+  /**
+   * The re-check notice (`RecheckNotice.svelte`) opens over a project solved with an earlier
+   * results version, which every committed fixture becomes at the next results-version bump.
+   * By default it is acknowledged whenever it would block an action, so a bump does not fail
+   * specs that are about something else (eight of them did, the last time). A spec about the
+   * notice itself sets `test.use({ recheckNotice: 'assert' })` and sees it untouched.
+   */
+  recheckNotice: ['acknowledge', { option: true }],
+  /**
+   * `page.goto` to the application, with the test hooks asked for, returns once the hooks are
+   * there. The application is loaded on demand (main.ts imports it for an app address), so it can
+   * finish after the page's load event; specs that call `window.__stabileo…` straight after
+   * `goto` used to find it already installed beside an application that mounted at once.
+   */
+  page: async ({ page, recheckNotice }, use) => {
+    if (recheckNotice === 'acknowledge') {
+      await page.addLocatorHandler(page.getByTestId('recheck-notice'), async () => {
+        await page.getByTestId('recheck-ack').check();
+        await page.getByTestId('recheck-later').click();
+      });
+    }
+    const goto = page.goto.bind(page);
+    page.goto = async (url, options) => {
+      const response = await goto(url, options);
+      if (/[?&]e2e=1/.test(url) && /^\/?(app\b|demo\b|\?)|[?&]embed\b|#(data|embed|code)=/.test(url.replace(/^https?:\/\/[^/]+/, ''))) {
+        await page.waitForFunction(() => !!(window as { __stabileoActions?: unknown }).__stabileoActions, null, { timeout: 60_000 });
+      }
+      return response;
+    };
+    await use(page);
+  },
   pro: async ({ page, appLocale }, use) => {
     const consoleErrors: string[] = [];
     const pageErrors: string[] = [];

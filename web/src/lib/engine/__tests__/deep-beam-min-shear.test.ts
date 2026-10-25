@@ -61,7 +61,7 @@ describe('a deep beam below Av,min where Vu passes φ·0,085·√f\'c·bw·d', (
     const seen: string[] = [];
     for (const h of [0.3, 0.45, 0.65, 0.9]) for (const b of [0.15, 0.2, 0.3, 0.5]) for (const fc of [20, 25, 30, 45, 70]) {
       for (const fy of [220, 420, 500]) for (const stirrupDia of [6, 8]) for (const Vu of [20, 60, 120, 250]) {
-        const sh = checkShear({ b, h, fc, fy, cover: 0.025, stirrupDia } as never, Vu, 0, CIRSOC201_DESIGN_EDITION);
+        const sh = checkShear({ b, h, fc, fy, cover: 0.025, stirrupDia } as never, Vu, 0, { edition: CIRSOC201_DESIGN_EDITION });
         const cap = computeShearCapacity(sh.stirrupDia, sh.stirrupLegs, sh.spacing, b, sh.d, fc, fy, 0, { Ag: b * h, rhoW: 0.005, h, edition: CIRSOC201_DESIGN_EDITION });
         if (cap.avBelowMin && Vu > 0.75 * 0.085 * Math.min(Math.sqrt(fc), 8.3) * b * sh.d * 1000) seen.push(`${h} ${b} ${fc} ${fy} Ø${stirrupDia} Vu=${Vu} s=${sh.spacing} AvMin=${cap.AvMin}`);
       }

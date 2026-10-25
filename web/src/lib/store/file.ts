@@ -315,10 +315,21 @@ export function deserializeProject(text: string): boolean {
   validateAxisSafety(data);
   resultsStore.clear(); // stale results dropped — the model must be re-solved
   resultsStore.forgetView();
-  noteAxisConventionMigrationIfNeeded(data.snapshot, data.analysisMode);
+  onProjectOpened(data.snapshot, uiStore.analysisMode);
   // Design kept in the file while it is off in PRO's settings: offered, not switched on.
   noteDesignHeldIfOff();
   return true;
+}
+
+/**
+ * What every load path does once a stored project is the one on screen: the one-time notes about
+ * conventions it was saved under, and the re-check of results it was last solved with
+ * (`recheck.svelte.ts`). Shared by `.ded` open, tab activation, autosave restore and share links,
+ * so no entry point opens an old project in silence.
+ */
+export function onProjectOpened(snap: ModelSnapshot | undefined, analysisMode: string | undefined): void {
+  noteAxisConventionMigrationIfNeeded(snap, analysisMode);
+  if (snap) recheckStore.openProject(snap as never, analysisMode);
 }
 
 /**
@@ -645,7 +656,7 @@ export async function loadFile(file: File): Promise<{ type: 'tab' | 'session'; c
  * The results as CSV. With `solveError` (the solve run for this export failed) and no results,
  * the file is its header and the reason, so the download still says what happened.
  */
-export function exportResultsCSV(solveError?: string): string {
+export function exportResultsCSV(solveError?: string, record?: ResultProvenance): string {
   const is3D = uiStore.is3DWorkspace;
   const r3d = resultsStore.results3D;
   const r2d = resultsStore.results;
@@ -656,6 +667,9 @@ export function exportResultsCSV(solveError?: string): string {
   lines.push(`# Stabileo — ${t('file.csvResults')} ${is3D ? '3D' : '2D'}`);
   lines.push(`# ${t('file.csvProject')}: ${modelStore.model.name}`);
   lines.push(`# ${t('file.csvDate')}: ${new Date().toLocaleString()}`);
+  // Which build produced these numbers from which model and settings (`provenance/result-provenance.ts`).
+  // The status row comes first and says STALE when the results predate registered changes.
+  for (const [k, v] of provenanceTextLines(record ?? currentResultProvenance(), provenanceLabels())) lines.push(`# ${k}: ${v}`);
   lines.push('');
   if (!r3d && !r2d) {
     lines.push(`# ${t('excel.solveFailed')}`);
@@ -715,8 +729,30 @@ export function exportResultsCSV(solveError?: string): string {
   return lines.join('\n');
 }
 
-export function downloadResultsCSV(solveError?: string): void {
-  const csv = exportResultsCSV(solveError);
+/**
+ * The results CSV with its provenance prepared as every export prepares it: engine hashes awaited
+ * (off the main thread), record bound to the state the export started on. Null, said to the
+ * reader, when the project moved meanwhile.
+ */
+export async function prepareResultsCSV(solveError?: string): Promise<string | null> {
+  let record: ResultProvenance;
+  try {
+    record = await provenanceForExport(captureProvenanceToken());
+  } catch (e) {
+    if (e instanceof ExportChangedError) { uiStore.toast(e.message, 'error'); return null; }
+    throw e;
+  }
+  return exportResultsCSV(solveError, record);
+}
+
+/**
+ * Download the results CSV. Async like every export that prints provenance: the record is
+ * prepared with the engine hashes awaited (off the main thread) and bound to the state the export
+ * started on (`provenanceForExport`); if the project moved meanwhile, nothing is written, and the
+ * reader is told.
+ */
+export async function downloadResultsCSV(solveError?: string): Promise<void> {
+  const csv = await prepareResultsCSV(solveError);
   if (!csv) return;
   const safeName = modelStore.model.name.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ _-]/g, '').trim() || t('file.defaultResults');
   downloadText(csv, `${safeName}_${t('file.defaultResults')}.csv`, 'text/csv');
@@ -725,23 +761,28 @@ export function downloadResultsCSV(solveError?: string): void {
 // ─── Export PNG ─────────────────────────────────────────────────
 
 /** A PNG given as a data URL, saved under the project's name. */
-export function downloadDataUrlPNG(dataUrl: string): void {
+export function downloadDataUrlPNG(dataUrl: string, embed?: (png: Uint8Array) => Uint8Array): void {
   const safeName = modelStore.model.name.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ _-]/g, '').trim() || t('file.defaultStructure');
   const bin = atob(dataUrl.split(',')[1] ?? '');
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  downloadBlob(new Blob([bytes], { type: 'image/png' }), `${safeName}.png`);
+  downloadBlob(new Blob([(embed ? embed(bytes) : bytes) as BlobPart], { type: 'image/png' }), `${safeName}.png`);
 }
 
-export function downloadCanvasPNG(canvas: HTMLCanvasElement): void {
+export function downloadCanvasPNG(canvas: HTMLCanvasElement, embed?: (png: Uint8Array) => Uint8Array): void {
   canvas.toBlob((blob) => {
     if (!blob) return;
     const safeName = modelStore.model.name.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ _-]/g, '').trim() || t('file.defaultStructure');
-    downloadBlob(blob, `${safeName}.png`);
+    if (!embed) { downloadBlob(blob, `${safeName}.png`); return; }
+    void blob.arrayBuffer().then((b) => downloadBlob(new Blob([embed(new Uint8Array(b)) as BlobPart], { type: 'image/png' }), `${safeName}.png`));
   }, 'image/png');
 }
 
 import { hydrateProjectProvenance } from './project-provenance';
+import { recheckStore } from './recheck.svelte';
+import { currentResultProvenance, provenanceLabels, captureProvenanceToken, provenanceForExport, ExportChangedError } from './result-provenance';
+import type { ResultProvenance } from '../provenance/result-provenance';
+import { provenanceTextLines } from '../provenance/result-provenance';
 import { askAboutOverlapsInModel } from '../model/edit/connection-questions';
 import { viewVisibility } from './view-state.svelte';
 

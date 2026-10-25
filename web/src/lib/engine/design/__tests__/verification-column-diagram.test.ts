@@ -5,7 +5,7 @@
  *
  * Hand value: a Ø45 circle, 8Ø16 with a Ø10 spiral, H-25, ADN 420. Its axial ceiling, CIRSOC
  * 201-2025 Tabla 22.4.2.1 (b) with Tabla 21.2.2 (a): φPn,max = 0,75·0,85·Po,
- * Po = 0,85·f'c·(Ag − Ast) + fy·Ast, Ag the engine's 360-gon 180·R²·sin 1°.
+ * Po = 0,85·f'c·(Ag − Ast) + fy·Ast, Ag = π·R² (the engine takes a circle as a circle).
  */
 import { describe, it, expect } from 'vitest';
 import { verificationColumnDiagram } from '../column-interaction';
@@ -25,7 +25,7 @@ describe('the verification detail\'s column diagram', () => {
     expect(out.kind).toBe('shaped');
     if (out.kind !== 'shaped') return;
     const a16 = Math.PI * 0.016 ** 2 / 4;
-    const Ag = 180 * 0.225 ** 2 * Math.sin(Math.PI / 180);
+    const Ag = Math.PI * 0.225 ** 2;
     const Po = 0.85 * 25000 * (Ag - 8 * a16) + 420000 * 8 * a16;
     expect(Math.max(...out.plot.overDepth.map((p) => p.P))).toBeCloseTo(0.75 * 0.85 * Po, 3);
   });

@@ -57,7 +57,7 @@ export function presetModifiers(p: StiffnessPreset): StiffnessModifiers {
   return { preset: p, a: 1, iy: f, iz: f };
 }
 
-type El = { id: number; nodeI: number; nodeJ: number; behaviour?: MemberBehaviour };
+type El = { id: number; nodeI: number; nodeJ: number; behaviour?: MemberBehaviour; cablePretension?: number };
 
 /** The model without its inactive members, their loads, and the nodes only they held. */
 export function activeModel<M extends ModelData>(model: M): M {
@@ -270,6 +270,12 @@ export function solveNonlinear3D(model: ModelData, input: SolverInput3D): { resu
     const mid = input.elements.get(id)!.materialId;
     if ((kgPerM3.get(mid) ?? 0) > 0) densities[String(mid)] = kgPerM3.get(mid)!;
   }
+  // The pretensions given (#527); a cable without one is as long as its chord.
+  const pretension: Record<string, number> = {};
+  for (const id of cables) {
+    const p = (model.elements.get(id) as El | undefined)?.cablePretension;
+    if (p !== undefined) pretension[String(id)] = p;
+  }
 
   // One-way members and cables as trusses, their transverse loads at their end nodes.
   const refs = new Map<number, MemberRef>();
@@ -289,7 +295,7 @@ export function solveNonlinear3D(model: ModelData, input: SolverInput3D): { resu
   const linearSolve = (trial: SolverInput3D): AnalysisResults3D => {
     if (cables.size === 0) return solve3D(trial);
     const typed: SolverInputCable3D = { ...trial, elements: new Map([...trial.elements].map(([id, e]) => [id, cables.has(id) ? { ...e, type: 'cable' as const } : e])) };
-    const r = solveCable3D(typed, 50, 1e-8, densities);
+    const r = solveCable3D(typed, 50, 1e-8, densities, pretension);
     cablesConverged = r.converged;
     cableForces = r.cableForces.map((c) => ({ elementId: c.elementId, tension: c.tension, horizontalThrust: c.horizontalThrust, sag: c.sag, ernstModulus: c.ernstModulus }));
     // Finished as a linear solve is: the other members keep the axial part of their loads.
