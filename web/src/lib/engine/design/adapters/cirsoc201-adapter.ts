@@ -37,7 +37,6 @@ import {
 import {
   transverseSpacingSupportedForEdition,
 } from '../../../codes/cirsoc201/transverse-spacing';
-import { clause } from '../../../codes/regulation';
 import { jointThreading, jointThreadingChecks } from '../joint-threading-check';
 import { supportInputOf, bottomReach, endSupportChecks, endSupportVerdicts, inflectionChecks, type EndSupportInput } from '../end-support-anchorage';
 

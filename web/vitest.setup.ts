@@ -1,3 +1,5 @@
+// The store starts with the public pages' entries; tests read every key.
+import './src/lib/i18n/full-dictionaries';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { initSolver, solve, hasCanonicalGeometryExport, hasSectionFieldExport } from './src/lib/engine/wasm-solver';

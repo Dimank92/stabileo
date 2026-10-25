@@ -3,9 +3,8 @@
 //! results carry a `StiffnessNotPositiveDefinite` warning; well-posed models
 //! never do, and the warning does not change any number.
 
-#[path = "common/mod.rs"]
-mod common;
-mod fuzz_models;
+use crate::common;
+use crate::fuzz_models;
 
 use common::*;
 use dedaliano_engine::solver::linear::{solve_2d, solve_3d};
@@ -21,7 +20,17 @@ fn warned(d: &[StructuredDiagnostic]) -> bool {
 /// fails, dense LU returns results).
 #[test]
 fn non_positive_definite_fuzz_models_are_warned() {
-    let res = solve_2d(&fuzz_models::random_2d_model(86)).expect("solver returns results");
+    // The model is all trusses: its nodal moments have no rotation DOF to act
+    // on and are refused (validate_loads_2d); the forces alone still leave
+    // the stiffness singular.
+    let mut m86 = fuzz_models::random_2d_model(86);
+    assert!(solve_2d(&m86).unwrap_err().contains("no rotational degrees of freedom"));
+    for l in &mut m86.loads {
+        if let SolverLoad::Nodal(n) = l {
+            n.my = 0.0;
+        }
+    }
+    let res = solve_2d(&m86).expect("solver returns results");
     assert!(warned(&res.structured_diagnostics), "{:?}", res.structured_diagnostics);
     let res = solve_3d(&fuzz_models::random_3d_model(100_031)).expect("solver returns results");
     assert!(warned(&res.structured_diagnostics), "{:?}", res.structured_diagnostics);

@@ -107,7 +107,7 @@ describe('the TypeScript designer (checkShear) never produces the held case', ()
     for (const h of [0.15, 0.2, 0.25]) for (const b of [0.15, 0.2, 0.3, 0.5, 0.8, 1.2]) for (const fc of [20, 25, 30, 45, 70]) {
       for (const fy of [220, 420, 500]) for (const stirrupDia of [6, 8]) for (const Vu of [5, 20, 40, 80]) {
         expect(h).toBeLessThanOrEqual(SHALLOW_BEAM_MAX_H);
-        const sh = checkShear({ b, h, fc, fy, cover: 0.025, stirrupDia } as never, Vu, 0, CIRSOC201_DESIGN_EDITION);
+        const sh = checkShear({ b, h, fc, fy, cover: 0.025, stirrupDia } as never, Vu, 0, { edition: CIRSOC201_DESIGN_EDITION });
         const av = sh.stirrupLegs * (sh.stirrupDia === 6 ? 0.283 : 0.503);
         const cap = computeShearCapacity(sh.stirrupDia, sh.stirrupLegs, sh.spacing, b, sh.d, fc, fy, 0, { Ag: b * h, rhoW: 0.005, h, edition: CIRSOC201_DESIGN_EDITION });
         expect(cap.evaluated).toBe(true);

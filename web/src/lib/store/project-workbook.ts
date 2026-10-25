@@ -30,6 +30,9 @@ import { specificationRows } from '../pro/specification-list';
 import { APP_VERSION, BUILD_COMMIT } from '../build-info';
 import { designSheets, physicalForceRows } from './design-exchange';
 import { detailingStore } from './detailing.svelte';
+import { currentResultProvenance, provenanceLabels, captureProvenanceToken, provenanceForExport, ExportChangedError } from './result-provenance';
+import type { ResultProvenance } from '../provenance/result-provenance';
+import { provenanceTextLines } from '../provenance/result-provenance';
 
 function workbookModel(): WorkbookModel {
   const m = modelStore.model;
@@ -88,7 +91,7 @@ export function stampOutdatedDesign(sheets: readonly WorkbookSheet[], exported: 
   return sheets.map((s) => ({ ...s, rows: [[stamp], ...s.rows] }));
 }
 
-export function currentWorkbookSheets(stations: StationSpec, opts: WorkbookOptions = {}): WorkbookSheet[] {
+export function currentWorkbookSheets(stations: StationSpec, opts: WorkbookOptions = {}, record?: ResultProvenance): WorkbookSheet[] {
   const model = workbookModel();
   const exported = new Date().toISOString();
   const input: ProjectWorkbookInput = {
@@ -96,7 +99,7 @@ export function currentWorkbookSheets(stations: StationSpec, opts: WorkbookOptio
     solved: buildSolverInput3D(model, false, false, { expandMemberOffsets: false }),
     projectName: modelStore.model.name,
     projectInfo: modelStore.projectInfo,
-    meta: { exported, commit: `${APP_VERSION} (${BUILD_COMMIT})` },
+    meta: { exported, commit: `${APP_VERSION} (${BUILD_COMMIT})`, provenance: provenanceTextLines(record ?? currentResultProvenance(), provenanceLabels()) },
     results: {
       sources: workbookSources(opts.sources),
       stations,
@@ -147,20 +150,39 @@ export function workbookZip(sheets: readonly WorkbookSheet[]): Uint8Array {
  * included, as the dialog says (`proExport.dataAlways`). One sheet of data used to come as that
  * sheet alone, without the units and the signs its numbers are in.
  */
-export function downloadProjectCsv(stations: StationSpec, opts: WorkbookOptions = {}): void {
+export async function downloadProjectCsv(stations: StationSpec, opts: WorkbookOptions = {}): Promise<void> {
+  const record = await workbookRecord();
+  if (!record) return;
   const safeName = modelStore.model.name.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ _-]/g, '').trim() || t('file.defaultAnalysis');
-  const sheets = currentWorkbookSheets(stations, opts);
+  const sheets = currentWorkbookSheets(stations, opts, record);
   const data = sheets.filter((s) => s.name !== 'Cover' && s.name !== 'Conventions');
   const name = data.length === 1 ? `${safeName}_${data[0]!.name}_csv.zip` : `${safeName}_csv.zip`;
   downloadBlob(new Blob([workbookZip(sheets) as BlobPart], { type: 'application/zip' }), name);
 }
 
+/**
+ * The cover's provenance, taken when the export starts and written only if nothing moved while the
+ * engine hashes were computed (`provenanceForExport`); the sheets are then built in the same tick.
+ * Null, said, when the project changed: nothing is exported.
+ */
+async function workbookRecord(): Promise<ResultProvenance | null> {
+  try {
+    return await provenanceForExport(captureProvenanceToken());
+  } catch (e) {
+    if (e instanceof ExportChangedError) { uiStore.toast(e.message, 'error'); return null; }
+    throw e;
+  }
+}
+
 /** Write the project workbook: xlsx when it fits, a zip of CSVs otherwise. */
 export async function downloadProjectWorkbook(stations: StationSpec, opts: WorkbookOptions = {}): Promise<void> {
+  const record = await workbookRecord();
+  if (!record) return;
   const safeName = modelStore.model.name.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ _-]/g, '').trim() || t('file.defaultAnalysis');
-  const sheets = currentWorkbookSheets(stations, opts);
+  const sheets = currentWorkbookSheets(stations, opts, record);
   if (fitsInXlsx(sheets)) {
-    await exportToExcel({ filename: `${safeName}.xlsx`, onlyExtras: true, extraSheets: sheets });
+    // The cover already carries the provenance, prepared above.
+    await exportToExcel({ filename: `${safeName}.xlsx`, onlyExtras: true, extraSheets: sheets, provenance: false });
     return;
   }
   const zip = workbookZip(sheets);

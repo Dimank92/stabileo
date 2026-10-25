@@ -16,10 +16,8 @@
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays; };
 
-        rustToolchain = pkgs.rust-bin.stable.latest.default.override {
-          extensions = [ "rust-src" "rust-analyzer" ];
-          targets = [ "wasm32-unknown-unknown" ];
-        };
+        # The one toolchain, shared with rustup and every CI job (scripts/check-pins.sh).
+        rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
       in
       {
         devShells.default = pkgs.mkShell {
@@ -28,10 +26,12 @@
             rustToolchain
             pkgs.wasm-pack
             pkgs.cargo-watch
+            pkgs.cargo-nextest
+            # Compiled crates shared by every worktree (RUSTC_WRAPPER below).
+            pkgs.sccache
 
-            # Node / frontend
+            # Node / frontend: the major in .nvmrc, which CI reads.
             pkgs.nodejs_22
-            pkgs.nodePackages.npm
 
             # Backend runtime deps
             pkgs.pkg-config
@@ -46,7 +46,13 @@
             pkgs.curl
           ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
             pkgs.apple-sdk_15
+          ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
+            # engine/.cargo/config.toml links x86_64 Linux builds with clang + mold.
+            pkgs.clang
+            pkgs.mold
           ];
+
+          RUSTC_WRAPPER = "sccache";
 
           shellHook = ''
             echo "🏗  Dedaliano dev shell ready"
