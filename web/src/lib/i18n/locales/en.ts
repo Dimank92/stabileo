@@ -13842,5 +13842,6 @@ const en: Record<string, string> = {
   "plates.sideCurve": "Curve",
   "plates.sideCurved": "Side curved. The mesh is out of date until you mesh again.",
   "proExport.ifcTip": "The model as an IFC exchange file: members with their profiles, plates with their outline and holes (curved sides in straight pieces), and the results' provenance. With design off it carries nothing of the design.",
+  "plates.sidesSummary": "{n}, {curved} curved",
 };
 export default en;

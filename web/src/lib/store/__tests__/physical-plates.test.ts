@@ -236,6 +236,32 @@ describe('a physical plate', () => {
     expect([plateStatus(A), plateStatus(B)]).toEqual(['current', 'current']);
   });
 
+  it('keeps the loads of the members its mesh cuts, on their pieces', async () => {
+    const { meshQuad } = await import('../../model/edit/mesh-region');
+    const total = () => modelStore.loads.reduce((s, l) => {
+      if (l.type !== 'distributed3d') return s;
+      const d = l.data as { elementId: number; qZI: number; qZJ: number };
+      const e = modelStore.elements.get(d.elementId);
+      expect(e, `load ${l.data.id} names member ${d.elementId}`).toBeDefined();
+      const a = modelStore.nodes.get(e!.nodeI)!, b = modelStore.nodes.get(e!.nodeJ)!;
+      return s + ((d.qZI + d.qZJ) / 2) * Math.hypot(b.x - a.x, b.y - a.y);
+    }, 0);
+    for (const path of ['plate', 'quad'] as const) {
+      modelStore.clear(); historyStore.clear(); uiStore.analysisMode = 'pro';
+      const c = [[0, 0], [6, 0], [6, 4], [0, 4]].map(([x, y]) => modelStore.addNode(x!, y!, 3));
+      const beam = modelStore.addElement(c[0]!, c[1]!);
+      modelStore.addDistributedLoad3D(beam, 0, 0, -10, -10);
+      if (path === 'plate') {
+        const { id } = createPlate({ outline: c, materialId: 1, thickness: 0.2 }) as { id: number };
+        mesh(id, 1);
+      } else {
+        meshQuad(modelStore.addQuad(c as [number, number, number, number], 1, 0.2), { density: { mode: 'targetSize', size: 1 }, splitBeams: true });
+      }
+      expect(modelStore.elements.has(beam), path).toBe(false);
+      expect(total(), path).toBeCloseTo(-60, 9);
+    }
+  });
+
   it('opens again with its outline, mesh and load', () => {
     const { id } = build();
     addPlateLoad(id, 1, 3);

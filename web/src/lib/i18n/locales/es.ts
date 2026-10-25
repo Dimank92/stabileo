@@ -13831,5 +13831,6 @@ const es: Record<string, string> = {
   "plates.sideCurve": "Curvar",
   "plates.sideCurved": "Lado curvado. La malla queda desactualizada hasta que la rehagas.",
   "proExport.ifcTip": "El modelo como archivo de intercambio IFC: barras con sus perfiles, placas con su contorno y sus huecos (los lados curvos en tramos rectos), y la procedencia de los resultados. Con el diseño apagado no lleva nada del diseño.",
+  "plates.sidesSummary": "{n}, {curved} curvos",
 };
 export default es;
