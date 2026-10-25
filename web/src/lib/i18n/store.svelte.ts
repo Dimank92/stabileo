@@ -1,10 +1,7 @@
-import es from './locales/es';
-import en from './locales/en';
-import pt from './locales/pt';
-import steelEs from './locales/steel/es';
-import steelEn from './locales/steel/en';
-import steelPt from './locales/steel/pt';
-import { stepsEs, stepsEn, stepsPt } from './locales/steps';
+// Only the public pages' entries at first (vite.config.ts, `publicI18nPlugin`): the landing and
+// the blog load this module, and the whole dictionaries were most of what they downloaded. The
+// application registers the rest when it loads (`full-dictionaries.ts`), before it renders.
+import { es as publicEs, en as publicEn, pt as publicPt } from 'virtual:public-i18n';
 import type { Translations } from './types';
 
 /**
@@ -38,10 +35,15 @@ import type { Translations } from './types';
  * are the offered three, and a PRO surface must speak all of them.
  */
 const dicts: Record<string, Translations> = {
-  es: { ...es, ...steelEs, ...stepsEs },
-  en: { ...en, ...steelEn, ...stepsEn },
-  pt: { ...pt, ...steelPt, ...stepsPt },
+  es: { ...publicEs },
+  en: { ...publicEn },
+  pt: { ...publicPt },
 };
+
+/** The whole dictionaries (main, steel, steps), registered once by `full-dictionaries.ts`. */
+export function registerDictionaries(full: Record<'es' | 'en' | 'pt', Translations>): void {
+  for (const loc of ['es', 'en', 'pt'] as const) Object.assign(dicts[loc], full[loc]);
+}
 
 /** Safe localStorage check — vitest defines localStorage but without working methods. */
 function hasLocalStorage(): boolean {

@@ -11,7 +11,7 @@ import type { BarPath } from '../../codes/cirsoc201/bar-geometry';
 import { straightSegment } from '../../codes/cirsoc201/bar-geometry';
 import { shapedBarPositions, outlineOf, type ColumnShape } from '../design/shaped-column';
 import { outlineRings } from '../codes/argentina/cirsoc201-section';
-import { polygonArea, type Pt } from '../codes/argentina/section-polygon';
+import { isCounterClockwise, type Pt } from '../codes/argentina/section-polygon';
 
 export interface PlanFrame { ey: readonly number[]; ez: readonly number[] }
 
@@ -29,7 +29,7 @@ export function tieRing(shape: ColumnShape, cover: number, tieDiaMm: number): Pt
     return Array.from({ length: 32 }, (_, i) => ({ x: R * Math.cos((2 * Math.PI * i) / 32), y: R * Math.sin((2 * Math.PI * i) / 32) }));
   }
   const outer = outlineRings(outlineOf(shape)).outer;
-  const ccw = polygonArea(outer) > 0, n = outer.length;
+  const ccw = isCounterClockwise(outer), n = outer.length;
   const nrm = (a: Pt, b: Pt) => { const dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy) || 1; return ccw ? { x: -dy / l, y: dx / l } : { x: dy / l, y: -dx / l }; };
   return outer.map((p, i) => { const n1 = nrm(outer[(i - 1 + n) % n]!, p), n2 = nrm(p, outer[(i + 1) % n]!); return { x: p.x + e * (n1.x + n2.x), y: p.y + e * (n1.y + n2.y) }; });
 }

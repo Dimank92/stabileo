@@ -54,17 +54,17 @@ describe('CIRSOC 201-2025 torsion limits in the verifier (22.7.2)', () => {
 
 /*
  * The design run's sizing (`verifyElement` → `checkShear`/`checkTorsion` with the 2025 edition),
- * 0,30 × 0,60, cover 0,025, Ø8 stirrups, H-25, ADN 500: d = 0,60 − 0,025 − 0,008 − 0,008 = 0,559 m.
- *   Vu = 300 kN: Vc = (1/6)·5·300·559 = 139,75 kN; Vs,req = 300/0,75 − 139,75 = 260,25 kN;
- *   Av/s = Vs/(fyt·d) = 260,25/(420·0,559)·10 = 11,0848 cm²/m (fyt 500: 9,3113).
- *   Torsion: At/s scales with 1/fyt, so the 2025 value is the 2005 one × 500/420.
+ * 0,30 × 0,60, cover 0,025, Ø8 stirrups, H-25. Shear is sized against the engine, which reads
+ * fyt ≤ 420 MPa in Vs (§22.5.3.3 → §20.2.1.3): where the demand governs, an ADN 500 stirrup
+ * needs the Av/s an ADN 420 one does. Torsion is computed here: At/s scales with 1/fyt, so the
+ * 2025 value is the 2005 one × 500/420.
  */
 describe('CIRSOC 201-2025 limits in the required-steel sizing', () => {
   const p = { fc: 25, fy: 500, cover: 0.025, b: 0.3, h: 0.6, stirrupDia: 8 };
-  it('checkShear 2025: Av/s with fyt = 420 MPa; the workbook\'s 2005 default keeps 500', () => {
-    expect(checkShear(p, 300, 0, '2025').AvOverS).toBeCloseTo(11.0848, 3);
-    expect(checkShear(p, 300, 0).AvOverS).toBeCloseTo(9.3113, 3);
-    expect(checkShear(p, 300, 0, '2025').steps[0]).toBe('fyt = 420 MPa en Vs (§22.5.3.3, §20.2.1.3)');
+  it('checkShear 2025: Av/s with fyt = 420 MPa, so ADN 500 needs what ADN 420 needs', () => {
+    const a500 = checkShear(p, 300, 0, { edition: '2025' }), a420 = checkShear({ ...p, fy: 420 }, 300, 0, { edition: '2025' });
+    expect(a500.AvOverS).toBeGreaterThan(a500.AvOverSMin);
+    expect(a500.AvOverS).toBeCloseTo(a420.AvOverS, 2);
   });
   it('checkTorsion 2025: the torsion steel with fy = 420 MPa', () => {
     const t25 = checkTorsion(p, 30, 0, '2025'), t05 = checkTorsion(p, 30, 0);
