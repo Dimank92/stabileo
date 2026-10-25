@@ -20,6 +20,9 @@ import {
 import { syncDefinedLoadsForAnalysis } from '../defined-loads';
 import { serializeProject, deserializeProject } from '../file';
 import { plateLoops } from '../../model/physical/plate';
+import { copyTransformed } from '../../model/edit/transformed-copy';
+import { compose, rotation, translation } from '../../model/edit/affine';
+import { plateLoadDefs } from '../physical-plates';
 import type { AnalysisResults3D } from '../../engine/types-3d';
 
 /** A 6 × 4 m plate at z = 0 with a 1 × 1 m hole, pinned at its corners. */
@@ -189,6 +192,28 @@ describe('a physical plate', () => {
     expect(plateStatus(id)).toBe('current');
     deletePlate(id);
     expect(modelStore.quads.size + modelStore.nodes.size).toBe(0);
+  });
+
+  it('copies whole: mesh still current, its load a definition on the copy', () => {
+    const { id } = build();
+    addPlateLoad(id, 1, 4);
+    mesh(id, 0.5);
+    const g = modelStore.model.groups.get(id)!;
+    // Turned 90° about z and moved clear of the original, with its supports.
+    const T = compose(translation([20, 0, 0]), rotation([0, 0, 0], [0, 0, 1], 90));
+    copyTransformed({ nodes: g.members.nodes!, elements: [], quads: g.members.quads!, plates: g.members.plates ?? [] }, [T], { withSupports: true, withLoads: true });
+    const all = physicalPlates();
+    expect(all).toHaveLength(2);
+    const copy = all.find((p) => p.id !== id)!;
+    expect(plateStatus(copy.id)).toBe('current');
+    expect(plateLoadDefs(copy.id)).toHaveLength(1);
+    expect(plateLoadDefs(id)).toHaveLength(1);
+    // Written by its own definition onto every shell of the copy, once.
+    syncDefinedLoadsForAnalysis();
+    const def = plateLoadDefs(copy.id)[0]!.id;
+    const loaded = modelStore.loads.filter((l) => l.type === 'surface3d' && (l.data as { fromDef?: number }).fromDef === def).map((l) => l.data.quadId);
+    expect(new Set(loaded).size).toBe(loaded.length);
+    expect(loaded.length).toBe(copy.group.members.quads!.length);
   });
 
   it('opens again with its outline, mesh and load', () => {

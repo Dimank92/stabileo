@@ -61,6 +61,7 @@ import { lastAutosaveOutcome, requestAutosave } from '../store/autosave-service'
 import { loadFixture } from '../templates/load-fixture';
 import { currentResultProvenance, provenanceForExport, captureProvenanceToken } from '../store/result-provenance';
 import { recheckStore } from '../store/recheck.svelte';
+import { physicalPlates, plateLoadDefs, plateStatus } from '../store/physical-plates';
 
 export const E2E_QUERY_FLAG = 'e2e';
 
@@ -187,6 +188,10 @@ export interface StabileoTestHooks {
    * when three of the four filters silently selected nothing.
    */
   selectionByKind(): { nodes: number[]; elements: number[]; supports: number[]; loads: number[] };
+  /** The physical plates: each one's mesh state and the shells it holds (`store/physical-plates.ts`). */
+  plates(): Array<{ id: number; name: string; status: string; shells: number; loads: number }>;
+  /** The plates selected whole, and the shells selected. */
+  plateSelection(): { plates: number[]; shells: string[]; scope: string };
   /** Which kinds a drag is currently armed to pick up. */
   armedKinds(): string[];
   /** What the viewport is drawing — the walkthrough audit reads this. */
@@ -750,6 +755,12 @@ export function installE2EHooks(): void {
       ? [drawState.memberStart] : [...uiStore.shellNodePick.picked]),
     nodeCount: () => modelStore.nodes.size,
     supportCount: () => modelStore.supports.size,
+    plates: () => physicalPlates().map((p) => ({
+      id: p.id, name: p.name, status: plateStatus(p.id),
+      shells: (p.group.members.quads?.length ?? 0) + (p.group.members.plates?.length ?? 0),
+      loads: plateLoadDefs(p.id).length,
+    })),
+    plateSelection: () => ({ plates: [...uiStore.selectedPlates].sort((a, b) => a - b), shells: [...uiStore.selectedShells].sort(), scope: uiStore.shellPickScope }),
     selectionByKind: () => {
       const sorted = (s: Iterable<number>) => [...s].sort((a, b) => a - b);
       return {

@@ -93,6 +93,15 @@ export function fragmentOf(set: EntitySet, opts: FragmentOptions = {}): Fragment
     materials: [], sections: [], loadCases: [],
     local: true,
   };
+  // An area load defined on a group the fragment holds (a physical plate's) goes with it: copied
+  // as loads only, the copy would hold plain loads that its next mesh cannot carry.
+  if (opts.withGroups !== false) {
+    const held = new Set(frag.groups.map((g) => g.id));
+    for (const g of modelStore.model.groups.values()) {
+      const target = (g.data as { target?: { by?: string; groupId?: number } } | undefined)?.target;
+      if (g.kind === 'floorLoad' && target?.by === 'group' && held.has(target.groupId!) && !held.has(g.id)) frag.groups.push(clone(g));
+    }
+  }
   const matIds = new Set([...frag.elements.map((e) => e.materialId), ...frag.quads.map((q) => q.materialId), ...frag.plates.map((p) => p.materialId)]);
   const secIds = new Set(frag.elements.flatMap((e) => (e.variableSection ? [e.sectionId, e.variableSection.sectionJ] : [e.sectionId])));
   // Preserve the original generated section too when a member has been manually resized.

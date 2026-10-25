@@ -272,15 +272,19 @@ export function externalFeatures(m: PlateModel, geo: PlateGeometry, owned: Reado
 }
 
 const r6 = (v: number) => (Math.round(v * 1e6) / 1e6).toString();
-const key3 = (p: Vec3) => `${r6(p[0])},${r6(p[1])},${r6(p[2])}`;
 
-/** What a mesh is made from, as one string: equal strings, the same mesh. */
+/**
+ * What a mesh is made from, as one string: equal strings, the same mesh. Written in the plate's own
+ * axes, so a plate moved or turned whole with what it meets (a copy) keeps a current mesh.
+ */
 export function plateSignature(geo: PlateGeometry, spec: PlateMeshSpec, features: { points: Vec3[]; segments: Array<[Vec3, Vec3]> } | null): string {
+  const f = geo.frame;
+  const key3 = (p: Vec3) => { const d = sub(p, f.o); return `${r6(dot(d, f.u))},${r6(dot(d, f.v))},${r6(dot(d, f.n))}`; };
   const loops = [geo.outer, ...geo.holes].map((l) => l.map(key3).join(';')).join('|');
-  const f = features && spec.followMembers
+  const ft = features && spec.followMembers
     ? `${features.points.map(key3).sort().join(';')}#${features.segments.map(([a, b]) => [key3(a), key3(b)].sort().join('>')).sort().join(';')}`
     : '';
-  return `${loops}@${r6(spec.size)}/${spec.element}/${spec.followMembers ? 1 : 0}@${f}`;
+  return `${loops}@${r6(spec.size)}/${spec.element}/${spec.followMembers ? 1 : 0}@${ft}`;
 }
 
 /** The mesher's input for a plate. */
