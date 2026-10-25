@@ -28,7 +28,7 @@ import { createSupportGizmo } from '../three/create-support-gizmo';
 import type { SupportGizmoType } from '../three/create-support-gizmo';
 import { createLoadArrowsBatched } from '../three/load-arrows-batched';
 import { COLORS, setGroupColor, disposeObject } from '../three/selection-helpers';
-import { createPlateMesh, createQuadMesh, shellColorForMaterial, paintShell, paintShellEdge, restoreShellColor } from '../three/create-shell-mesh';
+import { createPhysicalPlateMesh, createPlateMesh, createQuadMesh, shellColorForMaterial, paintShell, paintShellEdge, restoreShellColor } from '../three/create-shell-mesh';
 import { computeLocalAxes3D } from '../engine/local-axes-3d';
 import { createLocalAxesTriad } from '../three/create-local-axes';
 import { createMemberOffsetViz } from '../three/create-offset-viz';
@@ -37,6 +37,8 @@ import { jointHasRelease, type Section } from '../store/model.svelte';
 import { variableSectionPlan } from '../section/variable';
 import { DEFAULT_VARIABLE_SEGMENTS } from '../engine/variable-members';
 import { hasShellOffset, resolveShellOffsetGlobal } from '../engine/shell-offsets';
+import { physicalPlates } from '../store/physical-plates';
+import { plateGeometry, plateLoops } from '../model/physical/plate';
 import type { SolverNode3D } from '../engine/types-3d';
 import {
   get2DDisplayNodalLoadMoment,
@@ -612,6 +614,33 @@ function syncShellsNow(ctx: SceneSyncContext): void {
     seen.add(key);
   }
 
+  // Physical plates with no mesh yet: drawn from their outline, so they can be seen and picked.
+  for (const pl of physicalPlates()) {
+    if ((pl.group.members.quads?.length ?? 0) + (pl.group.members.plates?.length ?? 0) > 0) continue;
+    const key = `P${pl.id}`;
+    const geo = plateGeometry(modelStore, pl.group);
+    if (!geo) continue;
+    const loops = plateLoops(pl.group);
+    const scene = (ids: number[]) => ids.map((nid) => getNode(nid));
+    const outer = scene(loops.outer), holes = loops.holes.map(scene);
+    if (outer.some((n) => !n) || holes.some((h) => h.some((n) => !n))) continue;
+    const f = geo.frame;
+    const uv = (p: [number, number, number]): [number, number] => {
+      const d = [p[0] - f.o[0], p[1] - f.o[1], p[2] - f.o[2]];
+      return [d[0]! * f.u[0] + d[1]! * f.u[1] + d[2]! * f.u[2], d[0]! * f.v[0] + d[1]! * f.v[1] + d[2]! * f.v[2]];
+    };
+    const signature = `${renderMode}|${pl.surface.materialId}|` + [outer, ...holes].map((l) => l.map((n) => `${n!.x}:${n!.y}:${n!.z}`).join(';')).join('|');
+    const existing = ctx.shellGroups.get(key);
+    if (existing && existing.userData.shellSig === signature) { seen.add(key); continue; }
+    if (existing) { ctx.shellsParent.remove(existing); disposeObject(existing); }
+    const group = createPhysicalPlateMesh(outer as Array<{ x: number; y: number; z: number }>, holes as Array<Array<{ x: number; y: number; z: number }>>,
+      { outer: geo.outer.map(uv), holes: geo.holes.map((h) => h.map(uv)) }, pl.id, { renderMode, faceColor: shellColorForMaterial(pl.surface.materialId) });
+    group.userData.shellSig = signature;
+    ctx.shellsParent.add(group);
+    ctx.shellGroups.set(key, group);
+    seen.add(key);
+  }
+
   // Re-apply selection tint to surviving/rebuilt shell groups.
   applyShellSelection(ctx);
 
@@ -641,13 +670,14 @@ export function applyShellSelection(ctx: SceneSyncContext): void {
   if (!ctx.initialized) return;
   const selected = uiStore.selectedShells;
   // Drawn as members, a shell has a group of its own only while selected: the selection changed, so do they.
-  if (!inShellSync && meshHidden() && (selected.size !== ctx.shellGroups.size || [...selected].some((k) => !ctx.shellGroups.has(k)))) {
+  if (!inShellSync && meshHidden() && (selected.size !== [...ctx.shellGroups.keys()].filter((k) => k[0] !== 'P').length || [...selected].some((k) => !ctx.shellGroups.has(k)))) {
     syncShells(ctx);
     return;
   }
   const contour = shellContourActive();
+  const plates = uiStore.selectedPlates;
   for (const [key, group] of ctx.shellGroups) {
-    const isSel = selected.has(key);
+    const isSel = key[0] === 'P' ? plates.has(Number(key.slice(1))) : selected.has(key);
     if (contour) {
       paintShellEdge(group, isSel ? COLORS.elementSelected : (group.userData.baseEdgeColor as number) ?? COLORS.support);
     } else if (isSel) {

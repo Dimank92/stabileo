@@ -23,6 +23,7 @@
   import ProMemberStressTable from './ProMemberStressTable.svelte';
   import ProShellContourOptions from './ProShellContourOptions.svelte';
   import ProShellFacesTable from './ProShellFacesTable.svelte';
+  import PlateResults from './plates/PlateResults.svelte';
   import ProRecordVideo from './ProRecordVideo.svelte';
   import { fmtQ, unitQ } from '../../lib/store/display-units.svelte';
   import QuantityInput from './loads/QuantityInput.svelte';
@@ -627,6 +628,7 @@
 
     <!-- Results tables — each collapsible -->
     <div class="pro-res-scroll">
+      <PlateResults />
 
       <!-- Result query / extraction -->
       <!--

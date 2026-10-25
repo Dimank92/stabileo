@@ -263,6 +263,21 @@ function createUIStore() {
   // Shell (plate/quad) selection, keyed "p{id}" / "q{id}" to avoid colliding
   // with element ids. Separate channel from selectedElements (frames/trusses).
   let selectedShells = $state<Set<string>>(new Set());
+  /**
+   * Physical plates selected whole (`store/physical-plates.ts`), by group id. A meshed one also has
+   * its shells in `selectedShells`, so every shell tool reaches its mesh; it stays selected while
+   * all of them do. One with no mesh is selected only here.
+   */
+  let selectedPlates = $state<Set<number>>(new Set());
+  /** What a click on a plate's mesh picks: the plate whole, or the one element clicked. */
+  let shellPickScope = $state<'plate' | 'element'>('plate');
+  let plateShells: ((id: number) => string[]) | null = null;
+  function setShells(v: Set<string>, keepPlates = false) {
+    selectedShells = v;
+    if (keepPlates || selectedPlates.size === 0) return;
+    const kept = [...selectedPlates].filter((id) => { const k = plateShells?.(id) ?? []; return k.length > 0 && k.every((x) => v.has(x)); });
+    if (kept.length !== selectedPlates.size) selectedPlates = new Set(kept);
+  }
   // Shell node-pick: click nodes in the 3D viewport to fill a shell/mesh
   // creator instead of typing IDs. `target` says which creator is collecting.
   let shellNodePick = $state<{ active: boolean; target: ShellPickTarget | null; picked: number[]; capacity: number }>(
@@ -737,7 +752,7 @@ function createUIStore() {
     const takes = (k: SelectMode) => (multiKindSelect ? selectKinds.has(k) : selectMode === k);
     if (!takes('nodes') && selectedNodes.size) selectedNodes = new Set();
     if (!takes('elements') && !takes('stress') && selectedElements.size) selectedElements = new Set();
-    if (!takes('shells') && selectedShells.size) selectedShells = new Set();
+    if (!takes('shells') && selectedShells.size) setShells(new Set());
     if (!takes('supports') && selectedSupports.size) selectedSupports = new Set();
     if (!takes('loads') && selectedLoads.size) selectedLoads = new Set();
   }
@@ -938,6 +953,25 @@ function createUIStore() {
     set selectedSupports(v: Set<number>) { selectedSupports = v; },
     clearSelectedSupports() { selectedSupports = new Set(); },
     get selectedShells() { return selectedShells; },
+    get selectedPlates() { return selectedPlates; },
+    get shellPickScope() { return shellPickScope; },
+    set shellPickScope(v: 'plate' | 'element') { shellPickScope = v; },
+    /** How the store finds a plate's shells; set once by `physical-plates.ts`. */
+    setPlateShellResolver(fn: (id: number) => string[]) { plateShells = fn; },
+    /** Select physical plates whole: each one and its mesh, if it has one. */
+    selectPlates(ids: readonly number[], addToSelection = false) {
+      const plates = new Set(addToSelection ? [...selectedPlates, ...ids] : ids);
+      const keys = new Set(addToSelection ? selectedShells : []);
+      for (const id of ids) for (const k of plateShells?.(id) ?? []) keys.add(k);
+      if (!addToSelection) {
+        selectedNodes = new Set();
+        selectedElements = new Set();
+        selectedSupports = new Set();
+        selectedLoads = new Set();
+      }
+      selectedPlates = plates;
+      setShells(keys, true);
+    },
 
     get mouseX() { return mouseX; },
     get mouseY() { return mouseY; },
@@ -1431,7 +1465,7 @@ function createUIStore() {
       } else {
         selectedNodes = new Set([id]);
         selectedElements = new Set();
-        selectedShells = new Set();
+        setShells(new Set());
         // Emptied element selection can't stay 'manual' — a stale true here
         // permanently suppresses the result-query highlight.
         elementSelectionManual = false;
@@ -1445,7 +1479,7 @@ function createUIStore() {
       } else {
         selectedNodes = new Set();
         selectedElements = new Set([id]);
-        selectedShells = new Set();
+        setShells(new Set());
       }
     },
 
@@ -1456,7 +1490,7 @@ function createUIStore() {
       shellNodePick = { active: true, target, picked: [], capacity };
       selectedNodes = new Set();
       selectedElements = new Set();
-      selectedShells = new Set();
+      setShells(new Set());
     },
     /** Push a clicked node id into the active pick buffer (ignores duplicates).
      *  Auto-stops when capacity is reached. Highlights picked nodes. */
@@ -1475,9 +1509,9 @@ function createUIStore() {
     /** Select a shell (plate/quad). `key` is "p{id}" or "q{id}". */
     selectShell(key: string, addToSelection = false) {
       if (addToSelection) {
-        selectedShells = new Set([...selectedShells, key]);
+        setShells(new Set([...selectedShells, key]));
       } else {
-        selectedShells = new Set([key]);
+        setShells(new Set([key]));
         selectedNodes = new Set();
         selectedElements = new Set();
         selectedSupports = new Set();
@@ -1491,7 +1525,7 @@ function createUIStore() {
         selectedNodes = new Set();
         selectedElements = new Set();
         selectedSupports = new Set();
-        selectedShells = new Set();
+        setShells(new Set());
         elementSelectionManual = false;
       } else {
         selectedLoads = new Set([...selectedLoads, id]);
@@ -1504,7 +1538,7 @@ function createUIStore() {
         selectedNodes = new Set();
         selectedElements = new Set();
         selectedLoads = new Set();
-        selectedShells = new Set();
+        setShells(new Set());
         elementSelectionManual = false;
       } else {
         selectedSupports = new Set([...selectedSupports, id]);
@@ -1518,7 +1552,7 @@ function createUIStore() {
       selectedElements = new Set();
       selectedLoads = new Set();
       selectedSupports = new Set();
-      selectedShells = new Set();
+      setShells(new Set());
     },
 
     /** Bulk-set node and element selection. `manual` = true only for genuine
@@ -1529,7 +1563,7 @@ function createUIStore() {
       elementSelectionManual = manual;
       selectedNodes = nodes;
       selectedElements = elements;
-      selectedShells = shells;
+      setShells(shells);
     },
 
     /** True only when the element selection came from a manual action. */
@@ -1568,7 +1602,7 @@ function createUIStore() {
       selectedElements = new Set();
       selectedLoads = new Set();
       selectedSupports = new Set();
-      selectedShells = new Set();
+      setShells(new Set());
       elementsAside = null;
       for (const hook of sessionResetHooks) hook();
       // NOT reset: grid, showGrid, snapToGrid, zoom/pan, labels, analysisMode,

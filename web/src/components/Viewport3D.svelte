@@ -61,6 +61,7 @@
   import { ElementsPicking } from '../lib/three/elements-picking';
   import { fatLineResolution } from '../lib/three/create-element-mesh';
   import { resolveHitUserData, shellSelectionKey } from '../lib/viewport3d/picking';
+  import { plateOfShell, platesInMarquee } from '../lib/store/physical-plates';
   import { currentLoadDrawView, isLoadDrawn } from '../lib/viewport3d/load-drawn';
   import { evaluateDiagramAt, formatDiagramValue3D, type Diagram3DKind } from '../lib/engine/diagrams-3d';
   import { certificateStore, formatBound } from '../lib/store/certificate.svelte';
@@ -3016,6 +3017,19 @@
 
         // Reassign sets to trigger Svelte reactivity (manual box-select)
         uiStore.setSelection(newNodes, newElems, true, newShells);
+        // Picking plates whole: the plates the marquee takes (by their shells, or by their outline
+        // when they have no mesh) are selected whole, mesh and all.
+        if (allowShells && uiStore.shellPickScope === 'plate') {
+          const cornerIn = (nodeId: number): boolean => {
+            const nd = modelStore.getNode(nodeId);
+            if (!nd) return false;
+            const sp = projectNodeToScene(nd, project2D);
+            const sc = projectToScreen(sp.x, sp.y, sp.z);
+            return sc.x >= x1 && sc.x <= x2 && sc.y >= y1 && sc.y <= y2;
+          };
+          const plates = platesInMarquee(newShells, cornerIn, isWindow);
+          if (plates.length) uiStore.selectPlates(plates, true);
+        }
       } else {
         // Small drag = click → delegate to normal click selection
         boxSelect3D = null;
@@ -3212,10 +3226,9 @@
       const nodeHits = raycaster.intersectObjects(nodesParent.children, true);
       for (const hit of nodeHits) {
         const ud = resolveHitUserData(hit);
-        if (ud?.type === 'node') { uiStore.pushShellNodePick(ud.id); break; }
+        // The last corner, or the first one again on an outline, makes the plate (`drawState`).
+        if (ud?.type === 'node') { drawState.pickPlateNode(ud.id); break; }
       }
-      // The last corner makes the plate; see `drawState.finishPlate`.
-      drawState.finishPlate();
       return; // consume the click while picking (no normal selection / clear)
     }
 
@@ -3306,9 +3319,15 @@
     if (sm === 'shells') {
       const shellHits = raycaster.intersectObjects(shellsParent.children, true);
       for (const hit of shellHits) {
-        const key = shellSelectionKey(resolveHitUserData(hit));
+        const ud = resolveHitUserData(hit);
+        // A physical plate with no mesh is only ever the plate.
+        if (ud?.type === 'physicalPlate') { uiStore.selectPlates([ud.id], addToSel); return; }
+        const key = shellSelectionKey(ud);
         if (key) {
-          uiStore.selectShell(key, addToSel);
+          // Picking plates whole, a click on an element of a plate's mesh is the plate.
+          const plate = uiStore.shellPickScope === 'plate' ? plateOfShell(key) : null;
+          if (plate !== null) uiStore.selectPlates([plate], addToSel);
+          else uiStore.selectShell(key, addToSel);
           return;
         }
       }

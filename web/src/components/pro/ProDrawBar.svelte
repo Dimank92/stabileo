@@ -35,7 +35,9 @@
       case 'element': return drawState.memberStart === null
         ? t('drawBar.stepMemberI')
         : tp('drawBar.stepMemberJ', { id: drawState.memberStart });
-      case 'plate': return tp('drawBar.stepPlate', { k: Math.min(pick.picked.length + 1, drawState.plateCorners), n: drawState.plateCorners });
+      case 'plate': return drawState.plateCorners === 'outline'
+        ? (pick.picked.length < 3 ? tp('drawBar.stepOutline', { k: pick.picked.length + 1 }) : tp('drawBar.stepOutlineClose', { first: pick.picked[0] ?? '' }))
+        : tp('drawBar.stepPlate', { k: Math.min(pick.picked.length + 1, drawState.plateCorners), n: drawState.plateCorners });
       default: return '';
     }
   });
@@ -49,10 +51,21 @@
 
   function undoCorner() {
     const kept = pick.picked.slice(0, -1);
-    uiStore.startShellNodePick('quad', drawState.plateCorners);
+    drawState.startPlate();
     for (const id of kept) uiStore.pushShellNodePick(id);
   }
+
+  /** Enter closes an outline being drawn, as clicking its first node does. */
+  function onKey(e: KeyboardEvent) {
+    if (e.key !== 'Enter' || tool !== 'plate' || drawState.plateCorners !== 'outline' || pick.picked.length < 3) return;
+    const el = e.target as HTMLElement | null;
+    if (el && (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA')) return;
+    e.preventDefault();
+    drawState.closeOutline();
+  }
 </script>
+
+<svelte:window onkeydown={onKey} />
 
 {#if drawState.active}
   <div class="db" data-testid="pro-draw-bar" data-tool={tool}>
@@ -78,15 +91,19 @@
         </label>
       {:else if tool === 'plate'}
         <div class="db-seg" role="group" aria-label={t('drawBar.corners')}>
-          <button class:on={drawState.plateCorners === 3} aria-pressed={drawState.plateCorners === 3} onclick={() => (drawState.plateCorners = 3)} data-testid="draw-corners-3">{t('drawBar.triangle')}</button>
-          <button class:on={drawState.plateCorners === 4} aria-pressed={drawState.plateCorners === 4} onclick={() => (drawState.plateCorners = 4)} data-testid="draw-corners-4">{t('drawBar.quad')}</button>
+          <button class:on={drawState.plateCorners === 'outline'} aria-pressed={drawState.plateCorners === 'outline'} onclick={() => (drawState.plateCorners = 'outline')} title={t('drawBar.outlineHint')} data-testid="draw-corners-outline">{t('drawBar.outline')}</button>
+          <button class:on={drawState.plateCorners === 3} aria-pressed={drawState.plateCorners === 3} onclick={() => (drawState.plateCorners = 3)} title={t('drawBar.elementHint')} data-testid="draw-corners-3">{t('drawBar.triangle')}</button>
+          <button class:on={drawState.plateCorners === 4} aria-pressed={drawState.plateCorners === 4} onclick={() => (drawState.plateCorners = 4)} title={t('drawBar.elementHint')} data-testid="draw-corners-4">{t('drawBar.quad')}</button>
         </div>
         <span class="db-chips" data-testid="draw-corners">
-          {#each Array.from({ length: drawState.plateCorners }, (_, i) => i) as i (i)}
+          {#each Array.from({ length: drawState.plateCorners === 'outline' ? Math.max(3, pick.picked.length + 1) : drawState.plateCorners }, (_, i) => i) as i (i)}
             <span class="db-chip" class:set={pick.picked[i] !== undefined}>{pick.picked[i] ?? `N${i + 1}`}</span>
           {/each}
         </span>
         <button class="db-btn" disabled={pick.picked.length === 0} onclick={undoCorner} data-testid="draw-undo-corner">{t('drawBar.undoCorner')}</button>
+        {#if drawState.plateCorners === 'outline'}
+          <button class="db-btn" disabled={pick.picked.length < 3} onclick={() => drawState.closeOutline()} data-testid="draw-close-outline">{t('drawBar.closeOutline')} <kbd>Enter</kbd></button>
+        {/if}
         <select value={drawState.plateMaterialId} onchange={(e) => (drawState.plateMaterialId = Number(e.currentTarget.value))} aria-label={t('pro.thMaterial')}>
           {#each materials as m (m.id)}<option value={m.id}>{m.name}</option>{/each}
         </select>

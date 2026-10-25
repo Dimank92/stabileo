@@ -335,3 +335,45 @@ export function ensureOwnShellMaterial(mesh: THREE.Mesh): THREE.MeshStandardMate
   mesh.userData.ownShellMaterial = true;
   return owned;
 }
+
+/** The outline colour of a physical plate that has no mesh yet: the plate is there, its elements are not. */
+export const UNMESHED_PLATE_EDGE = 0xe0a040;
+
+/**
+ * A physical plate with no mesh (`store/physical-plates.ts`), drawn from its outline and holes:
+ * its face triangulated only to be seen and clicked, and its loops as the outline. `uv` are the
+ * loops' points in the plate's own plane, in the same order as `outer` and `holes`.
+ */
+export function createPhysicalPlateMesh(
+  outer: Vec3[], holes: Vec3[][], uv: { outer: Array<[number, number]>; holes: Array<Array<[number, number]>> },
+  plateId: number, opts: { faceColor?: number; renderMode: ShellRenderMode },
+): THREE.Group {
+  const group = new THREE.Group();
+  const contour = uv.outer.map(([x, y]) => new THREE.Vector2(x, y));
+  const hs = uv.holes.map((h) => h.map(([x, y]) => new THREE.Vector2(x, y)));
+  const faces = THREE.ShapeUtils.triangulateShape(contour, hs);
+  const pts = [...outer, ...holes.flat()];
+  const pos = new Float32Array(pts.length * 3);
+  pts.forEach((p, i) => { pos[i * 3] = p.x; pos[i * 3 + 1] = p.y; pos[i * 3 + 2] = p.z; });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setIndex(faces.flat());
+  geo.computeVertexNormals();
+  const faceColor = opts.faceColor ?? SHELL_COLOR;
+  const faceMat = makeFaceMaterial(faceColor, opts.renderMode === 'sections' || opts.renderMode === 'physical' ? 'solid' as ShellRenderMode : opts.renderMode);
+  const mesh = new THREE.Mesh(geo, faceMat);
+  mesh.userData.shellFace = true;
+  mesh.userData.ownShellMaterial = true;
+  group.add(mesh);
+  const seg: number[] = [];
+  for (const loop of [outer, ...holes]) {
+    for (let i = 0; i < loop.length; i++) { const a = loop[i]!, b = loop[(i + 1) % loop.length]!; seg.push(a.x, a.y, a.z, b.x, b.y, b.z); }
+  }
+  const eg = new THREE.BufferGeometry();
+  eg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(seg), 3));
+  const edges = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: UNMESHED_PLATE_EDGE }));
+  edges.userData.shellEdge = true;
+  group.add(edges);
+  group.userData = { type: 'physicalPlate', id: plateId, baseFaceColor: faceColor, baseEdgeColor: UNMESHED_PLATE_EDGE, renderMode: opts.renderMode };
+  return group;
+}
