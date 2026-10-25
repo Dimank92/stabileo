@@ -287,19 +287,7 @@ export function deserializeProject(text: string): boolean {
   if (!isValidDedalFile({ ...d, version: DEDAL_FILE_VERSION })) return false;
 
   const data = d as unknown as DedalFile;
-  forgetSessionDemandRevisions(data.snapshot);
-  historyStore.pushState();
-  modelStore.restore(data.snapshot);
-  modelStore.announceNewProject();
-  // Adopted separately from `restore()`, which is also the undo path — see project-provenance.ts.
-  // A file written before these fields existed hydrates to "we do not know", not to "none".
-  hydrateProjectProvenance(data.snapshot);
-  adoptLoadCases();
-  modelStore.model.name = data.name;
-  // A different model now occupies the store: any 3D original held for the
-  // simplified-2D round trip belongs to the model that was just replaced, and
-  // restoring it from here on would wipe THIS one. (See switch-2d.ts.)
-  resetSwitchBackup();
+  adoptStoredProject(data.snapshot, data.name);
   // appMode is derived from analysisMode (getter-only) — assigning it throws
   // in strict mode, which broke opening any .ded that carried appMode.
   // Restoring analysisMode below already yields the right appMode.
@@ -319,6 +307,29 @@ export function deserializeProject(text: string): boolean {
   // Design kept in the file while it is off in PRO's settings: offered, not switched on.
   noteDesignHeldIfOff();
   return true;
+}
+
+/**
+ * A stored project made the one in the store, as a `.ded` open and an autosave restore both make
+ * it: one undo step back to what was there, the project announced as new (the previous one's
+ * runs, marks and design view forgotten), and its provenance (hand edits, exports) adopted. The
+ * autosave restore used to do only the `restore()`, so the hand-edit record was the session's
+ * empty one: «Size…» then replaced bars edited by hand, and the next autosave wrote it empty.
+ */
+export function adoptStoredProject(snapshot: ModelSnapshot, name: string): void {
+  forgetSessionDemandRevisions(snapshot);
+  historyStore.pushState();
+  modelStore.restore(snapshot);
+  modelStore.announceNewProject();
+  // Adopted separately from `restore()`, which is also the undo path — see project-provenance.ts.
+  // A file written before these fields existed hydrates to "we do not know", not to "none".
+  hydrateProjectProvenance(snapshot);
+  adoptLoadCases();
+  modelStore.model.name = name;
+  // A different model now occupies the store: any 3D original held for the
+  // simplified-2D round trip belongs to the model that was just replaced, and
+  // restoring it from here on would wipe THIS one. (See switch-2d.ts.)
+  resetSwitchBackup();
 }
 
 /**
@@ -1082,11 +1093,17 @@ export function saveWorkspaceToLocalStorage(): void {
       type: 'session',
       timestamp: new Date().toISOString(),
       activeTabId: tabManager.activeTabId ?? '',
-      tabs: sessionTabsCopy(),
+      // The tabs without their undo stacks: a reload does not undo across it, and the stacks (up to
+      // 50 snapshots a tab, the detailing in each) are what overflowed localStorage on a designed
+      // project.
+      tabs: sessionTabsCopy().map((tab) => ({ ...tab, undoStack: [], redoStack: [], undoKinds: [], redoKinds: [] })),
     };
     localStorage.setItem(WORKSPACE_KEY, JSON.stringify(session));
   } catch {
-    // localStorage might be full or unavailable — silently ignore
+    // localStorage is full or unavailable. The workspace written before stays behind otherwise, and
+    // at the next start it would be restored over the newer autosave: withdrawn, so the autosave is
+    // offered instead.
+    clearWorkspaceFromLocalStorage();
   }
 }
 

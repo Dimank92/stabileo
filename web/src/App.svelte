@@ -38,7 +38,7 @@
   import {
     loadAutosave, clearAutosave,
     loadWorkspaceFromLocalStorage, saveWorkspaceToLocalStorage,
-    downloadCanvasPNG, downloadDataUrlPNG, onProjectOpened, noteBasicSelfWeightRuleIfNeeded,
+    downloadCanvasPNG, downloadDataUrlPNG, onProjectOpened, noteBasicSelfWeightRuleIfNeeded, adoptStoredProject,
     type DedalFile,
   } from './lib/store/file';
   import { requestAutosave } from './lib/store/autosave-service';
@@ -713,8 +713,8 @@
 
   function restoreAutosave() {
     if (autosaveData) {
-      modelStore.restore(autosaveData.snapshot);
-      modelStore.model.name = autosaveData.name;
+      // As a .ded open adopts it (`adoptStoredProject`): its hand edits and exports with it.
+      adoptStoredProject(autosaveData.snapshot, autosaveData.name);
       // Same convention note as a .ded open — an autosave predating the metadata
       // is restored under the corrected convention, so warn if it's a legacy 3D model.
       onProjectOpened(autosaveData.snapshot, autosaveData.analysisMode);

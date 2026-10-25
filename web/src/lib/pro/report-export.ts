@@ -21,7 +21,7 @@
  */
 
 import { captureProvenanceToken, provenanceForExport, provenanceLabels, ExportChangedError } from '../store/result-provenance';
-import { reportProvenance } from '../export/provenance-attach';
+import { reportProvenanceLines } from '../export/provenance-attach';
 import { runEngineActionAsync } from '../store/engine-action';
 import { tick } from 'svelte';
 import { viewportCanvas } from '../utils/viewport-canvas';
@@ -117,7 +117,7 @@ async function exportReportWithEngine(input: ReportExportInputs, token: ReturnTy
   }
   if (!input.format || input.format === 'pdf') { openReport(data); return; }
   const { downloadReport } = await import('../export/report-download');
-  await downloadReport(input.format, { title: data.projectName || input.t('proReport.title'), html: generateReportHtml(data), stem: `report-${(data.projectName || 'model').replace(/[^\w.-]+/g, '-')}`, ...(data.resultProvenance ? { provenance: reportProvenance(data.resultProvenance.record) } : {}) });
+  await downloadReport(input.format, { title: data.projectName || input.t('proReport.title'), html: generateReportHtml(data), stem: `report-${(data.projectName || 'model').replace(/[^\w.-]+/g, '-')}`, ...(data.resultProvenance ? { provenance: reportProvenanceLines(data.resultProvenance.record) } : {}) });
 }
 
 /** How the report's figures are drawn: the dialog's choices. */

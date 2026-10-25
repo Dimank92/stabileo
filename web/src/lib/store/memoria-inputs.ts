@@ -419,8 +419,12 @@ export function memoriaInput(tr: Tr, locale: string): MemoriaInput {
     const own = /^e(\d+)$/.exec(el.id), fx = /^fx-.+-(\d+)$/.exec(el.id);
     const id = Number((own ?? fx)?.[1]);
     if (!Number.isFinite(id) || !verificationStore.contextFor(id)) continue;
-    const holds = verificationStore.memberVerdict(id).holds.filter((h) => own || h.kind === 'analysis');
-    if (holds.length) el.heldBy = holds.map((h) => holdText(h, tr));
+    const verdict = verificationStore.memberVerdict(id);
+    const holds = verdict.holds.filter((h) => own || h.kind === 'analysis');
+    const held = holds.map((h) => holdText(h, tr));
+    // A design read on results that have since changed is open, as the screen shows it: never «Cumple».
+    if (verdict.status === 'stale') held.push(holdText({ key: 'verdict.hold.stale' }, tr));
+    if (held.length) el.heldBy = held;
   }
 
   // ── Hypotheses

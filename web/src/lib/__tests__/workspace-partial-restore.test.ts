@@ -218,3 +218,29 @@ describe('acceptSessionTabs', () => {
     expect(verdict.dropped).toEqual([{ index: 1, name: 'Viga rota' }]);
   });
 });
+
+/*
+ * The workspace a write could not replace. A small workspace written early (an example, the
+ * project before its design) stayed behind when a larger one overflowed the quota, and at the
+ * next start it was restored over the newer autosave, which was then never offered.
+ */
+describe('a workspace write that does not fit', () => {
+  it('withdraws the older stored workspace, so the autosave is offered at the next start', () => {
+    storage.setItem(WORKSPACE_KEY, storedWorkspace());
+    const big = memoryStorage(storage.getItem(WORKSPACE_KEY)!.length + 64);
+    big.setItem(WORKSPACE_KEY, storage.getItem(WORKSPACE_KEY)!);
+    vi.stubGlobal('localStorage', big);
+    tabManager.restoreSession([tab('a', 'Pórtico A', snapshot({ notes: [{ id: 1, text: 'x'.repeat(4000) }] })) as never], 'a');
+    saveWorkspaceToLocalStorage();
+    expect(big.getItem(WORKSPACE_KEY)).toBeNull();
+    expect(loadWorkspaceFromLocalStorage()).toBeNull();
+  });
+
+  it('is written without the undo stacks', () => {
+    tabManager.restoreSession([{ ...tab('a', 'Pórtico A', snapshot()), undoStack: [snapshot(), snapshot()] } as never], 'a');
+    saveWorkspaceToLocalStorage();
+    const stored = JSON.parse(storage.getItem(WORKSPACE_KEY)!);
+    expect(stored.tabs[0].undoStack).toEqual([]);
+    expect(stored.tabs[0].redoStack).toEqual([]);
+  });
+});

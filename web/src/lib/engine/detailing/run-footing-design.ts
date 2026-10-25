@@ -32,6 +32,7 @@
  * Pure: no store, no runes. Forces kN, moments kN·m, lengths m, pressures kPa.
  */
 
+import { shearSqrtFc } from '../codes/argentina/cirsoc201-basis';
 import { strapAdjust } from '../foundation/strap-footing';
 import { GRAVITY_CASES, LATERAL_CASES, serviceGravity } from './service-reaction';
 import { msg, type EngineMessage } from '../../codes/message';
@@ -326,7 +327,8 @@ export function runFootingDesign(given: RunFootingDesignInput): RunFootingDesign
       if (sec?.b && sec.h) {
         const d = sec.h - 0.05;
         const as = (x.M / (0.9 * 0.9 * d * input.fy * 1000)) * 1e4;
-        const phiVc = 0.75 * 0.17 * Math.sqrt(input.fc) * sec.b * d * 1000;
+        // A first estimate for the strap, which is not a designed member yet: √f'c ≤ 8,3 MPa (§22.5.3.1).
+        const phiVc = 0.75 * 0.17 * shearSqrtFc(input.fc) * sec.b * d * 1000;
         a.push(msg('footing.assumption.strapSteel', { footing: f.name, partner: nameOf(x.partnerId), b: Math.round(sec.b * 100), h: Math.round(sec.h * 100), as: +as.toFixed(2), V: +x.V.toFixed(1), phiVc: +phiVc.toFixed(1) }));
       }
     }

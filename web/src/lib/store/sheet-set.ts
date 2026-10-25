@@ -20,6 +20,8 @@ import type { DrawingInput } from '../sheets/compose';
 import { membersFromModel } from '../engine/detailing/member-geometry';
 import { projectPhysicalFrame } from './physical-frame';
 import { cachedSceneModel } from '../engine/detailing/scene-cache';
+import { dxfWithProvenance, svgWithProvenance, prepareExportProvenance, reportProvenanceLines } from '../export/provenance-attach';
+import type { SetProvenance } from '../sheets/sheet-set';
 import { PLAN_KINDS, planContext, workDrawings, type PlanKind } from './work-drawings';
 import { defaultEntries, parseSetTemplate, type SheetEntry, type SheetSetTemplate } from '../sheets/sheet-entries';
 import { emptyLayout, type DrawingAdjust, type SheetLayout } from '../sheets/sheet-layout';
@@ -195,25 +197,39 @@ function save(name: string, type: string, bytes: Uint8Array) {
 }
 
 /** The set as one zip with a DXF per sheet, recorded in the export log like the other files. */
-export function exportSheetsDxf(doc: DocumentModel | null, sheets: readonly SetSheet[], at: string, version: '2004' | 'r12' = '2004') {
+/** The results' provenance for a set, or null (said) when the project moved while it was prepared. */
+async function setProvenance(): Promise<SetProvenance | null> {
+  const record = await prepareExportProvenance();
+  if (!record) return null;
+  const { title, lines } = reportProvenanceLines(record);
+  return { dxf: (d) => dxfWithProvenance(d, record), svg: (d) => svgWithProvenance(d, record), title, lines };
+}
+
+export async function exportSheetsDxf(doc: DocumentModel | null, sheets: readonly SetSheet[], at: string, version: '2004' | 'r12' = '2004') {
   const tag = version === 'r12' ? 'dxf-r12' : 'dxf';
   const filename = doc ? `sheets-rev${doc.revision.number}-${tag}.zip` : `sheets-${tag}.zip`;
-  const write = () => save(filename, 'application/zip', sheetSetDxfZip(sheets, sheetSettings().display, version));
+  const provenance = await setProvenance();
+  if (!provenance) return;
+  const write = () => save(filename, 'application/zip', sheetSetDxfZip(sheets, sheetSettings().display, version, provenance));
   // The export log records emissions of a document revision; a set without one has none to cite.
   if (doc) withExportLog({ kind: 'sheetsDxf', doc, filename, at }, write); else write();
 }
 
 /** Every sheet as an SVG, zipped. */
-export function exportSheetsSvg(doc: DocumentModel | null, sheets: readonly SetSheet[], at: string) {
+export async function exportSheetsSvg(doc: DocumentModel | null, sheets: readonly SetSheet[], at: string) {
   const filename = doc ? `sheets-rev${doc.revision.number}-svg.zip` : 'sheets-svg.zip';
-  const write = () => save(filename, 'application/zip', sheetSetSvgZip(sheets, sheetSettings().display));
+  const provenance = await setProvenance();
+  if (!provenance) return;
+  const write = () => save(filename, 'application/zip', sheetSetSvgZip(sheets, sheetSettings().display, provenance));
   if (doc) withExportLog({ kind: 'sheetsSvg', doc, filename, at }, write); else write();
 }
 
 /** The set as one PDF, a page per sheet at its paper size. */
-export function exportSheetsPdf(doc: DocumentModel | null, sheets: readonly SetSheet[], at: string, title: string) {
+export async function exportSheetsPdf(doc: DocumentModel | null, sheets: readonly SetSheet[], at: string, title: string) {
   const filename = doc ? `sheets-rev${doc.revision.number}.pdf` : 'sheets.pdf';
-  const write = () => save(filename, 'application/pdf', sheetSetPdf(sheets, title, sheetSettings().display));
+  const provenance = await setProvenance();
+  if (!provenance) return;
+  const write = () => save(filename, 'application/pdf', sheetSetPdf(sheets, title, sheetSettings().display, provenance));
   if (doc) withExportLog({ kind: 'sheetsPdf', doc, filename, at }, write); else write();
 }
 

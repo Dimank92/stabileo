@@ -7,6 +7,7 @@
   import { t, i18n } from '../../../lib/i18n';
   import { exportProjectIfc } from '../../../lib/store/ifc-export';
   import { physicalForcesCsv } from '../../../lib/store/design-exchange';
+  import { downloadResultText, prepareExportProvenance } from '../../../lib/export/provenance-attach';
   import { downloadProjectWorkbook } from '../../../lib/store/project-workbook';
   import { resultsStore } from '../../../lib/store/results.svelte';
   import OutdatedNotice from './OutdatedNotice.svelte';
@@ -24,8 +25,16 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  const ifc = () => save(`${base()}.ifc`, 'application/x-step', exportProjectIfc(t, i18n.locale, projectName));
-  const csv = () => save(`${base()}-physical-forces.csv`, 'text/csv', physicalForcesCsv());
+  /*
+   * Both carry the results' provenance and stale status, as every export of results does
+   * (`export/provenance-attach.ts`); a project that moved while the record was prepared writes
+   * nothing and says so.
+   */
+  async function ifc() {
+    const record = await prepareExportProvenance();
+    if (record) save(`${base()}.ifc`, 'application/x-step', exportProjectIfc(t, i18n.locale, projectName, record));
+  }
+  const csv = () => void downloadResultText(physicalForcesCsv(), `${base()}-physical-forces.csv`, 'text/csv');
   const xlsx = () => void downloadProjectWorkbook(5);
 
   const columnTop = $derived<IfcColumnTop>(designData().exchange?.ifcColumnTop ?? 'slabTop');
