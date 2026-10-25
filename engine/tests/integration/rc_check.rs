@@ -489,3 +489,90 @@ fn rc_check_vc_caps_sqrt_fc() {
     let expected = 0.75 * 0.66 * rho.cbrt() * 8.3 * 300.0 * 250.0;
     assert!((r.phi_vn - expected).abs() / expected < 1e-12, "{} vs {expected}", r.phi_vn);
 }
+
+/// Issue #561: ACI 318-19 shear capacity under axial tension with fy=500 MPa.
+/// Factored axial tension Nu = 350 kN (tension positive in RCDesignForces), Vu = 200 kN, Mu = 50 kNm.
+/// ACI 318-19 reduces Vc by Nu/(6*Ag) and caps fyt in Vs at 420 MPa.
+/// Design phi*Vn = 0.75*(67.41 kN + 145.07 kN) = 159.36 kN -> shear_ratio = 1.2550 > 1.0 (fails).
+/// Without the fix, Stabileo overstated phi*Vn to 218.58 kN (+37.2%) and reported shear_ratio = 0.9150 <= 1.0 (passed).
+#[test]
+fn rc_check_shear_axial_tension_and_fyt_cap() {
+    let m = RCMemberData {
+        element_id: 1,
+        fc: 28e6,
+        fy: 500e6, // Grade 500 rebar (> 420 MPa cap)
+        es: Some(200e9),
+        b: 0.30,
+        h: 0.50,
+        d: 0.44,
+        d_prime: Some(0.06),
+        as_tension: 1500e-6,
+        as_compression: Some(1500e-6),
+        section_type: RCSectionType::Rectangular,
+        bf: None,
+        hf: None,
+        av: Some(157e-6),      // 2 legs of #10 stirrups (157 mm²)
+        s_stirrup: Some(0.20), // 200 mm spacing
+        lambda: None,
+    };
+
+    let input = RCCheckInput {
+        members: vec![m],
+        forces: vec![RCDesignForces {
+            element_id: 1,
+            mu: 50e3,
+            vu: Some(200e3),
+            nu: Some(350e3), // 350 kN tension (nu is tension-positive in RCDesignForces)
+        }],
+    };
+
+    let results = check_rc_members(&input);
+    let r = &results[0];
+
+    // True ACI 318-19:
+    // Ag = 0.30 * 0.50 = 0.15 m²
+    // Nu_ACI = -nu = -350 kN (compression positive)
+    // nu_ag = -350e3 / (0.15 * 1e6) = -2.33333 MPa
+    // axial_term = -2.33333 / 6 = -0.38889 MPa
+    // Vc_mpa = 0.17 * sqrt(28) - 0.38889 = 0.510666 MPa
+    // Vc = 0.510666 * 300 * 440 = 67_407.9 N
+    // Vs = 157e-6 * 420e6 * 0.44 / 0.20 = 145_068 N (fyt capped at 420 MPa)
+    // phi_vn = 0.75 * (67_407.9 + 145_068) = 159_356.9 N
+    let expected_phi_vn = 159_356.9;
+    assert!(
+        (r.phi_vn - expected_phi_vn).abs() / expected_phi_vn < 1e-3,
+        "phi*Vn: {:.2} vs {:.2}",
+        r.phi_vn,
+        expected_phi_vn
+    );
+
+    // Demand ratio: 200 kN / 159.36 kN = 1.255 > 1.0 (Governing check should be Shear and unity > 1.0)
+    assert!(r.shear_ratio > 1.25, "shear_ratio: {:.4}", r.shear_ratio);
+    assert_eq!(r.governing_check, "Shear ACI 318");
+    assert!(r.unity_ratio > 1.0, "unity_ratio: {:.4}", r.unity_ratio);
+}
+
+/// Issue #561: Full axial tension eliminates Vc when tensile stress >= 6 * 0.17 * sqrt(f'c).
+#[test]
+fn rc_check_shear_high_axial_tension_zeroes_vc() {
+    let mut m = rectangular_beam(1, 0.30, 0.50, 0.44, 1500e-6);
+    m.fc = 28e6;
+    // Without stirrups, at nu = 810 kN tension:
+    // Ag = 0.15 m², Nu_ACI = -810 kN, nu_ag = -5.4 MPa
+    // axial_term = -5.4 / 6 = -0.90 MPa
+    // base Vc_mpa = 0.66 * lambda_s * rho^(1/3) * sqrt(28) ≈ 0.61 MPa < 0.90 MPa
+    // Total Vc clamped to 0.0 -> phi_vn = 0.0!
+    let r = &check_rc_members(&RCCheckInput {
+        members: vec![m],
+        forces: vec![RCDesignForces {
+            element_id: 1,
+            mu: 10e3,
+            vu: Some(10e3),
+            nu: Some(810e3),
+        }],
+    })[0];
+    assert_eq!(r.phi_vn, 0.0, "phi*Vn should be 0 when tension exceeds concrete shear threshold");
+    assert!(r.unevaluated.iter().any(|u| u.contains("Shear")), "Shear check must be flagged unevaluated when capacity is 0: {:?}", r.unevaluated);
+    assert!(r.governing_check.contains("incomplete"), "governing check must be marked incomplete: {}", r.governing_check);
+}
+
