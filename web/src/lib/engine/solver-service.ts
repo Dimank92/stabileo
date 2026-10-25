@@ -42,7 +42,7 @@ import { memberAlphaOf, thermalAlphaOf, ENGINE_ALPHA } from './thermal-alpha';
 import { pointToSolver, pointToEnds, PointLoadNeedsCut, planePointLoad3D, pointWithCoupleToEnds } from './member-point-loads';
 import { prestressToSolver } from './prestress';
 import { hasCaseDisplacements, imposedOf, imposedUnsupported, supportsWithImposed, casesWithDisplacements } from './case-displacements';
-import { constraintsTo2D } from './constraint-2d-remap';
+import { constraintsTo2D, detectFramePlane } from './constraint-2d-remap';
 import { initPool, isPoolReady, solveParallel, solve2DInWorker, solve3DInWorker, PoolUnavailableError } from './solver-pool';
 import { i18n, t, tp } from '../i18n';
 // Counts app-side structural-solve dispatches so browser tests can assert that a
@@ -113,6 +113,7 @@ export interface ModelData {
   analysis?: import('./analysis-settings').AnalysisSettings;
   /** Named groups, for a self-weight load that covers a group. */
   groups?: Map<number, { id: number; members: { elements?: number[]; plates?: number[]; quads?: number[] } }>;
+  plane?: import('../geometry/plane-projection').DrawPlane;
 }
 
 /** Exported so UI affordances (e.g. the member-offset editor) can tell when a
@@ -420,7 +421,8 @@ function preflightModel2D(model: ModelData): { error: string | null; connectedNo
   // Remap ONCE and use the result for both the connectivity preflight and the
   // wire, so the preflight only credits constraints that actually reach the
   // solver (an out-of-plane-only constraint is dropped by the remap).
-  const constraints2D = constraintsTo2D(model.constraints);
+  const plane = model.plane ?? detectFramePlane(model.nodes.values());
+  const constraints2D = constraintsTo2D(model.constraints, plane);
 
   // Check for disconnected nodes. Connectivity sources: structural elements,
   // connectors (ConnectorElement), and constraints (rigidLink, equalDOF,
@@ -789,7 +791,7 @@ function solverFrame2D(model: ModelData): SolverInput {
     // credits as connected — actually receives stiffness and the 2D constrained
     // solver can solve it, instead of being handed a singular system.
     // constraintsTo2D translates the stored 3D DOF semantics to [ux, uz, ry].
-    constraints: constraintsTo2D(model.constraints),
+    constraints: constraintsTo2D(model.constraints, model.plane ?? detectFramePlane(model.nodes.values())),
     connectors: model.connectors,
   };
 }
@@ -1226,9 +1228,10 @@ function solveCombinations2DCore(
   const namesUnique =
     new Set(loadCases.map(c => c.name)).size === loadCases.length &&
     new Set(combinations.map(c => c.name)).size === combinations.length;
+  const plane = model.plane ?? detectFramePlane(model.nodes.values());
   if (
     !namesUnique ||
-    constraintsTo2D(model.constraints).length > 0 ||
+    constraintsTo2D(model.constraints, plane).length > 0 ||
     (model.connectors?.size ?? 0) > 0 ||
     modelHasSlidingJoints(model.elements.values())
   ) {

@@ -107,4 +107,54 @@ describe('constraints: the plane solve and the space solve of one model agree', 
     modelStore.addConstraint({ type: 'linearMPC', terms: [{ nodeId: c, dof: 2, coefficient: 1 }, { nodeId: b, dof: 4, coefficient: -0.01 }] } as Constraint3D);
     agree('linear MPC with ry');
   });
+
+  describe('Y–Z planar frame (Issue #466)', () => {
+    function portalYZ(): { b: number; c: number } {
+      const sec = modelStore.addSection({ name: 'Square', b: 0.2, h: 0.2, a: 0.04, iy: 1e-4, iz: 1e-4, j: 1e-4, shape: 'rect' });
+      const a = modelStore.addNode(0, 0, 0);
+      const b = modelStore.addNode(0, 0, 4);
+      const c = modelStore.addNode(0, 6, 4);
+      const d = modelStore.addNode(0, 6, 0);
+      const col1 = modelStore.addElement(a, b, 'frame');
+      const beam = modelStore.addElement(b, c, 'frame');
+      const col2 = modelStore.addElement(c, d, 'frame');
+      modelStore.updateElementSection(col1, sec);
+      modelStore.updateElementSection(beam, sec);
+      modelStore.updateElementSection(col2, sec);
+      modelStore.addSupport(a, 'fixed3d');
+      modelStore.addSupport(d, 'fixed3d');
+      modelStore.addNodalLoad3D(b, 0, 10, 0, 0, 0, 0);
+      modelStore.loads.push({ type: 'distributed3d', data: { id: 999, elementId: beam, qYI: 0, qYJ: 0, qZI: -12, qZJ: -12 } } as any);
+      return { b, c };
+    }
+
+    it('a diaphragm in plane YZ maps to rigidLink on Y–Z frame solve', () => {
+      const { b, c } = portalYZ();
+      modelStore.addConstraint({ type: 'diaphragm', masterNode: b, slaveNodes: [c], plane: 'YZ' } as Constraint3D);
+      const r2 = modelStore.solve(false, 'yz');
+      expect(typeof r2).not.toBe('string');
+      const r3 = modelStore.solve3D(false, false, true);
+      expect(r3).not.toBeNull();
+      expect(typeof r3).not.toBe('string');
+      const d2b = (r2 as any).displacements.find((d: any) => d.nodeId === b)!;
+      const d3b = (r3 as any).displacements.find((d: any) => d.nodeId === b)!;
+      expect(d2b.ux).toBeCloseTo(d3b.uy, 5);
+      expect(d2b.uz).toBeCloseTo(d3b.uz, 5);
+    });
+
+    it('a rigid link on Y–Z frame maps in-plane DOFs [uy, uz, rx] -> [0, 1, 2]', () => {
+      const { b, c } = portalYZ();
+      modelStore.addConstraint({ type: 'rigidLink', masterNode: b, slaveNode: c, dofs: [1, 2, 3] } as Constraint3D);
+      const r2 = modelStore.solve(false, 'yz');
+      expect(r2).not.toBeNull();
+      expect(typeof r2).not.toBe('string');
+      const r3 = modelStore.solve3D(false, false, true);
+      expect(r3).not.toBeNull();
+      expect(typeof r3).not.toBe('string');
+      const d2b = (r2 as any).displacements.find((d: any) => d.nodeId === b)!;
+      const d3b = (r3 as any).displacements.find((d: any) => d.nodeId === b)!;
+      expect(d2b.ux).toBeCloseTo(d3b.uy, 5);
+      expect(d2b.uz).toBeCloseTo(d3b.uz, 5);
+    });
+  });
 });

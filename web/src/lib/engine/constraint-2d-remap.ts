@@ -35,24 +35,114 @@
  */
 
 import type { Constraint3D } from './types-3d';
+import type { DrawPlane } from '../geometry/plane-projection';
 
-const DOF_3D_TO_2D: Record<number, number> = { 0: 0, 2: 1, 4: 2 };
+interface PlaneMappingConfig {
+  dofMap: Record<number, number>;
+  rotDof3d: number;
+  rotSign: number;
+  eccentricOffsets: (c: { offsetX?: number; offsetY?: number; offsetZ?: number }) => { offsetX: number; offsetY: number };
+  eccentricReleases: (r: boolean[]) => [boolean, boolean, boolean];
+  diaphragmTrace: (diaphragmPlane: string, masterNode: number, slaveNode: number, orig: Constraint3D) => Constraint3D;
+}
 
-function mapDofs(dofs: number[] | undefined): number[] | undefined {
-  if (!dofs) return undefined;
-  return dofs
-    .map(d => DOF_3D_TO_2D[d])
-    .filter((d): d is number => d !== undefined);
+const PLANE_CONFIGS: Record<DrawPlane, PlaneMappingConfig> = {
+  xz: {
+    dofMap: { 0: 0, 2: 1, 4: 2 },
+    rotDof3d: 4,
+    rotSign: -1,
+    eccentricOffsets: (c) => ({ offsetX: c.offsetX ?? 0, offsetY: c.offsetZ ?? 0 }),
+    eccentricReleases: (r) => [r[0] ?? false, r[2] ?? false, r[4] ?? false],
+    diaphragmTrace: (dp, masterNode, slaveNode, orig) => {
+      if (dp === 'XZ') return { type: 'rigidLink', masterNode, slaveNode, dofs: [0, 1, 2] };
+      if (dp === 'YZ') return { type: 'equalDOF', masterNode, slaveNode, dofs: [1] };
+      if (dp === 'XY') return { type: 'equalDOF', masterNode, slaveNode, dofs: [0] };
+      return { ...orig, slaveNodes: [slaveNode] };
+    },
+  },
+  yz: {
+    dofMap: { 1: 0, 2: 1, 3: 2 },
+    rotDof3d: 3,
+    rotSign: 1,
+    eccentricOffsets: (c) => ({ offsetX: c.offsetY ?? 0, offsetY: c.offsetZ ?? 0 }),
+    eccentricReleases: (r) => [r[1] ?? false, r[2] ?? false, r[3] ?? false],
+    diaphragmTrace: (dp, masterNode, slaveNode, orig) => {
+      if (dp === 'YZ') return { type: 'rigidLink', masterNode, slaveNode, dofs: [0, 1, 2] };
+      if (dp === 'XZ') return { type: 'equalDOF', masterNode, slaveNode, dofs: [1] };
+      if (dp === 'XY') return { type: 'equalDOF', masterNode, slaveNode, dofs: [0] };
+      return { ...orig, slaveNodes: [slaveNode] };
+    },
+  },
+  xy: {
+    dofMap: { 0: 0, 1: 1, 5: 2 },
+    rotDof3d: 5,
+    rotSign: 1,
+    eccentricOffsets: (c) => ({ offsetX: c.offsetX ?? 0, offsetY: c.offsetY ?? 0 }),
+    eccentricReleases: (r) => [r[0] ?? false, r[1] ?? false, r[5] ?? false],
+    diaphragmTrace: (dp, masterNode, slaveNode, orig) => {
+      if (dp === 'XY') return { type: 'rigidLink', masterNode, slaveNode, dofs: [0, 1, 2] };
+      if (dp === 'XZ') return { type: 'equalDOF', masterNode, slaveNode, dofs: [0] };
+      if (dp === 'YZ') return { type: 'equalDOF', masterNode, slaveNode, dofs: [1] };
+      return { ...orig, slaveNodes: [slaveNode] };
+    },
+  },
+};
+
+/**
+ * Detect which Cartesian plane a set of 3D nodes lies in.
+ * Returns 'xz' (default), 'yz', or 'xy'.
+ */
+export function detectFramePlane(nodes: Iterable<{ x: number; y: number; z?: number }>): DrawPlane {
+  let minX = Infinity, maxX = -Infinity;
+  let minY = Infinity, maxY = -Infinity;
+  let minZ = Infinity, maxZ = -Infinity;
+  let count = 0;
+
+  let hasZ = false;
+  for (const n of nodes) {
+    count++;
+    if (n.x < minX) minX = n.x;
+    if (n.x > maxX) maxX = n.x;
+    if (n.y < minY) minY = n.y;
+    if (n.y > maxY) maxY = n.y;
+    if (n.z !== undefined) {
+      hasZ = true;
+      const z = n.z;
+      if (z < minZ) minZ = z;
+      if (z > maxZ) maxZ = z;
+    }
+  }
+
+  if (count < 2 || !hasZ) return 'xz';
+
+  const spanX = maxX - minX;
+  const spanY = maxY - minY;
+  const spanZ = maxZ - minZ;
+
+  const tol = 1e-4;
+  if (spanX <= tol && (spanY > tol || spanZ > tol)) return 'yz';
+  if (spanY <= tol && (spanX > tol || spanZ > tol)) return 'xz';
+  if (spanZ <= tol && (spanX > tol || spanY > tol)) return 'xy';
+
+  return 'xz';
 }
 
 /**
- * Returns the 2D-wire shape of the given constraints. The result is what both
- * the 2D connectivity preflight and serializeInput2D must consume, so the
- * preflight only credits constraints that actually reach the solver.
+ * Returns the 2D-wire shape of the given constraints for the specified drawing plane.
+ * The result is what both the 2D connectivity preflight and serializeInput2D must consume.
  */
-export function constraintsTo2D(constraints: Constraint3D[] | undefined): Constraint3D[] {
+export function constraintsTo2D(constraints: Constraint3D[] | undefined, plane: DrawPlane = 'xz'): Constraint3D[] {
   if (!constraints || constraints.length === 0) return [];
+  const cfg = PLANE_CONFIGS[plane] ?? PLANE_CONFIGS.xz;
   const out: Constraint3D[] = [];
+
+  function mapDofs(dofs: number[] | undefined): number[] | undefined {
+    if (!dofs) return undefined;
+    return dofs
+      .map(d => cfg.dofMap[d])
+      .filter((d): d is number => d !== undefined);
+  }
+
   for (const c of constraints) {
     switch (c.type) {
       case 'rigidLink': {
@@ -72,38 +162,35 @@ export function constraintsTo2D(constraints: Constraint3D[] | undefined): Constr
       }
       case 'linearMPC': {
         // An equation involving an out-of-plane DOF has no 2D meaning — drop whole.
-        if (c.terms.some(t => DOF_3D_TO_2D[t.dof] === undefined)) break;
-        // θ = −ry: an ry term keeps its meaning with its coefficient negated.
-        out.push({ ...c, terms: c.terms.map(t => ({ ...t, dof: DOF_3D_TO_2D[t.dof], coefficient: t.dof === 4 ? -t.coefficient : t.coefficient })) });
+        if (c.terms.some(t => cfg.dofMap[t.dof] === undefined)) break;
+        // In-plane rotation coefficient takes cfg.rotSign
+        out.push({
+          ...c,
+          terms: c.terms.map(t => ({
+            ...t,
+            dof: cfg.dofMap[t.dof],
+            coefficient: t.dof === cfg.rotDof3d ? cfg.rotSign * t.coefficient : t.coefficient,
+          })),
+        });
         break;
       }
       case 'eccentricConnection': {
-        // 2D solver kinematics read offset_x (horizontal) and offset_y
-        // (VERTICAL — its dy slot); the stored 3D shape keeps vertical in
-        // offsetZ. The out-of-plane offsetY is dropped, like uy loads.
+        const offsets = cfg.eccentricOffsets(c);
         out.push({
           ...c,
-          offsetX: c.offsetX,
-          offsetY: c.offsetZ,
+          offsetX: offsets.offsetX,
+          offsetY: offsets.offsetY,
           offsetZ: 0,
-          releases: [
-            c.releases?.[0] ?? false, // ux
-            c.releases?.[2] ?? false, // uz → 2D slot 1
-            c.releases?.[4] ?? false, // ry → 2D slot 2
-          ],
+          releases: cfg.eccentricReleases(c.releases ?? []),
         });
         break;
       }
       case 'diaphragm': {
-        // Its trace on the model plane (see the header): per slave, an equal DOF or a rigid link.
-        const plane = (c.plane ?? 'XY').toUpperCase();
+        // Its trace on the model plane: per slave, an equal DOF or a rigid link.
+        const diaphragmPlane = (c.plane ?? 'XY').toUpperCase();
         for (const s of c.slaveNodes) {
           if (s === c.masterNode) continue;
-          if (plane === 'XZ') out.push({ type: 'rigidLink', masterNode: c.masterNode, slaveNode: s, dofs: [0, 1, 2] });
-          else if (plane === 'YZ') out.push({ type: 'equalDOF', masterNode: c.masterNode, slaveNode: s, dofs: [1] });
-          else if (plane === 'XY') out.push({ type: 'equalDOF', masterNode: c.masterNode, slaveNode: s, dofs: [0] });
-          // Any other name: sent as it is, for the solver to refuse.
-          else out.push({ ...c, slaveNodes: [s] });
+          out.push(cfg.diaphragmTrace(diaphragmPlane, c.masterNode, s, c));
         }
         break;
       }

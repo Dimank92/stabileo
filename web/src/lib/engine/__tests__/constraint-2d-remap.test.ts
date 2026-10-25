@@ -79,6 +79,80 @@ describe('constraintsTo2D mapping', () => {
       { nodeId: 2, dof: 2, coefficient: 1 },
     ]);
   });
+
+  describe('plane-aware mapping (YZ plane)', () => {
+    it('maps in-plane DOFs: 1 (uy) → 0, 2 (uz) → 1, 3 (rx) → 2, and drops out-of-plane 0, 4, 5', () => {
+      const out = (constraintsTo2D as any)([
+        { type: 'equalDOF', masterNode: 1, slaveNode: 2, dofs: [0, 1, 2, 3, 4, 5] },
+      ], 'yz');
+      expect(out).toEqual([
+        { type: 'equalDOF', masterNode: 1, slaveNode: 2, dofs: [0, 1, 2] },
+      ]);
+    });
+
+    it('maps diaphragms on a Y–Z frame: YZ is in-plane rigid body, XY is equalDOF [0] (uy), XZ is equalDOF [1] (uz)', () => {
+      const out = (constraintsTo2D as any)([
+        { type: 'diaphragm', masterNode: 1, slaveNodes: [2], plane: 'YZ' },
+        { type: 'diaphragm', masterNode: 1, slaveNodes: [3], plane: 'XY' },
+        { type: 'diaphragm', masterNode: 1, slaveNodes: [4], plane: 'XZ' },
+      ], 'yz');
+      expect(out).toEqual([
+        { type: 'rigidLink', masterNode: 1, slaveNode: 2, dofs: [0, 1, 2] },
+        { type: 'equalDOF', masterNode: 1, slaveNode: 3, dofs: [0] },
+        { type: 'equalDOF', masterNode: 1, slaveNode: 4, dofs: [1] },
+      ]);
+    });
+
+    it('maps eccentricConnection for Y–Z: in-plane horizontal is Y, vertical is Z; releases [1, 2, 3]', () => {
+      const out = (constraintsTo2D as any)([
+        {
+          type: 'eccentricConnection', masterNode: 1, slaveNode: 2,
+          offsetX: 10, offsetY: 0.2, offsetZ: 0.5,
+          releases: [false, true, false, true, false, false], // uy + rx released
+        },
+      ], 'yz');
+      expect(out).toEqual([
+        {
+          type: 'eccentricConnection', masterNode: 1, slaveNode: 2,
+          offsetX: 0.2, offsetY: 0.5, offsetZ: 0,
+          releases: [true, false, true],
+        },
+      ]);
+    });
+
+    it('maps linearMPC in Y–Z without negating rx coefficient (theta = +rx)', () => {
+      const out = (constraintsTo2D as any)([
+        { type: 'linearMPC', terms: [{ nodeId: 1, dof: 2, coefficient: 1 }, { nodeId: 2, dof: 3, coefficient: -0.05 }] },
+      ], 'yz');
+      expect(out).toEqual([
+        { type: 'linearMPC', terms: [{ nodeId: 1, dof: 1, coefficient: 1 }, { nodeId: 2, dof: 2, coefficient: -0.05 }] },
+      ]);
+    });
+  });
+
+  describe('plane-aware mapping (XY plane)', () => {
+    it('maps in-plane DOFs: 0 (ux) → 0, 1 (uy) → 1, 5 (rz) → 2', () => {
+      const out = (constraintsTo2D as any)([
+        { type: 'equalDOF', masterNode: 1, slaveNode: 2, dofs: [0, 1, 2, 3, 4, 5] },
+      ], 'xy');
+      expect(out).toEqual([
+        { type: 'equalDOF', masterNode: 1, slaveNode: 2, dofs: [0, 1, 2] },
+      ]);
+    });
+
+    it('maps diaphragms on an X–Y frame: XY is in-plane rigid body, XZ is equalDOF [0] (ux), YZ is equalDOF [1] (uy)', () => {
+      const out = (constraintsTo2D as any)([
+        { type: 'diaphragm', masterNode: 1, slaveNodes: [2], plane: 'XY' },
+        { type: 'diaphragm', masterNode: 1, slaveNodes: [3], plane: 'XZ' },
+        { type: 'diaphragm', masterNode: 1, slaveNodes: [4], plane: 'YZ' },
+      ], 'xy');
+      expect(out).toEqual([
+        { type: 'rigidLink', masterNode: 1, slaveNode: 2, dofs: [0, 1, 2] },
+        { type: 'equalDOF', masterNode: 1, slaveNode: 3, dofs: [0] },
+        { type: 'equalDOF', masterNode: 1, slaveNode: 4, dofs: [1] },
+      ]);
+    });
+  });
 });
 
 describe('UI-authored 3D constraints survive the real 2D wire', () => {

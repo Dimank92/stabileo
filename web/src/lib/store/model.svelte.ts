@@ -1329,14 +1329,14 @@ function createModelStore() {
    * into the 2D convention (x=horizontal, y=vertical) for the given plane.
    * The returned object is a shallow copy safe for passing to solver functions.
    */
-  function remapModelForPlane(plane: DrawPlane, includeSelfWeight = false): { nodes: Map<number, Node>; elements: typeof model.elements; supports: typeof model.supports; loads: typeof model.loads; materials: typeof model.materials; sections: typeof model.sections; connectors?: typeof model.connectors; constraints?: typeof model.constraints; analysis?: { selfWeight: SelfWeightLoad[] } } | string {
+  function remapModelForPlane(plane: DrawPlane, includeSelfWeight = false): { nodes: Map<number, Node>; elements: typeof model.elements; supports: typeof model.supports; loads: typeof model.loads; materials: typeof model.materials; sections: typeof model.sections; connectors?: typeof model.connectors; constraints?: typeof model.constraints; analysis?: { selfWeight: SelfWeightLoad[] }; plane?: DrawPlane } | string {
     // Only Basic's self-weight rule rides along: which case carries it.
     const sw = basicSelfWeight(includeSelfWeight);
     const analysis = sw ? { selfWeight: sw } : undefined;
     if (plane === 'xy') {
       return { nodes: model.nodes, elements: model.elements, supports: model.supports,
         loads: model.loads, materials: model.materials, sections: model.sections,
-        connectors: model.connectors, constraints: model.constraints, analysis };
+        connectors: model.connectors, constraints: model.constraints, analysis, plane: 'xz' };
     }
 
     // Remap nodes into the selected 2D plane
@@ -1403,10 +1403,10 @@ function createModelStore() {
     // Connectors are pure node-id + stiffness pairs — no geometry to remap.
     // Constraints are carried verbatim; the 2D wire layer (constraintsTo2D in
     // solver-service) maps their 3D DOF semantics onto the 2D solver's
-    // [ux, uz, ry] convention.
+    // [ux, uz, ry] convention using the detected/specified frame plane.
     return { nodes: remappedNodes, elements: model.elements, supports: remappedSupports,
       loads: remappedLoads, materials: model.materials, sections: model.sections,
-      connectors: model.connectors, constraints: model.constraints, analysis };
+      connectors: model.connectors, constraints: model.constraints, analysis, plane };
   }
 
   let nextId = $state({
