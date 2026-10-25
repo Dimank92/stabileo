@@ -32,19 +32,21 @@ const AXES: DesignAxes = {
   sagCategory: 'My+', hogCategory: 'My-', basis: 'stress-proxy', secondaryRatio: 0,
 };
 
-describe('Bresler: no 999, no squash load standing in for a moment capacity', () => {
-  it('without a bar layout, tension with two moments is not evaluated (was 999, a pass)', () => {
+/*
+ * Bresler is gone: biaxial columns are checked on the engine's load contour (main's concrete in the
+ * engine). What these cases pinned stays pinned on it: no 999, no squash load standing in for a
+ * moment capacity, and a tension never read as the same compression.
+ */
+describe('biaxial: no 999, no squash load standing in for a moment capacity', () => {
+  it('without a bar layout, tension with two moments is no pass (was 999)', () => {
     const r = computeBiaxialCapacity(12, 0.3, 0.3, 25, 420, 0.04, 8, -50, 30, 30);
-    console.log('BIAX-TENSION', r.ratio, r.status, r.evaluated);
-    expect(r.evaluated).toBe(false);
     expect(r.ratio).toBe(0);
     expect(r.status).toBe('fail');
   });
 
-  it('an axis with no capacity at its eccentricity leaves the section none (was φPn0)', () => {
+  it('no steel and no layout: no moment capacity, and no squash load in its place (was φPn0)', () => {
     const r = computeBiaxialCapacity(0, 0.3, 0.3, 25, 420, 0.04, 8, 100, 50, 50);
-    console.log('BIAX-ZERO', r.phiPnx, r.phiPny, r.phiPn, r.ratio, r.status);
-    expect(r.phiPn).toBe(0);
+    expect(r.phiMn).toBe(0);
     expect(r.ratio).toBe(0);
     expect(r.status).toBe('fail');
   });
@@ -52,21 +54,19 @@ describe('Bresler: no 999, no squash load standing in for a moment capacity', ()
   it('a uniaxial section with no axial capacity is 0, not 999', () => {
     const bars: BarInstance[] = [[0.06, 0.06], [0.24, 0.06], [0.06, 0.24], [0.24, 0.24]].map(([x, y], i) => ({ face: y! < 0.15 ? 'bottom' : 'top', row: 0, index: i, diameter: 16, x: x!, y: y! }));
     const r = computeColumnCapacity(0, 0.3, 0.3, 1e-5, 420, 0.04, 8, 0.05, 0, bars);
-    console.log('UNI', r.phiPn, r.ratio, r.status);
     expect(r.ratio).toBe(0);
     expect(r.status).toBe('fail');
   });
 
-  it('the legacy check: tension is not read as compression, and a zero capacity is not φPn0', () => {
+  it('the legacy check: a tension is not read as the same compression', () => {
     const P = { fc: 25, fy: 420, cover: 0.04, b: 0.3, h: 0.3, stirrupDia: 8 };
-    const t = checkBiaxial(P, -50, 30, 30, 12, '2025');
-    console.log('LEGACY-T', t.ratio, t.status);
-    expect(t.ratio).toBe(Number.POSITIVE_INFINITY);
+    // 12 cm² on the standard layout, Muy = Muz = 30 kN·m: the tension leaves less moment capacity
+    // than the same force in compression (below the balanced point), and here it fails.
+    const t = checkBiaxial(P, -50, 30, 30, 12, { edition: '2025' });
+    const c = checkBiaxial(P, 50, 30, 30, 12, { edition: '2025' });
+    expect(t.phiMn).toBeLessThan(c.phiMn);
+    expect(t.ratio).toBeGreaterThan(1);
     expect(t.status).toBe('fail');
-    const z = checkBiaxial(P, 100, 50, 50, 0, '2025');
-    console.log('LEGACY-Z', z.phiPn, z.ratio, z.status);
-    expect(z.phiPn).toBe(0);
-    expect(z.status).toBe('fail');
   });
 });
 

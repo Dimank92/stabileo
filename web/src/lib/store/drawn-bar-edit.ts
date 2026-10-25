@@ -20,6 +20,9 @@ import { lineAxis } from './line-axis';
 import { setHook, updateBar } from '../engine/design/beam-line';
 import { lineKey, type BeamLineBar, type BeamLineReinforcement } from '../design-contract/beam-line';
 import type { BeamLine } from '../engine/design/repeated-frames';
+import { historyStore } from './history.svelte';
+import { uiStore } from './ui.svelte';
+import { t } from '../i18n';
 
 const DRAWN = /^e(\d+)-line-(.+)-(\d+)$/;
 
@@ -79,11 +82,25 @@ function relay(line: BeamLine, next: BeamLineReinforcement): ScheduleChange[] {
   return dias.map((d) => ({ diameterMm: d, deltaKg: (after.get(d) ?? 0) - (before.get(d) ?? 0) })).filter((c) => Math.abs(c.deltaKg) > 0.005);
 }
 
+/** The longitudinal bars the detailing laid for these members: diameter, count and cut length, to the mm. */
+function laidLongitudinal(memberIds: readonly number[]): string {
+  const ids = new Set(memberIds);
+  return detailingStore.assemblies.flatMap((a) => a.bars)
+    .filter((b) => b.role === 'longitudinal' && b.ownerElementIds.some((id) => ids.has(id)))
+    .map((b) => `${b.diameterMm}:${Math.round(b.cuttingLength * 1000)}`).sort().join('|');
+}
+
 /**
  * Save a beam's line as the detailing laid it, so its bars become drawn bars: each bar the
  * detailing laid along the line is a line bar with the same ends, row, diameter and hooks
  * (`lineBarsFromDetailing`), the stirrup zones as its members hold them. With no detailing laid
  * yet the line is read from the members' regions, as the frame editor reads it.
+ *
+ * Taking a line as drawn changes no bar, and that is checked rather than assumed: the detailing
+ * laid again from the saved line must lay the same longitudinal bars (diameter and cut length)
+ * it laid before. A line it lays otherwise (bars the detailing fused or extended across a support
+ * that the line reads as two members' own, a member whose saved regions then fail and are not
+ * laid) is undone, said, and false: the bars stay as they were.
  */
 export function takeAsDrawn(memberId: number): boolean {
   const open = openLine(memberId);
@@ -97,7 +114,14 @@ export function takeAsDrawn(memberId: number): boolean {
     const bars = lineBarsFromDetailing(laid, axis.start, axis.dir, length);
     if (bars.length) model = { ...open.model, bars };
   }
+  const before = laid.length ? laidLongitudinal(open.line.members) : null;
   relay(open.line, model);
+  if (before !== null && laidLongitudinal(open.line.members) !== before) {
+    historyStore.undo();
+    if (detailingStore.assemblies.length) detailingStore.generate();
+    uiStore.toast(t('barEdit.takeRefused'), 'error');
+    return false;
+  }
   return true;
 }
 

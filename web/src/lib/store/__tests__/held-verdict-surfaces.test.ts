@@ -274,7 +274,7 @@ describe('(a) the span building on 40×40 columns at 6 m: its slab joined to the
   });
 });
 
-describe('(b) qa-8, the beams\' lateral role not declared: two refused, the others verified', () => {
+describe('(b) qa-8, the beams\' lateral role not declared: every member verified', () => {
   let r: Reading;
   let seis: Reading;
   let free: Array<[number, string]> = [];
@@ -290,17 +290,23 @@ describe('(b) qa-8, the beams\' lateral role not declared: two refused, the othe
     show('B-seismic', seis);
   }, 600_000);
 
-  it('the two refused beams are held, the others read ok, and the project is not approved', () => {
-    expect(kinds(r)).toEqual({ refused: 2 });
-    expect(free.map(([, s]) => s)).toEqual(Array(free.length).fill('ok'));
-    expect(r.counts.ok).toBe(free.length);
+  /*
+   * Since the verifier takes the axial force acting with each moment (main's concrete in the
+   * engine), the two 6 m beams this reading used to refuse on their anchorage verify: the
+   * compression they carry lifts their φMn (lateral-fixtures.test.ts). Nothing is refused, two read
+   * warn (near their limit) and six ok, and the project conforms.
+   */
+  it('nothing is refused, every member reads verified, and the project conforms', () => {
+    expect(kinds(r)).toEqual({});
+    expect(free.map(([, s]) => s).sort()).toEqual([...Array(6).fill('ok'), ...Array(2).fill('warn')]);
+    expect(r.counts.ok + r.counts.warn).toBe(free.length);
     expect(r.violations).toEqual([]);
-    expect(r.project.memoria).toMatch(/^verdict\.project\.held\[n=6,total=8\]$/);
-    expect(r.project.ifc).toBe('not approved: 6 of 8 concrete design members satisfy');
+    expect(r.project.memoria).toMatch(/^verdict\.project\.conforms\[n=8,total=8\]$/);
+    expect(r.project.ifc).toBe('every concrete design member satisfies');
   });
 
   it('with its seismic checks run as substitutes, the members they cover are held and nothing reads them as approved', () => {
-    expect(kinds(seis)).toEqual({ refused: 2, seismic: 6 });
+    expect(kinds(seis)).toEqual({ seismic: 8 });
     expect(seis.violations).toEqual([]);
     expect(seis.counts.ok).toBeLessThan(r.counts.ok);
   });
@@ -319,13 +325,22 @@ describe('(c) the span building with no slab: a member held by the detailing alo
   }, 600_000);
 
   it('it is held by the detailing alone, and no surface reads it or the project as approved', () => {
-    // One member holds a detailing condition. Seven before the lower column lifts were cranked
+    // One member held a detailing condition. Seven before the lower column lifts were cranked
     // (§10.7.4.1): the six upper lifts held their laps open, each pair on one centreline
     // (`splice-span-fixture.test.ts`). Nine before the layers were stepped from the largest bar
     // above them (`stackedLayerDepth`): beam e20's second top row sat 5,1 mm inside the clear
     // distance it owed the continuous pair through e20/e25, two unresolved clashes that held both.
-    expect(lifts).toEqual([]);
-    expect(kinds(r)).toEqual({ detailing: 1 });
+    //
+    // Ten since the beams are designed on main's concrete in the engine: adjacent spans choose
+    // different bars over a shared support (e18 4Ø12 top into e23's 3Ø16, e5 3Ø12 bottom into e10's
+    // 4Ø10, and the like), and their bars meet in the joint, lapped or clashing, held: e5, e7, e8,
+    // e10, e12, e18, e20, e23 and e25, besides e21. No column lift is left open.
+    const columns = new Set([...verificationStore.contexts].filter(([, c]) => c.elementType === 'column').map(([id]) => id));
+    expect(lifts.filter((id) => columns.has(id))).toEqual([]);
+    expect(lifts.filter((id) => !columns.has(id)).sort((a, b) => a - b)).toEqual([5, 7, 10, 12, 18, 20, 23, 25]);
+    const held = [...r.held.keys()].sort((a, b) => a - b);
+    expect(held).toEqual([5, 7, 8, 10, 12, 18, 20, 21, 23, 25]);
+    expect(kinds(r)).toEqual({ detailing: 10 });
     expect([...r.held.values()].some((k) => k.has('analysis'))).toBe(false);
     expect(r.violations).toEqual([]);
     expect(r.localOkHeld).toBeGreaterThan(0);

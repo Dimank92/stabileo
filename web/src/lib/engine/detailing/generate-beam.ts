@@ -40,7 +40,7 @@
  */
 
 import {
-  buildStraightBarWithHooks, minMandrelDiameter, standardHook,
+  buildStraightBarWithHooks, standardHook,
   type BarEndAnchorage, type BarPath, type BarSegment, type HookAngle, type Point3,
 } from '../../codes/cirsoc201/bar-geometry';
 import { topRowInboard as rowInboard, bottomHookInboard as nestBottom, type SupportEndPlan } from './support-anchorage';

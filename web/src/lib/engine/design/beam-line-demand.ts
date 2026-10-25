@@ -145,7 +145,7 @@ export function lineTransverseDemand(
         const s = c.stations[i];
         if (!s) continue;
         const Vu = Math.abs(tupleShear(s, ctx.axes.shear));
-        const v = checkShear(params, Vu, 0, CIRSOC201_DESIGN_EDITION);
+        const v = checkShear(params, Vu, 0, { edition: CIRSOC201_DESIGN_EDITION });
         shear = Math.max(shear, v.AvOverSReq ?? v.AvOverS);
         min = Math.max(min, v.AvOverSMin);
         if (Math.abs(s.torsion) > 1e-3) {

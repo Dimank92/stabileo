@@ -55,7 +55,7 @@ describe('a T beam out of its flange, ADN 500', () => {
     expect(phi25).toBeCloseTo(0.8138, 3);
   });
 
-  it('flangedCapacity takes the edition: 2025 on request, 2005 by default for the calculator', () => {
+  it('flangedCapacity takes the edition: 2025 by default (the edition in force), 2005 on request', () => {
     const params = { fc, fy, h, cover, stirrupDia: 8 } as never;
     // effectiveDepth subtracts half a Ø16, so h is given as d + cover + stirrup + 0,008.
     const p25 = flangedCapacity({ ...(params as object), h: d + cover + 0.008 + 0.008 } as never, { bf, hf, bw }, As * 1e4, '2025');
@@ -63,7 +63,7 @@ describe('a T beam out of its flange, ADN 500', () => {
     expect(p25.epsilonT).toBeCloseTo(et, 6);
     expect(p25.phi).toBeCloseTo(phi25, 6);
     expect(p25.phiMn).toBeCloseTo(phi25 * Mn, 2);
-    const p05 = flangedCapacity({ ...(params as object), h: d + cover + 0.008 + 0.008 } as never, { bf, hf, bw }, As * 1e4);
+    const p05 = flangedCapacity({ ...(params as object), h: d + cover + 0.008 + 0.008 } as never, { bf, hf, bw }, As * 1e4, '2005');
     expect(p05.phi).toBeCloseTo(phi05, 6);
   });
 
@@ -132,11 +132,12 @@ describe('the interaction plot of a rectangular column', () => {
 });
 
 /*
- * The verification detail's diagram of a rectangular column (two faces of steel, the displaced
- * concrete not deducted, as that diagram is built): 0,30 × 0,50, 6Ø20 (9,425 cm² a face) at
- * 0,05 from each face, H-25, ADN 500. At a plotted c: a = 0,85·c, Cc = 0,85·25 000·0,30·a,
- * εs' = 0,003·(c − 0,05)/c, εt = 0,003·(0,45 − c)/c, stresses within ±fy;
- * Mn = Cc·(h/2 − a/2) + As'·fs'·(h/2 − d') + As·fs·(d − h/2), and φ by Tabla 21.2.2.
+ * The verification detail's diagram of a rectangular column (two faces of steel, the concrete a
+ * compressed bar displaces deducted, as the verifier does): 0,30 × 0,50, 6Ø20 (9,425 cm² a face)
+ * at 0,05 from each face, H-25, ADN 500. At a plotted c: a = 0,85·c, Cc = 0,85·25 000·0,30·a,
+ * εs' = 0,003·(c − 0,05)/c, εt = 0,003·(0,45 − c)/c, stresses within ±fy, a bar inside the
+ * block taking fs' − 0,85·f'c; Mn = Cc·(h/2 − a/2) + As'·fs'·(h/2 − d') + As·fs·(d − h/2), and φ
+ * by Tabla 21.2.2.
  */
 describe('the rectangular diagram of the verification detail', () => {
   it('takes φ from Tabla 21.2.2 when asked for 2025', () => {
@@ -150,7 +151,7 @@ describe('the rectangular diagram of the verification detail', () => {
       inTransition++;
       const a = Math.min(0.85 * c, h);
       const Cc = 0.85 * fc * 1000 * b * a;
-      const fsp = Math.max(-fy, Math.min(fy, 200000 * 0.003 * (c - dp) / c)) * 1000;
+      const fsp = Math.max(-fy, Math.min(fy, 200000 * 0.003 * (c - dp) / c)) * 1000 - (dp <= a ? 0.85 * fc * 1000 : 0);
       const fs = Math.min(fy, 200000 * et) * 1000;
       const Mn = Cc * (h / 2 - a / 2) + As * fsp * (h / 2 - dp) + As * fs * (d - h / 2);
       const phi = 0.65 + 0.25 * (et - 0.0025) / 0.003;

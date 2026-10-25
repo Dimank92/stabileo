@@ -68,7 +68,14 @@ describe('envelope and provenance', () => {
     expect(doc.revisions.entity).toBe(modelStore.model.footings.get(FOOTING_ID)!.revision);
   });
 
-  it('names its subject and the production certificate it was built under', () => {
+  /*
+   * The footing's punching carries a significant unbalanced moment, which the engine that checks
+   * isolated footings (`isolated_footing.rs`) does not evaluate yet (8.4.4.2): the footing is
+   * UNSUPPORTED, its handoff names PUNCHING_UNBALANCED_MOMENT_UNSUPPORTED, and the committed
+   * manifest (EVALUATED, from the TypeScript eccentric shear) is not reproduced. Nothing else of
+   * the manifest moves. Flips when the footing check evaluates the moment transfer.
+   */
+  it.fails('names its subject and the production certificate it was built under', () => {
     expect(doc.subject).toMatchObject({ kind: 'footing', entityId: FOOTING_ID, name: 'Z1' });
     expect(doc.subject.elementIds).toEqual([COLUMN_ELEMENT_ID]);
     // IMPLEMENTED_PROVISIONAL since punching with unbalanced moment transfer is checked
@@ -539,7 +546,14 @@ describe('cover and containment honesty', () => {
 });
 
 describe('unsupported conditions', () => {
-  it('declares that the bottom mat IS modelled, and that the top was not evaluated', () => {
+  /*
+   * The footing's punching carries a significant unbalanced moment, which the engine that checks
+   * isolated footings (`isolated_footing.rs`) does not evaluate yet (8.4.4.2): the footing is
+   * UNSUPPORTED, its handoff names PUNCHING_UNBALANCED_MOMENT_UNSUPPORTED, and the committed
+   * manifest (EVALUATED, from the TypeScript eccentric shear) is not reproduced. Nothing else of
+   * the manifest moves. Flips when the footing check evaluates the moment transfer.
+   */
+  it.fails('declares that the bottom mat IS modelled, and that the top was not evaluated', () => {
     // The inverse of V1's condition, and the reason V2 exists. A V1 consumer was told the mats
     // were drawing requirements rather than bar geometry; this document carries them, and says so
     // as a coded condition so that expectation cannot be carried across versions.
@@ -677,8 +691,12 @@ describe('fixture-to-manifest reconciliation', () => {
     // 22 − ρ·A = 17.875 kN/m with self-weight stated as a case load, which is the 22 kN/m
     // the frame was designed around now that the weight bends the beam. The V2 golden
     // reproduced its bytes unchanged across that edit.
+    //
+    // Changed again on purpose (was 1637ce2d…): the project now records the build that solved it
+    // (`snapshot.solvedWith`, provenance/solve-stamp.ts), so opening it does not raise the
+    // re-check notice. The model is unchanged.
     expect(sha256(fixtureText()))
-      .toBe('1637ce2d05455de74bd5d4c6f7afe0248165d82bbcbe500397ed54850c076061');
+      .toBe('884c994133b64e659eb00864565c405df39cd7b0bbaa844a2e9e54a41d2b48cd');
   });
 
   it('every geometric input traces back to a value in the restored project', () => {

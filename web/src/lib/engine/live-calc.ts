@@ -11,6 +11,7 @@
  */
 
 import { meshDeferredSlabs, representFootprints } from '../model/building/deferred-slabs';
+import { noteBaseSolveInput } from '../store/result-provenance';
 import { syncDefinedLoadsForAnalysis } from '../store/defined-loads';
 import { spectralOrSay } from '../actions/solve';
 import { nodesOnMembers } from './nodes-on-members';
@@ -24,6 +25,7 @@ import { initSolver, isWasmReady, combineResults3D } from './wasm-solver';
 import { computeGoverning2D, computeGoverning3D } from './governing-case';
 import { hasNonlinearBehaviour } from './member-behaviour';
 import { allLoadsResult3D } from './shell-combos';
+import { markAllLoads } from './solver-service';
 import { singleSolveFactors } from './case-effects';
 import { reportSolverDiagnostics, reportModelDiagnostics } from './solve-diagnostics';
 import { solveForEdu } from '../../components/edu/edu-solver';
@@ -189,7 +191,7 @@ async function liveCalc2D(isStale: () => boolean): Promise<void> {
  * Solve the structure manually (triggered by Enter key / Calcular button).
  * Handles 2D and 3D, combinations, toasts and mobile panel.
  */
-export async function runGlobalSolve(): Promise<void> {
+export async function runGlobalSolve(options: { directBase?: boolean } = {}): Promise<void> {
   // Slabs placed to be meshed at the analysis get their mesh first, so what follows (the floor
   // loads, the solve, the results, the slab design) reads the mesh (`deferred-slabs.ts`).
   if (uiStore.is3DWorkspace) {
@@ -216,7 +218,7 @@ export async function runGlobalSolve(): Promise<void> {
   reportModelDiagnostics();
   if (uiStore.is3DWorkspace) {
     await ensureWasmReady('runGlobalSolve');
-    await globalSolve3D(isStale);
+    await globalSolve3D(isStale, options.directBase ?? false);
   } else if (uiStore.analysisMode === 'edu') {
     // Education owns its own solve lifecycle (results are withheld until the
     // student answers), so dispatch to it explicitly.
@@ -270,7 +272,7 @@ function isMechanismError(msg: string): boolean {
     || lc.includes('mechanism') || lc.includes('hypostatic') || lc.includes('unstable');
 }
 
-async function globalSolve3D(isStale: () => boolean): Promise<void> {
+async function globalSolve3D(isStale: () => boolean, directBase: boolean): Promise<void> {
   const isPro = uiStore.analysisMode === 'pro';
   const leftHand = uiStore.axisConvention3D === 'leftHand';
   const hasCombos = modelStore.model.combinations.length > 0;
@@ -318,7 +320,9 @@ async function globalSolve3D(isStale: () => boolean): Promise<void> {
     // (`singleSolveFactors`): at 1 each, a composite case's parts were counted twice. Where no
     // factors give it (a notional case, the older self-weight switch on several dead-load cases),
     // the single solve is solved.
-    const listedFactors = hasNonlinearBehaviour(modelStore.model) ? null : singleSolveFactors(modelStore.model.loadCases, {
+    // A reproduction must keep the original arithmetic: a sum of case solves is not bit-for-bit
+    // identical to solving all loads together, even for a linear model.
+    const listedFactors = directBase || hasNonlinearBehaviour(modelStore.model) ? null : singleSolveFactors(modelStore.model.loadCases, {
       // The rows a solve reads are PRO's; elsewhere the older switch (`analysisFor`).
       legacySelfWeight: uiStore.includeSelfWeight && !(isPro && modelStore.model.analysis?.selfWeight),
     });
@@ -334,10 +338,17 @@ async function globalSolve3D(isStale: () => boolean): Promise<void> {
       const only = factors.length === 1 && factors[0]!.factor === 1 ? comboResult.perCase.get(factors[0]!.caseId) : null;
       const combined = only ? null : combineResults3D(factors, comboResult.perCase);
       firstCaseResult = only ?? (combined ? allLoadsResult3D(combined, comboResult.perCase, modelStore.plates, factors) : null);
+      // No single solve returned this sum: the discretization estimate reads the one it stands for.
+      if (firstCaseResult) markAllLoads(firstCaseResult, comboResult.perCase, factors);
     }
     if (!firstCaseResult) return t('results.emptyModelError');
 
     resultsStore.setResults3D(firstCaseResult);
+    // A case, or the sum of the cases, has no engine input of its own: the provenance names the
+    // direct single solve's (store/result-provenance.ts), so reports carry engine hashes and the
+    // CLI reproduce has an input to run.
+    noteBaseSolveInput(modelStore.singleSolveInput3D(uiStore.includeSelfWeight, leftHand, isPro),
+      listedFactors === null || factors.length === 0 ? 'direct' : 'case-superposition');
     publishCombinations3D(comboResult);
 
     const elapsed = performance.now() - t0;

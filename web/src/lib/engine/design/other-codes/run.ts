@@ -15,6 +15,7 @@ import { classifyElement } from '../../codes/argentina/cirsoc201';
 import { gov, type CheckReading, type MemberContext, type OtherCode, type OtherCodeRow, type OtherCodeRun, type StationTuple, type MemberCertificate, type StationBound3D, type DemandBound } from './types';
 import type { CertifiedMemberCheck } from '../../certificate-types';
 import { isDesignedMember, maskDemands } from '../behaviour-demands';
+import { isEngineUnavailable, engineFailureText } from '../../engine-unavailable';
 
 export interface RunModel {
   nodes: Map<number, Node>;
@@ -173,11 +174,21 @@ export function runOtherCode(code: OtherCode, contexts: MemberContext[], opts: R
       }
     }
     if (pairs.length === 0) continue;
-    const results = code.run({
-      members: pairs.map((q, k) => ({ ...q.data, elementId: k + 1 })),
-      forces: pairs.map((q, k) => ({ ...code.forces(q.r.ctx, q.d, q.base), elementId: k + 1 })),
-    });
-    if (!results) return { code: code.id, rows: [...rows.values()], errorKey: 'otherCodes.error.engine' };
+    let results: unknown[];
+    try {
+      results = code.run({
+        members: pairs.map((q, k) => ({ ...q.data, elementId: k + 1 })),
+        forces: pairs.map((q, k) => ({ ...code.forces(q.r.ctx, q.d, q.base), elementId: k + 1 })),
+      });
+    } catch (err) {
+      // The engine's reason travels with the failure, and nothing of this run counts as checked:
+      // a member read in an earlier phase was not read under this phase's demands, so the rows
+      // it already has are withdrawn rather than shown as a verdict.
+      const errorKey = isEngineUnavailable(err) ? 'engine.unavailable' : 'otherCodes.error.engine';
+      const withdrawn: OtherCodeRow[] = [...rows.values()].map((r) => r.status === 'checked' ? { elementId: r.elementId, status: 'skipped', reasonKey: errorKey } : r);
+      for (const r of ready) if (!rows.has(r.ctx.elementId)) withdrawn.push({ elementId: r.ctx.elementId, status: 'skipped', reasonKey: errorKey });
+      return { code: code.id, rows: withdrawn.sort((a, b) => a.elementId - b.elementId), errorKey, errorMessage: engineFailureText(err) };
+    }
     for (const res of results as Array<Record<string, unknown>>) {
       const q = pairs[Number(res.elementId) - 1];
       if (!q) continue;

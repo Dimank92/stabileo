@@ -80,7 +80,6 @@ import {
 } from './design-convergence';
 import { DEFAULT_DESIGN_FAMILIES, type DesignFamily } from '../design/design-families';
 import { noFloorFamilies } from './family-record';
-import { envelopeIsComplete } from './coordination-search';
 import { materialiseLaps, lapIndex, lapBetween, type PlannedTransition, type LapInterval } from './lap-materialize';
 import type { LineBarPiece, LineLap, LineStirrupPiece } from './line-bars';
 import type { EngineMessage } from '../../codes/message';
@@ -1937,7 +1936,7 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
      */
     const lineName = (ids: readonly number[]): string =>
       `line-${String(Math.min(...ids)).padStart(6, '0')}`;
-    for (const [root, ids] of lineMembers) {
+    for (const [, ids] of lineMembers) {
       if (ids.length < 2) continue;   // a lone beam is not a chain; leave it to the search
       // Order along the line by the midpoint's projection on the line's own axis, so
       // consecutive DP states really are adjacent members.
@@ -1977,7 +1976,7 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
      * on this claim, so it is verified where it is made.
      */
     const lineViolations: Array<{ lineId: string; a: number; b: number; dot: number }> = [];
-    for (const [root, ids] of lineMembers) {
+    for (const [, ids] of lineMembers) {
       if (ids.length < 2) continue;
       for (let i = 0; i < ids.length; i++) {
         for (let j = i + 1; j < ids.length; j++) {
@@ -2024,7 +2023,7 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
         : {};
     };
     const linesForLayering: LineForLayering[] = [];
-    for (const [root, ids] of lineMembers) {
+    for (const [, ids] of lineMembers) {
       const dir = perBeam.get(ids[0])?.t;
       if (!dir) continue;
       linesForLayering.push({
@@ -3178,12 +3177,6 @@ function detailMembers(raw: RunDetailingInput): RunDetailingResult {
    * authoritative count, and guessing it ahead of time is how a gate ends up measuring
    * something other than what it claims.
    */
-  const prohibitedByElement = new Map<number, number>();
-  const prohibitedFor = (ids: readonly number[]): number =>
-    ids.reduce((n, id) => n + (prohibitedByElement.get(id) ?? 0), 0);
-
-  /** Spacing assessments that failed, across the run. Zero until the gate is wired. */
-  const spacingFailures = { codeLegal: 0, placementRobust: 0 };
 
   /**
    * What a repair move may not leave: each beam's and column's section, by its real width and

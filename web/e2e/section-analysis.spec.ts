@@ -38,7 +38,7 @@ async function openBasic(page: Page) {
   await page.goto('/app/basic?e2e=1');
   await page.waitForFunction(() => !!window.__stabileo, null, { timeout: 60_000 });
   await expect
-    .poll(() => page.evaluate(() => window.__stabileo.solverReady()), {
+    .poll(() => page.evaluate(() => window.__stabileo?.solverReady() ?? false), {
       timeout: 60_000,
       message: 'real WASM solver must be initialised (not the Vite stub)',
     })

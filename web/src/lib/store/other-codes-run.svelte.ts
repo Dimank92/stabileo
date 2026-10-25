@@ -21,6 +21,8 @@ function createOtherCodesRun() {
   let ranDirect = $state(false);
   let missing = $state<number[]>([]);
   let failed = $state(false);
+  /** Why the check could not run: "engine not available", or the engine's own message. */
+  let failure = $state<{ key: string; message: string } | null>(null);
   /** Not reactive: what the certified pass re-reads, never drawn. */
   let contexts: MemberContext[] = [];
 
@@ -32,17 +34,18 @@ function createOtherCodesRun() {
     get ranDirect() { return ranDirect; },
     get missing() { return missing; },
     get failed() { return failed; },
+    get failure() { return failure; },
     get contexts() { return contexts; },
     /** Keep a finished run, with what it read. */
     record(r: { run: OtherCodeRun; runOf: unknown; ranDirect: boolean; missing: number[]; contexts: MemberContext[] }) {
-      run = r.run; runOf = r.runOf; ranDirect = r.ranDirect; missing = r.missing; contexts = r.contexts; failed = false;
+      run = r.run; runOf = r.runOf; ranDirect = r.ranDirect; missing = r.missing; contexts = r.contexts; failed = false; failure = null;
     },
-    /** The engine could not run the check. */
-    fail() { run = null; failed = true; },
+    /** The engine could not run the check, and why. */
+    fail(why: { key: string; message: string }) { run = null; failed = true; failure = why; },
     /** Another code chosen: the run was under the previous one. */
-    drop() { run = null; failed = false; },
+    drop() { run = null; failed = false; failure = null; },
     reset() {
-      codeId = 'aisc360'; source = 'linear'; run = null; runOf = null; ranDirect = false; missing = []; failed = false; contexts = [];
+      codeId = 'aisc360'; source = 'linear'; run = null; runOf = null; ranDirect = false; missing = []; failed = false; failure = null; contexts = [];
     },
   };
 }
