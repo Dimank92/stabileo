@@ -641,6 +641,36 @@ function syncShellsNow(ctx: SceneSyncContext): void {
     seen.add(key);
   }
 
+  // Meshed plates drawn as pieces: their elements' edges hidden and their outline drawn over them.
+  // Only the drawing changes: the faces stay, so picking and contours are as with the mesh shown.
+  const pieceView = !uiStore.platesShowMesh;
+  for (const pl of physicalPlates()) {
+    const keys = [...(pl.group.members.quads ?? []).map((q) => `q${q}`), ...(pl.group.members.plates ?? []).map((q) => `p${q}`)];
+    if (!keys.length) continue;
+    for (const k of keys) ctx.shellGroups.get(k)?.traverse((c) => { if (c.userData?.shellEdge) c.visible = !pieceView; });
+    if (!pieceView) continue;
+    const key = `O${pl.id}`;
+    const loops = plateLoops(pl.group);
+    const pts = [loops.outer, ...loops.holes].map((l) => l.map((nid) => getNode(nid)));
+    if (pts.some((l) => l.some((n) => !n))) continue;
+    const signature = pts.map((l) => l.map((n) => `${n!.x}:${n!.y}:${n!.z}`).join(';')).join('|');
+    const existing = ctx.shellGroups.get(key);
+    if (existing && existing.userData.shellSig === signature) { seen.add(key); continue; }
+    if (existing) { ctx.shellsParent.remove(existing); disposeObject(existing); }
+    const seg: number[] = [];
+    for (const l of pts) for (let i = 0; i < l.length; i++) { const a = l[i]!, b = l[(i + 1) % l.length]!; seg.push(a.x, a.y, a.z, b.x, b.y, b.z); }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(seg), 3));
+    const lines = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x88ddcc }));
+    lines.raycast = () => {};
+    const group = new THREE.Group();
+    group.add(lines);
+    group.userData = { shellSig: signature, plateOutline: pl.id };
+    ctx.shellsParent.add(group);
+    ctx.shellGroups.set(key, group);
+    seen.add(key);
+  }
+
   // Re-apply selection tint to surviving/rebuilt shell groups.
   applyShellSelection(ctx);
 
@@ -670,13 +700,14 @@ export function applyShellSelection(ctx: SceneSyncContext): void {
   if (!ctx.initialized) return;
   const selected = uiStore.selectedShells;
   // Drawn as members, a shell has a group of its own only while selected: the selection changed, so do they.
-  if (!inShellSync && meshHidden() && (selected.size !== [...ctx.shellGroups.keys()].filter((k) => k[0] !== 'P').length || [...selected].some((k) => !ctx.shellGroups.has(k)))) {
+  if (!inShellSync && meshHidden() && (selected.size !== [...ctx.shellGroups.keys()].filter((k) => k[0] !== 'P' && k[0] !== 'O').length || [...selected].some((k) => !ctx.shellGroups.has(k)))) {
     syncShells(ctx);
     return;
   }
   const contour = shellContourActive();
   const plates = uiStore.selectedPlates;
   for (const [key, group] of ctx.shellGroups) {
+    if (key[0] === 'O') continue;
     const isSel = key[0] === 'P' ? plates.has(Number(key.slice(1))) : selected.has(key);
     if (contour) {
       paintShellEdge(group, isSel ? COLORS.elementSelected : (group.userData.baseEdgeColor as number) ?? COLORS.support);

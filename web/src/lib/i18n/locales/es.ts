@@ -13972,5 +13972,7 @@ const es: Record<string, string> = {
   "useZones.deleteReview": "Se eliminan las zonas {zones} y las {loads} cargas que generaron. Las cargas puestas a mano no se tocan.",
   "useZones.deleteYes": "Eliminar",
   "plates.resultsError": "Error de discretización estimado: hasta {pct} % en el elemento",
+  "plates.showMesh": "Ver la malla",
+  "plates.showMeshHint": "Apagado, cada placa mallada se dibuja como pieza (su contorno). Sólo cambia el dibujo: la selección y los resultados siguen igual.",
 };
 export default es;

@@ -65,6 +65,9 @@ test('a plate drawn on an outline has no mesh, meshes from its panel, and is pic
   const n1 = await quads(page);
   expect(n1).toBeGreaterThan(4);
 
+  // Drawn as the piece (outline only); a click on it still selects the plate whole.
+  await page.getByTestId('plates-show-mesh').uncheck();
+
   // A click on the mesh selects the plate whole; picking elements, one element.
   await page.getByTestId('pr-select').click();
   const q = await inside(page);
@@ -73,6 +76,7 @@ test('a plate drawn on an outline has no mesh, meshes from its panel, and is pic
   expect((await sel(page)).shells).toHaveLength(n1);
 
   await page.getByTestId('pr-cmd-shells').click();
+  await page.getByTestId('plates-show-mesh').check();
   await page.getByTestId('plate-show-elements').click();
   await expect.poll(async () => (await sel(page)).scope).toBe('element');
   await page.mouse.click(q.x, q.y);
