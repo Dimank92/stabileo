@@ -13443,5 +13443,6 @@ const pt: Translations = {
   "diag.detail.plate": "placa",
   "diag.detail.poor": "elementos baixos",
   "diag.detail.minAngle": "ângulo mínimo",
+  "plates.resultsError": "Erro de discretização estimado: até {pct} % no elemento",
 };
 export default pt;

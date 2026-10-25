@@ -13792,5 +13792,6 @@ const es: Record<string, string> = {
   "diag.detail.plate": "placa",
   "diag.detail.poor": "elementos bajos",
   "diag.detail.minAngle": "ángulo mínimo",
+  "plates.resultsError": "Error de discretización estimado: hasta {pct} % en el elemento",
 };
 export default es;
