@@ -78,8 +78,10 @@
   });
 </script>
 
+<svelte:window onkeydown={(e) => { if (e.key === 'Escape') onclose(); }} />
+
 <div class="pmd-overlay" onclick={onclose} role="presentation">
-  <div class="pmd" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={t('plates.meshTitle')} data-testid="plate-mesh-dialog" tabindex="-1" onkeydown={(e) => { if (e.key === 'Escape') onclose(); }}>
+  <div class="pmd" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={t('plates.meshTitle')} data-testid="plate-mesh-dialog" tabindex="-1">
     <h3>{ids.length > 1 ? tp('plates.meshTitleMany', { n: ids.length }) : tp('plates.meshTitleOne', { name: plateEntry(ids[0]!)?.name ?? '' })}</h3>
 
     <div class="pmd-row">

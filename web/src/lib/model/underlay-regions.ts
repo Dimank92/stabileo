@@ -14,7 +14,8 @@
  *
  * What a template keeps of each entity besides its drawn segments, in metres in the drawing's own
  * coordinates: lines, arcs (centre, radius, angles), circles and polylines with their bulges, by
- * layer. Blocks are drawn but not kept as shapes, and texts neither: they are counted.
+ * layer, and texts with their point (what a room label may suggest; never converted). Blocks are
+ * drawn but not kept as shapes: they are counted.
  *
  * Pure.
  */
@@ -34,7 +35,9 @@ export type UnderlayShape =
   | { k: 'l'; L: number; a: [number, number]; b: [number, number] }
   | { k: 'a'; L: number; c: [number, number]; r: number; a0: number; a1: number }
   | { k: 'c'; L: number; c: [number, number]; r: number }
-  | { k: 'p'; L: number; pts: Array<[number, number]>; closed: boolean; bulges?: number[] };
+  | { k: 'p'; L: number; pts: Array<[number, number]>; closed: boolean; bulges?: number[] }
+  /** A text, kept for what it may suggest (a room's name); never converted. */
+  | { k: 't'; L: number; at: [number, number]; text: string };
 
 const empty = (): CadBBox => ({ minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
 const grow = (b: CadBBox, p: CadPt) => { b.minX = Math.min(b.minX, p.x); b.minY = Math.min(b.minY, p.y); b.maxX = Math.max(b.maxX, p.x); b.maxY = Math.max(b.maxY, p.y); };
@@ -74,27 +77,23 @@ export function drawingRegions(doc: CadDocument, unit: CadUnit, opts: { gap?: nu
   if (!boxes.length) return [];
   const ext = boxes.reduce((a, b) => ({ minX: Math.min(a.minX, b.minX), minY: Math.min(a.minY, b.minY), maxX: Math.max(a.maxX, b.maxX), maxY: Math.max(a.maxY, b.maxY) }), empty());
   const gap = opts.gap ?? Math.max(1, 0.02 * Math.max(ext.maxX - ext.minX, ext.maxY - ext.minY));
-  // Union-find over boxes, neighbours found through a hash of cells as wide as the gap.
+  // Connected cells of a grid half the gap wide: each box marks the cells it covers grown by half
+  // the gap, and boxes whose cells touch are one cluster. Linear in the boxes and the cells, where
+  // comparing boxes pairwise took seconds on a plan of tens of thousands of lines.
+  const cell = Math.max(gap / 2, Math.max(ext.maxX - ext.minX, ext.maxY - ext.minY) / 1024);
+  const cx = (x: number) => Math.floor((x - ext.minX) / cell), cy = (y: number) => Math.floor((y - ext.minY) / cell);
+  // Row width with room for the boxes grown past the extent on both sides, so no cell wraps.
+  const nx = cx(ext.maxX + gap) + 3;
+  const owner = new Map<number, number>();
   const parent = boxes.map((_, i) => i);
   const find = (i: number): number => { while (parent[i] !== i) { parent[i] = parent[parent[i]!]!; i = parent[i]!; } return i; };
-  const cell = Math.max(gap, (ext.maxX - ext.minX + ext.maxY - ext.minY) / 2000);
-  const cells = new Map<string, number[]>();
   boxes.forEach((b, i) => {
-    const x0 = Math.floor((b.minX - gap) / cell), x1 = Math.floor((b.maxX + gap) / cell);
-    const y0 = Math.floor((b.minY - gap) / cell), y1 = Math.floor((b.maxY + gap) / cell);
-    // A box spanning very many cells (a long line, a frame) is checked against the boxes directly.
-    if ((x1 - x0 + 1) * (y1 - y0 + 1) > 4096) return;
+    const x0 = cx(b.minX - gap / 2), x1 = cx(b.maxX + gap / 2), y0 = cy(b.minY - gap / 2), y1 = cy(b.maxY + gap / 2);
     for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
-      const key = `${x},${y}`;
-      const list = cells.get(key);
-      if (list) { for (const j of list) if (near(boxes[j]!, b, gap)) parent[find(i)] = find(j); list.push(i); }
-      else cells.set(key, [i]);
+      const k = (y + 1) * nx + (x + 1);
+      const o = owner.get(k);
+      if (o === undefined) owner.set(k, i); else { const a = find(o), c = find(i); if (a !== c) parent[a] = c; }
     }
-  });
-  boxes.forEach((b, i) => {
-    const x0 = Math.floor((b.minX - gap) / cell), x1 = Math.floor((b.maxX + gap) / cell), y0 = Math.floor((b.minY - gap) / cell), y1 = Math.floor((b.maxY + gap) / cell);
-    if ((x1 - x0 + 1) * (y1 - y0 + 1) <= 4096) return;
-    boxes.forEach((c, j) => { if (j !== i && near(b, c, gap)) parent[find(i)] = find(j); });
   });
   const byRoot = new Map<number, DrawingRegion>();
   boxes.forEach((b, i) => {
@@ -108,7 +107,6 @@ export function drawingRegions(doc: CadDocument, unit: CadUnit, opts: { gap?: nu
   return out.sort((a, b) => area(b) - area(a));
 }
 
-const near = (a: CadBBox, b: CadBBox, gap: number) => a.minX - gap <= b.maxX && b.minX - gap <= a.maxX && a.minY - gap <= b.maxY && b.minY - gap <= a.maxY;
 
 /** Whether an entity lies in a region (metres): its box's centre inside the region's box. */
 export function inRegion(e: CadEntity, unit: CadUnit, box: CadBBox | null | undefined, doc?: CadDocument): boolean {
@@ -138,6 +136,7 @@ export function cadShapes(doc: CadDocument, unit: CadUnit, layers: readonly stri
       case 'arc': shapes.push({ k: 'a', L, c: p2(e.center), r: e.r * k, a0: e.startAngle, a1: e.endAngle }); break;
       case 'circle': shapes.push({ k: 'c', L, c: p2(e.center), r: e.r * k }); break;
       case 'polyline': shapes.push({ k: 'p', L, pts: e.pts.map(p2), closed: e.closed, ...(e.bulges?.some((b) => Math.abs(b) > 1e-12) ? { bulges: [...e.bulges] } : {}) }); break;
+      case 'text': if (e.value.trim()) shapes.push({ k: 't', L, at: p2(e.at), text: e.value.trim().slice(0, 80) }); break;
       default: leftOut[e.kind] = (leftOut[e.kind] ?? 0) + 1;
     }
   }

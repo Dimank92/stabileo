@@ -71,7 +71,7 @@
     <details class="ul-align">
       <summary>{t('underlay.alignTitle')}</summary>
       <p class="pk-hint">{t('underlay.alignHint')}</p>
-      {#each pairs as p, k (k)}
+      {#each pairs as _p, k (k)}
         <div class="pk-row ul-pair">
           <span>{k + 1}.</span>
           <input class="ul-num" placeholder="x" bind:value={pairs[k]!.fx} aria-label={t('underlay.drawingX')} />
