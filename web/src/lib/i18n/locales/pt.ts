@@ -13620,5 +13620,7 @@ const pt: Translations = {
   "useZones.role.live": "sobrecarga",
   "useZones.role.finish": "acabamentos",
   "plates.sidesSummary": "{n}, {curved} curvos",
+  "useZones.deleteReview": "Saem as zonas {zones} e as {loads} cargas que geraram. As cargas colocadas à mão não são tocadas.",
+  "useZones.deleteYes": "Excluir",
 };
 export default pt;

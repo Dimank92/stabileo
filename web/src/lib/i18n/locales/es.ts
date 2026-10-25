@@ -13969,5 +13969,7 @@ const es: Record<string, string> = {
   "useZones.role.live": "sobrecarga",
   "useZones.role.finish": "terminaciones",
   "plates.sidesSummary": "{n}, {curved} curvos",
+  "useZones.deleteReview": "Se eliminan las zonas {zones} y las {loads} cargas que generaron. Las cargas puestas a mano no se tocan.",
+  "useZones.deleteYes": "Eliminar",
 };
 export default es;

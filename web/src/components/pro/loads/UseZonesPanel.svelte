@@ -51,6 +51,9 @@
   let manual = $state<{ id: number; q: number; note: string } | null>(null);
   let message = $state<string | null>(null);
   let drawName = $state('');
+  let confirmDelete = $state(false);
+  /** The load definitions the zones generated (live and finishes), which go with them. */
+  const generatedOf = (ids: number[]) => [...modelStore.model.groups.values()].filter((g) => g.kind === 'floorLoad' && ids.includes((g.data as { fromZone?: number } | undefined)?.fromZone ?? -1)).length;
 
   const toggle = (id: number) => { const s = new Set(selected); if (s.has(id)) s.delete(id); else s.add(id); selected = s; };
   function assign(ids: number[], value: string) {
@@ -119,8 +122,16 @@
           {#each levels as l (l.id)}<label><input type="checkbox" checked={copyTo.includes(l.z)} onchange={() => (copyTo = copyTo.includes(l.z) ? copyTo.filter((x) => x !== l.z) : [...copyTo, l.z])} /> {l.name}</label>{/each}
           <button class="pk-btn" disabled={!copyTo.length} onclick={copy} data-testid="use-zones-copy">{t('useZones.copy')}</button>
         </span>
-        <button class="pk-btn danger" onclick={() => { deleteUseZones([...selected]); selected = new Set(); }}>{t('useZones.delete')}</button>
+        <button class="pk-btn danger" onclick={() => (confirmDelete = true)} data-testid="use-zones-delete">{t('useZones.delete')}</button>
       </div>
+      {#if confirmDelete}
+        <!-- What goes with the zones, before it goes: their names and the loads they generated. -->
+        <div class="uz-confirm" data-testid="use-zones-delete-confirm">
+          <span>{tp('useZones.deleteReview', { zones: [...selected].map((id) => modelStore.model.groups.get(id)?.name ?? `#${id}`).join(', '), loads: generatedOf([...selected]) })}</span>
+          <button class="pk-btn danger" onclick={() => { deleteUseZones([...selected]); selected = new Set(); confirmDelete = false; }} data-testid="use-zones-delete-yes">{t('useZones.deleteYes')}</button>
+          <button class="pk-btn" onclick={() => (confirmDelete = false)}>{t('plates.close')}</button>
+        </div>
+      {/if}
     {/if}
 
     <table class="uz-table" data-testid="lz-list">
@@ -197,7 +208,8 @@
   .uz-level td { color: var(--st-text); font-weight: 600; background: var(--st-surface-2); }
   .uz-dim { color: var(--st-text-3); }
   .uz-warn { color: var(--st-warn, #d9a441); }
-  .uz-manual { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .uz-manual, .uz-confirm { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .uz-confirm { padding: 4px; border: 1px solid var(--st-danger, #e06c6c); border-radius: var(--st-radius); }
   .chip { padding: 0 5px; border-radius: 8px; border: 1px solid var(--st-hair-strong); }
   .chip-assigned { color: var(--st-ok, #5cb85c); border-color: currentColor; }
   .chip-pending, .chip-unsupported { color: var(--st-warn, #d9a441); border-color: currentColor; }
