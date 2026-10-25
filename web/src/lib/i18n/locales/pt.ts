@@ -13474,5 +13474,12 @@ const pt: Translations = {
   "pieces.exportCsv": "Exportar CSV",
   "pieces.csvCoordinate": "s: comprimento ao longo da peça em m (comprimento de arco em uma viga curva)",
   "pieces.csvAxes": "Esforços nos eixos locais de cada segmento; em um arco conservam a orientação da seção",
+  "plates.sides": "Lados",
+  "plates.sideFollows": "curvo, segue a viga curva {id}",
+  "plates.sideCurvedThrough": "curvo, pelo nó {n}",
+  "plates.sideStraighten": "Voltar reto",
+  "plates.sideThrough": "nó de passagem",
+  "plates.sideCurve": "Curvar",
+  "plates.sideCurved": "Lado curvado. A malha fica desatualizada até você malhar de novo.",
 };
 export default pt;

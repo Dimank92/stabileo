@@ -9,8 +9,8 @@
   import { modelStore, uiStore } from '../../../lib/store';
   import { t, tp } from '../../../lib/i18n';
   import {
-    addPlateLoad, clearPlateMesh, deletePlate, plateEntry, plateLoadDefs, plateShellKeys, plateStatus, setPlateHoles,
-    setPlateProperties, type PlateStatus,
+    addPlateLoad, arcEdgeBetween, clearPlateMesh, deletePlate, plateEntry, plateLoadDefs, plateShellKeys, plateSides, plateStatus, setPlateHoles,
+    setPlateProperties, setPlateSideArc, type PlateStatus,
   } from '../../../lib/store/physical-plates';
   import { plateArea, plateGeometry, plateLoops } from '../../../lib/model/physical/plate';
   import { removeFloorLoadDef } from '../../../lib/store/defined-loads';
@@ -36,6 +36,14 @@
   const sharedThickness = $derived(entries.length && entries.every((e) => e.surface.thickness === entries[0]!.surface.thickness) ? entries[0]!.surface.thickness : null);
   const sharedMaterial = $derived(entries.length && entries.every((e) => e.surface.materialId === entries[0]!.surface.materialId) ? entries[0]!.surface.materialId : null);
 
+  const sides = $derived.by(() => { void modelStore.model.groups; return one ? plateSides(one.id) : []; });
+  let sideMid = $state<Record<number, string>>({});
+  function curveSide(k: number) {
+    if (!one) return;
+    const id = Number((sideMid[k] ?? '').trim());
+    const problem = setPlateSideArc(one.id, k, Number.isInteger(id) && modelStore.nodes.has(id) ? id : -1);
+    message = problem ? t(`plates.problem.${problem}`) : t('plates.sideCurved');
+  }
   let holeText = $state('');
   let loadCase = $state(1);
   let loadQ = $state(1);
@@ -115,6 +123,23 @@
     </div>
 
     {#if one && loops}
+      <div class="pp-block" data-testid="plate-sides">
+        <span class="pp-label">{t('plates.sides')}</span>
+        {#each sides as sd, k (k)}
+          {@const member = arcEdgeBetween(sd.from, sd.to)}
+          <div class="pp-line">
+            <span class="pp-dim">{sd.from} → {sd.to}</span>
+            {#if sd.mid !== null}
+              <span>{member ? tp('plates.sideFollows', { id: member.arcId }) : tp('plates.sideCurvedThrough', { n: sd.mid })}</span>
+              <button class="pp-x" onclick={() => one && setPlateSideArc(one.id, k, null)} title={t('plates.sideStraighten')} data-testid="plate-side-straight-{k}">×</button>
+            {:else}
+              <input class="pp-text pp-mid" placeholder={t('plates.sideThrough')} value={sideMid[k] ?? ''} oninput={(e) => (sideMid = { ...sideMid, [k]: e.currentTarget.value })} data-testid="plate-side-mid-{k}" />
+              <button class="pp-btn" disabled={!(sideMid[k] ?? '').trim()} onclick={() => curveSide(k)} data-testid="plate-side-curve-{k}">{t('plates.sideCurve')}</button>
+            {/if}
+          </div>
+        {/each}
+      </div>
+
       <div class="pp-block">
         <span class="pp-label">{t('plates.holes')} ({loops.holes.length})</span>
         {#each loops.holes as h, i (i)}
@@ -170,6 +195,7 @@
   .pp select, .pp-text, .pp :global(input.pp-num) { padding: 2px 5px; background: var(--st-ink); color: var(--st-text); border: 1px solid var(--st-hair-strong); border-radius: var(--st-radius); font: inherit; }
   .pp :global(input.pp-num) { width: 64px; font-family: var(--st-font-mono, monospace); }
   .pp-text { flex: 1 1 120px; min-width: 0; }
+  .pp-mid { flex: 0 1 90px; }
   .pp-btn { padding: 3px 9px; background: var(--st-surface-3); color: var(--st-text-2); border: 1px solid var(--st-hair-strong); border-radius: var(--st-radius); font: inherit; cursor: pointer; }
   .pp-btn:hover:not(:disabled) { color: var(--st-text); }
   .pp-btn:disabled { opacity: 0.5; cursor: default; }

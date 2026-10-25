@@ -13834,5 +13834,12 @@ const en: Record<string, string> = {
   "pieces.exportCsv": "Export CSV",
   "pieces.csvCoordinate": "s: length along the piece in m (arc length on a curved member)",
   "pieces.csvAxes": "Forces in each segment's local axes; on an arc they keep the section's orientation",
+  "plates.sides": "Sides",
+  "plates.sideFollows": "curved, follows curved member {id}",
+  "plates.sideCurvedThrough": "curved, through node {n}",
+  "plates.sideStraighten": "Make straight",
+  "plates.sideThrough": "node it passes",
+  "plates.sideCurve": "Curve",
+  "plates.sideCurved": "Side curved. The mesh is out of date until you mesh again.",
 };
 export default en;

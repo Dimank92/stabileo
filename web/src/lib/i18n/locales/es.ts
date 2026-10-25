@@ -13823,5 +13823,12 @@ const es: Record<string, string> = {
   "pieces.exportCsv": "Exportar CSV",
   "pieces.csvCoordinate": "s: longitud a lo largo de la pieza en m (longitud de arco en una viga curva)",
   "pieces.csvAxes": "Esfuerzos en los ejes locales de cada segmento; en un arco conservan la orientación de la sección",
+  "plates.sides": "Lados",
+  "plates.sideFollows": "curvo, sigue a la viga curva {id}",
+  "plates.sideCurvedThrough": "curvo, por el nodo {n}",
+  "plates.sideStraighten": "Volver recto",
+  "plates.sideThrough": "nodo de paso",
+  "plates.sideCurve": "Curvar",
+  "plates.sideCurved": "Lado curvado. La malla queda desactualizada hasta que la rehagas.",
 };
 export default es;
