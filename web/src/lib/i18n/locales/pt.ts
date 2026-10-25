@@ -13483,5 +13483,6 @@ const pt: Translations = {
   "plates.sideCurved": "Lado curvado. A malha fica desatualizada até você malhar de novo.",
   "proExport.ifcTip": "O modelo como arquivo de intercâmbio IFC: barras com seus perfis, placas com seu contorno e seus furos (os lados curvos em trechos retos), e a procedência dos resultados. Com o projeto desligado não leva nada do dimensionamento.",
   "plates.sidesSummary": "{n}, {curved} curvos",
+  "plates.resultsError": "Erro de discretização estimado: até {pct} % no elemento",
 };
 export default pt;
