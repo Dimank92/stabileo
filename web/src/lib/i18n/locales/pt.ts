@@ -9588,6 +9588,7 @@ const pt: Translations = {
   'list.ui.allXlsx': 'Todas em uma pasta (XLSX)',
   'list.ui.bvbs': 'Planilha para dobradeiras (BVBS)',
   'list.ui.noDocument': 'Primeiro é preciso montar o documento.',
+  'list.ui.bvbsNotBuildable': 'A planilha para dobradeiras não é gerada: o documento não é para construir (o modelo mudou depois do detalhamento ou há uma revisão posterior). Gere o detalhamento de novo.',
   'list.ui.filter': 'Filtrar…',
   'list.ui.failingOnly': 'Só o que não verifica',
   'list.ui.rows': '{n} linha(s)',

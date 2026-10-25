@@ -138,6 +138,15 @@ export const sheetDxf = (s: SetSheet, display?: SheetDisplay) => sheetToDxf(disp
  * 999 comments (`dxf`), each SVG as its comment and metadata (`svg`), the PDF as a closing page of
  * `key: value` lines, the status line first.
  */
+/** The results' provenance as a closing A4 page (mm) of a PDF: its title, then the `key: value` lines. */
+export function provenancePdfPage(p: { title: string; lines: ReadonlyArray<readonly [string, string]> }) {
+  const text = (y: number, s: string, height: number) => ({ kind: 'text' as const, layer: 'RC-TITLE', at: { x: 20, y }, text: s, height });
+  return { width: 210, height: 297, primitives: [
+    text(277, p.title, 4),
+    ...p.lines.map(([k, v], i) => text(265 - i * 6, `${k}: ${v}`.slice(0, 120), 2.4)),
+  ] as never };
+}
+
 export interface SetProvenance {
   dxf: (dxf: string) => string;
   svg: (svg: string) => string;
@@ -161,13 +170,6 @@ export function sheetSetSvgZip(sheets: readonly SetSheet[], display?: SheetDispl
 
 export function sheetSetPdf(sheets: readonly SetSheet[], title: string, display?: SheetDisplay, provenance?: SetProvenance): Uint8Array {
   const pages = sheets.map((s) => ({ width: s.width, height: s.height, primitives: displayPrimitives(s.primitives, display, 'plan') }));
-  if (provenance) {
-    // An A4 page (mm), its lines from the top margin down.
-    const text = (y: number, s: string, height: number) => ({ kind: 'text' as const, layer: 'RC-TITLE', at: { x: 20, y }, text: s, height });
-    pages.push({ width: 210, height: 297, primitives: [
-      text(277, provenance.title, 4),
-      ...provenance.lines.map(([k, v], i) => text(265 - i * 6, `${k}: ${v}`.slice(0, 120), 2.4)),
-    ] as never });
-  }
+  if (provenance) pages.push(provenancePdfPage(provenance));
   return sheetsToPdf(pages, title, displayStyle(display));
 }

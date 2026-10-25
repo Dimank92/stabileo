@@ -12,7 +12,7 @@
   import { t, tp, i18n, OFFERED_LOCALES } from '../../../lib/i18n';
   import { teAt } from '../../../lib/i18n/engine-text';
   import { memoriaInput } from '../../../lib/store/memoria-inputs';
-  import { downloadResultText, htmlWithProvenance, prepareExportProvenance } from '../../../lib/export/provenance-attach';
+  import { downloadResultText, htmlWithProvenance, prepareExportProvenance, reportProvenanceLines } from '../../../lib/export/provenance-attach';
   import { renderMemoriaHtml, type RenderContext } from '../../../lib/report/memoria/render';
   import { ALL_CHAPTERS, CHAPTERS, type ChapterId, type ChapterKey } from '../../../lib/report/memoria/types';
 
@@ -61,6 +61,14 @@
     w.document.write(withProv); w.document.close(); w.focus(); w.print();
   }
 
+  /** DOCX, XLSX or CSV: the same memoria as a file, with the results' provenance. */
+  async function asFile(f: Parameters<typeof downloadReport>[0]) {
+    const doc = html;
+    const record = await prepareExportProvenance();
+    if (!record) return;
+    await downloadReport(f, { title: t('memo.ui.title'), html: htmlWithProvenance(doc, record), stem: `memoria-${input.project.date}`, provenance: reportProvenanceLines(record) });
+  }
+
   function download() {
     void downloadResultText(html, `memoria-${input.project.date}.html`, 'text/html');
   }
@@ -103,7 +111,7 @@
         </ul>
         <div class="actions">
           <ReportFormats prefix="memoria" ids={{ pdf: 'memoria-print', html: 'memoria-html' }}
-            run={(f) => (f === 'pdf' ? print() : f === 'html' ? download() : void downloadReport(f, { title: t('memo.ui.title'), html, stem: `memoria-${input.project.date}` }))} />
+            run={(f) => (f === 'pdf' ? print() : f === 'html' ? download() : void asFile(f))} />
         </div>
       </aside>
       <section class="preview">

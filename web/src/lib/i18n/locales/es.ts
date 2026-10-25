@@ -9143,6 +9143,7 @@ const es: Record<string, string> = {
   'list.ui.allXlsx': 'Todos en un libro (XLSX)',
   'list.ui.bvbs': 'Planilla para dobladoras (BVBS)',
   'list.ui.noDocument': 'Primero hay que armar el documento.',
+  'list.ui.bvbsNotBuildable': 'La planilla para dobladoras no se genera: el documento no es para construir (el modelo cambió después del detallado o hay una revisión posterior). Volvé a generar el detallado.',
   'list.ui.filter': 'Filtrar…',
   'list.ui.failingOnly': 'Solo lo que no verifica',
   'list.ui.rows': '{n} fila(s)',

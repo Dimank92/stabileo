@@ -9150,6 +9150,7 @@ const en: Record<string, string> = {
   'list.ui.allXlsx': 'All in one workbook (XLSX)',
   'list.ui.bvbs': 'Bending machine schedule (BVBS)',
   'list.ui.noDocument': 'The document has to be built first.',
+  'list.ui.bvbsNotBuildable': 'The bending-machine schedule is not written: the document is not one to build from (the model changed after the detailing, or a later revision exists). Generate the detailing again.',
   'list.ui.filter': 'Filter…',
   'list.ui.failingOnly': 'Only what does not verify',
   'list.ui.rows': '{n} row(s)',
