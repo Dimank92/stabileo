@@ -11,6 +11,7 @@ import { openDeskAt, syncDeskWithTab } from '../design-navigation';
 import { deskUi } from '../../store/design-desk-ui.svelte';
 import { modelStore, uiStore, historyStore } from '../../store';
 import { projectHoldsDesign, noteDesignHeldIfOff } from '../../store/design-presence';
+import { onProjectOpened } from '../../store/file';
 
 const ctx = {
   solved: true, canSolve: true, canReport: true, onSolve: () => {}, onReport: () => {},
@@ -58,5 +59,18 @@ describe('normative design behind PRO settings', () => {
     expect(last.actionId).toBe('enable-design');
     expect(uiStore.designInPro).toBe(false);
     expect((modelStore.elements.get(e) as { reinforcement?: unknown }).reinforcement).toBeTruthy();
+  });
+
+  it('says it from every load path, once per project, with the mode the project opened in', () => {
+    uiStore.analysisMode = '3d';
+    modelStore.model.name = 'held once';
+    const a = modelStore.addNode(0, 0, 0), b = modelStore.addNode(4, 0, 0);
+    const e = modelStore.addElement(a, b);
+    modelStore.updateElement(e, { reinforcement: { kind: 'beam' } } as never);
+    const before = uiStore.toasts.filter((x) => x.actionId === 'enable-design').length;
+    onProjectOpened(undefined, 'pro');
+    onProjectOpened(undefined, 'pro');
+    noteDesignHeldIfOff('pro');
+    expect(uiStore.toasts.filter((x) => x.actionId === 'enable-design').length).toBe(before + 1);
   });
 });

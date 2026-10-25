@@ -16,10 +16,8 @@
     type DesignKind, type Exposure, type ProjectDesignData,
   } from '../../lib/model/design-data';
   import { designData, patchDesignData, setDesignData } from '../../lib/store/design-data';
-  import { assignConcrete } from '../../lib/model/building/assign-concrete';
-  import { materialFamilyOf } from '../../lib/engine/steel/material-family';
-  import { catalogueGradeFamily } from '../../lib/engine/steel/grade-family';
   import ProDeflectionLimits from './ProDeflectionLimits.svelte';
+  import ProConcreteByLevel from './ProConcreteByLevel.svelte';
   import { setBeamsLateral } from '../../lib/store/lateral-system';
 
   const d = $derived.by(() => { void modelStore.designData; return designData(); });
@@ -39,13 +37,6 @@
     if (g) patchDesignData({ rebarGrade: g.name, rebarFy: g.fy });
   }
 
-  // ── Concrete by kind and level ──
-  const concretes = $derived([...modelStore.materials.values()].filter((m) => materialFamilyOf(m, catalogueGradeFamily).family === 'concrete'));
-  const levels = $derived(modelStore.grid?.levels ?? []);
-  let ckind = $state<DesignKind>('column'), cmat = $state(0), clevel = $state('');
-  $effect(() => { if (!concretes.some((m) => m.id === cmat) && concretes[0]) cmat = concretes[0].id; });
-  let assigned = $state<number | null>(null);
-  function assign() { if (ckind !== 'footing') assigned = assignConcrete(ckind, cmat, clevel || undefined); }
 </script>
 
 <div class="pk dd" data-testid="design-data-panel">
@@ -152,22 +143,7 @@
     {/each}
   </section>
 
-  <section class="pk-card" data-testid="design-data-concrete">
-    <h5 class="dd-h">{t('designData.concrete')}</h5>
-    <p class="pk-hint">{t('designData.concreteHint')}</p>
-    {#if concretes.length === 0}<p class="pk-hint">{t('designData.noConcrete')}</p>{:else}
-      <div class="dd-row">
-        <select bind:value={ckind} aria-label={t('physical.kindCol')}>{#each DESIGN_KINDS.filter((k) => k !== 'footing') as k}<option value={k}>{t(`designData.kind.${k}`)}</option>{/each}</select>
-        <select bind:value={clevel} aria-label={t('building.level')}>
-          <option value="">{t('designData.allLevels')}</option>
-          {#each levels as l (l.id)}<option value={l.id}>{l.name}</option>{/each}
-        </select>
-        <select bind:value={cmat} aria-label={t('building.material')}>{#each concretes as m (m.id)}<option value={m.id}>{m.name}</option>{/each}</select>
-        <button class="pk-btn" onclick={assign} data-testid="design-data-assign">{t('designData.assign')}</button>
-      </div>
-      {#if assigned !== null}<p class="pk-hint" role="status">{tp('designData.assigned', { n: assigned })}</p>{/if}
-    {/if}
-  </section>
+  <ProConcreteByLevel />
 
   <section class="pk-card">
     <h5 class="dd-h">{t('designData.deflection')}</h5>

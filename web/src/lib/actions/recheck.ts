@@ -16,8 +16,14 @@ import { RESULTS_VERSION } from '../provenance/registry';
 import { t, tp } from '../i18n';
 import { errorText } from '../utils/error-text';
 
+
+/** The re-run's words: «analysis and design», or the analysis alone where PRO's design is off. */
+export function recheckKey(key: string): string {
+  return uiStore.analysisMode === 'pro' && !uiStore.designInPro ? `${key}Analysis` : key;
+}
+
 export async function rerunAnalysisAndDesign(): Promise<{ ok: boolean; error?: string }> {
-  uiStore.toast(t('recheck.rerunning'), 'info');
+  uiStore.toast(t(recheckKey('recheck.rerunning')), 'info');
   try {
     await runGlobalSolve();
   } catch (e) {
@@ -31,11 +37,13 @@ export async function rerunAnalysisAndDesign(): Promise<{ ok: boolean; error?: s
     uiStore.toast(tp('recheck.rerunFailed', { error }), 'error');
     return { ok: false, error };
   }
-  if (uiStore.analysisMode === 'pro' && resultsStore.results3D) {
+  // Design is re-run only where it is on (PRO's settings, `uiStore.designInPro`): off, the re-run is
+  // the analysis alone, and nothing of design is computed or drawn.
+  if (uiStore.analysisMode === 'pro' && uiStore.designInPro && resultsStore.results3D) {
     // A refusal here (no combinations, no concrete members) is not a failed re-run: there was
     // no RC check to repeat. The design panel says why when it is opened.
     designRunStore.runCodeCheck();
   }
-  uiStore.toast(tp('recheck.rerunDone', { v: RESULTS_VERSION }), 'success');
+  uiStore.toast(tp(recheckKey('recheck.rerunDone'), { v: RESULTS_VERSION }), 'success');
   return { ok: true };
 }

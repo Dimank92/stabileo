@@ -304,8 +304,6 @@ export function deserializeProject(text: string): boolean {
   resultsStore.clear(); // stale results dropped — the model must be re-solved
   resultsStore.forgetView();
   onProjectOpened(data.snapshot, uiStore.analysisMode);
-  // Design kept in the file while it is off in PRO's settings: offered, not switched on.
-  noteDesignHeldIfOff();
   return true;
 }
 
@@ -341,6 +339,8 @@ export function adoptStoredProject(snapshot: ModelSnapshot, name: string): void 
 export function onProjectOpened(snap: ModelSnapshot | undefined, analysisMode: string | undefined): void {
   noteAxisConventionMigrationIfNeeded(snap, analysisMode);
   if (snap) recheckStore.openProject(snap as never, analysisMode);
+  // Design kept in the project while it is off in PRO's settings: offered, not switched on.
+  noteDesignHeldIfOff(analysisMode);
 }
 
 /**

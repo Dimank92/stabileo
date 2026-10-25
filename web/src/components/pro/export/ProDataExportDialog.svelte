@@ -115,9 +115,10 @@
         results = false;
         uiStore.toast(t('proExport.dataNoResults'), 'info');
       }
-      const sheets = new Set([...modelShown, ...(results ? resultsShown : [])].filter(on));
+      // Design's sheets only where design is on in PRO's settings (`uiStore.designInPro`).
+      const sheets = new Set([...modelShown, ...(results ? resultsShown : [])].filter(on).filter((n) => uiStore.designInPro || !DESIGN_SHEETS.includes(n)));
       const opts = {
-        results, sheets,
+        results, sheets, design: uiStore.designInPro,
         sources: {
           cases: casesOff.size ? new Set(cases.map((c) => c.id).filter((id) => !casesOff.has(id))) : undefined,
           combinations: combosOff.size ? new Set(combos.map((c) => c.id).filter((id) => !combosOff.has(id))) : undefined,
@@ -144,7 +145,7 @@
     <div class="dx-cols">
       <div class="dx-col">
         <span class="dx-head">{t('proExport.groupModel')}</span>
-        {#each MODEL_GROUPS as g (g.key)}
+        {#each MODEL_GROUPS.filter((g) => g.key !== 'design' || uiStore.designInPro) as g (g.key)}
           <CheckGroup title={t(`proExport.grp.${g.key}`)} items={itemsOf(g.sheets, modelShown)} on={on} toggle={flip}
             setAll={(v) => setAll(g.sheets.filter((n) => modelShown.includes(n)), v)} testid="pro-data-sheet" />
         {/each}
@@ -159,7 +160,7 @@
     </div>
     {#if wantsResults && !resultsStore.results3D}<p class="xs-note">{t('proExport.dataSolves')}</p>{/if}
     <!-- The design sheets describe the model the design and its detailing were generated from. -->
-    {#if open && DESIGN_SHEETS.some(on)}<OutdatedNotice what="workbook" testid="pro-data-export-outdated" />{/if}
+    {#if open && uiStore.designInPro && DESIGN_SHEETS.some(on)}<OutdatedNotice what="workbook" testid="pro-data-export-outdated" />{/if}
   </ExportSection>
 
   {#if wantsResults && (cases.length > 1 || combos.length > 0)}

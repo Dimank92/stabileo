@@ -17,6 +17,7 @@
   import { proNav } from '../../../lib/store/pro-nav.svelte';
   import { assignConcrete } from '../../../lib/model/building/assign-concrete';
   import { physicalGroups } from '../../../lib/store/physical';
+  import ProConcreteByLevel from '../ProConcreteByLevel.svelte';
   import ProDesignDataPanel from '../ProDesignDataPanel.svelte';
 
   const materials = $derived([...modelStore.materials.values()]);
@@ -81,6 +82,8 @@
       <summary>{t('building.general.more')} <span class="pk-hint">· {tp('building.general.moreSummary', { c: Math.round(d.covers.beam * 1000), e: t(`designData.exp.${d.exposure.beam}`) })}</span></summary>
       <ProDesignDataPanel />
     </details>
+  {:else}
+    <ProConcreteByLevel />
   {/if}
 </section>
 

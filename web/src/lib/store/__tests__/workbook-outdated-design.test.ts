@@ -72,9 +72,12 @@ describe('the workbook as exported', () => {
 });
 
 describe('the Excel export dialog', () => {
-  it('shows the out-of-date notice while a design sheet is chosen', () => {
+  it('shows the out-of-date notice while a design sheet is chosen, and only with design on', () => {
     const src = readFileSync(join(process.cwd(), 'src/components/pro/export/ProDataExportDialog.svelte'), 'utf8');
-    expect(src).toMatch(/\{#if open && DESIGN_SHEETS\.some\(on\)\}<OutdatedNotice what="workbook" testid="pro-data-export-outdated" \/>\{\/if\}/);
+    expect(src).toMatch(/\{#if open && uiStore\.designInPro && DESIGN_SHEETS\.some\(on\)\}<OutdatedNotice what="workbook" testid="pro-data-export-outdated" \/>\{\/if\}/);
+    // With design off in PRO the dialog neither offers nor writes the design sheets.
+    expect(src).toMatch(/MODEL_GROUPS\.filter\(\(g\) => g\.key !== 'design' \|\| uiStore\.designInPro\)/);
+    expect(src).toMatch(/design: uiStore\.designInPro/);
     const notice = readFileSync(join(process.cwd(), 'src/components/pro/design/OutdatedNotice.svelte'), 'utf8');
     expect(notice).toMatch(/'workbook'/);
   });

@@ -138,7 +138,8 @@
   let lastStage = $state('model');
   const mappedStage = $derived(TAB_STAGE[uiStore.proActiveTab] ?? 'model');
   $effect(() => { if (mappedStage) lastStage = mappedStage; });
-  const activeStage = $derived(mappedStage || lastStage);
+  // A remembered stage that is no longer offered (Design turned off) is not one to show.
+  const activeStage = $derived(mappedStage || (STAGES.some((s) => s.id === lastStage) ? lastStage : 'model'));
   const stage = $derived(STAGES.find(s => s.id === activeStage) ?? STAGES[0]);
 
   $effect(() => { rememberStageTab(uiStore.proActiveTab); });

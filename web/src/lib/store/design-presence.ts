@@ -15,8 +15,20 @@ export function projectHoldsDesign(): boolean {
   return !!d && (d.locked.length > 0 || Object.keys(d.proposals).length > 0 || d.copies.length > 0);
 }
 
-/** A PRO project opened with design off that holds design: say so, with the switch at hand. */
-export function noteDesignHeldIfOff(): void {
-  if (uiStore.analysisMode !== 'pro' || uiStore.designInPro || !projectHoldsDesign()) return;
+/** The projects already told about in this session: a tab switched back to says nothing again. */
+const told = new Set<string>();
+
+/**
+ * A PRO project opened with design off that holds design: say so, with the switch at hand.
+ *
+ * Said once a project is the one on screen, from every load path (`onProjectOpened`: a .ded, the
+ * autosave, a tab, a share link), with the mode the project was opened in (the UI's may not be set
+ * yet). Once per project and session.
+ */
+export function noteDesignHeldIfOff(analysisMode: string | undefined = uiStore.analysisMode): void {
+  if (analysisMode !== 'pro' || uiStore.designInPro || !projectHoldsDesign()) return;
+  const key = `${modelStore.model.name}|${modelStore.elements.size}|${modelStore.nodes.size}`;
+  if (told.has(key)) return;
+  told.add(key);
   uiStore.toast(t('design.heldWhileOff'), 'info', 'enable-design');
 }
