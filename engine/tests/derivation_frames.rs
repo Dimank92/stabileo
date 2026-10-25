@@ -127,3 +127,39 @@ fn left_handed_axes_are_refused() {
     let err = mk(Some(true)).unwrap_err();
     assert!(err.contains("leftHand"), "{err}");
 }
+
+/// FR-3 (DOCUMENTED-CHOICE): in 2D, as_y pairs with iz (transverse shear in-plane);
+/// in 3D, as_y pairs with iy (shear along local z for bending about local y).
+/// An I-section with specified shear area gives identical shear deflection
+/// and matches the Timoshenko closed form delta = PL^3/(3EI) + PL/(G As).
+#[test]
+fn shear_area_pairing_agrees_between_2d_and_3d() {
+    let (l, e, nu, a, iz, as_val, p) = (2.0, 200_000.0, 0.3, 0.01, 1e-4, 0.005, 50.0);
+
+    // 2D cantilever: fixed at node 1 (x=0), tip load at node 2 (x=L) along z
+    let mut inp2 = make_beam(1, l, e, a, iz, "fixed", None, vec![
+        SolverLoad::Nodal(SolverNodalLoad { node_id: 2, fx: 0.0, fz: -p, my: 0.0 }),
+    ]);
+    inp2.sections.get_mut("1").unwrap().as_y = Some(as_val);
+    let r2 = solve_2d(&inp2).unwrap();
+    let d2 = r2.displacements.iter().find(|d| d.node_id == 2).unwrap().uz;
+
+    // 3D cantilever: fixed at node 1, tip load at node 2 along z (bending about local y)
+    let mut inp3 = make_3d_beam(1, l, e, nu, a, iz, iz, 1e-4, vec![true; 6], None, vec![
+        SolverLoad3D::Nodal(SolverNodalLoad3D { node_id: 2, fx: 0.0, fy: 0.0, fz: -p, mx: 0.0, my: 0.0, mz: 0.0, bw: None }),
+    ]);
+    inp3.sections.get_mut("1").unwrap().as_y = Some(as_val);
+    let r3 = solve_3d(&inp3).unwrap();
+    let d3 = r3.displacements.iter().find(|d| d.node_id == 2).unwrap().uz;
+
+    // Timoshenko analytical deflection (e in make_input/make_3d_input is in MPa, so E in kN/m² is e * 1000):
+    let e_kpa = e * 1000.0;
+    let g_kpa = e_kpa / (2.0 * (1.0 + nu));
+    let delta_bending = p * l.powi(3) / (3.0 * e_kpa * iz);
+    let delta_shear = p * l / (g_kpa * as_val);
+    let expected = -(delta_bending + delta_shear);
+
+    assert!((d2 - expected).abs() < 1e-9, "2D: {d2} vs expected {expected}");
+    assert!((d3 - expected).abs() < 1e-9, "3D: {d3} vs expected {expected}");
+    assert!((d2 - d3).abs() < 1e-9, "2D and 3D shear deflection differ: {d2} vs {d3}");
+}
