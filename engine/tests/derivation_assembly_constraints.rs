@@ -141,11 +141,9 @@ fn inclined_support_with_spring_reactions_balance_2d() {
     assert!((fz - 20.0).abs() < 1e-8, "ΣRz = {fz}");
 }
 
-/// AC-10 (OPEN): a prescribed displacement on a DOF that a spring makes free
-/// (3D: flag + stiffness) is dropped without a message. The support says
-/// "uz = −0.01" and the node does not move.
+/// AC-10 (FIXED): a prescribed displacement on a DOF that a spring makes free
+/// is refused with an informative diagnostic error rather than silently dropped.
 #[test]
-#[ignore = "open question AC-10: settlement on a spring DOF is silently ignored"]
 fn settlement_on_spring_dof_is_not_silently_dropped() {
     let mut s2 = sup3(2, [false, false, true, false, false, false]);
     let o = s2.as_object_mut().unwrap();
