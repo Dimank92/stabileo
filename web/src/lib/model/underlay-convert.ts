@@ -130,6 +130,7 @@ export function planConversion(u: Underlay, o: ConvertOptions, m: ConvertModel):
         break;
       }
       case 'c': skip('circle'); break;
+      case 't': skip('text'); break;
     }
   }
 

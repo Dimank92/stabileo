@@ -65,7 +65,8 @@ describe('templates from a DXF with two plans', () => {
     expect(snapToUnderlays(modelStore.underlays, 0.15, 0.15, 0.05, 3)).toEqual({ x: expect.closeTo(0.15, 9), y: expect.closeTo(0.15, 9) });
     expect(snapToUnderlays(modelStore.underlays, 6.15, 5.15, 0.05, 6)).toEqual({ x: expect.closeTo(6.15, 9), y: expect.closeTo(5.15, 9) });
     expect(ua.shapes!.filter((s) => s.k === 'l')).toHaveLength(4);
-    expect(ub.leftOut).toEqual({ text: 1 });
+    expect(ub.leftOut).toBeUndefined();
+    expect(ub.shapes!.filter((x) => x.k === 't').map((x) => (x as { text: string }).text)).toEqual(['ESTAR']);
 
     // A hidden layer, or one out of the snaps, is not captured.
     editUnderlay(ua.id, { hiddenLayers: ['VIGAS'] });

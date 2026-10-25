@@ -40,8 +40,10 @@
   const pt = (p: [number, number]) => `(${p[0].toFixed(2)}; ${p[1].toFixed(2)})`;
 </script>
 
+<svelte:window onkeydown={(e) => { if (e.key === 'Escape') onclose(); }} />
+
 <div class="cv-overlay" onclick={onclose} role="presentation">
-  <div class="cv" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabindex="-1" aria-label={t('convert.title')} data-testid="underlay-convert-dialog" onkeydown={(e) => { if (e.key === 'Escape') onclose(); }}>
+  <div class="cv" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabindex="-1" aria-label={t('convert.title')} data-testid="underlay-convert-dialog">
     <h3>{tp('convert.titleOf', { name: u.name })}</h3>
     <p class="cv-hint">{tp('convert.where', { level: levels.find((l) => l.id === u.levelId)?.name ?? `z = ${u.z}`, below: below?.name ?? t('convert.noLevelBelow') })}</p>
     <div class="cv-cols">
