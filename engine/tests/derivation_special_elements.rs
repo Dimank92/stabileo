@@ -692,12 +692,10 @@ fn cable_density_is_not_a_load() {
     assert!(r.cable_forces.iter().all(|c| c.ernst_modulus < 200e6), "density still reduces the modulus");
 }
 
-/// SP-14 (OPEN). Outside the cable solver a "cable" member is assembled as a
-/// plain truss bar, so the linear solver lets it carry compression without a
-/// warning. Two cables from a mid node to two supports, the node pushed up:
-/// both cables report compression.
+/// SP-14 (FIXED). Outside the cable solver a "cable" member is assembled as a
+/// plain truss bar: the linear solver detects when a cable carries compression
+/// and attaches diagnostics pointing to tension-only / cable analysis.
 #[test]
-#[ignore = "open question SP-14: linear solve_2d lets a cable carry compression silently"]
 fn linear_solver_does_not_report_cable_compression_silently() {
     let input = common::make_input(
         vec![(1, 0.0, 0.0), (2, 10.0, -2.0), (3, 20.0, 0.0)],
@@ -714,6 +712,29 @@ fn linear_solver_does_not_report_cable_compression_silently() {
             let all = format!("{:?} {:?} {:?}", r.diagnostics, r.structured_diagnostics, r.solver_diagnostics).to_lowercase();
             let warned = all.contains("cable") || all.contains("compression") || all.contains("tension-only");
             assert!(!compressed || warned, "cables in compression without a diagnostic: N = {:?}",
+                r.element_forces.iter().map(|f| f.n_start).collect::<Vec<_>>());
+        }
+    }
+}
+
+/// SP-14 (FIXED): same check in 3D.
+#[test]
+fn linear_solver_does_not_report_cable_compression_silently_3d() {
+    let input = make_3d_input(
+        vec![(1, 0.0, 0.0, 0.0), (2, 10.0, 0.0, -2.0), (3, 20.0, 0.0, 0.0)],
+        vec![(1, 200_000.0, 0.3)],
+        vec![(1, 1e-3, 1e-8, 1e-8, 1e-8)],
+        vec![(1, "cable", 1, 2, 1, 1), (2, "cable", 2, 3, 1, 1)],
+        vec![(1, vec![true; 6]), (3, vec![true; 6])],
+        vec![SolverLoad3D::Nodal(SolverNodalLoad3D { node_id: 2, fx: 0.0, fy: 0.0, fz: 10.0, mx: 0.0, my: 0.0, mz: 0.0, bw: None })],
+    );
+    match solve_3d(&input) {
+        Err(_) => {}
+        Ok(r) => {
+            let compressed = r.element_forces.iter().any(|f| f.n_start < 0.0);
+            let all = format!("{:?} {:?} {:?}", r.diagnostics, r.structured_diagnostics, r.solver_diagnostics).to_lowercase();
+            let warned = all.contains("cable") || all.contains("compression") || all.contains("tension-only");
+            assert!(!compressed || warned, "3D cables in compression without a diagnostic: N = {:?}",
                 r.element_forces.iter().map(|f| f.n_start).collect::<Vec<_>>());
         }
     }

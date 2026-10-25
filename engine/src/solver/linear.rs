@@ -407,10 +407,105 @@ fn pcg_solver_path(preconditioner: &str) -> &'static str {
     }
 }
 
+pub(crate) fn check_cable_compression_2d(input: &SolverInput, results: &mut AnalysisResults) {
+    if results.structured_diagnostics.iter().any(|d| d.code == DiagnosticCode::CableInCompression) {
+        return;
+    }
+    for ef in &results.element_forces {
+        if ef.n_start < -1e-6 {
+            let is_cable = input.elements.get(&ef.element_id.to_string())
+                .or_else(|| input.elements.values().find(|e| e.id == ef.element_id))
+                .map(|e| e.elem_type.eq_ignore_ascii_case("cable"))
+                .unwrap_or(false);
+            if is_cable {
+                results.diagnostics.push(AssemblyDiagnostic {
+                    element_id: ef.element_id,
+                    element_type: "cable".to_string(),
+                    metric: "axial_force".to_string(),
+                    value: ef.n_start,
+                    threshold: 0.0,
+                    message: format!(
+                        "Cable element {} carries compression (N = {:.2} kN); cables carry tension only outside the cable solver.",
+                        ef.element_id, ef.n_start
+                    ),
+                });
+                results.solver_diagnostics.push(SolverDiagnostic {
+                    category: "model_quality".to_string(),
+                    message: format!(
+                        "Cable element {} carries compression ({:.2} kN); tension-only members slacken under compression.",
+                        ef.element_id, ef.n_start
+                    ),
+                    severity: "warning".to_string(),
+                });
+                let d = StructuredDiagnostic::global(
+                    DiagnosticCode::CableInCompression,
+                    Severity::Warning,
+                    format!(
+                        "Cable element {} carries compression ({:.2} kN); cables carry tension only outside the cable solver (SP-14)",
+                        ef.element_id, ef.n_start
+                    ),
+                )
+                .with_phase("solve")
+                .with_elements(vec![ef.element_id])
+                .with_value(ef.n_start, 0.0);
+                results.structured_diagnostics.push(d);
+            }
+        }
+    }
+}
+
+pub(crate) fn check_cable_compression_3d(input: &SolverInput3D, results: &mut AnalysisResults3D) {
+    if results.structured_diagnostics.iter().any(|d| d.code == DiagnosticCode::CableInCompression) {
+        return;
+    }
+    for ef in &results.element_forces {
+        if ef.n_start < -1e-6 {
+            let is_cable = input.elements.get(&ef.element_id.to_string())
+                .or_else(|| input.elements.values().find(|e| e.id == ef.element_id))
+                .map(|e| e.elem_type.eq_ignore_ascii_case("cable"))
+                .unwrap_or(false);
+            if is_cable {
+                results.diagnostics.push(AssemblyDiagnostic {
+                    element_id: ef.element_id,
+                    element_type: "cable".to_string(),
+                    metric: "axial_force".to_string(),
+                    value: ef.n_start,
+                    threshold: 0.0,
+                    message: format!(
+                        "Cable element {} carries compression (N = {:.2} kN); cables carry tension only outside the cable solver.",
+                        ef.element_id, ef.n_start
+                    ),
+                });
+                results.solver_diagnostics.push(SolverDiagnostic {
+                    category: "model_quality".to_string(),
+                    message: format!(
+                        "Cable element {} carries compression ({:.2} kN); tension-only members slacken under compression.",
+                        ef.element_id, ef.n_start
+                    ),
+                    severity: "warning".to_string(),
+                });
+                let d = StructuredDiagnostic::global(
+                    DiagnosticCode::CableInCompression,
+                    Severity::Warning,
+                    format!(
+                        "Cable element {} carries compression ({:.2} kN); cables carry tension only outside the cable solver (SP-14)",
+                        ef.element_id, ef.n_start
+                    ),
+                )
+                .with_phase("solve")
+                .with_elements(vec![ef.element_id])
+                .with_value(ef.n_start, 0.0);
+                results.structured_diagnostics.push(d);
+            }
+        }
+    }
+}
+
 /// Solve a 2D linear static analysis.
 /// Linear static 2D solve, with the known-issue warnings that apply to the model attached.
 pub fn solve_2d(input: &SolverInput) -> Result<AnalysisResults, String> {
     let mut r = solve_2d_inner(input)?;
+    check_cable_compression_2d(input, &mut r);
     crate::known_issues::attach(&mut r.structured_diagnostics, crate::known_issues::for_2d(input, crate::known_issues::Analysis::Linear));
     Ok(r)
 }
@@ -978,6 +1073,7 @@ impl PreparedStatic2D<'_> {
     /// stored factorization, then runs the same postprocessing as `solve_2d`.
     pub fn solve_loads(&self, loads: &[SolverLoad]) -> Result<AnalysisResults, String> {
         let mut r = self.solve_loads_by_path(loads)?;
+        check_cable_compression_2d(&self.input, &mut r);
         // Known issues of this load set.
         crate::known_issues::attach(&mut r.structured_diagnostics, crate::known_issues::loads_2d(loads));
         Ok(r)
@@ -1921,6 +2017,7 @@ pub(crate) fn assert_finite_3d(u: &[f64]) -> Result<(), String> {
 /// Linear static 3D solve, with the known-issue warnings that apply to the model attached.
 pub fn solve_3d(input: &SolverInput3D) -> Result<AnalysisResults3D, String> {
     let mut r = solve_3d_inner(input)?;
+    check_cable_compression_3d(input, &mut r);
     crate::known_issues::attach(&mut r.structured_diagnostics, crate::known_issues::for_3d(input, crate::known_issues::Analysis::Linear));
     Ok(r)
 }
@@ -2525,6 +2622,7 @@ impl PreparedStatic3D {
         validate_loads_3d(&self.input, loads)?;
         self.refuse_loads_on_orphan_dofs(loads)?;
         let mut r = self.solve_loads_by_path(loads)?;
+        check_cable_compression_3d(&self.input, &mut r);
         // Known issues of this load set (the model's are in the pre-solve diagnostics).
         crate::known_issues::attach(&mut r.structured_diagnostics, crate::known_issues::loads_3d(loads));
         Ok(r)
