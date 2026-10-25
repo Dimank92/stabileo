@@ -49,9 +49,11 @@ pub fn catenary_ordinate(h_thrust: f64, w: f64, l: f64, h: f64, x: f64) -> (f64,
 
 /// Parabolic cable ordinate (approximate, valid when sag/span < 1/8).
 ///
-/// y(x) = h*x/L + 4*f*x*(L-x)/L²
+/// y(x) = h*x/L − 4*f*x*(L−x)/L²
 ///
-/// where f = wL²/(8H) is the midspan sag below chord.
+/// where f = wL²/(8H) is the midspan sag below chord. The sag is subtracted
+/// so that the cable hangs below the chord, consistent with `catenary_ordinate`
+/// and the physical gravity convention.
 pub fn parabolic_ordinate(h_thrust: f64, w: f64, l: f64, h: f64, x: f64) -> (f64, f64) {
     if h_thrust.abs() < 1e-15 {
         let t = x / l;
@@ -59,8 +61,8 @@ pub fn parabolic_ordinate(h_thrust: f64, w: f64, l: f64, h: f64, x: f64) -> (f64
     }
 
     let f_sag = w * l * l / (8.0 * h_thrust);
-    let y = h * x / l + 4.0 * f_sag * x * (l - x) / (l * l);
-    let dy_dx = h / l + 4.0 * f_sag * (l - 2.0 * x) / (l * l);
+    let y = h * x / l - 4.0 * f_sag * x * (l - x) / (l * l);
+    let dy_dx = h / l - 4.0 * f_sag * (l - 2.0 * x) / (l * l);
 
     (y, dy_dx)
 }
@@ -365,9 +367,9 @@ mod tests {
     fn test_parabolic_ordinate() {
         // Level cable: H=1250, w=10, L=100
         let (y_mid, _) = parabolic_ordinate(1250.0, 10.0, 100.0, 0.0, 50.0);
-        // y(50) = 4*10*50*50/(100²) = 10.0 (sag at midspan)
+        // y(50) = -4*10*50*50/(100²) = -10.0 (sag below chord at midspan)
         let f_sag = 10.0 * 100.0 * 100.0 / (8.0 * 1250.0);
-        assert!((y_mid - f_sag).abs() < 1e-10);
+        assert!((y_mid - (-f_sag)).abs() < 1e-10);
     }
 
     #[test]

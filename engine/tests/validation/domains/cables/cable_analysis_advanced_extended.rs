@@ -133,9 +133,9 @@ fn cable_advanced_ext_parabolic_ordinate() {
     let f_sag: f64 = w * l * l / (8.0 * h_thrust);
     assert_close(f_sag, 10.0, 0.001, "Parabolic ordinate: f = 10.0 m");
 
-    // y(L/2) = f (for level cable, h=0)
+    // y(L/2) = −f (for level cable, h=0; cable hangs below chord, SP-10)
     let (y_mid, dy_mid) = element::parabolic_ordinate(h_thrust, w, l, h, l / 2.0);
-    assert_close(y_mid, f_sag, 0.001, "Parabolic ordinate: y(L/2) = f");
+    assert_close(y_mid, -f_sag, 0.001, "Parabolic ordinate: y(L/2) = -f");
 
     // Slope at midspan = h/L = 0 for level cable
     assert!(
@@ -144,13 +144,13 @@ fn cable_advanced_ext_parabolic_ordinate() {
         dy_mid
     );
 
-    // y(L/4) = 3f/4 for level cable
+    // y(L/4) = −3f/4 for level cable
     let (y_quarter, _) = element::parabolic_ordinate(h_thrust, w, l, h, l / 4.0);
     assert_close(
         y_quarter,
-        3.0 * f_sag / 4.0,
+        -3.0 * f_sag / 4.0,
         0.001,
-        "Parabolic ordinate: y(L/4) = 3f/4",
+        "Parabolic ordinate: y(L/4) = -3f/4",
     );
 
     // y(0) = 0
@@ -169,34 +169,34 @@ fn cable_advanced_ext_parabolic_ordinate() {
         y_l
     );
 
-    // Slope at supports: dy/dx = 4f/L (pointing inward = positive at x=0)
+    // Slope at supports: dy/dx = -4f/L (cable hangs downward away from x=0)
     let (_, dy_0) = element::parabolic_ordinate(h_thrust, w, l, h, 0.0);
     let expected_slope: f64 = 4.0 * f_sag / l;
     assert_close(
         dy_0,
-        expected_slope,
+        -expected_slope,
         0.001,
-        "Parabolic ordinate: slope at x=0 = 4f/L",
+        "Parabolic ordinate: slope at x=0 = -4f/L",
     );
 
-    // Slope at x=L: dy/dx = -4f/L (symmetric, opposite sign)
+    // Slope at x=L: dy/dx = +4f/L (symmetric, opposite sign, sloping upward to support)
     let (_, dy_l) = element::parabolic_ordinate(h_thrust, w, l, h, l);
     assert_close(
         dy_l,
-        -expected_slope,
+        expected_slope,
         0.001,
-        "Parabolic ordinate: slope at x=L = -4f/L",
+        "Parabolic ordinate: slope at x=L = +4f/L",
     );
 
     // Now test inclined cable: h = 20 m (right support higher)
     let h_incl: f64 = 20.0;
     let (y_mid_incl, _) = element::parabolic_ordinate(h_thrust, w, l, h_incl, l / 2.0);
-    // y(L/2) = h/2 + f
+    // y(L/2) = h/2 − f
     assert_close(
         y_mid_incl,
-        h_incl / 2.0 + f_sag,
+        h_incl / 2.0 - f_sag,
         0.001,
-        "Parabolic ordinate: inclined y(L/2) = h/2 + f",
+        "Parabolic ordinate: inclined y(L/2) = h/2 - f",
     );
 }
 
