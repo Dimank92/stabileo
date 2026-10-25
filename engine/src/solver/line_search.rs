@@ -19,15 +19,30 @@ pub fn residual_energy(residual: &[f64], nf: usize) -> f64 {
     0.5 * e
 }
 
-/// Compute the directional derivative of energy along delta_u.
-/// ∇E · Δu = -R · Δu (since R = F_ext - F_int, and ∇E = -R for E = 0.5*||R||²)
-/// Only considers free DOFs.
-pub fn directional_derivative(residual: &[f64], delta_u: &[f64], nf: usize) -> f64 {
+/// Compute the directional derivative of residual energy E(u) = 0.5 * ||R(u)||² along Δu.
+///
+/// By the chain rule:
+///   d/dα E(u + α·Δu)|_{α=0} = R(u)ᵀ · (∂R/∂u) · Δu = -R(u)ᵀ · K_T · Δu
+///
+/// where K_T = -∂R/∂u is the tangent stiffness matrix (∂F_int/∂u).
+/// `kt_delta_u` is the vector product K_T · Δu.
+/// For a standard Newton-Raphson step where K_T · Δu = R, this simplifies to -||R||² = -2·E(u)
+/// (see [`newton_directional_derivative`]).
+///
+/// Only considers free DOFs (indices 0..nf).
+pub fn directional_derivative(residual: &[f64], kt_delta_u: &[f64], nf: usize) -> f64 {
     let mut dd = 0.0;
     for i in 0..nf {
-        dd -= residual[i] * delta_u[i];
+        dd -= residual[i] * kt_delta_u[i];
     }
     dd
+}
+
+/// Compute the directional derivative of residual energy along the Newton step (where K_T · Δu = R).
+///
+///   d/dα E(u + α·Δu)|_{α=0} = -||R||² = -2 · E(u)
+pub fn newton_directional_derivative(residual: &[f64], nf: usize) -> f64 {
+    -2.0 * residual_energy(residual, nf)
 }
 
 /// Armijo backtracking line search.
@@ -141,9 +156,17 @@ mod tests {
     #[test]
     fn test_directional_derivative() {
         let r = vec![1.0, 2.0];
-        let du = vec![1.0, 1.0];
+        let kt_du = vec![1.0, 1.0];
         // dd = -(1*1 + 2*1) = -3
-        assert!((directional_derivative(&r, &du, 2) - (-3.0)).abs() < 1e-10);
+        assert!((directional_derivative(&r, &kt_du, 2) - (-3.0)).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_newton_directional_derivative() {
+        let r = vec![3.0, 4.0];
+        // ||R||² = 9 + 16 = 25, dd = -25
+        assert!((newton_directional_derivative(&r, 2) - (-25.0)).abs() < 1e-10);
+        assert!((directional_derivative(&r, &r, 2) - (-25.0)).abs() < 1e-10);
     }
 
     #[test]
@@ -152,8 +175,9 @@ mod tests {
         let mut u = vec![10.0, 0.0];
         let du = vec![-10.0]; // Newton step to zero
         let nf = 1;
-        let energy_0 = residual_energy(&u, nf);
-        let slope_0 = directional_derivative(&u, &du, nf);
+        let r = vec![-u[0]]; // R(x) = -E'(x) = -10.0
+        let energy_0 = residual_energy(&r, nf);
+        let slope_0 = newton_directional_derivative(&r, nf); // -100.0
 
         let alpha = armijo_backtrack(
             &mut u, &du, nf, energy_0, slope_0,
@@ -161,5 +185,6 @@ mod tests {
             1e-4, 0.5, 10,
         );
         assert!((alpha - 1.0).abs() < 1e-10);
+        assert!(u[0].abs() < 1e-10);
     }
 }

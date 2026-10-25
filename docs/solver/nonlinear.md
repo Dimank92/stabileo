@@ -463,10 +463,9 @@ Neither is called by any solver. They are library utilities, tested only in
 `tests/validation/domains/solver/line_search.rs`.
 
 - `armijo_backtrack` tests $E(u+\alpha\Delta u) \le E(u) + c_1\alpha\,E'(0)$ with
-  $E = \tfrac12\lVert R\rVert^2$. The slope helper `directional_derivative` returns
-  $-R\cdot\Delta u$, which is the slope of the potential energy. The slope of $E$ is
-  $-R^{\mathsf T}K_T\Delta u$, which equals $-\lVert R\rVert^2$ for the Newton step. The two differ
-  in value and in units (NL-8).
+  $E = \tfrac12\lVert R\rVert^2$. The slope helper `directional_derivative(residual, kt_delta_u, nf)`
+  evaluates $-R^{\mathsf T}K_T\Delta u$ from the residual and the tangent-increment product $K_T\Delta u$
+  (or `newton_directional_derivative` returning $-\lVert R\rVert^2 = -2E$ for the full Newton step) (NL-8, FIXED).
 - `AdaptiveStepper` doubles or halves $\Delta\lambda$ by iteration count, the same rule as the
   arc-length $\Delta s$.
 
@@ -636,11 +635,11 @@ Neither is called by any solver. They are library utilities, tested only in
   `corotational.rs` (§4.4). This was not bisected.
 - *Tests.* `nl_corot3d_released_member_small_load_matches_linear` also covers released members.
 
-**NL-8. `line_search::directional_derivative` returns $-R\cdot\Delta u$. OPEN, unused code.**
+**NL-8. `line_search::directional_derivative` returns $-R^{\mathsf T}(K_T\Delta u)$. FIXED (#430).**
 
-- *Problem.* The slope of $\tfrac12\lVert R\rVert^2$ is $-R^{\mathsf T}K_T\Delta u$.
-- *Effect.* For $K_T = 3$ the helper gives −0.963 and the true slope is −2.89. No solver calls it.
-- *Test.* `nl_line_search_slope_is_the_derivative_of_the_residual_energy` (ignored).
+- *Fix.* `directional_derivative` evaluates $-R^{\mathsf T}(K_T\Delta u)$ from $R$ and $K_T\Delta u$. For a standard Newton step ($K_T\Delta u = R$), `newton_directional_derivative` provides $-\lVert R\rVert^2 = -2E$.
+- *Effect.* For $K_T = 3$, $K_T\Delta u$ correctly yields the true slope −2.89 matching numerical differentiation.
+- *Test.* `nl_line_search_slope_is_the_derivative_of_the_residual_energy` (un-ignored, passes).
 
 **NL-9. `NotionalLoadDef.gravity_axis` defaults to 1, which is $Y$ in 3D. OPEN.**
 

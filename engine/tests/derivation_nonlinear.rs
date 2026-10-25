@@ -617,18 +617,20 @@ fn nl_fiber_one_increment_matches_many() {
 
 /// The Armijo condition needs the slope of E(α) = ½‖R(u + αΔu)‖² at α = 0,
 /// which is −Rᵀ·K_T·Δu (= −‖R‖² for the Newton step). The helper returns
-/// −R·Δu, the slope of the potential energy, which has other units.
+/// −R·(K_T·Δu) (NL-8, FIXED).
 #[test]
-#[ignore = "open question NL-8: line_search::directional_derivative is -R.du, not the slope of 0.5*|R|^2"]
 fn nl_line_search_slope_is_the_derivative_of_the_residual_energy() {
-    use dedaliano_engine::solver::line_search::{directional_derivative, residual_energy};
+    use dedaliano_engine::solver::line_search::{directional_derivative, newton_directional_derivative, residual_energy};
     // R(u) = f − k·u with k = 3, f = 2: Newton step Δu = R/k.
     let (k, f, u0) = (3.0, 2.0, 0.1);
     let r = |u: f64| vec![f - k * u];
     let du = r(u0)[0] / k;
+    let kt_du = k * du;
     let h = 1e-6;
     let fd = (residual_energy(&r(u0 + h * du), 1) - residual_energy(&r(u0 - h * du), 1)) / (2.0 * h);
-    close(directional_derivative(&r(u0), &[du], 1), fd, 1e-6, "slope at α = 0");
+    close(directional_derivative(&r(u0), &[kt_du], 1), fd, 1e-6, "slope at α = 0 with K_T·Δu");
+    close(directional_derivative(&r(u0), &r(u0), 1), fd, 1e-6, "slope at α = 0 for Newton step");
+    close(newton_directional_derivative(&r(u0), 1), fd, 1e-6, "Newton helper slope");
 }
 
 /// Notional loads in 3D: with the defaults (Z up, ADR 0001) a column carrying

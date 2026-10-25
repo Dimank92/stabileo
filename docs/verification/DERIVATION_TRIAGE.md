@@ -68,7 +68,7 @@ on that branch: a test that now passes means the finding is fixed.
 | [#413](https://github.com/lambdaclass/stabileo/issues/413) | SH-15 shell docstrings disagree with the code | fix the docstrings |
 | [#414](https://github.com/lambdaclass/stabileo/issues/414) | SP-10 parabolic vs catenary ordinate sag sides | fix the helper; check its callers (promote if a result uses it) |
 | [#415](https://github.com/lambdaclass/stabileo/issues/415) | SP-11 Ernst tangent not the derivative of the chord law | **fixed** with #416: `ernst_tangent_modulus` returns the derivative (= `ernst_equivalent_modulus`); `ernst_tangent_modulus_is_the_chord_law_derivative` passes |
-| [#430](https://github.com/lambdaclass/stabileo/issues/430) | NL-8 line-search slope (unused) | fix or remove |
+| [#430](https://github.com/lambdaclass/stabileo/issues/430) | NL-8 line-search slope (unused) | **fixed** (#430): `directional_derivative` evaluates $-R^{\mathsf T}(K_T\Delta u)$; `newton_directional_derivative` evaluates $-\lVert R\rVert^2$; `nl_line_search_slope_is_the_derivative_of_the_residual_energy` passes |
 
 ## Order of work
 
