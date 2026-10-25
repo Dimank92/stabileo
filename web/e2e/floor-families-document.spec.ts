@@ -154,6 +154,9 @@ async function captureReport(page: Page): Promise<string> {
     page.getByTestId('doc-report').click(),
   ]);
   await popup.waitForLoadState('domcontentloaded');
+  // The tab is opened inside the click and written once the provenance is in (an await later),
+  // so its first document is the empty one: read it once the report is there.
+  await popup.waitForFunction(() => (document.body?.textContent ?? '').trim().length > 0, null, { timeout: 60_000 });
   const html = await popup.content();
   await popup.close();
   return html;

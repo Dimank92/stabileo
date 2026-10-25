@@ -61,6 +61,11 @@ Educational tool with step-by-step solver visualization for civil/structural eng
   longer. A shard is never shorter than its longest spec file: keep files under ~10 min.
 - `@flaky` quarantines an intermittent e2e test, and only with a linked issue
   (`e2e/README.md`). The blocking runs skip it; the non-required `e2e-flaky` job runs it.
+- Locally, run parallel shards with `node scripts/e2e-parallel.mjs --shards 5 [-- playwright args]`
+  (preview server started first), not with N bare `playwright test --shard` launches: those share
+  Playwright's transform cache, and on a spec or fixture changed since the last run one of them
+  reads another's half-written entry and dies at startup with a SyntaxError. The script warms the
+  cache once and gives each shard its own artifacts and report folder.
 - `npm run wasm` — Build the Rust/WASM engine into `src/lib/wasm` (needs Rust and wasm-pack). Required
   to run the app or any test that solves: without it `vite.config.ts` substitutes a stub, so
   `npm run build` still succeeds in CI, but the stub's `solve_3d` returns `{}`.

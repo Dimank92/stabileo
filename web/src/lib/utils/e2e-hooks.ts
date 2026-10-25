@@ -54,7 +54,7 @@ import {
 import { sceneCacheStats } from '../engine/detailing/scene-cache';
 import { openTimeline, type OpenPhase } from './open-timeline';
 import { autosaveRevisions as storedAutosaveRevisions } from '../store/autosave-db';
-import { autosaveFingerprint, clearAutosave, deserializeProject, loadAutosave, type DedalFile } from '../store/file';
+import { autosaveFingerprint, clearAutosave, deserializeProject, loadAutosave, serializeProject, type DedalFile } from '../store/file';
 import { lastAutosaveOutcome, requestAutosave } from '../store/autosave-service';
 import { loadFixture } from '../templates/load-fixture';
 import { currentResultProvenance, provenanceForExport, captureProvenanceToken } from '../store/result-provenance';
@@ -405,6 +405,8 @@ export interface StabileoTestHooks {
    * into the database's private layout.
    */
   autosaveRevisions(): Promise<Array<{ revision: number; timestamp: string; status: string }>>;
+  /** The project as File → Save writes it, as JSON text. */
+  serializeProject(): string;
   /** The family census of the newest readable stored project, plus how it was read. */
   autosaveStored(): Promise<{
     revision: number | null;
@@ -804,6 +806,7 @@ export function installE2EHooks(): void {
     canvasCount: () => document.querySelectorAll('canvas').length,
     sceneCacheStats,
     openTimeline,
+    serializeProject: () => serializeProject(),
     autosaveRevisions: async () => (await storedAutosaveRevisions())
       .map(({ revision, timestamp, status }) => ({ revision, timestamp, status })),
     autosaveStored: async () => {
