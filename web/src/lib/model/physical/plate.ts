@@ -283,7 +283,7 @@ export function plateKindOf(geo: PlateGeometry): 'slab' | 'wall' {
  * plane inside the plate come back as the point where they cross; nodes of other things on the
  * plate as points. `owned` are the nodes the plate's own mesh created, which do not count.
  */
-export function externalFeatures(m: PlateModel, geo: PlateGeometry, owned: ReadonlySet<number>, loopNodes: ReadonlySet<number>): { points: Vec3[]; segments: Array<[Vec3, Vec3]> } {
+export function externalFeatures(m: PlateModel, geo: PlateGeometry, owned: ReadonlySet<number>, loopNodes: ReadonlySet<number>, opts: { mine?: ReadonlySet<number>; neighbours?: ReadonlySet<number> } = {}): { points: Vec3[]; segments: Array<[Vec3, Vec3]> } {
   // Members by node, to walk through the mesh's own nodes.
   const at = new Map<number, number[]>();
   for (const e of m.elements.values()) {
@@ -339,7 +339,32 @@ export function externalFeatures(m: PlateModel, geo: PlateGeometry, owned: Reado
     const p = pos(id);
     if (inPlane(p) && insidePlate(geo, p)) points.push(p);
   }
+  // The mesh of a plate beside this one: its nodes on this plate's outline are where this mesh
+  // meets it, so the two share them (`opts.mine`, this plate's own mesh nodes, do not count).
+  for (const id of opts.neighbours ?? []) {
+    if (opts.mine?.has(id) || loopNodes.has(id) || external.has(id)) continue;
+    const n = m.nodes.get(id);
+    if (!n) continue;
+    const p = v3(n);
+    if (inPlane(p) && onOutline(geo, p)) points.push(p);
+  }
   return { points, segments };
+}
+
+/** Whether a point of the plate's plane lies on its outline or a hole's edge (within the plane tolerance). */
+export function onOutline(geo: PlateGeometry, p: Vec3): boolean {
+  for (const loop of [geo.outer, ...geo.holes]) {
+    for (let i = 0; i < loop.length; i++) {
+      const a = loop[i]!, b = loop[(i + 1) % loop.length]!;
+      const ab = sub(b, a), L2 = dot(ab, ab);
+      if (L2 < 1e-18) continue;
+      const t = dot(sub(p, a), ab) / L2;
+      if (t < 1e-9 || t > 1 - 1e-9) continue;
+      const q: Vec3 = [a[0] + ab[0] * t, a[1] + ab[1] * t, a[2] + ab[2] * t];
+      if (norm(sub(p, q)) <= PLANE_TOL) return true;
+    }
+  }
+  return false;
 }
 
 const r6 = (v: number) => (Math.round(v * 1e6) / 1e6).toString();
@@ -360,8 +385,32 @@ export function plateSignature(geo: PlateGeometry, spec: PlateMeshSpec, features
 
 /** The mesher's input for a plate. */
 export function plateMeshInput(geo: PlateGeometry, spec: PlateMeshSpec, features: { points: Vec3[]; segments: Array<[Vec3, Vec3]> } | null): MeshInput {
+  // A side a neighbour's mesh already meets takes that mesh's spacing: as many divisions as the
+  // neighbour's points on it make, so the two meshes meet node to node whatever their sizes. The
+  // other sides keep the element size.
+  const met = geo.outer.map((a, i) => {
+    const b = geo.outer[(i + 1) % geo.outer.length]!;
+    const ab = sub(b, a), L2 = dot(ab, ab);
+    const count = (features?.points ?? []).filter((p) => {
+      const t = dot(sub(p, a), ab) / L2;
+      if (t <= 1e-9 || t >= 1 - 1e-9) return false;
+      return norm(sub(p, [a[0] + ab[0] * t, a[1] + ab[1] * t, a[2] + ab[2] * t])) <= PLANE_TOL;
+    }).length;
+    return { count, length: Math.sqrt(L2) };
+  });
+  let sides = met.some((x) => x.count > 0) ? met.map((x) => ({ divisions: x.count > 0 ? x.count + 1 : Math.max(1, Math.round(x.length / spec.size)) })) : undefined;
+  // Four sides: the side opposite a met one takes its divisions, so the mesh stays a grid (the
+  // mesher's structured path needs opposite sides equal) and no midpoint lands on the met side.
+  if (sides && sides.length === 4 && geo.holes.length === 0) {
+    for (const [i, j] of [[0, 2], [1, 3]] as const) {
+      const mi = met[i]!.count > 0, mj = met[j]!.count > 0;
+      if (mi && !mj) sides[j] = { ...sides[i]! };
+      else if (mj && !mi) sides[i] = { ...sides[j]! };
+    }
+  }
   return {
     outer: { kind: 'polygon', points: geo.outer },
+    ...(sides ? { sides } : {}),
     holes: geo.holes.map((h) => ({ kind: 'polygon' as const, points: h })),
     size: spec.size,
     element: spec.element,
