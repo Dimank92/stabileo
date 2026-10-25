@@ -13804,5 +13804,7 @@ const en: Record<string, string> = {
   "diag.detail.poor": "poor elements",
   "diag.detail.minAngle": "minimum angle",
   "plates.resultsError": "Estimated discretization error: up to {pct} % at element",
+  "plates.showMesh": "Show the mesh",
+  "plates.showMeshHint": "Off, each meshed plate is drawn as the piece (its outline). Only the drawing changes: picking and results stay as they are.",
 };
 export default en;

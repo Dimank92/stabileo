@@ -13444,5 +13444,7 @@ const pt: Translations = {
   "diag.detail.poor": "elementos baixos",
   "diag.detail.minAngle": "ângulo mínimo",
   "plates.resultsError": "Erro de discretização estimado: até {pct} % no elemento",
+  "plates.showMesh": "Ver a malha",
+  "plates.showMeshHint": "Desligado, cada placa malhada é desenhada como peça (seu contorno). Só muda o desenho: a seleção e os resultados continuam iguais.",
 };
 export default pt;

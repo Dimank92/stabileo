@@ -13793,5 +13793,7 @@ const es: Record<string, string> = {
   "diag.detail.poor": "elementos bajos",
   "diag.detail.minAngle": "ángulo mínimo",
   "plates.resultsError": "Error de discretización estimado: hasta {pct} % en el elemento",
+  "plates.showMesh": "Ver la malla",
+  "plates.showMeshHint": "Apagado, cada placa mallada se dibuja como pieza (su contorno). Sólo cambia el dibujo: la selección y los resultados siguen igual.",
 };
 export default es;

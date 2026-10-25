@@ -271,6 +271,8 @@ function createUIStore() {
   let selectedPlates = $state<Set<number>>(new Set());
   /** What a click on a plate's mesh picks: the plate whole, or the one element clicked. */
   let shellPickScope = $state<'plate' | 'element'>('plate');
+  /** Whether a meshed physical plate is drawn with its mesh's edges, or as the piece (its outline). Picking does not depend on it. */
+  let platesShowMesh = $state(true);
   let plateShells: ((id: number) => string[]) | null = null;
   function setShells(v: Set<string>, keepPlates = false) {
     selectedShells = v;
@@ -955,6 +957,8 @@ function createUIStore() {
     get selectedShells() { return selectedShells; },
     get selectedPlates() { return selectedPlates; },
     get shellPickScope() { return shellPickScope; },
+    get platesShowMesh() { return platesShowMesh; },
+    set platesShowMesh(v: boolean) { platesShowMesh = v; },
     set shellPickScope(v: 'plate' | 'element') { shellPickScope = v; },
     /** How the store finds a plate's shells; set once by `physical-plates.ts`. */
     setPlateShellResolver(fn: (id: number) => string[]) { plateShells = fn; },

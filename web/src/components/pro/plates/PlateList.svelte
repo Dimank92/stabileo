@@ -21,6 +21,7 @@
   <section class="pl" data-testid="plate-list">
     <header class="pl-head">
       <span>{tp('plates.listTitle', { n: rows.length })}</span>
+      <label class="pl-mesh" title={t('plates.showMeshHint')}><input type="checkbox" checked={uiStore.platesShowMesh} onchange={(e) => (uiStore.platesShowMesh = e.currentTarget.checked)} data-testid="plates-show-mesh" /> {t('plates.showMesh')}</label>
       {#if pending.length}
         <button class="pl-btn" onclick={() => { meshIds = pending; open = true; }} data-testid="plate-list-mesh-pending">{tp('plates.meshPending', { n: pending.length })}</button>
       {/if}
@@ -49,6 +50,7 @@
   .pl-row.sel { border-color: var(--st-accent); }
   .pl-name { min-width: 38px; color: var(--st-text); }
   .pl-dim { color: var(--st-text-3); }
+  .pl-mesh { font-weight: 400; display: inline-flex; gap: 4px; align-items: center; margin-left: auto; }
   .pl-btn { padding: 2px 8px; background: var(--st-surface-3); color: var(--st-text-2); border: 1px solid var(--st-hair-strong); border-radius: var(--st-radius); font: inherit; cursor: pointer; font-weight: 400; }
   .chip { padding: 0 6px; border-radius: 9px; font-size: 0.66rem; border: 1px solid var(--st-hair-strong); }
   .chip-current { color: var(--st-ok, #5cb85c); border-color: currentColor; }
