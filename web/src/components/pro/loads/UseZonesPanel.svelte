@@ -9,7 +9,8 @@
   import { modelStore } from '../../../lib/store';
   import { t, tp } from '../../../lib/i18n';
   import { OCCUPANCY_TABLE_2025, findOccupancy } from '../../../lib/codes/cirsoc101/live-loads';
-  import { confirmZoneUse, copyZonesToLevels, deleteUseZones, liveCaseId, setZoneUse, useZones } from '../../../lib/store/use-zones';
+  import { confirmZoneUse, copyZonesToLevels, deleteUseZones, finishPackages, liveCaseId, setZoneUse, useZones } from '../../../lib/store/use-zones';
+  import FinishPackages from './FinishPackages.svelte';
   import { zoneLiveLoad, zoneStatus, zoneUnsupported, zoneOverlap, zoneUseOf, type ZoneStatus } from '../../../lib/model/use-zones';
   import { zoneArea, zoneChanged, type DefinitionModel } from '../../../lib/model/loads/floor-definitions';
   import { sortedLevels } from '../../../lib/model/grid';
@@ -123,10 +124,10 @@
     {/if}
 
     <table class="uz-table" data-testid="lz-list">
-      <thead><tr><th></th><th>{t('useZones.zone')}</th><th>{t('useZones.use')}</th><th>{t('useZones.state')}</th><th>m²</th><th>kN/m²</th><th>kN</th></tr></thead>
+      <thead><tr><th></th><th>{t('useZones.zone')}</th><th>{t('useZones.use')}</th><th>{t('useZones.state')}</th><th>m²</th><th>kN/m²</th><th>kN</th><th>{t('finishes.column')}</th></tr></thead>
       {#each byLevel as [z, list] (z)}
         <tbody>
-          <tr class="uz-level"><td colspan="7">{levelName(z)} · {tp('useZones.levelTotal', { area: list.reduce((s, r) => s + r.area, 0).toFixed(2), kN: list.reduce((s, r) => s + (r.kN ?? 0), 0).toFixed(1), pending: list.filter((r) => r.status !== 'assigned' && r.status !== 'none').length })}</td></tr>
+          <tr class="uz-level"><td colspan="8">{levelName(z)} · {tp('useZones.levelTotal', { area: list.reduce((s, r) => s + r.area, 0).toFixed(2), kN: list.reduce((s, r) => s + (r.kN ?? 0), 0).toFixed(1), pending: list.filter((r) => r.status !== 'assigned' && r.status !== 'none').length })}</td></tr>
           {#each list as r (r.id)}
             <tr data-testid="use-zone-{r.name}">
               <td><input type="checkbox" checked={selected.has(r.id)} onchange={() => toggle(r.id)} aria-label={r.name} /></td>
@@ -146,6 +147,12 @@
               <td class="num">{r.area.toFixed(2)} m²</td>
               <td class="num">{fmt(r.q)}</td>
               <td class="num">{fmt(r.kN, 1)}</td>
+              <td>
+                <select value={r.use?.finish ?? ''} onchange={(e) => setZoneUse([r.id], { finish: e.currentTarget.value || undefined })} data-testid="use-zone-finish-{r.name}">
+                  <option value="">—</option>
+                  {#each finishPackages() as f (f.id)}<option value={String(f.id)}>{f.name}</option>{/each}
+                </select>
+              </td>
             </tr>
           {/each}
         </tbody>
@@ -158,6 +165,7 @@
       {#if liveCaseId() === null}<span class="uz-warn">{t('useZones.noLiveCase')}</span>{/if}
     </div>
   {/if}
+  <FinishPackages />
   {#if manual}
     <div class="uz-manual" data-testid="use-zone-manual">
       <label>{t('useZones.manualValue')} <input type="number" step="0.1" bind:value={manual.q} /> kN/m²</label>

@@ -5,7 +5,7 @@
  */
 import { modelStore } from './model.svelte';
 import { addLoadZone, removeLoadZone, syncDefinedLoads } from './defined-loads';
-import { planZoneLoads, zoneDefinition, zoneUseOf, type UseData, type ZonePlan, type ZoneUse } from '../model/use-zones';
+import { planZoneLoads, zoneDefinition, zoneUseOf, type FinishPackage, type UseData, type ZonePlan, type ZoneUse } from '../model/use-zones';
 import { zoneOutline, zoneOutlineProblem, type DefinitionModel } from '../model/loads/floor-definitions';
 import { classifyRoomLabel, roomOccupancyCandidates } from '../cad/rooms';
 import { laidPoint, type Underlay } from '../model/underlay';
@@ -127,10 +127,38 @@ export function deleteUseZones(ids: readonly number[]): void {
   });
 }
 
-/** The plan of the zones' live loads against the definitions there are. Null without a live case. */
+/** The dead case finishes load: the first case of type D. */
+export function deadCaseId(): number | null {
+  return modelStore.model.loadCases.find((c) => c.type === 'D')?.id ?? null;
+}
+
+/** The plan of the zones' live loads and finishes against the definitions there are. Null without a live case. */
 export function zoneLoadPlan(zoneIds?: readonly number[]): ZonePlan | null {
   const live = liveCaseId();
-  return live === null ? null : planZoneLoads(dm(), live, zoneIds);
+  return live === null ? null : planZoneLoads(dm(), live, zoneIds, deadCaseId());
+}
+
+// ─── Finishes ────────────────────────────────────────────────────
+
+export function finishPackages(): ModelGroup[] {
+  return [...modelStore.model.groups.values()].filter((g) => g.kind === 'finishPackage');
+}
+
+/** A package of finishes; its id. */
+export function addFinishPackage(name: string, pkg: FinishPackage): number {
+  return modelStore.addGroup(name, 'finishPackage', {}, { data: pkg as unknown as Record<string, unknown> });
+}
+
+export function setFinishPackage(id: number, pkg: FinishPackage): void {
+  modelStore.setGroupData(id, pkg as unknown as Record<string, unknown>);
+}
+
+/** Remove a package; the zones it was given to lose it (their finish loads go at the next plan). */
+export function removeFinishPackage(id: number): void {
+  modelStore.batch(() => {
+    for (const z of useZones()) if (zoneUseOf(z)?.finish === String(id)) setZoneUse([z.id], { finish: undefined });
+    modelStore.removeGroup(id);
+  });
 }
 
 /** Write a reviewed plan: definitions added, changed and removed, the loads rewritten; one undo step. */
@@ -138,7 +166,7 @@ export function applyZoneLoadPlan(plan: ZonePlan): { added: number; changed: num
   modelStore.batch(() => {
     for (const r of plan.remove) if (modelStore.model.groups.has(r.defId)) modelStore.removeGroup(r.defId);
     for (const c of plan.change) modelStore.setGroupData(c.defId!, zoneDefinition(c) as unknown as Record<string, unknown>);
-    for (const a of plan.add) modelStore.addGroup(`${a.zone} · L`, 'floorLoad', {}, { data: zoneDefinition(a) as unknown as Record<string, unknown> });
+    for (const a of plan.add) modelStore.addGroup(`${a.zone} · ${a.role === 'finish' ? 'D' : 'L'}`, 'floorLoad', {}, { data: zoneDefinition(a) as unknown as Record<string, unknown> });
     syncDefinedLoads();
   });
   return { added: plan.add.length, changed: plan.change.length, removed: plan.remove.length };

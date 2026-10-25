@@ -172,6 +172,36 @@ describe('use zones over two floors', () => {
     expect(zoneTotals().get(living)).toBeUndefined();
   });
 
+  it('gives zones a package of finishes as a dead load of its own', async () => {
+    const { addFinishPackage, setFinishPackage } = await import('../use-zones');
+    modelStore.clear(); historyStore.clear(); uiStore.analysisMode = 'pro';
+    floor(3);
+    meshAll(0.5);
+    const z1 = zone([[0, 2.5], [3, 2.5], [3, 5], [0, 5]], 3, 'Estar');
+    setZoneUse([z1], { occupancy: 'vivienda', provenance: 'confirmed' });
+    // 5 cm of screed at 20 kN/m³ and 2 cm of floor at 22: 1.44 kN/m².
+    const pkg = addFinishPackage('Piso', { layers: [{ name: 'contrapiso', thickness: 0.05, unitWeight: 20 }, { name: 'piso', thickness: 0.02, unitWeight: 22 }] });
+    setZoneUse([z1], { finish: String(pkg) });
+    let plan = zoneLoadPlan()!;
+    const fin = plan.add.find((a) => a.role === 'finish')!;
+    expect(fin.q).toBeCloseTo(1.44, 9);
+    expect(fin.caseId).toBe(modelStore.model.loadCases.find((c) => c.type === 'D')!.id);
+    expect(plan.add.filter((a) => a.role === 'live')).toHaveLength(1);
+    applyZoneLoadPlan(plan);
+    const deadDefs = [...modelStore.model.groups.values()].filter((g) => g.kind === 'floorLoad' && (g.data as { role?: string }).role === 'finish');
+    expect(deadDefs).toHaveLength(1);
+    // The package changed: the finish load changes, the live one does not.
+    setFinishPackage(pkg, { layers: [{ name: 'contrapiso', thickness: 0.08, unitWeight: 20 }] });
+    plan = zoneLoadPlan()!;
+    expect(plan.change.map((c) => [c.role, c.q])).toEqual([['finish', 1.6]]);
+    applyZoneLoadPlan(plan);
+    // Taken off the zone: its finish load goes, the live load stays.
+    setZoneUse([z1], { finish: undefined });
+    plan = zoneLoadPlan()!;
+    expect(plan.remove).toHaveLength(1);
+    expect(plan.add.length + plan.change.length).toBe(0);
+  });
+
   it('solves with the zones loading the floor, and the reactions add up to their loads', () => {
     modelStore.clear(); historyStore.clear(); uiStore.analysisMode = 'pro';
     floor(3);

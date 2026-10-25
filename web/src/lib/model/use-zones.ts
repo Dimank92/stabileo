@@ -79,7 +79,21 @@ export function zoneLiveLoad(use: ZoneUse | undefined): { q: number; source: 'ta
   return { q: row.uniformKNm2!, source: 'table', row };
 }
 
-export interface ZonePlanItem { zoneId: number; zone: string; defId?: number; q: number; caseId: number; distribution: FloorLoadDef['distribution'] }
+/**
+ * A package of finishes (a floor build-up, a ceiling): layers with their thickness and unit weight,
+ * or a load per square metre stated directly. Its total is a dead load on the zones it is given to,
+ * apart from the structure's own weight. Never inferred from a room's name.
+ */
+export interface FinishLayer { name: string; thickness?: number; unitWeight?: number; q?: number }
+export interface FinishPackage { layers: FinishLayer[] }
+
+/** A package's total, kN/m²: each layer's thickness × unit weight, or its stated load. */
+export function finishTotal(p: FinishPackage | undefined): number {
+  return (p?.layers ?? []).reduce((s, l) => s + (Number.isFinite(l.q) ? l.q! : (l.thickness ?? 0) * (l.unitWeight ?? 0)), 0);
+}
+
+export type ZoneLoadRole = 'live' | 'finish';
+export interface ZonePlanItem { zoneId: number; zone: string; defId?: number; q: number; caseId: number; distribution: FloorLoadDef['distribution']; role: ZoneLoadRole }
 export interface ZonePlan {
   add: ZonePlanItem[];
   change: Array<ZonePlanItem & { from: { q: number; caseId: number; distribution: string } }>;
@@ -117,41 +131,52 @@ export function zoneHasShells(m: DefinitionModel, zoneId: number): boolean {
  * added, changed and removed, and what stays unresolved. `zoneIds` limits it to some zones (the
  * definitions of the others are left alone); absent, every zone.
  */
-export function planZoneLoads(m: DefinitionModel, liveCaseId: number, zoneIds?: readonly number[]): ZonePlan {
+export function planZoneLoads(m: DefinitionModel, liveCaseId: number, zoneIds?: readonly number[], deadCaseId: number | null = null): ZonePlan {
   const plan: ZonePlan = { add: [], change: [], remove: [], unresolved: [] };
   const zones = [...m.groups.values()].filter((g) => g.kind === 'loadZone' && (!zoneIds || zoneIds.includes(g.id)));
   const defs = [...m.groups.values()].filter((g) => g.kind === 'floorLoad' && (g.data as { fromZone?: number } | undefined)?.fromZone !== undefined);
-  const defOf = new Map<number, ModelGroup>();
+  const key = (z: number, r: ZoneLoadRole) => `${z}|${r}`;
+  const defOf = new Map<string, ModelGroup>();
   for (const d of defs) {
-    const z = (d.data as { fromZone: number }).fromZone;
-    if (defOf.has(z) || !m.groups.has(z)) {
-      // A second definition for one zone, or one whose zone is gone: removed.
+    const { fromZone: z, role } = d.data as { fromZone: number; role?: ZoneLoadRole };
+    const k = key(z, role ?? 'live');
+    if (defOf.has(k) || !m.groups.has(z)) {
+      // A second definition for one zone and role, or one whose zone is gone: removed.
       if (!zoneIds || zoneIds.includes(z)) plan.remove.push({ defId: d.id, zoneId: m.groups.has(z) ? z : null, zone: m.groups.get(z)?.name ?? `#${z}` });
       continue;
     }
-    defOf.set(z, d);
+    defOf.set(k, d);
   }
+  const packages = new Map([...m.groups.values()].filter((g) => g.kind === 'finishPackage').map((g) => [g.id, g.data as unknown as FinishPackage]));
+  const want = (z: ModelGroup, role: ZoneLoadRole, q: number, caseId: number) => {
+    const have = defOf.get(key(z.id, role));
+    const item: ZonePlanItem = { zoneId: z.id, zone: z.name, q, caseId, distribution: zoneHasShells(m, z.id) ? 'slab' : 'twoWay', role };
+    if (!have) { plan.add.push(item); return; }
+    const d = have.data as unknown as FloorLoadDef;
+    if (d.q !== item.q || d.caseId !== item.caseId || d.distribution !== item.distribution) plan.change.push({ ...item, defId: have.id, from: { q: d.q, caseId: d.caseId, distribution: d.distribution } });
+  };
+  const drop = (z: ModelGroup, role: ZoneLoadRole) => { const have = defOf.get(key(z.id, role)); if (have) plan.remove.push({ defId: have.id, zoneId: z.id, zone: z.name }); };
   for (const z of zones) {
     const use = zoneUseOf(z);
     const live = zoneLiveLoad(use);
-    const have = defOf.get(z.id);
-    if (!live) {
+    if (live) want(z, 'live', live.q, liveCaseId);
+    else {
       const s = zoneStatus(use);
       if (s !== 'none') plan.unresolved.push({ zoneId: z.id, zone: z.name, status: s });
-      if (have) plan.remove.push({ defId: have.id, zoneId: z.id, zone: z.name });
-      continue;
+      drop(z, 'live');
     }
-    const want: ZonePlanItem = { zoneId: z.id, zone: z.name, q: live.q, caseId: liveCaseId, distribution: zoneHasShells(m, z.id) ? 'slab' : 'twoWay' };
-    if (!have) { plan.add.push(want); continue; }
-    const d = have.data as unknown as FloorLoadDef;
-    if (d.q !== want.q || d.caseId !== want.caseId || d.distribution !== want.distribution) plan.change.push({ ...want, defId: have.id, from: { q: d.q, caseId: d.caseId, distribution: d.distribution } });
+    // Finishes, a dead load of their own, whatever the live state.
+    const pkg = use?.finish !== undefined ? packages.get(Number(use.finish)) : undefined;
+    const total = finishTotal(pkg);
+    if (pkg && total > 0 && deadCaseId !== null) want(z, 'finish', Math.round(total * 1e6) / 1e6, deadCaseId);
+    else drop(z, 'finish');
   }
   return plan;
 }
 
 /** The definition a zone's live load is written as. */
-export function zoneDefinition(item: ZonePlanItem): FloorLoadDef & { fromZone: number } {
-  return { caseId: item.caseId, q: item.q, target: { by: 'zone', zoneId: item.zoneId }, distribution: item.distribution, fromZone: item.zoneId };
+export function zoneDefinition(item: ZonePlanItem): FloorLoadDef & { fromZone: number; role: ZoneLoadRole } {
+  return { caseId: item.caseId, q: item.q, target: { by: 'zone', zoneId: item.zoneId }, distribution: item.distribution, fromZone: item.zoneId, role: item.role };
 }
 
 // ─── Review ──────────────────────────────────────────────────────

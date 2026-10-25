@@ -27,8 +27,8 @@
     <h3>{t('useZones.planTitle')}</h3>
     {#if plan}
       <p class="zp-hint">{t('useZones.planHint')}</p>
-      {#if plan.add.length}<h4>{tp('useZones.planAdd', { n: plan.add.length })}</h4><ul>{#each plan.add as a (a.zoneId)}<li>{a.zone}: {a.q} kN/m² · {caseName(a.caseId)} · {dist(a.distribution)}</li>{/each}</ul>{/if}
-      {#if plan.change.length}<h4>{tp('useZones.planChange', { n: plan.change.length })}</h4><ul>{#each plan.change as c (c.zoneId)}<li>{c.zone}: {c.from.q} → {c.q} kN/m²{c.from.distribution !== c.distribution ? ` · ${dist(c.distribution)}` : ''}</li>{/each}</ul>{/if}
+      {#if plan.add.length}<h4>{tp('useZones.planAdd', { n: plan.add.length })}</h4><ul>{#each plan.add as a (`${a.zoneId}|${a.role}`)}<li>{a.zone} · {t(`useZones.role.${a.role}`)}: {a.q} kN/m² · {caseName(a.caseId)} · {dist(a.distribution)}</li>{/each}</ul>{/if}
+      {#if plan.change.length}<h4>{tp('useZones.planChange', { n: plan.change.length })}</h4><ul>{#each plan.change as c (`${c.zoneId}|${c.role}`)}<li>{c.zone} · {t(`useZones.role.${c.role}`)}: {c.from.q} → {c.q} kN/m²{c.from.distribution !== c.distribution ? ` · ${dist(c.distribution)}` : ''}</li>{/each}</ul>{/if}
       {#if plan.remove.length}<h4>{tp('useZones.planRemove', { n: plan.remove.length })}</h4><ul>{#each plan.remove as r (r.defId)}<li>{r.zone}</li>{/each}</ul>{/if}
       {#if plan.unresolved.length}<h4 class="warn">{tp('useZones.planUnresolved', { n: plan.unresolved.length })}</h4><ul>{#each plan.unresolved as u (u.zoneId)}<li>{u.zone}: {t(`useZones.status.${u.status}`)}</li>{/each}</ul>{/if}
       {#if !plan.add.length && !plan.change.length && !plan.remove.length}<p data-testid="use-zones-plan-empty">{t('useZones.planNothing')}</p>{/if}
