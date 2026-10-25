@@ -31,7 +31,10 @@ test.describe('@slow exchange', () => {
     expect(text).toContain("'Stabileo_Design'");
 
     const [csv] = await Promise.all([page.waitForEvent('download'), panel.getByTestId('exchange-csv').click()]);
-    const rows = readFileSync(await csv.path(), 'utf8').trim().split('\n');
+    // The file opens with the results' provenance as `#` comment lines, then the table.
+    const lines = readFileSync(await csv.path(), 'utf8').trim().split('\n');
+    expect(lines[0]).toMatch(/^# /);
+    const rows = lines.filter((l) => !l.startsWith('#'));
     expect(rows[0]).toContain('member');
     expect(rows.length).toBeGreaterThan(8);
 
