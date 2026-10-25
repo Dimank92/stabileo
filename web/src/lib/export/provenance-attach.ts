@@ -46,6 +46,11 @@ export function csvWithProvenance(csv: string, p: ResultProvenance): string {
   return `${head}\n${csv}`;
 }
 
+/** The record's title and its `key: value` lines, the status line first, for a format that prints them. */
+export function reportProvenanceLines(p: ResultProvenance): { title: string; lines: Array<[string, string]> } {
+  return { title: provenanceLabels().title, lines: provenanceLines(p) };
+}
+
 export function htmlWithProvenance(html: string, p: ResultProvenance): string {
   const block = provenanceBlockHtml(p, provenanceLabels());
   const i = html.lastIndexOf('</body>');

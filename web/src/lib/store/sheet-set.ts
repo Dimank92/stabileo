@@ -18,6 +18,8 @@ import type { DocumentModel } from '../engine/detailing/document-model';
 import type { SheetFormat } from '../sheets/formats';
 import { membersFromModel } from '../engine/detailing/member-geometry';
 import { cachedSceneModel } from '../engine/detailing/scene-cache';
+import { dxfWithProvenance, prepareExportProvenance, reportProvenanceLines } from '../export/provenance-attach';
+import type { SetProvenance } from '../sheets/sheet-set';
 import { PLAN_KINDS, planContext, workDrawings, type PlanKind } from './work-drawings';
 
 export const sheetSettings = () => ({ ...DEFAULT_SHEET_SETTINGS, ...designData().sheets });
@@ -76,16 +78,28 @@ function save(name: string, type: string, bytes: Uint8Array) {
 }
 
 /** The set as one zip with a DXF per sheet, recorded in the export log like the other files. */
-export function exportSheetsDxf(doc: DocumentModel | null, sheets: readonly SetSheet[], at: string) {
+/** The results' provenance for a set, or null (said) when the project moved while it was prepared. */
+async function setProvenance(): Promise<SetProvenance | null> {
+  const record = await prepareExportProvenance();
+  if (!record) return null;
+  const { title, lines } = reportProvenanceLines(record);
+  return { dxf: (d) => dxfWithProvenance(d, record), title, lines };
+}
+
+export async function exportSheetsDxf(doc: DocumentModel | null, sheets: readonly SetSheet[], at: string) {
   const filename = doc ? `sheets-rev${doc.revision.number}-dxf.zip` : 'sheets-dxf.zip';
-  const write = () => save(filename, 'application/zip', sheetSetDxfZip(sheets));
+  const provenance = await setProvenance();
+  if (!provenance) return;
+  const write = () => save(filename, 'application/zip', sheetSetDxfZip(sheets, provenance));
   // The export log records emissions of a document revision; a set without one has none to cite.
   if (doc) withExportLog({ kind: 'sheetsDxf', doc, filename, at }, write); else write();
 }
 
 /** The set as one PDF, a page per sheet at its paper size. */
-export function exportSheetsPdf(doc: DocumentModel | null, sheets: readonly SetSheet[], at: string, title: string) {
+export async function exportSheetsPdf(doc: DocumentModel | null, sheets: readonly SetSheet[], at: string, title: string) {
   const filename = doc ? `sheets-rev${doc.revision.number}.pdf` : 'sheets.pdf';
-  const write = () => save(filename, 'application/pdf', sheetSetPdf(sheets, title));
+  const provenance = await setProvenance();
+  if (!provenance) return;
+  const write = () => save(filename, 'application/pdf', sheetSetPdf(sheets, title, provenance));
   if (doc) withExportLog({ kind: 'sheetsPdf', doc, filename, at }, write); else write();
 }

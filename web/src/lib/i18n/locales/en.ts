@@ -8921,6 +8921,7 @@ const en: Record<string, string> = {
   'verdict.detailing.clash': 'bar clash',
   'verdict.hold.detailing': 'the detailing left {n} condition(s) open: {what}',
   'verdict.hold.refused': 'the design refused it: {outcome}',
+  'verdict.hold.stale': 'the results changed after this design: it has to be checked again',
   'verdict.hold.analysis': 'slab joined to the columns at one node at level {level} m: the split of the slab\'s load between beams and columns is not established ({share} % goes straight into the columns on this mesh)',
   'verdict.hold.deflection': 'the deflection exceeds the limit (Table 24.2.2)',
   'verdict.hold.seismic': 'its seismic checks run only as a substitute (ACI 318-19 ch. 18) and do not verify it',

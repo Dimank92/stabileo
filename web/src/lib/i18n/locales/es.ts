@@ -8914,6 +8914,7 @@ const es: Record<string, string> = {
   'verdict.detailing.clash': 'interferencia de barras',
   'verdict.hold.detailing': 'el detallado dejó {n} condición(es) abierta(s): {what}',
   'verdict.hold.refused': 'el diseño lo rechazó: {outcome}',
+  'verdict.hold.stale': 'los resultados cambiaron después de este diseño: hay que volver a verificarlo',
   'verdict.hold.analysis': 'unión losa-columna en un solo nudo en el nivel {level} m: el reparto de la carga de la losa entre vigas y columnas no está establecido (con esta malla va directo a las columnas el {share} %)',
   'verdict.hold.deflection': 'la flecha supera el límite (Tabla 24.2.2)',
   'verdict.hold.seismic': 'sus comprobaciones sísmicas corren como sustituto (ACI 318-19 cap. 18) y no lo verifican',
