@@ -1,11 +1,11 @@
-# SA-2026-021: the RC column check read one sign of the moment, and an uneven bar layout is weaker the other way
+# SA-2026-023: the RC column check read one sign of the moment, and an uneven bar layout is weaker the other way
 
 | | |
 |---|---|
 | Severity | Critical |
-| Status | Draft |
+| Status | Fixed on `main`; to be published with the next release |
 | Issue | — (D4-01 in the 2026-10 audit) |
-| Fix | branch `fix/d4-01-column-both-signs`, not yet merged |
+| Fix | PR [#590](https://github.com/lambdaclass/stabileo/pull/590), merged with the integration PR of #589, #590, #588 and #487 |
 | Affected versions | the verification of provided column bars from 2026-04-19 (5ba936310, by source history; not bisected by running), 0.2.0 and 0.3.0; the column designer's own sizing from 0.3.0 (PR #402, 2026-10-21); `main` until the fix |
 | Re-check registry | `column-capacity-both-signs`, results version 3 (models with CIRSOC 201 members) |
 
@@ -57,7 +57,7 @@ whose governing check is the axial force, are not affected.
 
 ## Fixed in
 
-Not yet fixed (the fix is in review on `fix/d4-01-column-both-signs`). The column kernel
+On `main` with PR #590, to ship in the next release. The column kernel
 (`engine/src/column_capacity_kernel.rs`) solves both signs and returns the weaker, with the sign
 that governs (`momentSign` on the column result). A layout symmetric about the bending axis is
 solved once, exactly as before (bit for bit). Tests:

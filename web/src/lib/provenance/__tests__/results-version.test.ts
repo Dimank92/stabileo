@@ -34,7 +34,7 @@ const RELEASED: Record<number, string[]> = {
     'curved-shell-moments-and-thermal', 'arc-member-local-axes', 'plastic-3d-element-order', 'cable-tension-chord-law',
     'soil-curves-references', 'frame-thermal-alpha-depth', 'free-roof-wind-minimum', 'earth-pressure-dead-load-resisting',
   ],
-  // D4-01: RC columns checked for both signs of the moment (SA-2026-021).
+  // D4-01: RC columns checked for both signs of the moment (SA-2026-023).
   3: ['column-capacity-both-signs'],
 };
 

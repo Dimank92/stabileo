@@ -36,7 +36,7 @@ The registry is seeded with every behaviour change of the October 2026 safety wa
 (`docs/MERGE_PLAN_SAFETY_WAVE.md` section 3) and the earlier BREAKING entries of `CHANGELOG.md`,
 all at results version 1 (#328, 2026-10-21). Version 2 holds the fixes merged with 0.3.0 after
 that (SA-2026-013 to 017 and 019) and the first entries taken under the rule above (the free-roof
-wind minimum and the earth-pressure dead load, #581 and #593); version 3, the column moment sign (SA-2026-021).
+wind minimum and the earth-pressure dead load, #581 and #593); version 3, the column moment sign (SA-2026-023).
 
 ## Solve stamps and the re-check prompt
 
