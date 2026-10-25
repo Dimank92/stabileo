@@ -21,7 +21,7 @@ export function listingSheet(X: typeof Xlsx, l: Listing, locale: string): Xlsx.W
 }
 
 /** A workbook of listings, one sheet each (names cut to the 31 characters a sheet name allows). */
-export function listingsWorkbook(X: typeof Xlsx, ls: readonly Listing[], locale: string): Uint8Array {
+export function listingsWorkbook(X: typeof Xlsx, ls: readonly Listing[], locale: string, provenance?: { title: string; lines: ReadonlyArray<readonly [string, string]> }): Uint8Array {
   const wb = X.utils.book_new(), used = new Set<string>();
   for (const l of ls) {
     let name = l.title.replace(/[\\/?*[\]:]/g, ' ').slice(0, 31).trim() || l.id, n = 2;
@@ -29,5 +29,7 @@ export function listingsWorkbook(X: typeof Xlsx, ls: readonly Listing[], locale:
     used.add(name);
     X.utils.book_append_sheet(wb, listingSheet(X, l, locale), name);
   }
+  // The results' provenance on a sheet of its own, the status line first (`export/provenance-attach.ts`).
+  if (provenance) X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(provenance.lines.map(([k, v]) => [k, v])), provenance.title.slice(0, 31));
   return X.write(wb, { type: 'array', bookType: 'xlsx' }) as Uint8Array;
 }

@@ -24,7 +24,8 @@
     ctx: MemberContext;
     provided: ProvidedRebarResult | null;
     outcome: MemberDesignOutcome | undefined;
-    onApplyAdvice: (o: MemberDesignOutcome) => void;
+    /** Applies the section advice; absent, the advice is shown without its button (no handler, no button). */
+    onApplyAdvice?: (o: MemberDesignOutcome) => void;
     /** The member's verdict is stated by the host already (the desk's inspector): not again here. */
     hideVerdict?: boolean;
   }
@@ -145,9 +146,9 @@
           {/if}
         </div>
         {#each a.rationale as r}<div class="reason">{tp(r.key, r.params)}</div>{/each}
-        {#if !a.capReached}
+        {#if !a.capReached && onApplyAdvice}
           <button class="advice-btn" data-testid={`apply-advice-${elementId}`}
-                  onclick={() => onApplyAdvice(outcome)}>{t('design.advice.apply')}</button>
+                  onclick={() => onApplyAdvice?.(outcome)}>{t('design.advice.apply')}</button>
         {/if}
       </div>
     {/if}

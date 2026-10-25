@@ -133,18 +133,43 @@ export function buildSheetSet(i: SheetSetInput): SetSheet[] {
 export const sheetSvg = (s: SetSheet, display?: SheetDisplay, target: 'screen' | 'plan' = 'screen') => sheetToSvg(s.width, s.height, displayPrimitives(s.primitives, display, target), displayStyle(display));
 export const sheetDxf = (s: SetSheet, display?: SheetDisplay) => sheetToDxf(displayPrimitives(s.primitives, display, 'plan'), displayStyle(display));
 
+/**
+ * The results' provenance a set carries (`export/provenance-attach.ts`): each sheet's DXF as its
+ * 999 comments (`dxf`), each SVG as its comment and metadata (`svg`), the PDF as a closing page of
+ * `key: value` lines, the status line first.
+ */
+/** The results' provenance as a closing A4 page (mm) of a PDF: its title, then the `key: value` lines. */
+export function provenancePdfPage(p: { title: string; lines: ReadonlyArray<readonly [string, string]> }) {
+  const text = (y: number, s: string, height: number) => ({ kind: 'text' as const, layer: 'RC-TITLE', at: { x: 20, y }, text: s, height });
+  return { width: 210, height: 297, primitives: [
+    text(277, p.title, 4),
+    ...p.lines.map(([k, v], i) => text(265 - i * 6, `${k}: ${v}`.slice(0, 120), 2.4)),
+  ] as never };
+}
+
+export interface SetProvenance {
+  dxf: (dxf: string) => string;
+  svg: (svg: string) => string;
+  title: string;
+  lines: ReadonlyArray<readonly [string, string]>;
+}
+
 /** Every sheet's DXF in one zip, named by number: version 2004 (model space and layouts) by default, R12 when asked. */
-export function sheetSetDxfZip(sheets: readonly SetSheet[], display?: SheetDisplay, version: '2004' | 'r12' = '2004'): Uint8Array {
+export function sheetSetDxfZip(sheets: readonly SetSheet[], display?: SheetDisplay, version: '2004' | 'r12' = '2004', provenance?: SetProvenance): Uint8Array {
+  const wrap = provenance?.dxf ?? ((d: string) => d);
   return zipSync(Object.fromEntries(sheets.map((s) => [`${s.number}.dxf`, version === 'r12'
-    ? strToU8(sheetDxf(s, display))
-    : dxf2004Bytes(sheetToDxf2004(s, displayStyle(display), (ps) => displayPrimitives(ps, display, 'plan')))])));
+    ? strToU8(wrap(sheetDxf(s, display)))
+    : dxf2004Bytes(wrap(sheetToDxf2004(s, displayStyle(display), (ps) => displayPrimitives(ps, display, 'plan'))))])));
 }
 
 /** Every sheet's SVG in one zip, as the plan shows it. */
-export function sheetSetSvgZip(sheets: readonly SetSheet[], display?: SheetDisplay): Uint8Array {
-  return zipSync(Object.fromEntries(sheets.map((s) => [`${s.number}.svg`, strToU8(sheetSvg(s, display, 'plan'))])));
+export function sheetSetSvgZip(sheets: readonly SetSheet[], display?: SheetDisplay, provenance?: SetProvenance): Uint8Array {
+  const wrap = provenance?.svg ?? ((d: string) => d);
+  return zipSync(Object.fromEntries(sheets.map((s) => [`${s.number}.svg`, strToU8(wrap(sheetSvg(s, display, 'plan')))])));
 }
 
-export function sheetSetPdf(sheets: readonly SetSheet[], title: string, display?: SheetDisplay): Uint8Array {
-  return sheetsToPdf(sheets.map((s) => ({ width: s.width, height: s.height, primitives: displayPrimitives(s.primitives, display, 'plan') })), title, displayStyle(display));
+export function sheetSetPdf(sheets: readonly SetSheet[], title: string, display?: SheetDisplay, provenance?: SetProvenance): Uint8Array {
+  const pages = sheets.map((s) => ({ width: s.width, height: s.height, primitives: displayPrimitives(s.primitives, display, 'plan') }));
+  if (provenance) pages.push(provenancePdfPage(provenance));
+  return sheetsToPdf(pages, title, displayStyle(display));
 }

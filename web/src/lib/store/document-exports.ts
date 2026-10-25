@@ -22,7 +22,7 @@ import { i18n, tp } from '../i18n';
 import { renderReportHtml, renderDrawings, renderSchedule } from '../engine/detailing/document-render';
 import { exportToExcel } from '../export/excel';
 import { captureProvenanceToken, provenanceForExport, ExportChangedError } from './result-provenance';
-import { htmlWithProvenance, dxfWithProvenance, reportProvenance } from '../export/provenance-attach';
+import { htmlWithProvenance, dxfWithProvenance, reportProvenanceLines } from '../export/provenance-attach';
 import { uiStore } from './ui.svelte';
 import { retouchedIn, withExportLog } from './export-log';
 import { coverForMember, sheetMembers } from './detailing-sheet-inputs';
@@ -94,7 +94,7 @@ export function exportDetailingReport(doc: DocumentModel, ctx: ExportContext, fo
       if (w) { w.document.write(withProv); w.document.close(); w.focus(); w.print(); }
       else downloadBlob(filename, 'text/html', withProv);
     } else {
-      await downloadReport(format, { title: `${ctx.projectName} · rev. ${doc.revision.number}`, html: withProv, stem: `detailing-rev${doc.revision.number}`, provenance: reportProvenance(record) });
+      await downloadReport(format, { title: `${ctx.projectName} · rev. ${doc.revision.number}`, html: withProv, stem: `detailing-rev${doc.revision.number}`, provenance: reportProvenanceLines(record) });
     }
   }));
 }

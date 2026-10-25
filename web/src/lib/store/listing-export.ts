@@ -15,6 +15,11 @@ import { bvbsFile, legsOf, mandrelOf, type BvbsBar } from '../listings/bvbs';
 import { designData } from './design-data';
 import type { DocumentModel } from '../engine/detailing/document-model';
 import { withExportLog } from './export-log';
+import { csvWithProvenance, htmlWithProvenance, prepareExportProvenance, reportProvenanceLines } from '../export/provenance-attach';
+import { provenancePdfPage } from '../sheets/sheet-set';
+import { uiStore } from './ui.svelte';
+import { t } from '../i18n';
+import type { ResultProvenance } from '../provenance/result-provenance';
 
 export type ListingFormat = 'pdf' | 'html' | 'docx' | 'xlsx' | 'csv';
 
@@ -27,30 +32,39 @@ function save(name: string, type: string, data: BlobPart) {
 const projectName = () => modelStore.model.projectInfo?.job ?? '';
 
 /** The bytes of a listing in a format: what is downloaded, and what the tests compare. */
-export async function listingBytes(id: ListingId, format: ListingFormat, locale = sheetLanguage()): Promise<Uint8Array | string | null> {
+export async function listingBytes(id: ListingId, format: ListingFormat, locale = sheetLanguage(), record?: ResultProvenance): Promise<Uint8Array | string | null> {
   const l = listing(id, locale);
+  // The results' provenance and stale status, in the form each format allows (`export/provenance-attach.ts`).
+  const p = record ? reportProvenanceLines(record) : undefined;
   switch (format) {
-    case 'html': return toHtml(l, locale, projectName());
-    case 'csv': return toCsv(l, locale);
-    case 'docx': return docxBytes(toDocModel(l, locale, projectName()));
-    case 'pdf': return sheetsToPdf(toPdfPages(l, locale, projectName()), l.title);
-    case 'xlsx': { const X = await loadXlsxModule(); return X ? listingsWorkbook(X, [l], locale) : null; }
+    case 'html': { const h = toHtml(l, locale, projectName()); return record ? htmlWithProvenance(h, record) : h; }
+    case 'csv': { const c = toCsv(l, locale); return record ? csvWithProvenance(c, record) : c; }
+    case 'docx': {
+      const m = toDocModel(l, locale, projectName());
+      return docxBytes(p ? { ...m, blocks: [...m.blocks, { kind: 'heading', text: p.title, level: 2 }, { kind: 'table', head: [p.lines[0]?.[0] ?? '', p.lines[0]?.[1] ?? ''], rows: p.lines.slice(1).map(([k, v]) => [k, v]) }] } as never : m);
+    }
+    case 'pdf': return sheetsToPdf([...toPdfPages(l, locale, projectName()), ...(p ? [provenancePdfPage(p)] : [])], l.title);
+    case 'xlsx': { const X = await loadXlsxModule(); return X ? listingsWorkbook(X, [l], locale, p) : null; }
   }
 }
 
 const MIME: Record<ListingFormat, string> = { docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', pdf: 'application/pdf', html: 'text/html', csv: 'text/csv', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
 
 export async function exportListing(id: ListingId, format: ListingFormat): Promise<void> {
-  const data = await listingBytes(id, format);
+  const record = await prepareExportProvenance();
+  if (!record) return;
+  const data = await listingBytes(id, format, sheetLanguage(), record);
   if (data !== null) save(`${id}.${format}`, MIME[format], data as BlobPart);
 }
 
 /** Several listings in one workbook. */
 export async function exportListingsWorkbook(ids: readonly ListingId[]): Promise<void> {
+  const record = await prepareExportProvenance();
+  if (!record) return;
   const X = await loadXlsxModule();
   if (!X) return;
   const locale = sheetLanguage();
-  save('listings.xlsx', MIME.xlsx, listingsWorkbook(X, ids.map((id) => listing(id, locale)), locale) as BlobPart);
+  save('listings.xlsx', MIME.xlsx, listingsWorkbook(X, ids.map((id) => listing(id, locale)), locale, reportProvenanceLines(record)) as BlobPart);
 }
 
 // ─── The bar schedule for bending machines (BVBS) ───
@@ -72,7 +86,16 @@ export function bvbsOfDocument(doc: DocumentModel, plan = ''): string {
   return bvbsFile(bars, { project: info?.jobNumber || info?.job || 'stabileo', plan, index: String(doc.revision.number), grade: designData().rebarGrade });
 }
 
-export function exportBvbs(doc: DocumentModel, at: string): void {
+/**
+ * The BVBS file of a document. A bending machine reads no provenance, so a document never to be built
+ * from (the model changed after it, or a later revision exists) is refused, and said, rather than written.
+ */
+export function exportBvbs(doc: DocumentModel, at: string): boolean {
+  if (doc.readiness === 'OUTDATED' || doc.readiness === 'SUPERSEDED') {
+    uiStore.toast(t('list.ui.bvbsNotBuildable'), 'error');
+    return false;
+  }
   const filename = `bars-rev${doc.revision.number}.abs`;
   withExportLog({ kind: 'bvbs', doc, filename, at }, () => save(filename, 'text/plain', bvbsOfDocument(doc)));
+  return true;
 }

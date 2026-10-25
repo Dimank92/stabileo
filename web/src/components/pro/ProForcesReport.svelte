@@ -2,7 +2,7 @@
   import { downloadReport } from '../../lib/export/report-download';
   import type { DocBlock } from '../../lib/export/docx';
   import { captureProvenanceToken, provenanceForExport } from '../../lib/store/result-provenance';
-  import { htmlWithProvenance, reportProvenance } from '../../lib/export/provenance-attach';
+  import { htmlWithProvenance, reportProvenanceLines } from '../../lib/export/provenance-attach';
   import { activePerCombo3D } from '../../lib/store/active-results';
   /**
    * The raw forces report, configured and generated.
@@ -160,7 +160,7 @@
           { kind: 'paragraph', text: doc.scopeLine }, ...(doc.stationNote ? [{ kind: 'paragraph' as const, text: doc.stationNote }] : []),
           ...doc.sheets.flatMap((sh) => [{ kind: 'heading' as const, text: sh.name, level: 2 as const }, { kind: 'table' as const, head: (sh.aoa[0] ?? []).map(String), rows: sh.aoa.slice(1).map((r) => r.map((c) => (c === null || c === undefined ? '' : String(c)))) }]),
         ];
-        const fn = await downloadReport(format, { title: t('design.forcesReport.title'), html: withProv, stem, blocks, provenance: reportProvenance(record) });
+        const fn = await downloadReport(format, { title: t('design.forcesReport.title'), html: withProv, stem, blocks, provenance: reportProvenanceLines(record) });
         if (fn) lastExport = { filename: fn, at };
         return;
       }

@@ -187,7 +187,7 @@
       <!-- The member list has this member's row open, with these same checks and its editors. -->
       <p class="di-hint" data-testid="desk-inspector-in-list">{t('desk.inspectorInList')}</p>
     {:else if row.material === 'concrete' && ctx}
-      <VerificationDetail elementId={row.id} {ctx} provided={verificationStore.providedFor(row.id) ?? null} outcome={verificationStore.outcomeFor(row.id)} onApplyAdvice={() => {}} hideVerdict />
+      <VerificationDetail elementId={row.id} {ctx} provided={verificationStore.providedFor(row.id) ?? null} outcome={verificationStore.outcomeFor(row.id)} hideVerdict />
     {:else if row.material !== 'concrete' && row.material !== 'steel'}
       {@const res = materialCheckState.results.get(row.id)}
       {#if res}<SteelMemberSheet rows={res.rows} elementId={row.id} note={t(`mat.note.${res.family}`)} />{/if}
