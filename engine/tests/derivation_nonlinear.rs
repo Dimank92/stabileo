@@ -676,3 +676,127 @@ fn nl_residual_stress_survives_the_first_evaluation() {
     let (sigma, _) = material_response(&mat, 0.0, &mut states[0].fiber_states[0]);
     close(sigma, -75.0, 1e-9, "fiber stress at zero strain after a −75 MPa residual stress");
 }
+
+// ======================================================================
+// Contact solver
+// ======================================================================
+
+fn make_contact_input_2d(solver: SolverInput) -> dedaliano_engine::solver::contact::ContactInput {
+    use dedaliano_engine::solver::contact::{ContactInput, ContactType};
+    ContactInput {
+        solver,
+        element_behaviors: HashMap::new(),
+        gap_elements: vec![],
+        uplift_supports: vec![],
+        max_iter: Some(40),
+        tolerance: None,
+        augmented_lagrangian: None,
+        max_flips: None,
+        damping_coefficient: None,
+        al_max_iter: None,
+        contact_type: ContactType::default(),
+        node_to_surface_pairs: vec![],
+    }
+}
+
+fn make_contact_input_3d(solver: SolverInput3D) -> dedaliano_engine::solver::contact::ContactInput3D {
+    use dedaliano_engine::solver::contact::ContactInput3D;
+    ContactInput3D {
+        solver,
+        element_behaviors: HashMap::new(),
+        gap_elements: vec![],
+        uplift_supports: vec![],
+        max_iter: Some(40),
+        tolerance: None,
+        augmented_lagrangian: None,
+        max_flips: None,
+        damping_coefficient: None,
+        al_max_iter: None,
+    }
+}
+
+/// NL-13 (FIXED). When a chattering contact gap element exceeds `max_flips`,
+/// its status is frozen to stop cycling. The solver must report `converged = false`
+/// and include the diagnostic warning (before the fix, it reported `converged = true`).
+#[test]
+fn nl_contact_chattering_gap_reports_not_converged() {
+    use dedaliano_engine::solver::contact::{solve_contact_2d, GapElement};
+    let model = make_input(
+        vec![
+            (1, 0.0, 1.0),
+            (2, 2.0, 0.0),
+            (3, 2.5, -1.0),
+            (4, 2.001, 0.0),
+        ],
+        vec![(1, 200.0, 0.3)],
+        vec![(1, 0.01, 1e-4)],
+        vec![
+            (1, "frame", 1, 2, 1, 1, false, false),
+            (2, "truss", 2, 3, 1, 1, false, false),
+        ],
+        vec![
+            (1, 1, "fixed"),
+            (2, 3, "fixed"),
+            (3, 4, "fixed"),
+        ],
+        vec![SolverLoad::Nodal(SolverNodalLoad { node_id: 2, fx: 50.0, fz: -50.0, my: 0.0 })],
+    );
+    let mut ci = make_contact_input_2d(model);
+    ci.element_behaviors.insert("2".into(), "tension_only".into());
+    ci.gap_elements.push(GapElement {
+        id: 1, node_i: 2, node_j: 4, direction: 0, initial_gap: 0.001, stiffness: 100_000.0,
+        friction: None, friction_direction: None, friction_coefficient: None,
+    });
+    ci.max_flips = Some(1);
+    ci.max_iter = Some(30);
+
+    let r = solve_contact_2d(&ci).unwrap();
+    assert!(!r.converged, "chattering gap must report converged = false");
+    assert!(
+        r.diagnostics.iter().any(|d| d.contains("exceeded max_flips=1") && d.contains("status was frozen")),
+        "diagnostics must report frozen chattering gap, got: {:?}", r.diagnostics
+    );
+}
+
+/// NL-13 (FIXED), 3D twin.
+#[test]
+fn nl_contact_3d_chattering_gap_reports_not_converged() {
+    use dedaliano_engine::solver::contact::{solve_contact_3d, GapElement};
+    let solver = make_3d_input(
+        vec![
+            (1, 0.0, 0.0, 1.0),
+            (2, 2.0, 0.0, 0.0),
+            (3, 2.5, 0.0, -1.0),
+            (4, 2.001, 0.0, 0.0),
+        ],
+        vec![(1, 200.0, 0.3)],
+        vec![(1, 0.01, 1e-4, 1e-4, 1e-4)],
+        vec![
+            (1, "frame", 1, 2, 1, 1),
+            (2, "truss", 2, 3, 1, 1),
+        ],
+        vec![
+            (1, vec![true; 6]),
+            (3, vec![true; 6]),
+            (4, vec![true; 6]),
+        ],
+        vec![SolverLoad3D::Nodal(SolverNodalLoad3D {
+            node_id: 2, fx: 50.0, fy: 0.0, fz: -50.0, mx: 0.0, my: 0.0, mz: 0.0, bw: None,
+        })],
+    );
+    let mut ci = make_contact_input_3d(solver);
+    ci.element_behaviors.insert("2".into(), "tension_only".into());
+    ci.gap_elements.push(GapElement {
+        id: 1, node_i: 2, node_j: 4, direction: 0, initial_gap: 0.001, stiffness: 100_000.0,
+        friction: None, friction_direction: None, friction_coefficient: None,
+    });
+    ci.max_flips = Some(1);
+    ci.max_iter = Some(30);
+
+    let r = solve_contact_3d(&ci).unwrap();
+    assert!(!r.converged, "3D chattering gap must report converged = false");
+    assert!(
+        r.diagnostics.iter().any(|d| d.contains("exceeded max_flips=1") && d.contains("status was frozen")),
+        "3D diagnostics must report frozen chattering gap, got: {:?}", r.diagnostics
+    );
+}

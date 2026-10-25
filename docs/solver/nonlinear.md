@@ -64,7 +64,7 @@ Newton for that increment.
 | Fiber 2D/3D | as co-rotational | $10^{-6}$ | stops, reports the **unconverged iterate** (NL-17) |
 | Arc-length | $\lVert C^{\mathsf T}R\rVert_2 / (\lvert\lambda\rvert\lVert F\rVert_2) < \text{tol}$ | $10^{-6}$ | halves $\Delta s$, restores the last converged state |
 | Displacement control | force test as arc-length, with $\lVert\lambda F\rVert$ floored at 1, **and** $\lvert u_c - u_c^\ast\rvert \le \text{tol}\cdot\lvert\Delta d\rvert$ | $10^{-6}$ | stops |
-| Contact | no status change in one full pass (after the first) | — | `converged=false` after `max_iter` |
+| Contact | no status change in one full pass (after the first) | — | `converged=false` after `max_iter` or if any gap/pair was frozen at `max_flips` (NL-13, FIXED #432) |
 
 If $\lVert F\rVert = 0$, the co-rotational 2D and fiber solvers test $\lVert R\rVert$ in absolute
 terms, and the 3D co-rotational solver divides by 1. Every force norm is an unweighted $\ell_2$
@@ -449,10 +449,9 @@ from that solution, and the passes repeat until no status changes.
 - **Uplift supports (2D).** This is an outer loop that swaps the support type: a support with a
   tensile reaction lifts off, and a lifted node that comes back below its seat bears again. In 3D
   uplift supports are refused.
-- **Chattering.** After `max_flips` changes the status of a gap or pair is frozen. A frozen status
-  no longer counts as a change, so the loop can return `converged = true` with a state that does
-  not match its own solution (a closed gap in tension, an open gap that penetrates). The only sign
-  is a text diagnostic (NL-13). Optional damping adds $c(u-u_\text{prev})$ to oscillating gaps
+- **Chattering.** After `max_flips` changes the status of a gap or pair is frozen. When any gap or pair
+  status is frozen at `max_flips`, the contact solver marks `converged = false` (NL-13, FIXED #432) and
+  emits a diagnostic warning. Optional damping adds $c(u-u_\text{prev})$ to oscillating gaps
   during iteration only.
 
 ---
@@ -669,11 +668,14 @@ Neither is called by any solver. They are library utilities, tested only in
   `control_displacement` is `u_full[0]`, and no reactions are reported.
 - *Test.* None quantitative (gap, §13).
 
-**NL-13. Contact status frozen after `max_flips` still counts as converged. OPEN.**
+**NL-13. Contact status frozen after `max_flips` still counts as converged. FIXED (#432).**
 
-- *Evidence.* Code path, `solve_contact_2d`: a frozen gap sets no `any_change`, so the inner loop
-  ends with `converged = true` and only a diagnostic string.
-- *Test.* None (a chattering model is needed).
+- *Evidence.* In `solve_contact_2d` and `solve_contact_3d`, a frozen gap set no `any_change`, so the loop
+  previously ended with `converged = true` and only a diagnostic string.
+- *Fix.* In both 2D and 3D contact solvers, if any gap or node-to-surface pair has its status frozen
+  (`gap_flips > max_flips`), `converged` is set to `false`.
+- *Tests.* `nl_contact_chattering_gap_reports_not_converged` (2D) and
+  `nl_contact_3d_chattering_gap_reports_not_converged` (3D).
 
 **NL-14. Co-rotational member loads are dead loads in the initial frame. DOCUMENTED-CHOICE.**
 

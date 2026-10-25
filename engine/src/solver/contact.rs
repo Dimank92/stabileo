@@ -924,6 +924,11 @@ pub fn solve_contact_2d(input: &ContactInput) -> Result<ContactResult, String> {
             }
         }
 
+        let any_frozen = st.gap_flips.iter().any(|&f| f > max_flips) || n2s_flips.iter().any(|&f| f > max_flips);
+        if any_frozen {
+            inner_converged = false;
+        }
+
         if !al {
             converged = inner_converged;
             break;
@@ -956,6 +961,11 @@ pub fn solve_contact_2d(input: &ContactInput) -> Result<ContactResult, String> {
             converged = inner_converged && al_converged;
             break;
         }
+    }
+
+    let any_frozen = st.gap_flips.iter().any(|&f| f > max_flips) || n2s_flips.iter().any(|&f| f > max_flips);
+    if any_frozen {
+        converged = false;
     }
 
     // Final state, solved once more without the damping term (it only
@@ -1407,6 +1417,11 @@ pub fn solve_contact_3d(input: &ContactInput3D) -> Result<ContactResult3D, Strin
             }
         }
 
+        let any_frozen = gap_flips.iter().any(|&f| f > max_flips);
+        if any_frozen {
+            inner_converged = false;
+        }
+
         if !al {
             converged = inner_converged;
             break;
@@ -1427,6 +1442,11 @@ pub fn solve_contact_3d(input: &ContactInput3D) -> Result<ContactResult3D, Strin
             converged = inner_converged && al_converged;
             break;
         }
+    }
+
+    let any_frozen = gap_flips.iter().any(|&f| f > max_flips);
+    if any_frozen {
+        converged = false;
     }
 
     // Final state without the damping term.
