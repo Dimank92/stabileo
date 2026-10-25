@@ -326,7 +326,7 @@
   import RebarWorkspace from './components/pro/design/RebarWorkspace.svelte';
   import DesignDesk from './components/pro/desk/DesignDesk.svelte';
   import { deskUi, deskLayout } from './lib/store/design-desk-ui.svelte';
-  import { syncDeskWithTab, syncTabWithDesk } from './lib/pro/design-navigation';
+  import { isDesignTab, syncDeskWithTab, syncTabWithDesk } from './lib/pro/design-navigation';
   import { rebarWorkspace } from './lib/store/rebar-workspace.svelte';
   /** Design docks beside the viewer on a desktop PRO screen; elsewhere it is a full-screen sheet. */
   const deskDocked = $derived(uiStore.appMode === 'pro' && !uiStore.isMobile);
@@ -552,6 +552,8 @@
       'settings', 'selection', 'steel', 'grid', 'generators', 'transform', 'edit', 'groups', 'code', 'view',
       'otherCodes', 'designData', 'desk'];
     if (!VALID.includes(tab)) return;
+    // A link to a place of design asks for design: on for this visit, not remembered.
+    if (isDesignTab(tab) && !uiStore.designInPro) uiStore.designForSession();
     uiStore.proActiveTab = tab;
   }
 

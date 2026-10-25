@@ -5,7 +5,7 @@
  * lands on the model, and a project opened with design in it says so with the switch at hand and
  * keeps it. On, everything is where it was.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { buildProStages } from '../stages';
 import { openDeskAt, syncDeskWithTab } from '../design-navigation';
 import { deskUi } from '../../store/design-desk-ui.svelte';
@@ -72,5 +72,21 @@ describe('normative design behind PRO settings', () => {
     onProjectOpened(undefined, 'pro');
     noteDesignHeldIfOff('pro');
     expect(uiStore.toasts.filter((x) => x.actionId === 'enable-design').length).toBe(before + 1);
+  });
+
+  // A post's embed names a place of design (`?proTab=design`): on for the visit, not remembered.
+  it('turns design on for the session only, leaving the browser setting off', () => {
+    const stored = new Map<string, string>([['stabileo-design-in-pro', '0']]);
+    vi.stubGlobal('localStorage', { getItem: (k: string) => stored.get(k) ?? null, setItem: (k: string, v: string) => void stored.set(k, v) });
+    uiStore.designForSession();
+    expect(uiStore.designInPro).toBe(true);
+    expect(buildProStages(ctx).map((s) => s.id)).toContain('design');
+    expect(stored.get('stabileo-design-in-pro')).toBe('0');
+    // The setting itself still writes it, so the test's storage is the one the store uses.
+    uiStore.designInPro = false;
+    expect(stored.get('stabileo-design-in-pro')).toBe('0');
+    uiStore.designInPro = true;
+    expect(stored.get('stabileo-design-in-pro')).toBe('1');
+    vi.unstubAllGlobals();
   });
 });

@@ -758,6 +758,11 @@ function createUIStore() {
       designInPro = v;
       try { localStorage.setItem('stabileo-design-in-pro', v ? '1' : '0'); } catch { /* private mode */ }
     },
+    /**
+     * Design on for this session only, the browser's setting untouched: a link that names a place
+     * of design (a post's embed, `?proTab=design`) opens on it, and the next visit is as it was.
+     */
+    designForSession() { designInPro = true; },
 
     get moveMode() { return moveMode; },
     set moveMode(v: 'view' | 'nodes') { moveMode = v; },

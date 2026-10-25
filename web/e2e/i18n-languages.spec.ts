@@ -51,7 +51,12 @@ type Offered = (typeof OFFERED)[number];
  */
 async function bootDetecting(page: Page) {
   await page.addInitScript(() => {
-    try { localStorage.clear(); } catch { /* private mode */ }
+    try {
+      localStorage.clear();
+      // The language is left to the browser; design is turned on as `bootPro` does, since the
+      // surface read below is design's.
+      localStorage.setItem('stabileo-design-in-pro', '1');
+    } catch { /* private mode */ }
   });
   await page.goto(PRO_URL);
   await page.waitForFunction(() => !!window.__stabileo, null, { timeout: 60_000 });
