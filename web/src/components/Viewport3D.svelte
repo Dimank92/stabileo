@@ -1463,6 +1463,13 @@
     invalidate();
   });
 
+  // Meshed plates as pieces or with their mesh: only the drawing changes.
+  $effect(() => {
+    void uiStore.platesShowMesh;
+    syncShells();
+    invalidate();
+  });
+
   $effect(() => {
     // Trigger on model changes
     modelStore.nodes;

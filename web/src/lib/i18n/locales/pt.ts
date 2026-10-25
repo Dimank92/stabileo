@@ -13484,5 +13484,7 @@ const pt: Translations = {
   "proExport.ifcTip": "O modelo como arquivo de intercâmbio IFC: barras com seus perfis, placas com seu contorno e seus furos (os lados curvos em trechos retos), e a procedência dos resultados. Com o projeto desligado não leva nada do dimensionamento.",
   "plates.sidesSummary": "{n}, {curved} curvos",
   "plates.resultsError": "Erro de discretização estimado: até {pct} % no elemento",
+  "plates.showMesh": "Ver a malha",
+  "plates.showMeshHint": "Desligado, cada placa malhada é desenhada como peça (seu contorno). Só muda o desenho: a seleção e os resultados continuam iguais.",
 };
 export default pt;

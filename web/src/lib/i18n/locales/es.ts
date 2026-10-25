@@ -13833,5 +13833,7 @@ const es: Record<string, string> = {
   "proExport.ifcTip": "El modelo como archivo de intercambio IFC: barras con sus perfiles, placas con su contorno y sus huecos (los lados curvos en tramos rectos), y la procedencia de los resultados. Con el diseño apagado no lleva nada del diseño.",
   "plates.sidesSummary": "{n}, {curved} curvos",
   "plates.resultsError": "Error de discretización estimado: hasta {pct} % en el elemento",
+  "plates.showMesh": "Ver la malla",
+  "plates.showMeshHint": "Apagado, cada placa mallada se dibuja como pieza (su contorno). Sólo cambia el dibujo: la selección y los resultados siguen igual.",
 };
 export default es;
