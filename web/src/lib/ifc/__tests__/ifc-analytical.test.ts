@@ -78,7 +78,7 @@ describe('a waffle\'s system from its type', () => {
 describe('a curved edge drawn as straight pieces', () => {
   const R = 3, n = 19;
   const arc = Array.from({ length: n + 1 }, (_, k) => { const a = (Math.PI / 2) * (k / n); return [R * Math.cos(a), R * Math.sin(a)] as [number, number]; });
-  const pieces = arc.slice(0, -1).map((p, k) => beam(100 + k, 0, 0, 0, 0)).map((m, k) => ({
+  const pieces = arc.slice(0, -1).map((_p, k) => beam(100 + k, 0, 0, 0, 0)).map((m, k) => ({
     ...m, start: { x: arc[k]![0], y: arc[k]![1], z: 3.325 }, end: { x: arc[k + 1]![0], y: arc[k + 1]![1], z: 3.325 },
   }));
   const straight = [beam(200, 0, 1.5, -1, -1), beam(201, 1.5, 3, -1, -1)];
