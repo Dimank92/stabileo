@@ -472,10 +472,14 @@ test.describe('@slow RC design at scale', () => {
      * Av,min (§9.6.3.4): four more beams reach an arrangement that threads and anchors
      * (`lateral-fixtures.test.ts` measures it: 356/39 without it).
      */
+    /*
+     * 359 and 36 with columns checked for both signs of the moment (SA-2026-023): one column
+     * that verified for the sign checked before has no implemented layout for the other.
+     */
     const counts = (await page.evaluate(() => window.__stabileo.runCounts()))!;
-    expect(counts.verified).toBe(360);
+    expect(counts.verified).toBe(359);
     expect(counts.sectionInadequate, 'nothing is called inadequate without a proof').toBe(0);
-    expect(counts.searchExhausted, 'the beams no implemented layout threads and anchors').toBe(35);
+    expect(counts.searchExhausted, 'the members no implemented layout threads and anchors').toBe(36);
     expect(counts.unsupported, 'and nothing is refused outright any more').toBe(0);
     expect(counts.provisionalBiaxial, 'the 13 are proposals').toBe(13);
     expect(counts.aborted).toBe(0);
