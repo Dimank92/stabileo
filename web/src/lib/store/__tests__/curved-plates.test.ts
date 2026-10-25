@@ -125,3 +125,20 @@ describe('a plate with a curved side', () => {
     expect(plateArea(plateGeometry(modelStore, plateEntry(id)!.group)!)).toBeCloseTo(R * R / 2, 9);
   });
 });
+
+describe('a physical plate in the IFC export', () => {
+  it('is written with its own outline, its hole and its curved side, mesh or not', async () => {
+    const { exportProjectIfc } = await import('../ifc-export');
+    const { o, a, b, m } = quarter();
+    const h = [[1, 1], [1.5, 1], [1.5, 1.5], [1, 1.5]].map(([x, y]) => modelStore.addNode(x!, y!, 0));
+    const r = createPlate({ outline: [o, a, m, b], arcMids: [2], holes: [h], materialId: 1, thickness: 0.2, followArcs: false }) as { id: number };
+    const unmeshed = exportProjectIfc((k) => k, 'en', 'test');
+    // Unmeshed, it is there all the same, with its void and its curved side said.
+    expect(unmeshed).toContain('IFCARBITRARYPROFILEDEFWITHVOIDS');
+    expect(unmeshed).toContain('PhysicalPlate');
+    expect(unmeshed).toMatch(/CurvedSides/);
+    applyPlateMeshes([planPlateMesh(r.id, { size: 0.5, element: 'quad', followMembers: true })!]);
+    const meshed = exportProjectIfc((k) => k, 'en', 'test');
+    expect((meshed.match(/IFCSLAB\(/g) ?? []).length).toBe(1);
+  });
+});
