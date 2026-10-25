@@ -473,8 +473,10 @@ test.describe('@slow RC design at scale', () => {
      * (`lateral-fixtures.test.ts` measures it: 356/39 without it).
      */
     /*
-     * 359 and 36 with columns checked for both signs of the moment (SA-2026-023): one column
-     * that verified for the sign checked before has no implemented layout for the other.
+     * 359 and 36 since main of 24 October came into this branch (68047c908): member 185, which
+     * verified, is refused because no implemented layout threads and anchors. Measured member by
+     * member on a6013dcf1 (360/35, its own engine) against this branch before (d8b0e26b1) and after
+     * main of 25 October: the same 359/36 both times, so the change came with the earlier merge.
      */
     const counts = (await page.evaluate(() => window.__stabileo.runCounts()))!;
     expect(counts.verified).toBe(359);
@@ -590,15 +592,19 @@ test.describe('@slow RC design at scale', () => {
      * Since the minimum shear reinforcement of §9.6.3.1 (run counts above): 339 of the 360
      * verified read fail, held by the detailing as described, and the 35 refused read
      * unavailable.
+     *
+     * Since main of 24 October (run counts above): 341 of the 359 verified read fail. Members 6
+     * and 10 still verify their sections (0.93) and are held by the detailing; member 185 is
+     * among the 36 refused, which read unavailable.
      */
     const display = await page.evaluate(() => window.__stabileo.counts());
-    expect(display.ok + display.warn + display.fail, 'the fully checked members').toBe(360);
+    expect(display.ok + display.warn + display.fail, 'the fully checked members').toBe(359);
     expect(display.provisional, 'the proposals, named as proposals').toBe(13);
-    expect(display.fail, 'and only what the detailing could not build is called a failure').toBe(339);
-    expect(display.unavailable, 'only the refused beams are left without steel').toBe(35);
+    expect(display.fail, 'and only what the detailing could not build is called a failure').toBe(341);
+    expect(display.unavailable, 'only the refused members are left without steel').toBe(36);
     // A proposal is never folded into the passes. This is the assertion that would catch the
     // exception being widened into a way of making red things green.
-    expect(display.ok + display.warn, 'proposals are not counted as verified').toBe(21);
+    expect(display.ok + display.warn, 'proposals are not counted as verified').toBe(18);
     // Every member lands in exactly one display bucket. A member missing from all of them
     // would be a row the summary bar does not describe.
     expect(display.ok + display.warn + display.fail + display.provisional
