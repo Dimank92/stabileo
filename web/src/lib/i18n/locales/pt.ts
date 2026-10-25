@@ -13538,5 +13538,6 @@ const pt: Translations = {
   "convert.labelsNote": "Os textos (seções, materiais, usos) não são lidos como dados do modelo: revise-os e atribua-os você.",
   "convert.apply": "Criar {n} elementos",
   "convert.applied": "Criadas {members} barras ({arcs} vigas curvas) e {columns} pilares. Ficam agrupadas como conversão deste modelo.",
+  "plates.sidesSummary": "{n}, {curved} curvos",
 };
 export default pt;

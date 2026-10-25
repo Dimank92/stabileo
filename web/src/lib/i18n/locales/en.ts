@@ -13898,5 +13898,6 @@ const en: Record<string, string> = {
   "convert.labelsNote": "Texts (sections, materials, uses) are not read as model data: review and assign them yourself.",
   "convert.apply": "Make {n} elements",
   "convert.applied": "Made {members} members ({arcs} curved) and {columns} columns. They are grouped as this template's conversion.",
+  "plates.sidesSummary": "{n}, {curved} curved",
 };
 export default en;

@@ -13887,5 +13887,6 @@ const es: Record<string, string> = {
   "convert.labelsNote": "Los textos (secciones, materiales, usos) no se leen como datos del modelo: revisalos y asignalos vos.",
   "convert.apply": "Crear {n} elementos",
   "convert.applied": "Creadas {members} barras ({arcs} vigas curvas) y {columns} columnas. Quedan agrupadas como conversión de esta plantilla.",
+  "plates.sidesSummary": "{n}, {curved} curvos",
 };
 export default es;
