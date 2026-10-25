@@ -13622,5 +13622,6 @@ const pt: Translations = {
   "plates.sidesSummary": "{n}, {curved} curvos",
   "useZones.deleteReview": "Saem as zonas {zones} e as {loads} cargas que geraram. As cargas colocadas à mão não são tocadas.",
   "useZones.deleteYes": "Excluir",
+  "plates.resultsError": "Erro de discretização estimado: até {pct} % no elemento",
 };
 export default pt;

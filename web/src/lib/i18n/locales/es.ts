@@ -13971,5 +13971,6 @@ const es: Record<string, string> = {
   "plates.sidesSummary": "{n}, {curved} curvos",
   "useZones.deleteReview": "Se eliminan las zonas {zones} y las {loads} cargas que generaron. Las cargas puestas a mano no se tocan.",
   "useZones.deleteYes": "Eliminar",
+  "plates.resultsError": "Error de discretización estimado: hasta {pct} % en el elemento",
 };
 export default es;

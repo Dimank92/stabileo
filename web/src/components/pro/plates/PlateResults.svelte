@@ -10,6 +10,7 @@
   import { plateGeometry, plateLoops } from '../../../lib/model/physical/plate';
   import { plateSummary, type PlateQuantity } from '../../../lib/engine/plate-results';
   import { activePerCombo3D } from '../../../lib/store/active-results';
+  import { discretizationStore } from '../../../lib/store/discretization.svelte';
   import { fmtQ, unitQ } from '../../../lib/store/display-units.svelte';
   import type { Quantity } from '../../../lib/utils/units';
 
@@ -39,6 +40,17 @@
       s: plateSummary(sets, { nodes: modelStore.nodes, quads: modelStore.quads, plates: modelStore.plates }, plateShellKeys(entry.id), [...loops.outer, ...loops.holes.flat(), ...loops.owned], geo.frame),
       first: [loops.outer[0], loops.outer[1]],
     };
+  });
+
+  /** The discretization-error estimate of the plate's elements (`store/discretization.svelte.ts`), worst first. */
+  const error = $derived.by(() => {
+    const s = discretizationStore.estimate as { status?: string; estimate?: { elements: Array<{ kind: string; elementId: number; localPercent?: number | null }>; threshold: number } } | null;
+    if (!entry || s?.status !== 'done' || !s.estimate) return null;
+    const keys = new Set(plateShellKeys(entry.id));
+    const mine = s.estimate.elements.filter((e) => keys.has(`${e.kind === 'plate' ? 'p' : 'q'}${e.elementId}`) && Number.isFinite(e.localPercent ?? NaN));
+    if (!mine.length) return null;
+    const worst = mine.reduce((a, b) => ((b.localPercent ?? 0) > (a.localPercent ?? 0) ? b : a));
+    return { pct: worst.localPercent!, at: `${worst.kind === 'plate' ? 'p' : 'q'}${worst.elementId}`, threshold: s.estimate.threshold };
   });
 
   const QTY: Record<PlateQuantity, { label: string; q: Quantity }> = {
@@ -85,6 +97,11 @@
         </tbody>
       </table>
       <p class="pr-dim">{t('plates.resultsNote')}{summary.s.leftOut ? ' ' + tp('plates.resultsLeftOut', { n: summary.s.leftOut }) : ''}</p>
+      {#if error}
+        <p class:pr-warn={error.pct > error.threshold * 100} data-testid="plate-results-error">
+          {tp('plates.resultsError', { pct: error.pct.toFixed(1) })} <button class="pr-at" onclick={() => show(error!.at)}>{error.at}</button>
+        </p>
+      {/if}
     {/if}
   </section>
 {/if}
@@ -98,5 +115,6 @@
   th, td { padding: 2px 4px; text-align: left; border-bottom: 1px solid var(--st-hair); }
   th { color: var(--st-text-3); font-weight: 500; }
   td.num { text-align: right; font-family: var(--st-font-mono, monospace); color: var(--st-text); }
+  .pr-warn { color: var(--st-warn, #d9a441); margin: 0; }
   .pr-at { background: none; border: none; padding: 0; color: var(--st-accent); font: inherit; cursor: pointer; text-decoration: underline dotted; }
 </style>
