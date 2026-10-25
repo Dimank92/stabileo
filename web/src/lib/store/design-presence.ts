@@ -32,3 +32,23 @@ export function noteDesignHeldIfOff(analysisMode: string | undefined = uiStore.a
   told.add(key);
   uiStore.toast(t('design.heldWhileOff'), 'info', 'enable-design');
 }
+
+/** The place of design a link asked for while design was off, opened if the reader turns it on. */
+let askedTab: string | null = null;
+
+/**
+ * A link that names a place of design (a post's embed, `?proTab=design`) while design is off in
+ * PRO's settings: say so and offer to turn it on for this visit. Nothing is turned on until the
+ * reader answers (`enableDesignForLink`); left unanswered, the link lands where design off lands.
+ */
+export function askDesignForLink(tab: string): void {
+  askedTab = tab;
+  uiStore.toast(t('design.linkAsks'), 'info', 'enable-design-link', true);
+}
+
+/** The reader's yes to `askDesignForLink`: design on for the session, and the place it asked for. */
+export function enableDesignForLink(): void {
+  uiStore.designForSession();
+  if (askedTab) uiStore.proActiveTab = askedTab;
+  askedTab = null;
+}

@@ -10,7 +10,7 @@ import { buildProStages } from '../stages';
 import { openDeskAt, syncDeskWithTab } from '../design-navigation';
 import { deskUi } from '../../store/design-desk-ui.svelte';
 import { modelStore, uiStore, historyStore } from '../../store';
-import { projectHoldsDesign, noteDesignHeldIfOff } from '../../store/design-presence';
+import { projectHoldsDesign, noteDesignHeldIfOff, askDesignForLink, enableDesignForLink } from '../../store/design-presence';
 import { onProjectOpened } from '../../store/file';
 
 const ctx = {
@@ -74,19 +74,28 @@ describe('normative design behind PRO settings', () => {
     expect(uiStore.toasts.filter((x) => x.actionId === 'enable-design').length).toBe(before + 1);
   });
 
-  // A post's embed names a place of design (`?proTab=design`): on for the visit, not remembered.
-  it('turns design on for the session only, leaving the browser setting off', () => {
+  // A post's embed names a place of design (`?proTab=design`): it asks, and only the reader's
+  // answer turns design on, for the visit and not remembered.
+  it('a link to a place of design asks; only the answer turns design on, for the session', () => {
     const stored = new Map<string, string>([['stabileo-design-in-pro', '0']]);
     vi.stubGlobal('localStorage', { getItem: (k: string) => stored.get(k) ?? null, setItem: (k: string, v: string) => void stored.set(k, v) });
-    uiStore.designForSession();
+    vi.useFakeTimers();
+    askDesignForLink('design');
+    expect(uiStore.designInPro).toBe(false);
+    expect(uiStore.proActiveTab).toBe('nodes');
+    const asked = uiStore.toasts.at(-1)!;
+    expect(asked.actionId).toBe('enable-design-link');
+    // The question stays until it is answered or dismissed.
+    vi.advanceTimersByTime(60_000);
+    expect(uiStore.toasts.some((x) => x.id === asked.id)).toBe(true);
+    vi.useRealTimers();
+
+    enableDesignForLink();
     expect(uiStore.designInPro).toBe(true);
+    expect(uiStore.proActiveTab).toBe('design');
     expect(buildProStages(ctx).map((s) => s.id)).toContain('design');
     expect(stored.get('stabileo-design-in-pro')).toBe('0');
-    // The setting itself still writes it, so the test's storage is the one the store uses.
-    uiStore.designInPro = false;
-    expect(stored.get('stabileo-design-in-pro')).toBe('0');
-    uiStore.designInPro = true;
-    expect(stored.get('stabileo-design-in-pro')).toBe('1');
+    uiStore.dismissToast(asked.id);
     vi.unstubAllGlobals();
   });
 });

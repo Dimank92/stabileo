@@ -3654,6 +3654,8 @@ const zh: Translations = {
   'design.stagePurpose.detailing': 'Coordinates the bars the design produced into assemblies. The drawings, the schedule, the report and the 3-D view are projections of it.',
   'design.heldWhileOff': "The project holds normative design (reinforcement or detailing), which is off in PRO's settings. It is kept either way.",
   'design.enable': "Turn on design",
+  'design.linkAsks': "This link opens normative design, which is off in PRO's settings.",
+  'design.enableForVisit': "Turn on design for this visit",
   // ─── Certified results (docs/verification/CERTIFY.md) ───
   'certificate.certified': '已认证：位移误差 ≤ {abs}（相对 {rel}）',
   'certificate.notCertified': '未认证：{reason}',

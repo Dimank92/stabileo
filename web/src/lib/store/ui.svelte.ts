@@ -759,8 +759,8 @@ function createUIStore() {
       try { localStorage.setItem('stabileo-design-in-pro', v ? '1' : '0'); } catch { /* private mode */ }
     },
     /**
-     * Design on for this session only, the browser's setting untouched: a link that names a place
-     * of design (a post's embed, `?proTab=design`) opens on it, and the next visit is as it was.
+     * Design on for this session only, the browser's setting untouched. Called from the reader's
+     * own answer to a link that names a place of design (`askDesignForLink`), never by the link.
      */
     designForSession() { designInPro = true; },
 
@@ -1224,9 +1224,11 @@ function createUIStore() {
     set contextMenu(v: { x: number; y: number; nodeId?: number; elementId?: number } | null) { contextMenu = v; },
 
     get toasts() { return toasts; },
-    toast(message: string, type: 'success' | 'error' | 'info' = 'info', actionId?: string) {
+    /** `sticky`: kept until it is acted on or dismissed, for a question the reader has to answer. */
+    toast(message: string, type: 'success' | 'error' | 'info' = 'info', actionId?: string, sticky = false) {
       const id = ++toastCounter;
       toasts.push({ id, message, type, actionId });
+      if (sticky) return;
       setTimeout(() => {
         const idx = toasts.findIndex(t => t.id === id);
         if (idx >= 0) toasts.splice(idx, 1);

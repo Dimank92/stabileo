@@ -292,6 +292,13 @@ test.describe('@smoke blog', () => {
     await expect(embed.locator('iframe')).toHaveAttribute('src', /\/app\/pro\?/);
 
     const app = page.frameLocator('.post-embed iframe');
+    // Design is off in a fresh browser: the link asks, and nothing of design is on until the
+    // reader answers. The caption names the answer, in this language.
+    expect(caption).toContain('Activar el diseño en esta visita');
+    const ask = app.getByTestId('toast-enable-design-link');
+    await expect(ask).toHaveText('Activar el diseño en esta visita', { timeout: 60_000 });
+    await expect(app.getByTestId('pr-stage-design')).toHaveCount(0);
+    await ask.click();
     await expect(app.locator('body')).toContainText('CIRSOC 201', { timeout: 60_000 });
     // The buttons the caption promises are really there, in this language.
     await expect(app.getByTestId('cmd-compute-demands')).toHaveText('Calcular solicitaciones');
@@ -319,6 +326,8 @@ test.describe('@smoke blog', () => {
     await embed.locator('.post-embed-start').click();
 
     const app = page.frameLocator('.post-embed iframe');
+    // The reader's answer to the link's question first: design is off in a fresh browser.
+    await app.getByTestId('toast-enable-design-link').click({ timeout: 60_000 });
     await expect(app.locator('body')).toContainText('CIRSOC 201', { timeout: 60_000 });
 
     // Exactly the three presses the caption asks for, in its order. Each wait is

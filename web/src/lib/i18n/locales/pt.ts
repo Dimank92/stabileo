@@ -7000,6 +7000,8 @@ const pt: Translations = {
   'config.designInProHint': 'Adiciona a etapa Dimensionamento: dimensionamento, armadura, detalhamento e desenhos. Modelar, calcular, revisar resultados e exportar não precisam dele. O que o projeto já tiver de dimensionamento é mantido mesmo desativado.',
   'design.heldWhileOff': "O projeto tem dimensionamento normativo (armaduras ou detalhamento), que está desativado nas configurações do PRO. É mantido de qualquer forma.",
   'design.enable': "Ativar o dimensionamento",
+  'design.linkAsks': "Este link abre o dimensionamento normativo, que está desativado nas configurações do PRO.",
+  'design.enableForVisit': "Ativar o dimensionamento nesta visita",
   'ribbon.edu': 'Exercícios',
   'ribbon.groupEdu': 'Educativo',
   'ribbon.move': 'Mover',

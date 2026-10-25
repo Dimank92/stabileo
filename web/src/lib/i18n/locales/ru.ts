@@ -3657,6 +3657,8 @@ const ru: Translations = {
   'design.stagePurpose.detailing': 'Coordinates the bars the design produced into assemblies. The drawings, the schedule, the report and the 3-D view are projections of it.',
   'design.heldWhileOff': "The project holds normative design (reinforcement or detailing), which is off in PRO's settings. It is kept either way.",
   'design.enable': "Turn on design",
+  'design.linkAsks': "This link opens normative design, which is off in PRO's settings.",
+  'design.enableForVisit': "Turn on design for this visit",
   // ─── Certified results (docs/verification/CERTIFY.md) ───
   'certificate.certified': 'Сертифицировано: погрешность перемещений ≤ {abs} ({rel} относительная)',
   'certificate.notCertified': 'Не сертифицировано: {reason}',

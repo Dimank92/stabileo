@@ -10274,6 +10274,8 @@ const es: Record<string, string> = {
   'config.designInProHint': 'Agrega la etapa Diseño: dimensionado, armado, detallado y planos. Modelar, calcular, revisar resultados y exportar no lo necesitan. Lo que el proyecto ya tenga de diseño se conserva aunque esté apagado.',
   'design.heldWhileOff': "El proyecto tiene diseño normativo (armaduras o detallado), que está apagado en la configuración de PRO. Se conserva igual.",
   'design.enable': "Activar el diseño",
+  'design.linkAsks': "Este enlace abre el diseño normativo, que está apagado en la configuración de PRO.",
+  'design.enableForVisit': "Activar el diseño en esta visita",
   'ribbon.edu': 'Ejercicios',
   'ribbon.groupEdu': 'Educativo',
   'ribbon.move': 'Mover',

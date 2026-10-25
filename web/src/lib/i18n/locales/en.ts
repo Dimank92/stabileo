@@ -10285,6 +10285,8 @@ const en: Record<string, string> = {
   'config.designInProHint': 'Adds the Design stage: sizing, reinforcement, detailing and drawings. Modeling, solving, reading results and exporting do not need it. What the project already holds of design is kept while it is off.',
   'design.heldWhileOff': "The project holds normative design (reinforcement or detailing), which is off in PRO's settings. It is kept either way.",
   'design.enable': "Turn on design",
+  'design.linkAsks': "This link opens normative design, which is off in PRO's settings.",
+  'design.enableForVisit': "Turn on design for this visit",
   'ribbon.edu': 'Exercises',
   'ribbon.groupEdu': 'Educational',
   'ribbon.move': 'Move',
