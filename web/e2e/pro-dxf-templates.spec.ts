@@ -51,7 +51,7 @@ test('two plans of one DXF become templates at two levels, and one is converted'
 
   // Saved and opened: the templates are back with their levels.
   const text = await page.evaluate(() => window.__stabileo.serializeProject());
-  await page.evaluate((t) => window.__stabileo.loadProject(JSON.parse(t)), text);
+  await page.evaluate((t) => window.__stabileoActions.loadProject(JSON.parse(t)), text);
   await expect(page.getByTestId('underlay-row-dos · 1')).toBeVisible();
   expect((await page.evaluate(() => window.__stabileo.modelCensus())).elements).toBe(8);
 });

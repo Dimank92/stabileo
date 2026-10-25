@@ -6,6 +6,7 @@
    * the regions; a click in a region takes the drawing point nearest to it as that region's point.
    * Nothing is laid until the reader confirms.
    */
+  import { untrack } from 'svelte';
   import { t, tp } from '../../../lib/i18n';
   import { parseCadDxf, unsupportedFileKind, suggestUnitFromExtent, cadImportProblem } from '../../../lib/cad/parse';
   import type { CadDocument, CadUnit } from '../../../lib/cad/types';
@@ -45,12 +46,12 @@
   $effect(() => {
     if (!doc) { rows = []; return; }
     const regs = drawingRegions(doc, unit, { layers: new Set(chosen) });
-    const old = rows;
+    const old = untrack(() => rows);
     rows = regs.map((r, k) => {
       const same = old.find((o) => Math.abs(o.region.box.minX - r.box.minX) < 1e-6 && Math.abs(o.region.box.minY - r.box.minY) < 1e-6);
       return same ? { ...same, region: r } : {
         region: r, use: k === 0 || r.count >= Math.max(5, (regs[0]?.count ?? 0) * 0.2),
-        name: regs.length > 1 ? `${fileName} · ${k + 1}` : fileName,
+        name: '',
         // One plan keeps the drawing's own coordinates; several are laid by their lower-left corners.
         levelId: levels[Math.min(k, levels.length - 1)]?.id ?? '', ref: regs.length > 1 ? { ...r.ref } : { x: 0, y: 0 }, target: { x: 0, y: 0 },
       };
@@ -60,9 +61,12 @@
 
   function lay() {
     if (!doc) return;
-    const made = rows.filter((r) => r.use).map((r) => {
+    const used = rows.filter((r) => r.use);
+    const made = used.map((r) => {
       const lv = levels.find((l) => l.id === r.levelId);
-      return underlayFromDrawing(doc!, { name: r.name, unit, layers: chosen, region: rows.length > 1 ? r.region : null, ref: r.ref, target: r.target, z: lv?.z ?? 0, ...(lv ? { levelId: lv.id } : {}), source: fileName });
+      // Unnamed: the file's name, numbered by region when more than one is laid.
+      const name = r.name.trim() || (used.length > 1 ? `${fileName} · ${rows.indexOf(r) + 1}` : fileName);
+      return underlayFromDrawing(doc!, { name, unit, layers: chosen, region: rows.length > 1 ? r.region : null, ref: r.ref, target: r.target, z: lv?.z ?? 0, ...(lv ? { levelId: lv.id } : {}), source: fileName });
     }).filter((x): x is NonNullable<typeof x> => !!x);
     if (!made.length) { error = t('underlay.empty'); return; }
     addUnderlays(made.map((m) => m.underlay));
@@ -146,7 +150,7 @@
           <tr class:on={k === active} onclick={() => (active = k)}>
             <td><input type="checkbox" bind:checked={rows[k]!.use} aria-label={t('underlay.useRegion')} data-testid="underlay-region-use-{k}" /></td>
             <td title={tp('underlay.regionSize', { w: fmt(r.region.box.maxX - r.region.box.minX), h: fmt(r.region.box.maxY - r.region.box.minY), n: r.region.count })}>{k + 1}</td>
-            <td><input class="ul-name" bind:value={rows[k]!.name} /></td>
+            <td><input class="ul-name" bind:value={rows[k]!.name} placeholder={rows.filter((x) => x.use).length > 1 ? `${fileName} · ${k + 1}` : fileName} /></td>
             <td>
               <select bind:value={rows[k]!.levelId} data-testid={k === 0 ? 'underlay-level' : `underlay-level-${k}`}>
                 {#if levels.length === 0}<option value="">z = 0</option>{/if}
