@@ -682,8 +682,11 @@ describe('fixture-to-manifest reconciliation', () => {
     // Changed again on purpose (was 1637ce2d…): the project now records the build that solved it
     // (`snapshot.solvedWith`, provenance/solve-stamp.ts), so opening it does not raise the
     // re-check notice. The model is unchanged.
+    //
+    // And again (was 884c9941…, then 04cf5998…): the stamp moved to results versions 2 and 3
+    // with the registry.
     expect(sha256(fixtureText()))
-      .toBe('884c994133b64e659eb00864565c405df39cd7b0bbaa844a2e9e54a41d2b48cd');
+      .toBe('94fa28fe6c09d164af76a16c73c02fc57c7b8452451509092dff8cac86b6050d');
   });
 
   it('every geometric input traces back to a value in the restored project', () => {
