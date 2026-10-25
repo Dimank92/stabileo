@@ -236,12 +236,12 @@ test.describe('@slow acceptance of the two journeys', () => {
     await step(page, j, 'documents after reopening', async () => {
       await deskDocs(page);
       const desk = page.getByTestId('design-desk');
-      await expect(desk.getByTestId('recheck-notice')).toBeVisible();
+      await expect(desk.getByTestId('design-recheck-notice')).toBeVisible();
       await desk.getByTestId('memoria-open').first().click();
       const beforeSolve = await page.getByTestId('memoria-count').innerText();
       await page.getByTestId('memoria-close').click();
       await desk.getByTestId('recheck-run').click();
-      await expect(desk.getByTestId('recheck-notice')).toHaveCount(0, { timeout: 60_000 });
+      await expect(desk.getByTestId('design-recheck-notice')).toHaveCount(0, { timeout: 60_000 });
       await desk.getByTestId('memoria-open').first().click();
       const afterSolve = await page.getByTestId('memoria-count').innerText();
       await page.getByTestId('memoria-close').click();
