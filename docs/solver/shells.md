@@ -11,7 +11,7 @@ Frame conventions (Z-up, right-handed rotations) are in [frames.md](frames.md#2-
 
 | Kernel | Source |
 |---|---|
-| DKT+CST triangle | `engine/src/element/plate.rs`: `local_axes`, `cst_b_matrix`, `cst_stiffness`, `dkt_b_matrix`, `dkt_stiffness`, `plate_local_stiffness`, `plate_transform_3d`, `plate_pressure_load`, `plate_thermal_load`, `plate_consistent_mass`, `plate_stress_recovery`, `plate_stress_at_nodes(_thermal)`, `plate_geometric_stiffness`, `plate_shear_stiffness_dkmt`, `plate_local_stiffness_thick` |
+| DKT+CST triangle | `engine/src/element/plate.rs`: `local_axes`, `cst_b_matrix`, `cst_stiffness`, `dkt_b_matrix`, `dkt_stiffness`, `plate_local_stiffness`, `plate_transform_3d`, `plate_pressure_load`, `plate_thermal_load`, `plate_consistent_mass`, `plate_stress_recovery`, `plate_stress_at_nodes(_thermal)`, `plate_geometric_stiffness` |
 | MITC4 | `engine/src/element/quad.rs`: `quad_local_axes`, `warp_offsets`, `warp_correct_*`, `shear_b_nat`, `mitc4_local_stiffness`, `quad_transform_3d`, `quad_consistent_mass`, `quad_geometric_stiffness`, `quad_stresses`, `quad_transverse_shear(_at)`, `quad_stress_at_nodes`, `quad_nodal_von_mises`, `quad_pressure_load`, `quad_thermal_load`, `quad_self_weight_load`, `quad_edge_load` |
 | MITC9 | `engine/src/element/quad9.rs`: `shape_functions_9`, `quad9_local_axes`, `shear_b_nat_9`, `mitc9_local_stiffness`, `quad9_transform_3d`, `quad9_consistent_mass`, `quad9_geometric_stiffness`, `quad9_stresses`, `quad9_stress_at_nodes`, `quad9_*_load` |
 | Curved shell | `engine/src/element/curved_shell.rs`: `compute_element_directors`, `covariant_basis`, `local_frame`, `build_b_matrix_at_point`, `shear_b_covariant`, `ans_shear_to_local`, `drilling_row`, `curved_shell_stiffness(_impl/_no_ans/_covariant)`, `curved_shell_consistent_mass`, `curved_shell_geometric_stiffness`, `curved_shell_stresses`, `curved_shell_*_load` |
@@ -91,11 +91,11 @@ DKT is a Kirchhoff element: no transverse shear energy, no shear locking, no $Q$
 DOF positions per node $[u,v,w,\theta_x,\theta_y,\theta_z]$. The CST's $\omega$ is constant, so the
 penalty integrals are exact: $\int N_iN_j=A(1+\delta_{ij})/12$, $\int N_i=A/3$.
 
-### 2.5 DKMT add-on (`plate_local_stiffness_thick`) — not used by any solver path
-Adds $\alpha K_s$, $K_s=\kappa_sGtA\,B_s^{\mathsf T}B_s$ at the centroid with $\gamma_{xz}=w_{,x}-\theta_y$,
-$\gamma_{yz}=w_{,y}+\theta_x$ and $\alpha=\phi/(1+\phi)$, $\phi=t^2/(\bar l^2\kappa_s(1-\nu)/2)$. This is not
-Katili's DKMT: the shear signs contradict §1 (a rigid tilt strains it) and the term *adds*
-stiffness, whereas shear deformation must add flexibility. See [SH-1](#discrepancies-and-open-questions-for-review).
+### 2.5 DKMT add-on — removed (SH-1)
+The previous prototype `plate_local_stiffness_thick` / `plate_shear_stiffness_dkmt` added $\alpha K_s$ with
+$\gamma_{xz}=w_{,x}-\theta_y$, $\gamma_{yz}=w_{,y}+\theta_x$. This contradicted §1 (a rigid tilt strained it)
+and added stiffness instead of flexibility. Because no solver path used it, it has been removed.
+See [SH-1](#discrepancies-and-open-questions-for-review).
 
 ### 2.6 Mass, $K_G$, loads, recovery
 - **Mass** (`plate_consistent_mass`, despite the name): lumped, $m=\rho At/3$ on each translation
@@ -352,7 +352,7 @@ $K_G$ in-plane terms are untested separately; no orthotropic or layered material
 
 | ID | Finding | Status | Test |
 |---|---|---|---|
-| SH-1 | **DKMT add-on is wrong and unused.** `plate_local_stiffness_thick` adds $\alpha K_s$ with $\gamma_{xz}=w_{,x}-\theta_y$, $\gamma_{yz}=w_{,y}+\theta_x$; with $\theta_x=w_{,y}$, $\theta_y=-w_{,x}$ a rigid tilt gives $\gamma=2$ (relative $K\mathbf r$ residual 5e-2). It also adds stiffness where shear deformation must add flexibility. Public API only, no solver path. Remove, or implement Katili's DKMT? | OPEN | `sh1_dkmt_thick_triangle_annihilates_rigid_motions` (ignored) |
+| SH-1 | **DKMT add-on was wrong and unused.** `plate_local_stiffness_thick` added stiffness under shear and resisted rigid tilt; unused by any solver path, it has been removed. | DOCUMENTED-CHOICE | `sh_dkt_triangle_annihilates_rigid_motions` |
 | SH-2 | **Curved-shell drilling penalty had dimension $Gh^2$.** It was integrated over the volume with $\gamma=Gh/1000$, i.e. $h$ × the flat elements' value and unit-dependent (×0.05 at h = 0.05 m). Now an area integral, identical to MITC4 on a flat element. | FIXED | `sh2_curved_shell_drilling_penalty_matches_flat_mitc4` |
 | SH-3 | **Curved-shell ANS transform wrong on skewed elements.** Tied covariant shears were mapped with $(\hat g_\alpha\cdot e_\beta)/(|g_\alpha||g_3|)$ instead of $(e_\beta\cdot g^\alpha)(e_3\cdot g^3)$. A constant transverse shear on a 60° parallelogram read $\gamma=(1.25, 0.43)$ instead of $(1,0)$: shear energy ×1.75, the element too stiff in shear on any non-rectangular mesh. Fixed in the default and the `_covariant` variant. | FIXED | `sh3_curved_shell_ans_reproduces_constant_shear_on_a_skewed_element` |
 | SH-4 | **Shell rotary inertia on the wrong axes.** Quad and quad9 masses (local) were scattered without rotation; the curved shell put $\rho h^3/12$ on global $\theta_X,\theta_Y$. A wall got inertia about its normal (drilling) and none about one in-plane axis. Now $T^{\mathsf T}MT$ in dense and sparse assembly, and $(I-\mathbf n\mathbf n^{\mathsf T})$ in the curved shell. Horizontal elements unchanged. Follow-ups from the review of #330: the curved-shell block is built from the nodal directors (§5.5). The time-history initial acceleration now finds the massless drilling direction of an oblique shell, which is not a coordinate DOF ([mass-geometric-dynamics.md §7](mass-geometric-dynamics.md)). | FIXED | `sh4_wall_rotary_inertia_is_about_in_plane_axes`, `sh4_curved_shell_mass_horizontal_unchanged`, `sh4_curved_shell_director_spin_has_no_mass`, `shell_mass_is_rotation_invariant`, `shell_time_history_initial_acceleration_is_rotation_invariant` |

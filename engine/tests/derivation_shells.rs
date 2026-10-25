@@ -15,7 +15,7 @@ use dedaliano_engine::element::quad9::{
     mitc9_local_stiffness, quad9_nodal_von_mises, quad9_stress_at_nodes, quad9_stresses, quad9_transform_3d,
 };
 use dedaliano_engine::element::{
-    plate_geometric_stiffness, plate_local_stiffness, plate_local_stiffness_thick,
+    plate_geometric_stiffness, plate_local_stiffness,
     plate_stress_at_nodes_thermal, plate_stress_recovery,
 };
 use dedaliano_engine::solver::dof::DofNumbering;
@@ -151,20 +151,9 @@ const EZ_DIRS: [[f64; 3]; 4] = [[0.0, 0.0, 1.0]; 4];
 
 // ───────────────────── SH-1: DKMT thick-plate add-on ─────────────────────
 
-/// SH-1 (OPEN). `plate_local_stiffness_thick` adds α·Ks to the DKT stiffness with
-/// γxz = w,x − θy, γyz = w,y + θx. With the model's right-handed rotations
-/// (θx = w,y, θy = −w,x) a rigid tilt w = y, θx = 1 gives γyz = 2, not 0, so the
-/// "thick" triangle resists a rigid rotation. It is also stiffer than DKT, while its
-/// docstring promises shear flexibility. Not called by any solver path.
-#[test]
-#[ignore = "open question SH-1: DKMT shear B uses the wrong rotation signs and adds stiffness instead of flexibility"]
-fn sh1_dkmt_thick_triangle_annihilates_rigid_motions() {
-    let c = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.3, 0.9, 0.0]];
-    let k = plate_local_stiffness_thick(&c, E, 0.3, 0.2, 5.0 / 6.0);
-    let res = rigid_residual(&k, &c);
-    assert!(res < 1e-10, "DKMT triangle: K·r ≠ 0 for a rigid motion, relative residual {res:.3e}");
-}
-
+/// SH-1 (DOCUMENTED-CHOICE). The DKMT add-on (`plate_local_stiffness_thick` /
+/// `plate_shear_stiffness_dkmt`) was removed as unused and incorrect (it resisted
+/// rigid tilt and added stiffness instead of flexibility).
 /// Control for SH-1: the DKT+CST triangle itself annihilates the rigid motions.
 #[test]
 fn sh_dkt_triangle_annihilates_rigid_motions() {

@@ -8,9 +8,9 @@
 /// 5. Patch test: uniform stress field
 
 use dedaliano_engine::element::{
-    plate_local_stiffness, plate_local_stiffness_thick, plate_pressure_load,
+    plate_local_stiffness, plate_pressure_load,
     plate_thermal_load, plate_element_quality, plate_stress_at_nodes,
-    plate_stress_recovery, plate_geometric_stiffness, plate_shear_stiffness_dkmt,
+    plate_stress_recovery, plate_geometric_stiffness,
     plate_thickness_ratio,
 };
 
@@ -301,107 +301,6 @@ fn plate_geometric_stiffness_symmetry_and_sign() {
     let kg_zero = plate_geometric_stiffness(&coords, 0.0, 0.0, 0.0);
     let max_val = kg_zero.iter().map(|v| v.abs()).fold(0.0f64, f64::max);
     assert!(max_val < 1e-15, "Zero stress should give zero Kg: {:.2e}", max_val);
-}
-
-#[test]
-fn plate_dkmt_shear_stiffness_properties() {
-    let coords = [
-        [0.0, 0.0, 0.0],
-        [1.0, 0.0, 0.0],
-        [0.5, 0.866, 0.0],
-    ];
-    let e = 200e6;
-    let nu = 0.3;
-    let t = 0.1; // thick plate: t/L = 0.1
-    let kappa_s = 5.0 / 6.0;
-
-    let ks = plate_shear_stiffness_dkmt(&coords, e, nu, t, kappa_s);
-
-    // Symmetry check (9×9)
-    let mut max_asym = 0.0f64;
-    for i in 0..9 {
-        for j in 0..9 {
-            let diff = (ks[i * 9 + j] - ks[j * 9 + i]).abs();
-            if diff > max_asym {
-                max_asym = diff;
-            }
-        }
-    }
-    assert!(
-        max_asym < 1e-8,
-        "Shear stiffness should be symmetric: {:.2e}",
-        max_asym
-    );
-
-    // All diagonal entries should be non-negative (positive semi-definite)
-    for i in 0..9 {
-        assert!(
-            ks[i * 9 + i] >= 0.0,
-            "Shear stiffness diagonal at {} should be non-negative: {}",
-            i, ks[i * 9 + i]
-        );
-    }
-
-    // Shear stiffness should scale linearly with thickness
-    let ks2 = plate_shear_stiffness_dkmt(&coords, e, nu, 2.0 * t, kappa_s);
-    let ratio = ks2[0] / ks[0];
-    assert!(
-        (ratio - 2.0).abs() < 0.01,
-        "Shear stiffness should scale linearly with t: ratio = {}",
-        ratio
-    );
-}
-
-#[test]
-fn plate_thick_vs_thin_stiffness() {
-    let coords = [
-        [0.0, 0.0, 0.0],
-        [1.0, 0.0, 0.0],
-        [0.5, 0.866, 0.0],
-    ];
-    let e = 200e6;
-    let nu = 0.3;
-    let kappa_s = 5.0 / 6.0;
-
-    // Thin plate: t/L << 1/20, shear contribution should be small
-    let t_thin = 0.001; // t/L ≈ 0.001
-    let k_thin = plate_local_stiffness(&coords, e, nu, t_thin);
-    let k_thick_thin = plate_local_stiffness_thick(&coords, e, nu, t_thin, kappa_s);
-
-    // For a very thin plate, the thick and thin formulations should agree closely.
-    // Compare using Frobenius norm of the difference relative to Frobenius norm of the original.
-    let n = 18;
-    let mut diff_sq = 0.0f64;
-    let mut norm_sq = 0.0f64;
-    for i in 0..n {
-        for j in 0..n {
-            let d = k_thick_thin[i * n + j] - k_thin[i * n + j];
-            diff_sq += d * d;
-            norm_sq += k_thin[i * n + j] * k_thin[i * n + j];
-        }
-    }
-    let rel_diff = (diff_sq / norm_sq).sqrt();
-    assert!(
-        rel_diff < 0.01,
-        "For thin plate, DKMT Frobenius norm diff should be < 1%: {:.6}",
-        rel_diff
-    );
-
-    // Thick plate: t/L ~ 0.2, shear should add meaningful stiffness
-    let t_thick = 0.2;
-    let k_pure_thin = plate_local_stiffness(&coords, e, nu, t_thick);
-    let k_dkmt = plate_local_stiffness_thick(&coords, e, nu, t_thick, kappa_s);
-
-    // The DKMT stiffness should be STIFFER than DKT alone (shear adds stiffness)
-    // Compare bending DOF diagonal entries
-    let bend_dofs = [2, 3, 4, 8, 9, 10, 14, 15, 16];
-    let mut found_increase = false;
-    for &d in &bend_dofs {
-        if k_dkmt[d * n + d] > k_pure_thin[d * n + d] * 1.01 {
-            found_increase = true;
-        }
-    }
-    assert!(found_increase, "DKMT should add noticeable shear stiffness for thick plates");
 }
 
 #[test]
