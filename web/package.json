@@ -1,13 +1,16 @@
 {
   "name": "stabileo-web",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22 <23"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build && npx tsx scripts/prerender.ts",
     "preview": "vite preview",
-    "wasm": "cd ../engine && wasm-pack build --target web --out-dir ../web/src/lib/wasm --no-opt",
+    "wasm": "../scripts/wasm-cached.sh",
     "test": "node scripts/test-all.mjs",
     "test:watch": "vitest --project unit",
     "check": "svelte-check --tsconfig ./tsconfig.json",
@@ -15,8 +18,9 @@
     "check:gate": "node scripts/svelte-check-gate.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:smoke": "playwright test --grep @smoke",
-    "test:e2e:slow": "playwright test --grep @slow",
+    "test:e2e:smoke": "playwright test --grep @smoke --grep-invert @flaky",
+    "test:e2e:slow": "playwright test --grep @slow --grep-invert @flaky",
+    "test:e2e:flaky": "playwright test --grep @flaky --retries=2",
     "test:e2e:install": "playwright install --with-deps chromium",
     "test:e2e:update-snapshots": "playwright test --update-snapshots",
     "typecheck": "node scripts/typecheck.mjs",

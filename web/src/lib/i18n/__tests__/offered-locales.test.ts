@@ -55,6 +55,8 @@ async function boot(languages: string[], seed: Record<string, string> = {}) {
   vi.stubGlobal('navigator', { languages, language: languages[0] });
   vi.resetModules();
   const store: Store = await import('../store.svelte');
+  // The fresh store holds the public pages' entries; the application registers the rest.
+  await import('../full-dictionaries');
   return { store, storage };
 }
 

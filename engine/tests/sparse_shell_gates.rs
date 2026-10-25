@@ -105,7 +105,7 @@ fn make_ss_plate(nx: usize, ny: usize) -> SolverInput3D {
         .collect();
 
     SolverInput3D {
-        solver_options: None,
+        solver_options: None, masses: Default::default(),
         nodes,
         materials: mats,
         sections: HashMap::new(),
@@ -267,7 +267,7 @@ fn sparse_vs_dense_parity() {
 /// which α makes the strict IC(0) factorization succeed on the pattern, plus
 /// the PCG iteration count when it does. Also reports Jacobi/SSOR convergence
 /// for reference. Ignored by default — run manually with:
-///   cargo test --release --test sparse_shell_gates diagnose_ic0_shift_sweep -- --ignored --nocapture
+///   cargo test --release --test gates sparse_shell_gates::diagnose_ic0_shift_sweep -- --ignored --nocapture
 ///
 /// Measured 2026-09-22 (Apple M3, release): strict IC(0) needs α ≥ 1e-1 on
 /// 10×10/20×20 and α ≥ 1e-2 on 30×30 to factorize at all; Jacobi/SSOR
@@ -348,7 +348,7 @@ fn diagnose_ic0_shift_sweep() {
 /// on SS MITC4 plates, reporting restored pivots, iterations and the true
 /// relative residual. The chosen production default is `ICS_SHIFT_REL` in
 /// `solver/linear.rs`. Ignored by default — run manually with:
-///   cargo test --release --test sparse_shell_gates diagnose_shifted_ic_sweep -- --ignored --nocapture
+///   cargo test --release --test gates sparse_shell_gates::diagnose_shifted_ic_sweep -- --ignored --nocapture
 #[test]
 #[ignore]
 fn diagnose_shifted_ic_sweep() {
@@ -451,7 +451,7 @@ fn diagnose_shifted_ic_breakdown() {
 ///   - restore-up: degraded pivot → restore_rel · max_diag (Ajiz-Jennings up)
 ///   - diag-scaled global shift: factorize K + alpha·diag(K) with strict IC(0)
 /// Ignored by default — run manually with:
-///   cargo test --release --test sparse_shell_gates diagnose_ic_restore_policy -- --ignored --nocapture
+///   cargo test --release --test gates sparse_shell_gates::diagnose_ic_restore_policy -- --ignored --nocapture
 #[test]
 #[ignore]
 fn diagnose_ic_restore_policy() {
@@ -615,7 +615,7 @@ fn diagnose_ic_restore_policy() {
 /// on MITC4 shells? IC(0) quality is ordering-sensitive; AMD reduces the
 /// effective dropped fill. Factorizes the AMD-permuted K_ff with strict IC(0),
 /// then Shifted-IC, and reports PCG convergence on the permuted system.
-///   cargo test --release --test sparse_shell_gates diagnose_ic0_ordering -- --ignored --nocapture
+///   cargo test --release --test gates sparse_shell_gates::diagnose_ic0_ordering -- --ignored --nocapture
 #[test]
 #[ignore]
 fn diagnose_ic0_ordering() {
@@ -1182,7 +1182,7 @@ fn make_ss_plate_with_grid(nx: usize, ny: usize) -> (SolverInput3D, Vec<Vec<usiz
         .collect();
 
     let input = SolverInput3D {
-        solver_options: None,
+        solver_options: None, masses: Default::default(),
         nodes,
         materials: mats,
         sections: HashMap::new(),
@@ -1271,7 +1271,7 @@ fn make_compressed_plate(nx: usize, ny: usize) -> SolverInput3D {
     }
 
     SolverInput3D {
-        solver_options: None,
+        solver_options: None, masses: Default::default(),
         nodes, materials: mats, sections: HashMap::new(),
         elements: HashMap::new(), supports, loads,
         constraints: vec![], left_hand: None,
@@ -1624,7 +1624,7 @@ fn guyan_3d_vs_linear_parity() {
 /// PCG-Jacobi on ≥20×20 shells: measured −71% (20×20), −75% (30×30) and −85%
 /// (50×50) end-to-end vs direct. The 10×10 row stays direct (nf=684 <
 /// threshold).
-///   cargo test --release --test sparse_shell_gates diagnose_pcg_attempt_overhead -- --ignored --nocapture
+///   cargo test --release --test gates sparse_shell_gates::diagnose_pcg_attempt_overhead -- --ignored --nocapture
 #[test]
 #[ignore]
 fn diagnose_pcg_attempt_overhead() {
@@ -1869,7 +1869,7 @@ fn pcg_trace_no_guard(
 /// 10×10: 109 iters, 20×20: 235 (with ‖r‖/‖b‖ climbing to ≈11 around iter
 /// 100 before collapsing — CG's 2-norm residual is not monotone), 30×30: 338,
 /// 50×50: 495. This motivated the size-scaled stall window in `pcg_solve`.
-///   cargo test --release --test sparse_shell_gates diagnose_pcg_stall_curve -- --ignored --nocapture
+///   cargo test --release --test gates sparse_shell_gates::diagnose_pcg_stall_curve -- --ignored --nocapture
 #[test]
 #[ignore]
 fn diagnose_pcg_stall_curve() {
@@ -1921,7 +1921,7 @@ fn diagnose_pcg_stall_curve() {
 /// 0.99 factor. Grounds the size-scaled stall limit in `pcg_solve`: a fixed
 /// 50-iteration window aborts legitimate convergence (measured plateaus:
 /// Jacobi 164 @ 20×20, 272 @ 30×30, 426 @ 50×50, 527 @ 70×70 — ≈ 3.2·√nf).
-///   cargo test --release --test sparse_shell_gates diagnose_pcg_plateau_length -- --ignored --nocapture
+///   cargo test --release --test gates sparse_shell_gates::diagnose_pcg_plateau_length -- --ignored --nocapture
 #[test]
 #[ignore]
 fn diagnose_pcg_plateau_length() {
@@ -2008,7 +2008,7 @@ fn diagnose_pcg_plateau_length() {
 /// to factorize even after scaling (shifted-IC still breaks PCG down at
 /// iteration 0). Conclusion: no cheap preconditioner beats Jacobi here; the
 /// fix was the stall safeguard, not the preconditioner.
-///   cargo test --release --test sparse_shell_gates diagnose_precond_sweep -- --ignored --nocapture
+///   cargo test --release --test gates sparse_shell_gates::diagnose_precond_sweep -- --ignored --nocapture
 #[test]
 #[ignore]
 fn diagnose_precond_sweep() {
@@ -2235,7 +2235,7 @@ fn make_2d_multi_span(n_elements: usize) -> SolverInput {
     })];
 
     SolverInput {
-        solver_options: None,
+        solver_options: None, masses: Default::default(),
         nodes, materials, sections, elements, supports, loads,
         constraints: vec![], connectors: HashMap::new(),
     }
@@ -2304,13 +2304,19 @@ fn dense_modal_masses(
     let eigen = dedaliano_engine::linalg::lanczos_generalized_eigen(&k_dense, &m_ff, nf, num_modes, 0.0)
         .expect("Dense Lanczos failed");
 
-    // Influence vectors for X, Y, Z translational DOFs (same as modal.rs)
+    // Ground-motion loads (M·r)_f for X, Y, Z (same as modal.rs): r = 1 on every
+    // node's translation, supports included, times the full mass, free rows kept —
+    // the inertia the consistent mass couples to the moving supports is part of it.
     let mut r = [vec![0.0; nf], vec![0.0; nf], vec![0.0; nf]];
-    for &node_id in &dof_num.node_order {
-        for (axis, r_axis) in r.iter_mut().enumerate() {
+    for (axis, r_axis) in r.iter_mut().enumerate() {
+        let mut iota = vec![0.0; n];
+        for &node_id in &dof_num.node_order {
             if let Some(&d) = dof_num.map.get(&(node_id, axis)) {
-                if d < nf { r_axis[d] = 1.0; }
+                iota[d] = 1.0;
             }
+        }
+        for i in 0..nf {
+            r_axis[i] = (0..n).map(|j| m_full[i * n + j] * iota[j]).sum();
         }
     }
 
@@ -2334,8 +2340,8 @@ fn dense_modal_masses(
         }
         let phi_m_phi: f64 = phi.iter().zip(m_phi.iter()).map(|(a, b)| a * b).sum();
         if phi_m_phi.abs() < 1e-30 { continue; }
-        for (axis, r_axis) in r.iter().enumerate() {
-            let phi_m_r: f64 = r_axis.iter().zip(m_phi.iter()).map(|(a, b)| a * b).sum();
+        for (axis, mr_axis) in r.iter().enumerate() {
+            let phi_m_r: f64 = mr_axis.iter().zip(phi.iter()).map(|(a, b)| a * b).sum();
             let gamma = phi_m_r / phi_m_phi;
             meff_sum[axis] += gamma * gamma * phi_m_phi;
         }
@@ -2419,6 +2425,8 @@ fn make_cantilever_frame_3d(n_elem: usize) -> SolverInput3D {
     sections.insert("1".to_string(), SolverSection3D {
         id: 1, name: None, a: 0.0625, iy: 2.0e-4, iz: 3.2552e-4, j: 5.0e-4,
         cw: None, as_y: None, as_z: None,
+        shear_center_y: None,
+        shear_center_z: None,
     });
 
     let mut elements = HashMap::new();
@@ -2445,7 +2453,7 @@ fn make_cantilever_frame_3d(n_elem: usize) -> SolverInput3D {
     });
 
     SolverInput3D {
-        solver_options: None,
+        solver_options: None, masses: Default::default(),
         nodes, materials: mats, sections, elements, supports,
         loads: vec![],
         constraints: vec![], left_hand: None,

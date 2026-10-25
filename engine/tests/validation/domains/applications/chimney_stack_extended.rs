@@ -293,6 +293,7 @@ fn chimney_temperature_gradient() {
             element_id: i + 1,
             dt_uniform: 0.0,
             dt_gradient: dt_gradient,
+            alpha: None, depth: None,
         }));
     }
 
@@ -501,7 +502,7 @@ fn chimney_guy_wire_spring_support() {
     });
 
     let input_guyed = SolverInput {
-        solver_options: None,
+        solver_options: None, masses: Default::default(),
         nodes: nodes_map, materials: mats_map, sections: secs_map,
         elements: elems_map, supports: sups_map, loads: loads_guyed,
     constraints: vec![],

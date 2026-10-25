@@ -120,7 +120,11 @@ describe('exhausted: the span fixture on its 30×30 columns', () => {
     // Every one is an exhausted search: shown for every admissible diameter, hooked or straight,
     // against the cages as designed, and not for headed bars, mechanical anchorage or another
     // column cage, which nothing here implements. No bound proves the section inadequate.
-    expect([...new Set(spans.values())].sort()).toEqual(['SEARCH_EXHAUSTED anchorage', 'SEARCH_EXHAUSTED anchorage,congestion']);
+    // Since the columns are checked on the engine's load contour (main's concrete in the engine),
+    // columns 14, 15, 22 and 24 take 8Ø12 where they had 12Ø10: fewer bars a face, and the spans
+    // that reach them (beams 71–82) find room through the cage, so «congestion» goes and their
+    // anchorage still refuses them, as it does every other span.
+    expect([...new Set(spans.values())].sort()).toEqual(['SEARCH_EXHAUSTED anchorage']);
     for (const c of beamCtxs()) {
       const o = verificationStore.outcomeFor(c.elementId)!;
       expect([o.insufficiency, o.exhaustion?.scope], `e${c.elementId}`).toEqual([undefined, 'implementedAlternatives']);

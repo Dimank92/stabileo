@@ -12,6 +12,11 @@ import { conceptualAdvanced } from './posts/conceptual-advanced';
 import { cirsoc201Flexure } from './posts/cirsoc-201-flexure';
 import { torsionTheories } from './posts/torsion-theories';
 import { barsOrFiniteElements } from './posts/bars-or-finite-elements';
+import { safetyAdvisories } from './posts/safety-advisories';
+import { howStabileoChecksItsResults } from './posts/how-stabileo-checks-its-results';
+import { release030 } from './posts/release-0-3-0';
+import { endToEndCertificates } from './posts/end-to-end-certificates';
+import { sameModelSameNumbers } from './posts/same-model-same-numbers';
 
 /**
  * By `order`, not by date.
@@ -26,7 +31,19 @@ export const POSTS: Post[] = [
   cirsoc201Flexure,
   torsionTheories,
   barsOrFiniteElements,
+  safetyAdvisories,
+  howStabileoChecksItsResults,
+  release030,
+  endToEndCertificates,
+  sameModelSameNumbers,
 ].sort((a, b) => a.order - b.order);
+
+/**
+ * What a reader looking for news expects: newest first (by date, then by series order). The blog
+ * index and the landing's "latest post" use it. In series order the newest posts sat at the bottom
+ * of the index and the landing's "latest" was the oldest post.
+ */
+export const POSTS_NEWEST_FIRST: Post[] = [...POSTS].sort((a, b) => b.date.localeCompare(a.date) || b.order - a.order);
 
 export function findPost(slug: string): Post | undefined {
   return POSTS.find((p) => p.slug === slug);

@@ -56,7 +56,7 @@ async function bootDetecting(page: Page) {
   await page.goto(PRO_URL);
   await page.waitForFunction(() => !!window.__stabileo, null, { timeout: 60_000 });
   await expect
-    .poll(() => page.evaluate(() => window.__stabileo.solverReady()), { timeout: 60_000 })
+    .poll(() => page.evaluate(() => window.__stabileo?.solverReady() ?? false), { timeout: 60_000 })
     .toBe(true);
   await page.evaluate(() => window.__stabileoActions.openDesignTab());
 }
