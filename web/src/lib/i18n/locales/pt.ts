@@ -13540,5 +13540,7 @@ const pt: Translations = {
   "convert.applied": "Criadas {members} barras ({arcs} vigas curvas) e {columns} pilares. Ficam agrupadas como conversão deste modelo.",
   "plates.sidesSummary": "{n}, {curved} curvos",
   "plates.resultsError": "Erro de discretização estimado: até {pct} % no elemento",
+  "plates.showMesh": "Ver a malha",
+  "plates.showMeshHint": "Desligado, cada placa malhada é desenhada como peça (seu contorno). Só muda o desenho: a seleção e os resultados continuam iguais.",
 };
 export default pt;
