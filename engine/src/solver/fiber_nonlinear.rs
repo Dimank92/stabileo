@@ -48,6 +48,7 @@ fn default_tol() -> f64 { 1e-6 }
 fn default_n_inc() -> usize { 10 }
 
 /// Per-element fiber state.
+#[derive(Clone)]
 struct ElementFiberState {
     _section_id: String,
     section_states: Vec<SectionState>, // One per integration point
@@ -141,6 +142,7 @@ pub fn solve_fiber_nonlinear_2d(input: &FiberNonlinearInput) -> Result<FiberNonl
     let mut u_full = vec![0.0; n];
     let mut total_iters = 0;
     let mut converged = true;
+    let mut f_int_converged = vec![0.0; n];
 
     // Sparse symbolic Cholesky reused across increments/iterations (the
     // tangent pattern is constant; the fingerprinted cache rebuilds it if
@@ -165,6 +167,7 @@ pub fn solve_fiber_nonlinear_2d(input: &FiberNonlinearInput) -> Result<FiberNonl
         // Modified-NR sparse cache: numeric factor of the increment's first
         // tangent (sparse analogue of cached_l).
         let mut cached_sparse_num: Option<NumericCholesky> = None;
+        let mut f_int = vec![0.0; n];
 
         for _iter in 0..input.max_iter {
             total_iters += 1;
@@ -176,7 +179,7 @@ pub fn solve_fiber_nonlinear_2d(input: &FiberNonlinearInput) -> Result<FiberNonl
             // Below SPARSE_THRESHOLD the tangent is assembled dense (n×n); at
             // or above it, as lower-triangle COO triplets that feed the CSC
             // sparse solve directly — no O(n²) dense matrix is ever built.
-            let mut f_int = vec![0.0; n];
+            f_int.fill(0.0);
             let sparse_tangent = ns >= super::linear::SPARSE_THRESHOLD;
             let mut k_t: Vec<f64> = Vec::new();
             let mut trip_rows: Vec<usize> = Vec::new();
@@ -258,6 +261,7 @@ pub fn solve_fiber_nonlinear_2d(input: &FiberNonlinearInput) -> Result<FiberNonl
             let rel_error = if f_norm > 1e-30 { r_norm / f_norm } else { r_norm };
 
             if rel_error < input.tolerance {
+                f_int_converged = f_int.clone();
                 nr_converged = true;
                 break;
             }
@@ -359,6 +363,7 @@ pub fn solve_fiber_nonlinear_2d(input: &FiberNonlinearInput) -> Result<FiberNonl
         }
 
         if !nr_converged {
+            f_int_converged = f_int.clone();
             converged = false;
             break;
         }
@@ -401,7 +406,7 @@ pub fn solve_fiber_nonlinear_2d(input: &FiberNonlinearInput) -> Result<FiberNonl
         // Rebuild final tangent stiffness for constraint force computation
         let mut f_int_final = vec![0.0; n];
         let mut k_t_final = vec![0.0; n * n];
-        let mut elem_states_copy = elem_states;
+        let mut elem_states_copy = elem_states.clone();
         let mut scatter = |gi: usize, gj: usize, v: f64| k_t_final[gi * n + gj] += v;
         assemble_fiber_elements(
             &input.solver, &input.fiber_sections, &dof_num,
@@ -421,10 +426,27 @@ pub fn solve_fiber_nonlinear_2d(input: &FiberNonlinearInput) -> Result<FiberNonl
         vec![]
     };
 
+    // Recover reactions at restrained DOFs and spring supports (SP-18).
+    let mut f_int_rot = f_int_converged.clone();
+    let mut f_total_rot = f_total.clone();
+    for it in &its {
+        assembly::rotate_inclined_f_2d(&mut f_int_rot, &it.dofs, &it.r);
+        assembly::rotate_inclined_f_2d(&mut f_total_rot, &it.dofs, &it.r);
+    }
+    let nr = n - nf;
+    let mut reactions_vec = vec![0.0; nr];
+    for i in 0..nr {
+        reactions_vec[i] = f_int_rot[nf + i] - f_total_rot[nf + i];
+    }
+    let mut reactions = super::linear::build_reactions_2d_inclined(
+        &input.solver, &dof_num, &reactions_vec, &f_total_rot[nf..], nf, &u_full, &its,
+    );
+    reactions.sort_by_key(|r| r.node_id);
+
     Ok(FiberNonlinearResult {
         results: AnalysisResults {
             displacements,
-            reactions: vec![],
+            reactions,
             element_forces,
             constraint_forces,
             diagnostics: vec![],
@@ -855,6 +877,7 @@ pub fn solve_fiber_nonlinear_3d(input: &FiberNonlinearInput3D) -> Result<FiberNo
     let mut u_full = vec![0.0; n];
     let mut total_iters = 0;
     let mut converged = true;
+    let mut f_int_converged = vec![0.0; n];
 
     // Sparse symbolic Cholesky reused across increments/iterations (the
     // tangent pattern is constant; the fingerprinted cache rebuilds it if
@@ -878,6 +901,7 @@ pub fn solve_fiber_nonlinear_3d(input: &FiberNonlinearInput3D) -> Result<FiberNo
         // Modified-NR sparse cache: numeric factor of the increment's first
         // tangent (sparse analogue of cached_l).
         let mut cached_sparse_num: Option<NumericCholesky> = None;
+        let mut f_int = vec![0.0; n];
 
         for _iter in 0..input.max_iter {
             total_iters += 1;
@@ -889,7 +913,7 @@ pub fn solve_fiber_nonlinear_3d(input: &FiberNonlinearInput3D) -> Result<FiberNo
             // Below SPARSE_THRESHOLD the tangent is assembled dense (n×n); at
             // or above it, as lower-triangle COO triplets that feed the CSC
             // sparse solve directly — no O(n²) dense matrix is ever built.
-            let mut f_int = vec![0.0; n];
+            f_int.fill(0.0);
             let sparse_tangent = ns >= super::linear::SPARSE_THRESHOLD;
             let mut k_t: Vec<f64> = Vec::new();
             let mut trip_rows: Vec<usize> = Vec::new();
@@ -965,6 +989,7 @@ pub fn solve_fiber_nonlinear_3d(input: &FiberNonlinearInput3D) -> Result<FiberNo
             let rel_error = if f_norm > 1e-30 { r_norm / f_norm } else { r_norm };
 
             if rel_error < input.tolerance {
+                f_int_converged = f_int.clone();
                 nr_converged = true;
                 break;
             }
@@ -1064,6 +1089,7 @@ pub fn solve_fiber_nonlinear_3d(input: &FiberNonlinearInput3D) -> Result<FiberNo
         }
 
         if !nr_converged {
+            f_int_converged = f_int.clone();
             converged = false;
             break;
         }
@@ -1102,7 +1128,7 @@ pub fn solve_fiber_nonlinear_3d(input: &FiberNonlinearInput3D) -> Result<FiberNo
     let constraint_forces = if let Some(ref fcs) = cs {
         let mut f_int_final = vec![0.0; n];
         let mut k_t_final = vec![0.0; n * n];
-        let mut elem_states_copy = elem_states;
+        let mut elem_states_copy = elem_states.clone();
         let mut scatter = |gi: usize, gj: usize, v: f64| k_t_final[gi * n + gj] += v;
         assemble_fiber_elements_3d(
             &input.solver, &input.fiber_sections, &dof_num,
@@ -1122,10 +1148,27 @@ pub fn solve_fiber_nonlinear_3d(input: &FiberNonlinearInput3D) -> Result<FiberNo
         vec![]
     };
 
+    // Recover reactions at restrained DOFs and spring supports (SP-18).
+    let mut f_int_rot = f_int_converged.clone();
+    let mut f_total_rot = f_total.clone();
+    for it in &its {
+        assembly::rotate_inclined_f_3d(&mut f_int_rot, &it.dofs, &it.r);
+        assembly::rotate_inclined_f_3d(&mut f_total_rot, &it.dofs, &it.r);
+    }
+    let nr = n - nf;
+    let mut reactions_vec = vec![0.0; nr];
+    for i in 0..nr {
+        reactions_vec[i] = f_int_rot[nf + i] - f_total_rot[nf + i];
+    }
+    let mut reactions = super::linear::build_reactions_3d_inclined(
+        &input.solver, &dof_num, &reactions_vec, &f_total_rot[nf..], nf, &u_full, &its,
+    );
+    reactions.sort_by_key(|r| r.node_id);
+
     Ok(FiberNonlinearResult3D {
         results: AnalysisResults3D {
             displacements,
-            reactions: vec![],
+            reactions,
             element_forces,
             plate_stresses: super::linear::compute_plate_stresses(&input.solver, &dof_num, &u_full, None),
             quad_stresses: super::linear::compute_quad_stresses(&input.solver, &dof_num, &u_full, None),

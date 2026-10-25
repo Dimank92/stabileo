@@ -423,9 +423,10 @@ remembered; only cracking is (SP-8, pinned). No tension stiffening, no confineme
 resisting forces $q$ at the converged state, keeping the fixed-end forces of member loads and the
 sign mapping of [frames.md](frames.md) §7.1 ($N_s = -q_{u_1}$, $V_s = q_{v_1}$, $M_s = q_{\theta_1}$, …).
 Before SP-7 the reported member forces were $K_\text{elastic}u$ with the SolverSection's $A$, $I$,
-so a yielded member reported forces that violated statics by orders of magnitude. The fiber solver
-still returns no reactions (SP-18) and `fiber_status` (max |strain|, max |stress|, a yielded/cracked
-flag per element). Section stresses are not reported per fiber.
+so a yielded member reported forces that violated statics by orders of magnitude. Reactions are
+recovered from the converged resisting forces and applied nodal loads at restrained DOFs, including
+springs and inclined supports (SP-18; #420). The solver also reports `fiber_status` (max |strain|,
+max |stress|, a yielded/cracked flag per element). Section stresses are not reported per fiber.
 
 ### 4.6 Members without a fiber section
 
@@ -513,4 +514,4 @@ All tests are in `engine/tests/derivation_special_elements.rs` unless stated.
 | SP-15 | Curved-beam segments take default local axes; near-vertical segments switch reference, so outside the X–Z plane $I_y$/$I_z$ swap on them (semicircle, N = 40: 15 % crown-deflection difference between the X–Z and Y–Z planes). Fixed (#418): every segment takes its axes from the arc's plane, the same relative to the curve. | FIXED | `curved_beam_arch_is_invariant_under_plan_rotation`, `curved_beam_arch_matches_explicit_members_with_plane_normal_axes` |
 | SP-16 | Zero-length 3D connector axes are $e_x=X$, $e_y=-Z$, $e_z=Y$ (its own reference rule), so `k_shear` acts along global Z and `k_shear_z` along Y; the "local Y" in the type doc is not the frame's local y. | DOCUMENTED-CHOICE | `connector_zero_length_3d_axis_mapping` |
 | SP-17 | 3D connector triad is discontinuous where its reference switches ($|e_{x,X}|=0.9$) for directions with a Z component, and has no user orientation input: anisotropic transverse springs change by O(k) between nearly parallel connectors. | OPEN | `connector_3d_axes_are_continuous_in_direction` |
-| SP-18 | Fiber solvers return an empty `reactions` list. | OPEN | `fiber_solver_reports_reactions` |
+| SP-18 | Fiber solvers returned an empty `reactions` list. Fixed (#420): reactions recovered from converged resisting forces at restrained DOFs, including springs and inclined supports. | FIXED | `fiber_solver_reports_reactions` |

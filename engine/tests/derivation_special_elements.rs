@@ -441,13 +441,68 @@ fn fiber_solver_3d_element_forces_satisfy_statics_after_yield() {
     assert!(ef.mz_start.abs() < 1e-6 * p * l && ef.n_start.abs() < 1e-6 * p, "Mz {} N {}", ef.mz_start, ef.n_start);
 }
 
-/// SP-18 (OPEN). The fiber solvers return an empty `reactions` list.
+/// SP-18 (FIXED). The fiber solvers return reactions that balance applied loads
+/// after yield in 2D and 3D.
 #[test]
-#[ignore = "open question SP-18: fiber solvers return no reactions"]
 fn fiber_solver_reports_reactions() {
     let sec = rectangular_fiber_section(0.2, 0.4, 10, FiberMaterial::Elastic { e: 200_000.0 });
     let r = solve_fiber_nonlinear_2d(&fiber_cantilever_2d(3.0, sec, 0.0, -10.0, 5, 1, 1e-10)).unwrap();
     assert!(!r.results.reactions.is_empty(), "no reactions reported");
+    let re = &r.results.reactions[0];
+    assert_eq!(re.node_id, 0);
+    assert!(re.rx.abs() < 1e-6, "Rx {}", re.rx);
+    assert!(rel(re.rz, 10.0) < 1e-6, "Rz {}", re.rz);
+    assert!(rel(re.my, 30.0) < 1e-6, "My {}", re.my);
+
+    // Post-yield 2D: cantilever under plastic load satisfies reaction equilibrium
+    let (l, p) = (3.0, -1800.0);
+    let sec_yield = rectangular_fiber_section(0.2, 0.4, 40,
+        FiberMaterial::SteelBilinear { e: 200_000.0, fy: 250.0, hardening_ratio: 0.02 });
+    let mut input_2d = fiber_cantilever_2d(l, sec_yield, 0.0, p, 5, 20, 1e-10);
+    input_2d.solver.sections.get_mut("1").unwrap().a = 0.08;
+    input_2d.solver.sections.get_mut("1").unwrap().iz = 0.2 * 0.4f64.powi(3) / 12.0;
+    let r_yield = solve_fiber_nonlinear_2d(&input_2d).unwrap();
+    assert!(r_yield.converged);
+    assert!(r_yield.fiber_status.iter().any(|s| s.yielded));
+    let re_yield = &r_yield.results.reactions[0];
+    assert!(re_yield.rx.abs() < 1e-6, "Rx {}", re_yield.rx);
+    assert!(rel(re_yield.rz, -p) < 1e-6, "Rz {} vs {}", re_yield.rz, -p);
+    assert!(rel(re_yield.my, -p * l) < 1e-6, "My {} vs {}", re_yield.my, -p * l);
+
+    // 3D elastic: cantilever under tip shear Vz = -10.0 kN
+    let sec_3d = four_fiber_section(200_000.0, 0.1, 2e-3, 2e-3, true);
+    let r_3d = solve_fiber_nonlinear_3d(&fiber_cantilever_3d(3.0, sec_3d,
+        SolverNodalLoad3D { node_id: 2, fx: 0.0, fy: 0.0, fz: -10.0, mx: 0.0, my: 0.0, mz: 0.0, bw: None })).unwrap();
+    assert!(!r_3d.results.reactions.is_empty(), "3D reactions reported");
+    let re_3d = &r_3d.results.reactions[0];
+    assert_eq!(re_3d.node_id, 1);
+    assert!(rel(re_3d.fz, 10.0) < 1e-6, "Fz {} vs 10", re_3d.fz);
+    assert!(rel(re_3d.my, -30.0) < 1e-6, "My {} vs -30", re_3d.my);
+
+    // 3D yielded cantilever
+    let (l, p) = (3.0, 600.0);
+    let (b, h, n_f) = (0.2, 0.4, 20);
+    let mut fibers = Vec::new();
+    let mat = FiberMaterial::SteelBilinear { e: 200_000.0, fy: 250.0, hardening_ratio: 0.02 };
+    for iy in 0..4 {
+        for iz in 0..n_f {
+            let y = -b / 2.0 + b / 4.0 * (iy as f64 + 0.5);
+            let z = -h / 2.0 + h / n_f as f64 * (iz as f64 + 0.5);
+            fibers.push(Fiber { y, z, area: b * h / (4 * n_f) as f64, material_idx: 0 });
+        }
+    }
+    let sec_yield_3d = FiberSectionDef { fibers, materials: vec![mat] };
+    let mut input_3d = fiber_cantilever_3d(l, sec_yield_3d,
+        SolverNodalLoad3D { node_id: 2, fx: 0.0, fy: 0.0, fz: -p, mx: 0.0, my: 0.0, mz: 0.0, bw: None });
+    input_3d.n_increments = 20;
+    input_3d.max_iter = 100;
+    input_3d.tolerance = 1e-10;
+    let r_3d_yield = solve_fiber_nonlinear_3d(&input_3d).unwrap();
+    assert!(r_3d_yield.converged);
+    assert!(r_3d_yield.fiber_status.iter().any(|s| s.yielded));
+    let re_3d_yield = &r_3d_yield.results.reactions[0];
+    assert!(rel(re_3d_yield.fz, p) < 1e-6, "Fz {} vs {}", re_3d_yield.fz, p);
+    assert!(rel(re_3d_yield.my, -p * l) < 1e-6, "My {} vs {}", re_3d_yield.my, -p * l);
 }
 
 /// SP-8 (DOCUMENTED-CHOICE, pinned). Hognestad concrete has no unloading
