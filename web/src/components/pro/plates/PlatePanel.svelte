@@ -123,9 +123,8 @@
     </div>
 
     {#if one && loops}
-<<<<<<< HEAD
-      <div class="pp-block" data-testid="plate-sides">
-        <span class="pp-label">{t('plates.sides')}</span>
+      <details class="pp-block" data-testid="plate-sides" open={sides.some((x) => x.mid !== null)}>
+        <summary class="pp-label">{t('plates.sides')} ({tp('plates.sidesSummary', { n: sides.length, curved: sides.filter((x) => x.mid !== null).length })})</summary>
         {#each sides as sd, k (k)}
           {@const member = arcEdgeBetween(sd.from, sd.to)}
           <div class="pp-line">
@@ -139,14 +138,10 @@
             {/if}
           </div>
         {/each}
-      </div>
+      </details>
 
-      <div class="pp-block">
-        <span class="pp-label">{t('plates.holes')} ({loops.holes.length})</span>
-=======
       <details class="pp-block">
         <summary class="pp-label">{t('plates.holes')} ({loops.holes.length})</summary>
->>>>>>> pro-calc/01-placas-y-mallado
         {#each loops.holes as h, i (i)}
           <div class="pp-line"><span class="pp-dim">{h.join(', ')}</span><button class="pp-x" onclick={() => removeHole(i)} title={t('plates.removeHole')}>×</button></div>
         {/each}
