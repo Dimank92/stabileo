@@ -155,11 +155,12 @@ test.describe('@slow rc cad handoff — the visible export', () => {
 
     // And the limitations are in the file, not only in the UI — including the ones a user must
     // not miss: the mat IS modelled, the top steel was never evaluated, and four clear distances
-    // fail. Punching now carries its unbalanced moment (§8.4.4.2), so that note is gone.
+    // fail. Designed from the factored results (SA-2026-024), this footing's unbalanced moment is
+    // significant and its moment transfer (§8.4.4.2) is not evaluated: the file says so.
     const codes = (doc.unsupported as Array<{ code: string }>).map((n) => n.code);
     expect(codes).toContain('FOOTING_BOTTOM_MAT_MODELED');
     expect(codes).toContain('FOOTING_TOP_REINFORCEMENT_NOT_EVALUATED');
-    expect(codes).not.toContain('PUNCHING_UNBALANCED_MOMENT_UNSUPPORTED');
+    expect(codes).toContain('PUNCHING_UNBALANCED_MOMENT_UNSUPPORTED');
     expect(codes).toContain('MAT_STARTER_CLEAR_SPACING_FAILURE');
     expect(codes).toContain('COLUMN_COVER_OUT_OF_SCOPE');
     // V1's opposite claim must NOT be here.
@@ -170,7 +171,7 @@ test.describe('@slow rc cad handoff — the visible export', () => {
     expect(doc.statuses.constructibilityBlockers).toEqual(['MAT_STARTER_CLEAR_SPACING_FAILURE']);
     expect(doc.statuses.bottomAnchorage).toBe('FAILED');
     expect(doc.statuses.topReinforcement).toBe('NOT_EVALUATED');
-    expect(doc.statuses.punchingMomentTransfer).toBe('EVALUATED');
+    expect(doc.statuses.punchingMomentTransfer).toBe('UNSUPPORTED');
   });
 
   test('C-D the downloaded manifest validates against the shipped schema and rules', async ({ pro: page }) => {
