@@ -233,12 +233,12 @@ test.describe('@smoke RC design workflow', () => {
     await solveModel(page);
 
     /*
-     * The claim needs a model the design can complete, and qa-8 is one only once its beams say
-     * what they are. Since 292b87f68 a beam that declares no role in the lateral-force-resisting
-     * system is designed as part of it (§9.7.3.8.2: its bottom bars develop fy at the column
-     * face), and on that reading e5 and e6 refuse: no arrangement anchors their bars in the
-     * columns (SEARCH_EXHAUSTED, limited by anchorage). Before: 8 verified; undeclared: 6 and
-     * those two. Stated here, then the beams are declared not part of the system through the
+     * Since 292b87f68 a beam that declares no role in the lateral-force-resisting system is
+     * designed as part of it (§9.7.3.8.2: its bottom bars develop fy at the column face). On that
+     * reading e5 and e6 were refused on their anchorage until the verifier took the axial force
+     * acting with each moment (concrete in the engine): the compression they carry lifts their φMn
+     * enough for bars whose ends anchor, so undeclared every design verifies too
+     * (`lateral-fixtures.test.ts`). Then the beams are declared not part of the system through the
      * design data panel, which is what a user of this frame states, and every design verifies.
      */
     await page.evaluate(() => window.__stabileoActions.designAll());
@@ -246,7 +246,7 @@ test.describe('@smoke RC design workflow', () => {
     const undeclared = await page.evaluate((list) => list
       .filter((id) => window.__stabileo.outcome(id) !== 'VERIFIED')
       .map((id) => [id, window.__stabileo.outcome(id)]), ids);
-    expect(undeclared, 'undeclared, the two beams that cannot anchor fy at the face').toEqual([[5, 'SEARCH_EXHAUSTED'], [6, 'SEARCH_EXHAUSTED']]);
+    expect(undeclared, 'undeclared, every beam anchors with the concurrent compression').toEqual([]);
 
     await designPlace(page, 'designData');
     await page.getByTestId('design-data-lateral-beams').selectOption('gravity');
