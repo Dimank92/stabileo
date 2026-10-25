@@ -575,11 +575,9 @@ fn winkler_2d_rigid_beam_settlement() {
     }
 }
 
-/// AC-7 (OPEN): Winkler member-end forces are K_e·u − FEF of the bar alone;
-/// the foundation stiffness K_f·u of the same member is left out, so at a free
-/// end (zero shear and moment) the reported end forces equal −K_f·u.
+/// AC-7 (FIXED): Winkler member-end forces include the foundation stiffness K_f·u
+/// so that at a free end the reported end forces are zero.
 #[test]
-#[ignore = "open question AC-7: Winkler member-end forces omit the foundation term K_f u"]
 fn winkler_member_end_forces_include_foundation() {
     let (l, kf, p) = (4.0, 1.0e4, 20.0);
     let solver = in2(json!({
