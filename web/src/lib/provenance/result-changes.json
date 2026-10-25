@@ -1,11 +1,49 @@
 {
-  "$comment": "Registry of result-affecting changes. Read by web/src/lib/provenance/registry.ts; schema and rules in docs/verification/PROVENANCE.md. Add an entry whenever a change makes the same saved model give different numbers, and bump currentResultsVersion when the entry's resultsVersion is new. Feature ids are defined in web/src/lib/provenance/model-features.ts.",
+  "$comment": "Registry of result-affecting changes. Read by web/src/lib/provenance/registry.ts; schema and rules in docs/verification/PROVENANCE.md. Add an entry whenever a change makes the same saved model give different numbers, at currentResultsVersion + 1, and bump currentResultsVersion: a version on main is deployed, and an entry added to it later is never shown to the projects it stamped (results-version.test.ts). Feature ids are defined in web/src/lib/provenance/model-features.ts.",
   "schema": 1,
-  "currentResultsVersion": 2,
+  "currentResultsVersion": 3,
   "changes": [
     {
+      "id": "design-on-unfactored-results",
+      "resultsVersion": 3,
+      "date": "2026-10-22",
+      "prs": [588],
+      "area": "design",
+      "when": { "allOf": [["footings", "jointDesigns"], ["combinations"]] },
+      "title": {
+        "en": "Footings and joints are not designed for the unfactored loads when the combinations are not solved",
+        "es": "Las bases y los nudos no se diseñan con las cargas sin mayorar cuando las combinaciones no están resueltas",
+        "pt": "As sapatas e os nós não são dimensionados com as cargas sem majorar quando as combinações não estão resolvidas"
+      },
+      "explanation": {
+        "en": "With combinations defined and none of them solved (after an edit with live calc on, or when the combination solve failed and the single solve stood in), footings and joints were designed for every load at factor 1, the service loads, instead of the factored combinations (a footing's reaction 15 % low in a portal under 1.2D + 1.6W; 29 to 38 % low for dead and live load). They now refuse and say why until the combinations are solved: re-solve and re-run their design (SA-2026-024).",
+        "es": "Con combinaciones definidas y ninguna resuelta (después de una edición con el cálculo en vivo activado, o cuando falló el cálculo de combinaciones y quedó el cálculo simple), las bases y los nudos se diseñaban con todas las cargas a factor 1, las de servicio, en lugar de las combinaciones mayoradas (la reacción de una base un 15 % baja en un pórtico con 1,2D + 1,6W; entre 29 y 38 % baja con carga permanente y sobrecarga). Ahora se niegan y dicen por qué hasta que las combinaciones estén resueltas: volvé a calcular y a diseñarlas (SA-2026-024).",
+        "pt": "Com combinações definidas e nenhuma resolvida (depois de uma edição com o cálculo ao vivo ligado, ou quando o cálculo das combinações falhou e ficou o cálculo simples), as sapatas e os nós eram dimensionados com todas as cargas a fator 1, as de serviço, em vez das combinações majoradas (a reação de uma sapata 15 % baixa num pórtico com 1,2D + 1,6W; entre 29 e 38 % baixa com carga permanente e sobrecarga). Agora se recusam e dizem por quê até as combinações estarem resolvidas: calcule de novo e refaça o dimensionamento (SA-2026-024)."
+      },
+      "changelog": { "file": "docs/advisories/SA-2026-024-design-on-unfactored-results.md", "heading": "SA-2026-024: footings and joints were designed for the unfactored loads when the combinations had not been re-solved" }
+    },
+    {
+      "id": "column-capacity-both-signs",
+      "resultsVersion": 3,
+      "date": "2026-10-22",
+      "prs": [590],
+      "area": "design",
+      "when": { "any": ["cirsoc201"] },
+      "title": {
+        "en": "RC columns are checked for both signs of the moment",
+        "es": "Las columnas de hormigón armado se verifican con los dos signos del momento",
+        "pt": "Os pilares de concreto armado são verificados com os dois sinais do momento"
+      },
+      "explanation": {
+        "en": "A CIRSOC 201 column whose bars are not symmetric about the bending axis (6, 10, 14… bars, or faces with different counts) was checked with one face compressed only; the other side is weaker (30×30, 6 Ø20, Nu 100 kN: 78.57 instead of 101.57 kN·m), so columns may now fail or need more bars (SA-2026-023).",
+        "es": "Una columna CIRSOC 201 con barras no simétricas respecto del eje de flexión (6, 10, 14… barras, o caras con distinta cantidad) se verificaba con una sola cara comprimida; el otro lado es más débil (30×30, 6 Ø20, Nu 100 kN: 78,57 en lugar de 101,57 kN·m), así que hay columnas que ahora no verifican o piden más barras (SA-2026-023).",
+        "pt": "Um pilar CIRSOC 201 com barras não simétricas em relação ao eixo de flexão (6, 10, 14… barras, ou faces com quantidades diferentes) era verificado com uma só face comprimida; o outro lado é mais fraco (30×30, 6 Ø20, Nu 100 kN: 78,57 em vez de 101,57 kN·m), então há pilares que agora não verificam ou pedem mais barras (SA-2026-023)."
+      },
+      "changelog": { "file": "docs/advisories/SA-2026-023-column-moment-sign.md", "heading": "SA-2026-023: the RC column check read one sign of the moment, and an uneven bar layout is weaker the other way" }
+    },
+    {
       "id": "curved-shell-moments-and-thermal",
-      "resultsVersion": 1,
+      "resultsVersion": 2,
       "date": "2026-10-21",
       "prs": [522],
       "area": "analysis",
@@ -24,7 +62,7 @@
     },
     {
       "id": "arc-member-local-axes",
-      "resultsVersion": 1,
+      "resultsVersion": 2,
       "date": "2026-10-21",
       "prs": [523],
       "area": "analysis",
@@ -43,7 +81,7 @@
     },
     {
       "id": "plastic-3d-element-order",
-      "resultsVersion": 1,
+      "resultsVersion": 2,
       "date": "2026-10-21",
       "prs": [524],
       "area": "analysis",
@@ -62,7 +100,7 @@
     },
     {
       "id": "cable-tension-chord-law",
-      "resultsVersion": 1,
+      "resultsVersion": 2,
       "date": "2026-10-21",
       "prs": [525],
       "area": "analysis",
@@ -81,7 +119,7 @@
     },
     {
       "id": "soil-curves-references",
-      "resultsVersion": 1,
+      "resultsVersion": 2,
       "date": "2026-10-21",
       "prs": [526],
       "area": "analysis",
@@ -97,6 +135,25 @@
         "pt": "A curva de argila mole omitia o termo J de Matlock (resistência última do solo entre um terço e a metade baixa perto da superfície), a areia usava sempre o fator cíclico A = 0,9 e uma tabela de k em degraus, e a curva de argila rígida saltava da metade para a resistência total em y50 e caía a 70 % depois (SA-2026-017). Afeta modelos resolvidos com molas de solo no PRO Avançado; resolva-os novamente."
       },
       "changelog": { "file": "docs/advisories/SA-2026-017-soil-curves.md", "heading": "SA-2026-017: Soil-structure interaction p-y, t-z and q-z curves departed from their references" }
+    },
+    {
+      "id": "frame-thermal-alpha-depth",
+      "resultsVersion": 2,
+      "date": "2026-10-21",
+      "prs": [531],
+      "area": "loads",
+      "when": { "any": ["memberThermalLoads"] },
+      "title": {
+        "en": "Member temperature loads take the material's α and the section's depth",
+        "es": "Las cargas de temperatura en barras toman el α del material y la altura de la sección",
+        "pt": "As cargas de temperatura em barras tomam o α do material e a altura da seção"
+      },
+      "explanation": {
+        "en": "Projects solved before 2026-10-07 took steel's α for every material and the depth of the section's equivalent solid rectangle (an I section's gradient moment about 30 % low, aluminium's thermal force about half). The app has compensated since, so most results do not move; a gradient on a member of a flat model whose section is turned a quarter or half turn in its plane now acts across b or h instead of the equivalent rectangle (SA-2026-019).",
+        "es": "Los proyectos resueltos antes del 2026-10-07 tomaban el α del acero para todo material y la altura del rectángulo macizo equivalente de la sección (en un perfil doble T el momento por gradiente salía un 30 % bajo, en aluminio la fuerza térmica casi la mitad). Desde entonces la app lo compensa, así que la mayoría de los resultados no cambia; un gradiente sobre una barra de un modelo plano cuya sección está girada un cuarto o media vuelta en su plano ahora actúa sobre b o h en lugar del rectángulo equivalente (SA-2026-019).",
+        "pt": "Os projetos resolvidos antes de 2026-10-07 tomavam o α do aço para todo material e a altura do retângulo maciço equivalente da seção (num perfil I o momento por gradiente saía 30 % baixo, no alumínio a força térmica quase a metade). Desde então o app compensa, então a maioria dos resultados não muda; um gradiente numa barra de um modelo plano cuja seção está girada um quarto ou meia volta no seu plano agora atua sobre b ou h em vez do retângulo equivalente (SA-2026-019)."
+      },
+      "changelog": { "file": "docs/advisories/SA-2026-019-frame-thermal-alpha-depth.md", "heading": "SA-2026-019: frame and truss temperature loads assumed steel's α and a solid rectangle's depth" }
     },
     {
       "id": "spectral-cqc-and-participation",

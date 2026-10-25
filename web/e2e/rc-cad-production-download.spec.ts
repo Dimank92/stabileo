@@ -256,14 +256,22 @@ test.describe('@slow rc cad handoff — the production download', () => {
       ].sort());
 
     // ── the mat IS here, and every limitation is coded ──────────
-    const unsupportedCodes = (m.unsupported as Array<{ code: string }>).map((u) => u.code).sort();
+    // Designed from the factored results (SA-2026-024), the joint's unbalanced moment passes the
+    // significance threshold on this journey, and the footing check does not evaluate moment
+    // transfer (§8.4.4.2): the handoff says so, coded, as main's own expectation has it. The
+    // detailing's own record travels as its two notes (the unevaluated transfer and the record's
+    // unverified conditions), keyed `foundation` as the committed V2 golden carries them.
+    const entries = m.unsupported as Array<{ code?: string; messageKey?: string }>;
+    const unsupportedCodes = entries.filter((u) => u.code).map((u) => u.code).sort();
     expect(unsupportedCodes).toEqual([
       'COLUMN_COVER_OUT_OF_SCOPE',
       'FOOTING_BOTTOM_MAT_MODELED',
       'FOOTING_TOP_REINFORCEMENT_NOT_EVALUATED',
       'MAT_STARTER_CLEAR_SPACING_FAILURE',
       'NO_PRODUCTION_CONTAINMENT_CHECKER',
+      'PUNCHING_UNBALANCED_MOMENT_UNSUPPORTED',
     ]);
+    expect(entries.filter((u) => !u.code).map((u) => u.messageKey)).toEqual(['foundation', 'foundation']);
     // The inverse of what this used to assert. V1 declared the mats absent and this checked that
     // no mat bar had slipped in; V2 carries them, so the check is that they ARE here and remain
     // individually addressable rather than folded into the dowel family.
@@ -281,7 +289,7 @@ test.describe('@slow rc cad handoff — the production download', () => {
     expect(m.statuses.bottomMatGeometry).toBe('MODELED');
     expect(m.statuses.bottomAnchorage).toBe('FAILED');
     expect(m.statuses.topReinforcement).toBe('NOT_EVALUATED');
-    expect(m.statuses.punchingMomentTransfer).toBe('EVALUATED');
+    expect(m.statuses.punchingMomentTransfer).toBe('UNSUPPORTED');
 
     // ── checks and observation policy ───────────────────────────
     const checks = m.checks as Array<{ checkId: string; evaluationStatus: string }>;
