@@ -1,4 +1,5 @@
 import { collapseVariableResults, collapseVariableEnvelope, collapseVariablePDelta, collapseVariableModes, variableExpansionFor } from '../engine/variable-members';
+import { clearMaterialChecks } from './material-check.svelte';
 import { modelStore } from './model.svelte';
 import { uiStore } from './ui.svelte';
 import { resultsStore } from './results.svelte';
@@ -62,6 +63,8 @@ modelStore._setOnNewProject(() => {
   designRunStore.resetMarks();
   // Another project in this tab: design stays on the place it was (a new tab starts from the plan).
   forgetDesignView(true);
+  // The other materials' checks were the previous project's too.
+  clearMaterialChecks();
   // A new project was made in this build: nothing of it is stale.
   recheckStore.reset();
 });
@@ -88,6 +91,8 @@ modelStore._setOnMutation(() => {
   queueMicrotask(pruneDeletedMembers);
   resultsStore.clear();
   verificationStore.invalidateAnalysis();
+  // The other materials' checks read the results just cleared.
+  clearMaterialChecks();
   /*
    * A structural edit retires the current document, as a footing edit does: its drawings and
    * schedule describe the structure before the edit. The bars themselves stay, and say they are
@@ -198,6 +203,8 @@ resultsStore._setOnAnalysisPublish((kind) => recheckStore.noteSolved(kind));
 
 resultsStore._setOnResultsPublish(() => {
   verificationStore.bumpSolveGeneration();
+  // A new analysis: the other materials' checks read the previous one.
+  clearMaterialChecks();
 });
 
 // Let verificationStore read the current provided reinforcement without importing

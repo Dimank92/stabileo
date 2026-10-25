@@ -12,6 +12,7 @@
   import { t, tp, i18n, OFFERED_LOCALES } from '../../../lib/i18n';
   import { teAt } from '../../../lib/i18n/engine-text';
   import { memoriaInput } from '../../../lib/store/memoria-inputs';
+  import { downloadResultText, htmlWithProvenance, prepareExportProvenance } from '../../../lib/export/provenance-attach';
   import { renderMemoriaHtml, type RenderContext } from '../../../lib/report/memoria/render';
   import { ALL_CHAPTERS, CHAPTERS, type ChapterId, type ChapterKey } from '../../../lib/report/memoria/types';
 
@@ -44,16 +45,24 @@
 
   const partLabel = (key: ChapterKey, p: string) => (key === 'members' ? t(`memo.fam.${p}`) : t(`memo.part.${key}.${p}`));
 
-  function print() {
+  /*
+   * The memoria leaves with the provenance of the results it prints and their stale status
+   * (`export/provenance-attach.ts`), as every export of results does. The print tab is opened in
+   * the click, before the record is awaited (pop-up blockers); a project that moved meanwhile
+   * writes nothing and says so.
+   */
+  async function print() {
+    const doc = html;
     const w = window.open('', '_blank');
-    if (!w) return download();
-    w.document.write(html); w.document.close(); w.focus(); w.print();
+    const record = await prepareExportProvenance();
+    if (!record) { w?.close(); return; }
+    const withProv = htmlWithProvenance(doc, record);
+    if (!w) { void downloadResultText(doc, `memoria-${input.project.date}.html`, 'text/html'); return; }
+    w.document.write(withProv); w.document.close(); w.focus(); w.print();
   }
 
   function download() {
-    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
-    const a = document.createElement('a'); a.href = url; a.download = `memoria-${input.project.date}.html`; a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    void downloadResultText(html, `memoria-${input.project.date}.html`, 'text/html');
   }
 
   function handleKeydown(e: KeyboardEvent) { if (e.key === 'Escape') onclose(); }
