@@ -13,7 +13,7 @@
 </script>
 
 {#if shown}
-  <p class="recheck" role="status" data-testid="recheck-notice">
+  <p class="recheck" role="status" data-testid="design-recheck-notice">
     {t('recheck.text')}
     <button disabled={busy} onclick={async () => { busy = true; try { await solveAndRecheck(); } finally { busy = false; } }} data-testid="recheck-run">{t('recheck.run')}</button>
   </p>
