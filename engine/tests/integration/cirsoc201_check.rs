@@ -336,3 +336,52 @@ fn cirsoc201_vc_caps_sqrt_fc() {
     assert!((r.vc - expected).abs() / expected < 1e-12, "Vc {} vs {expected}", r.vc);
     assert!(r.vc < (25.0 / 3.0) / 6.0 * 300.0 * 450.0);
 }
+
+// ─── #562: CIRSOC 201 factored axial force equilibrium & phi*Pn,max / phi*Pnt caps ─────
+
+/// PoC Case 1: compression-controlled axial demand (Nu = 2200 kN) uses phi = 0.65 in
+/// axial equilibrium (Pn = Nu / 0.65 = 3384.62 kN). Evaluating nominal Pn = Nu without phi
+/// dropped 35% of the axial load, overstating phi*Mn by +50.2% (258.92 vs 172.35 kN*m)
+/// and falsely passing at Mu = 210 kN*m.
+#[test]
+fn cirsoc201_compression_controlled_axial_equilibrium_uses_phi() {
+    let mut m = section(28e6, 420e6, 0.30, 0.50, 0.44, 1.5e-3);
+    m.as_compression = Some(1.5e-3);
+    m.d_prime = Some(0.06);
+    m.es = Some(200e9);
+
+    let r = check(m, forces(Some(210_000.0), None, Some(2_200_000.0)));
+    // True phi*Mn = 172.35 kN*m. At Mu = 210 kN*m, flexure_ratio = 1.218 > 1.0 (FAIL).
+    assert!(!r.pass, "Must fail at Mu = 210 kN*m, Nu = 2200 kN: {r:?}");
+    assert!(r.flexure_ratio > 1.0, "Flexure ratio was {}", r.flexure_ratio);
+    assert!(
+        (r.phi_mn - 172_350.0).abs() / 172_350.0 < 0.02,
+        "phi_mn expected ~172.35 kN*m, got {}",
+        r.phi_mn
+    );
+}
+
+/// PoC Case 2: axially overloaded column above phi*Pn,max (Nu = 3500 kN > phi*Pn,max = 2474.47 kN).
+/// Must refuse or fail the check, not pass with a positive moment capacity.
+#[test]
+fn cirsoc201_axial_compression_exceeding_phi_pn_max_fails() {
+    let mut m = section(28e6, 420e6, 0.30, 0.50, 0.44, 1.5e-3);
+    m.as_compression = Some(1.5e-3);
+    m.d_prime = Some(0.06);
+    m.es = Some(200e9);
+
+    let r = check(m, forces(Some(100_000.0), None, Some(3_500_000.0)));
+    assert!(!r.pass, "Nu = 3500 kN exceeds phi*Pn,max = 2474.5 kN, must fail: {r:?}");
+    assert!(r.flexure_ratio > 1.0 || r.unevaluated.iter().any(|u| u.contains("Flexure")));
+}
+
+/// Axial tension exceeding phi*Pnt = 0.90 * Ast * fy must refuse or fail the check.
+#[test]
+fn cirsoc201_axial_tension_exceeding_phi_pnt_fails() {
+    let m = section(25e6, 420e6, 0.30, 0.50, 0.45, 1.0e-3);
+    // phi*Pnt = 0.90 * 1.0e-3 * 420e6 = 378 kN < applied tension 400 kN
+    let r = check(m, forces(Some(5_000.0), None, Some(-400_000.0)));
+    assert!(!r.pass, "Nu = -400 kN exceeds phi*Pnt = 378 kN, must fail: {r:?}");
+    assert!(r.flexure_ratio > 1.0 || r.unevaluated.iter().any(|u| u.contains("Flexure")));
+}
+

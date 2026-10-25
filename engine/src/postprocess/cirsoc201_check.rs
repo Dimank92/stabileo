@@ -189,6 +189,7 @@ pub(crate) const CIRSOC201_DUCTILITY: &str = "Ductility";
 pub(crate) const CIRSOC201_SHEAR: &str = "Shear";
 pub(crate) const CIRSOC201_MIN_SHEAR: &str = "Minimum shear reinforcement";
 
+#[allow(dead_code)]
 fn not(t: Tri) -> Tri {
     match t {
         Tri::True => Tri::False,
@@ -327,6 +328,32 @@ pub(crate) fn flexure_inputs_valid(m: &Cirsoc201MemberData) -> bool {
 /// (residual C − T − Nu, moment about the section centroid, a, εt, fs, fs') at neutral axis
 /// depth c, with the axial force `nu` (compression positive) acting at the gross centroid.
 ///
+/// Maximum design axial compressive strength φ·Pn,max = 0,65·0,80·Po for a tied section
+/// (Tabla 22.4.2.1, 22.4.2.2; [10.3.6.2]).
+pub(crate) fn max_axial_compression_r<T: Real>(m: &Cirsoc201MemberData) -> T {
+    let as_c = m.as_compression.unwrap_or(0.0).max(0.0);
+    let d_p = m.d_prime.unwrap_or(0.0);
+    let doubly = as_c > 0.0 && d_p > 0.0 && d_p < m.d;
+    let ast = T::exact(m.as_tension) + if doubly { T::exact(as_c) } else { T::exact(0.0) };
+    let ag = match flange(m) {
+        Some((bf, hf)) => T::exact(bf) * T::exact(hf) + T::exact(m.b) * (T::exact(m.h) - T::exact(hf)),
+        None => T::exact(m.b) * T::exact(m.h),
+    };
+    let ag = m.ag.map(T::exact).unwrap_or(ag);
+    let k = T::lit(0.85) * T::exact(m.fc);
+    let po = k * (ag - ast) + T::exact(m.fy) * ast;
+    T::lit(0.65) * T::lit(0.80) * po
+}
+
+/// Maximum design axial tensile strength φ·Pnt = 0,90·Ast·fy (22.4.3.1; Tabla 21.2.2; [9.3.2]).
+pub(crate) fn max_axial_tension_r<T: Real>(m: &Cirsoc201MemberData) -> T {
+    let as_c = m.as_compression.unwrap_or(0.0).max(0.0);
+    let d_p = m.d_prime.unwrap_or(0.0);
+    let doubly = as_c > 0.0 && d_p > 0.0 && d_p < m.d;
+    let ast = T::exact(m.as_tension) + if doubly { T::exact(as_c) } else { T::exact(0.0) };
+    T::lit(0.90) * T::exact(m.fy) * ast
+}
+
 /// The residual is continuous and non-decreasing in c: the block min(β1·c, h) grows (over the
 /// flange first, then the web), a bar in compression pushes with As·max(0, fs − 0,85·f'c) (net
 /// of the concrete it displaces, whether or not it is inside the block, which can only lower
@@ -373,9 +400,11 @@ fn flexure_at<T: Real>(m: &Cirsoc201MemberData, b1: T, c: T, nu: T) -> (T, T, T,
     // max(fs, 0) + min(fs + 0,85·f'c, 0) is fs in tension and −max(|fs| − 0,85·f'c, 0) in
     // compression, continuous and non-increasing in c.
     let t = T::exact(m.as_tension) * (fst.max(zero) + (fst + k).min(zero));
+    let pn = cc + cs - t;
+    let phi = phi_flexure_r::<T>(m.edition, eps_t, m.fy, m.es.unwrap_or(200e9));
     let yc = T::exact(centroid_depth(m));
-    let mn = mc + cs * (d - T::exact(d_p)) - nu * (d - yc);
-    (cc + cs - t - nu, mn, a, eps_t, fst, fsc)
+    let mn = mc + cs * (d - T::exact(d_p)) - pn * (d - yc);
+    (phi * pn - nu, mn, a, eps_t, fst, fsc)
 }
 
 /// Nominal flexural strength with an axial force `nu` (N, compression positive) acting at the
@@ -387,6 +416,11 @@ fn flexure_at<T: Real>(m: &Cirsoc201MemberData, b1: T, c: T, nu: T) -> (T, T, T,
 /// beam and the clause gives it no flexural strength.
 pub(crate) fn nominal_flexure_axial_r<T: Real>(m: &Cirsoc201MemberData, nu: T, nu_f64: f64) -> Option<FlexureStateR<T>> {
     if !flexure_inputs_valid(m) || !nu_f64.is_finite() {
+        return None;
+    }
+    let p_max = max_axial_compression_r::<T>(m);
+    let p_nt = max_axial_tension_r::<T>(m);
+    if nu.le(p_max) != Tri::True || (-nu).le(p_nt) != Tri::True {
         return None;
     }
     let b1_f = beta1(m.fc);
