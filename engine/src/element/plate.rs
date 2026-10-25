@@ -509,16 +509,12 @@ pub fn plate_transform_3d(coords: &[[f64; 3]; 3]) -> Vec<f64> {
     t
 }
 
-/// Compute the 18-element consistent pressure load vector in **global**
+/// Compute the 18-element lumped pressure load vector in **global**
 /// coordinates for a uniform pressure applied normal to the plate surface.
 ///
-/// Uses the consistent load vector formulation for the DKT element:
-/// - Translational DOFs: F/3 per node in the normal direction
-/// - Rotational DOFs: consistent moments from the DKT shape functions
-///   integrated over the element area
-///
-/// The rotational terms improve accuracy for coarse meshes by ensuring
-/// the load vector is work-equivalent to the actual distributed pressure.
+/// Distributes the total normal pressure force evenly to the three corner nodes:
+/// - Translational DOFs: $p \cdot \text{Area} / 3$ per node in the normal direction ($e_z$)
+/// - Rotational DOFs: zero (lumped tributary load approximation, no consistent moments)
 pub fn plate_pressure_load(
     coords: &[[f64; 3]; 3],
     pressure: f64,
@@ -637,9 +633,12 @@ pub fn plate_thermal_load(
     f_global
 }
 
-/// Compute the 18×18 lumped mass matrix (row-major flat vector).
+/// Compute the 18×18 lumped mass matrix (row-major flat vector) with rotary inertia.
 ///
-/// mass per node = ρ · A · t / 3 applied to translational DOFs only.
+/// Despite the function name, this computes a diagonal lumped mass matrix:
+/// - Translational DOFs: $m_{\text{node}} = \rho \cdot A \cdot t / 3$ per node
+/// - Rotational DOFs: physical through-thickness rotary inertia $I_{\text{rot}} = m_{\text{node}} \cdot t^2 / 12$
+///   to prevent singularity when rotational DOFs are unrestrained.
 pub fn plate_consistent_mass(
     coords: &[[f64; 3]; 3],
     rho: f64,

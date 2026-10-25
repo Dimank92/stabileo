@@ -65,7 +65,7 @@ on that branch: a test that now passes means the finding is fixed.
 | [#406](https://github.com/lambdaclass/stabileo/issues/406) | FR-3 shear-area field names mean different axes in 2D and 3D | docs fixed; rename with a compatibility alias |
 | [#409](https://github.com/lambdaclass/stabileo/issues/409) | SH-1 DKMT thick-plate add-on wrong and unused | remove |
 | [#412](https://github.com/lambdaclass/stabileo/issues/412) | SH-8 MITC9 tying points | confirm the variant and cite it |
-| [#413](https://github.com/lambdaclass/stabileo/issues/413) | SH-15 shell docstrings disagree with the code | fix the docstrings |
+| [#413](https://github.com/lambdaclass/stabileo/issues/413) | SH-15 shell docstrings disagree with the code | **fixed**: docstrings corrected; `sh15_shell_docstring_behaviors_match_code` passes |
 | [#414](https://github.com/lambdaclass/stabileo/issues/414) | SP-10 parabolic vs catenary ordinate sag sides | fix the helper; check its callers (promote if a result uses it) |
 | [#415](https://github.com/lambdaclass/stabileo/issues/415) | SP-11 Ernst tangent not the derivative of the chord law | **fixed** with #416: `ernst_tangent_modulus` returns the derivative (= `ernst_equivalent_modulus`); `ernst_tangent_modulus_is_the_chord_law_derivative` passes |
 | [#430](https://github.com/lambdaclass/stabileo/issues/430) | NL-8 line-search slope (unused) | fix or remove |

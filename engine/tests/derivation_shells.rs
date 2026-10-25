@@ -9,14 +9,15 @@ use dedaliano_engine::element::curved_shell::{
     curved_shell_stiffness_covariant, curved_shell_stiffness_no_ans, curved_shell_stresses, curved_shell_nodal_von_mises,
 };
 use dedaliano_engine::element::quad::{
-    mitc4_local_stiffness, quad_geometric_stiffness, quad_pressure_load,
+    mitc4_local_stiffness, quad_consistent_mass, quad_geometric_stiffness, quad_pressure_load,
 };
 use dedaliano_engine::element::quad9::{
     mitc9_local_stiffness, quad9_nodal_von_mises, quad9_stress_at_nodes, quad9_stresses, quad9_transform_3d,
 };
 use dedaliano_engine::element::{
-    plate_geometric_stiffness, plate_local_stiffness, plate_local_stiffness_thick,
-    plate_stress_at_nodes_thermal, plate_stress_recovery,
+    plate_consistent_mass, plate_geometric_stiffness, plate_local_stiffness,
+    plate_local_stiffness_thick, plate_pressure_load, plate_stress_at_nodes_thermal,
+    plate_stress_recovery,
 };
 use dedaliano_engine::solver::dof::DofNumbering;
 use dedaliano_engine::solver::geometric_stiffness::{
@@ -1128,3 +1129,56 @@ fn shell_time_history_initial_acceleration_is_rotation_invariant() {
     }
 }
 
+/// SH-15 (FIXED): verifies the actual behaviors clarified in the docstrings:
+/// 1. `plate_pressure_load` applies lumped p*Area/3 in normal direction, rotational DOFs are exactly 0.
+/// 2. `plate_consistent_mass` is diagonal (lumped) with m_node on translations and m_node*t^2/12 on rotations.
+/// 3. `quad_consistent_mass` is consistent (has non-zero coupling between distinct nodes i != j).
+#[test]
+fn sh15_shell_docstring_behaviors_match_code() {
+    // 1. plate_pressure_load: right triangle (0,0), (1,0), (0,1) in XY plane (Area = 0.5)
+    let tri = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
+    let p = 12.0;
+    let area = 0.5;
+    let expected_fz = p * area / 3.0; // 2.0
+    let f_press = plate_pressure_load(&tri, p);
+    assert_eq!(f_press.len(), 18);
+    for node in 0..3 {
+        let base = node * 6;
+        assert_eq!(f_press[base + 0], 0.0, "fx must be 0");
+        assert_eq!(f_press[base + 1], 0.0, "fy must be 0");
+        assert!((f_press[base + 2] - expected_fz).abs() < 1e-12, "fz must be pA/3 lumped");
+        // Rotational DOFs must be exactly 0 (lumped, no consistent moments)
+        assert_eq!(f_press[base + 3], 0.0, "mx is zero (lumped load)");
+        assert_eq!(f_press[base + 4], 0.0, "my is zero (lumped load)");
+        assert_eq!(f_press[base + 5], 0.0, "mz is zero (lumped load)");
+    }
+
+    // 2. plate_consistent_mass: diagonal lumped with m_node and i_rot
+    let rho = 7850.0;
+    let t = 0.02;
+    let m_tri = plate_consistent_mass(&tri, rho, t);
+    let m_node = rho * area * t / 3.0;
+    let i_rot = m_node * t * t / 12.0;
+    for i in 0..18 {
+        for j in 0..18 {
+            let val = m_tri[i * 18 + j];
+            if i != j {
+                assert_eq!(val, 0.0, "plate_consistent_mass is strictly diagonal (lumped)");
+            } else {
+                let dof = i % 6;
+                let expected = if dof < 3 { m_node } else { i_rot };
+                assert!((val - expected).abs() < 1e-12, "diagonal mass mismatch at {i}");
+            }
+        }
+    }
+
+    // 3. quad_consistent_mass: 1x1 quad in XY plane
+    let quad = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]];
+    let m_quad = quad_consistent_mass(&quad, rho, t);
+    assert_eq!(m_quad.len(), 24 * 24);
+    // In a consistent mass matrix, node 0 and node 1 have non-zero translational coupling (e.g. M(ux0, ux1) > 0)
+    let ux0 = 0;
+    let ux1 = 6;
+    let off_diag = m_quad[ux0 * 24 + ux1];
+    assert!(off_diag > 0.0, "quad_consistent_mass has non-zero off-diagonal mass coupling (truly consistent)");
+}

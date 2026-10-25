@@ -366,9 +366,9 @@ fn invert_4x4(m: &[f64; 16]) -> [f64; 16] {
 /// t: shell thickness (m)
 ///
 /// Uses Bathe-Dvorkin (1986) ANS interpolation for transverse shear
-/// (eliminates shear locking) and Simo-Rifai (1990) 4-mode EAS for
-/// the membrane field (eliminates membrane locking), statically
-/// condensed at element level.
+/// (eliminates shear locking) and 7-mode EAS for the membrane field
+/// (Simo-Rifai 1990 modes 1–4 + Andelfinger-Ramm 1993 modes 5–7 to
+/// eliminate membrane locking), statically condensed at element level.
 ///
 /// Returns 576-element Vec (24×24 row-major).
 pub fn mitc4_local_stiffness(
@@ -698,7 +698,7 @@ pub fn quad_transform_3d(coords: &[[f64; 3]; 4]) -> Vec<f64> {
 
 /// Compute quad element consistent mass matrix (24×24).
 ///
-/// Lumped mass approximation with rotary inertia.
+/// Full consistent mass matrix with rotary inertia, integrated via 2×2 Gauss quadrature.
 pub fn quad_consistent_mass(
     coords: &[[f64; 3]; 4],
     rho: f64,
