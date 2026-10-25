@@ -291,6 +291,12 @@ export function insertFragment(frag: Fragment, transforms: readonly Affine[], op
         let data = generated ? mapped as unknown as Record<string, unknown> | null : g.data;
         const target = (data as { target?: { by?: string; groupId?: number } } | undefined)?.target;
         if (g.kind === 'floorLoad' && target?.by === 'group' && groupMap.has(target.groupId!)) data = { ...data, target: { ...target, groupId: groupMap.get(target.groupId!) } };
+        // A load along an arc names the arc's copy, and its direction turns with the copy.
+        const curve = g.kind === 'curveLoad' ? (data as { arcId?: number; dir?: Vec3 } | undefined) : undefined;
+        if (curve?.arcId !== undefined && arcMap.has(curve.arcId)) {
+          const d = curve.dir ? applyVector(T, curve.dir) : undefined;
+          data = { ...data, arcId: arcMap.get(curve.arcId), ...(d ? { dir: d.map((v) => Math.round(v * 1e12) / 1e12) } : {}) };
+        }
         if (generated && mapped) members.nodes = mapped.nodes.filter((n) => n.owned).map((n) => n.id);
         if (g.data && !generated) warn('groupDataVerbatim');
         const name = frag.local || transforms.length > 1 ? `${g.name} (${k + 1})` : g.name;

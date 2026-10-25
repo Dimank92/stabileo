@@ -101,6 +101,13 @@ export function fragmentOf(set: EntitySet, opts: FragmentOptions = {}): Fragment
       const target = (g.data as { target?: { by?: string; groupId?: number } } | undefined)?.target;
       if (g.kind === 'floorLoad' && target?.by === 'group' && held.has(target.groupId!) && !held.has(g.id)) frag.groups.push(clone(g));
     }
+    // A load along an arc goes with the arc when every member of the arc is in the fragment.
+    const arcIn = new Map<number, boolean>();
+    for (const e of modelStore.elements.values()) if (e.arc) arcIn.set(e.arc.id, (arcIn.get(e.arc.id) ?? true) && elements.has(e.id));
+    for (const g of modelStore.model.groups.values()) {
+      const arcId = (g.data as { arcId?: number } | undefined)?.arcId;
+      if (g.kind === 'curveLoad' && arcId !== undefined && arcIn.get(arcId) && !held.has(g.id)) frag.groups.push(clone(g));
+    }
   }
   const matIds = new Set([...frag.elements.map((e) => e.materialId), ...frag.quads.map((q) => q.materialId), ...frag.plates.map((p) => p.materialId)]);
   const secIds = new Set(frag.elements.flatMap((e) => (e.variableSection ? [e.sectionId, e.variableSection.sectionJ] : [e.sectionId])));

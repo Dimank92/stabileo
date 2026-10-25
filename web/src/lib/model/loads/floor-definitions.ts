@@ -18,6 +18,7 @@ import { floorLoad, type FloorBeam, type FloorLoadResult } from '../../engine/lo
 import { shellLoadForces } from '../../engine/shell-load-integration';
 import { applyPoint, axisPermutation, type Affine } from '../edit/affine';
 import { parseDecimal } from '../../utils/numeric-input';
+import { arcThroughThree } from '../curved-member';
 import type { GroupMembers, Load, ModelGroup } from '../../store/model.svelte';
 
 type P3 = [number, number, number];
@@ -192,10 +193,38 @@ export function expandDefinition(m: DefinitionModel, def: FloorLoadDef, own: Gro
   return { defId, loads, result: res, totalKN: res.totalKN, ...(loads.length ? {} : { problem: 'nothingTargeted' as const }) };
 }
 
-/** Every floor-load definition of the model, expanded. */
+/** Every load definition of the model, expanded: floor loads and loads along an arc. */
 export function expandAll(m: DefinitionModel, opts: { leftHand: boolean }): Expansion[] {
-  return [...m.groups.values()].filter((g) => g.kind === 'floorLoad').map((g) => expandFloorLoad(m, g.id, opts));
+  return [...m.groups.values()].flatMap((g) => (g.kind === 'floorLoad' ? [expandFloorLoad(m, g.id, opts)] : g.kind === 'curveLoad' ? [expandCurveLoad(m, g.id)] : []));
 }
+
+/**
+ * A load along an arc (`store/curved-members.ts`): kN per metre of arc in a global direction,
+ * written on each segment of the arc as a global load per metre of member, scaled by the arc
+ * length its chord stands for over the chord's length, so the total is the arc's on any number
+ * of segments.
+ */
+export function expandCurveLoad(m: DefinitionModel, defId: number): Expansion {
+  const g = m.groups.get(defId);
+  const def = g?.data as unknown as { arcId: number; caseId: number; q: number; dir: P3 } | undefined;
+  const none = (problem: Expansion['problem']): Expansion => ({ defId, loads: [], result: null, problem, totalKN: 0 });
+  if (!def) return none('nothingTargeted');
+  if (!m.loadCases.some((c) => c.id === def.caseId)) return none('noCase');
+  const segs = [...m.elements.values()].filter((e) => (e as { arc?: { id: number } }).arc?.id === def.arcId);
+  if (!segs.length) return none('nothingTargeted');
+  const spec = (segs[0] as unknown as { arc: { spec: { start: { x: number; y: number; z: number }; through: { x: number; y: number; z: number }; end: { x: number; y: number; z: number } } } }).arc.spec;
+  const chord = (e: { nodeI: number; nodeJ: number }) => { const a = m.nodes.get(e.nodeI)!, b = m.nodes.get(e.nodeJ)!; return Math.hypot(b.x - a.x, b.y - a.y, (b.z ?? 0) - (a.z ?? 0)); };
+  const chords = segs.map(chord);
+  const arcLen = arcThroughThree(spec.start, spec.through, spec.end)?.length ?? chords.reduce((a, b) => a + b, 0);
+  const k = arcLen / chords.reduce((a, b) => a + b, 0);
+  const loads: Load[] = segs.map((e) => {
+    const q = def.q * k;
+    const [x, y, z] = [def.dir[0] * q, def.dir[1] * q, def.dir[2] * q].map((v) => Math.round(v * 1e9) / 1e9);
+    return { type: 'distributed3d', data: { id: 0, elementId: e.id, frame: 'global', qXI: x, qXJ: x, qYI: y, qYJ: y, qZI: z, qZJ: z, caseId: def.caseId, fromDef: defId } } as unknown as Load;
+  });
+  return { defId, loads, result: null, totalKN: def.q * arcLen };
+}
+
 
 /** Whether the loads a model holds from its definitions are the ones they expand to now. */
 export function definitionsCurrent(loads: readonly Load[], expanded: readonly Expansion[]): boolean {

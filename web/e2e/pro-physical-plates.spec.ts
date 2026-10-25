@@ -52,7 +52,7 @@ test('a plate drawn on an outline has no mesh, meshes from its panel, and is pic
 
   // Selected whole, its panel says it has no mesh.
   await expect(page.getByTestId('plate-panel')).toBeVisible();
-  await expect(page.getByTestId(`plate-status-${p!.id}`)).toHaveText(/sin malla/);
+  await expect(page.getByTestId(`plate-status-${p!.id}`)).toHaveText(/no mesh/);
 
   // Meshed from the panel, after the plan.
   await page.getByTestId('plate-mesh-open').click();

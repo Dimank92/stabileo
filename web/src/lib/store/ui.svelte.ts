@@ -272,6 +272,8 @@ function createUIStore() {
   /** What a click on a plate's mesh picks: the plate whole, or the one element clicked. */
   let shellPickScope = $state<'plate' | 'element'>('plate');
   let plateShells: ((id: number) => string[]) | null = null;
+  /** What a click on a member picks in PRO: the whole piece (an arc, a member a mesh cut) or one segment. */
+  let memberPickScope = $state<'piece' | 'segment'>('piece');
   function setShells(v: Set<string>, keepPlates = false) {
     selectedShells = v;
     if (keepPlates || selectedPlates.size === 0) return;
@@ -955,6 +957,16 @@ function createUIStore() {
     get selectedShells() { return selectedShells; },
     get selectedPlates() { return selectedPlates; },
     get shellPickScope() { return shellPickScope; },
+    get memberPickScope() { return memberPickScope; },
+    set memberPickScope(v: 'piece' | 'segment') { memberPickScope = v; },
+    /** Select several members by a click: a whole piece (`store/curved-members.ts`). */
+    selectElements(ids: readonly number[], addToSelection = false) {
+      elementSelectionManual = true;
+      if (addToSelection) { selectedElements = new Set([...selectedElements, ...ids]); return; }
+      selectedNodes = new Set();
+      selectedElements = new Set(ids);
+      setShells(new Set());
+    },
     set shellPickScope(v: 'plate' | 'element') { shellPickScope = v; },
     /** How the store finds a plate's shells; set once by `physical-plates.ts`. */
     setPlateShellResolver(fn: (id: number) => string[]) { plateShells = fn; },
