@@ -211,7 +211,7 @@ describe('a physical plate', () => {
     // Written by its own definition onto every shell of the copy, once.
     syncDefinedLoadsForAnalysis();
     const def = plateLoadDefs(copy.id)[0]!.id;
-    const loaded = modelStore.loads.filter((l) => l.type === 'surface3d' && (l.data as { fromDef?: number }).fromDef === def).map((l) => l.data.quadId);
+    const loaded = modelStore.loads.filter((l) => l.type === 'surface3d' && (l.data as { fromDef?: number }).fromDef === def).map((l) => (l.data as { quadId: number }).quadId);
     expect(new Set(loaded).size).toBe(loaded.length);
     expect(loaded.length).toBe(copy.group.members.quads!.length);
   });
