@@ -4,6 +4,25 @@
   "currentResultsVersion": 3,
   "changes": [
     {
+      "id": "design-on-unfactored-results",
+      "resultsVersion": 3,
+      "date": "2026-10-22",
+      "prs": [588],
+      "area": "design",
+      "when": { "allOf": [["footings", "jointDesigns"], ["combinations"]] },
+      "title": {
+        "en": "Footings and joints are not designed for the unfactored loads when the combinations are not solved",
+        "es": "Las bases y los nudos no se diseñan con las cargas sin mayorar cuando las combinaciones no están resueltas",
+        "pt": "As sapatas e os nós não são dimensionados com as cargas sem majorar quando as combinações não estão resolvidas"
+      },
+      "explanation": {
+        "en": "With combinations defined and none of them solved (after an edit with live calc on, or when the combination solve failed and the single solve stood in), footings and joints were designed for every load at factor 1, the service loads, instead of the factored combinations (a footing's reaction 15 % low in a portal under 1.2D + 1.6W; 29 to 38 % low for dead and live load). They now refuse and say why until the combinations are solved: re-solve and re-run their design (SA-2026-024).",
+        "es": "Con combinaciones definidas y ninguna resuelta (después de una edición con el cálculo en vivo activado, o cuando falló el cálculo de combinaciones y quedó el cálculo simple), las bases y los nudos se diseñaban con todas las cargas a factor 1, las de servicio, en lugar de las combinaciones mayoradas (la reacción de una base un 15 % baja en un pórtico con 1,2D + 1,6W; entre 29 y 38 % baja con carga permanente y sobrecarga). Ahora se niegan y dicen por qué hasta que las combinaciones estén resueltas: volvé a calcular y a diseñarlas (SA-2026-024).",
+        "pt": "Com combinações definidas e nenhuma resolvida (depois de uma edição com o cálculo ao vivo ligado, ou quando o cálculo das combinações falhou e ficou o cálculo simples), as sapatas e os nós eram dimensionados com todas as cargas a fator 1, as de serviço, em vez das combinações majoradas (a reação de uma sapata 15 % baixa num pórtico com 1,2D + 1,6W; entre 29 e 38 % baixa com carga permanente e sobrecarga). Agora se recusam e dizem por quê até as combinações estarem resolvidas: calcule de novo e refaça o dimensionamento (SA-2026-024)."
+      },
+      "changelog": { "file": "docs/advisories/SA-2026-024-design-on-unfactored-results.md", "heading": "SA-2026-024: footings and joints were designed for the unfactored loads when the combinations had not been re-solved" }
+    },
+    {
       "id": "column-capacity-both-signs",
       "resultsVersion": 3,
       "date": "2026-10-22",

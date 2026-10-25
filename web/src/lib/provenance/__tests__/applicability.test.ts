@@ -65,6 +65,15 @@ describe('which registered changes concern a model', () => {
     expect(ids(model({ elements: [member(1, 1, 'frame')] }))).not.toContain('frame-thermal-alpha-depth');
   });
 
+  it('shows the unfactored-design change only for models with footings or joint designs and combinations (W2-01)', () => {
+    const combos = { combinations: [{ id: 1, name: '1.2D', factors: [{ caseId: 1, factor: 1.2 }] }] } as Partial<FeatureSnapshot>;
+    const frame = { elements: [member(1, 2, 'frame')] };
+    expect(ids(model({ ...frame, ...combos, footings: [[1, { nodeId: 1 }]] as never }))).toContain('design-on-unfactored-results');
+    expect(ids(model({ ...frame, ...combos, jointDesigns: { 1: { nodeId: 1 } } }))).toContain('design-on-unfactored-results');
+    expect(ids(model({ ...frame, footings: [[1, { nodeId: 1 }]] as never }))).not.toContain('design-on-unfactored-results');
+    expect(ids(model({ ...frame, ...combos }))).not.toContain('design-on-unfactored-results');
+  });
+
   it('names the ACI change for an ACI-bound concrete model and not the CIRSOC 201 one', () => {
     const aci = model({ elements: [member(1, 2, 'frame')], regulations: { roles: { concrete: { adapterId: 'aci-aisc' } } } });
     expect(ids(aci)).toContain('aci318-strain-and-axial');

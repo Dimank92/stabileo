@@ -34,8 +34,9 @@ const RELEASED: Record<number, string[]> = {
     'curved-shell-moments-and-thermal', 'arc-member-local-axes', 'plastic-3d-element-order', 'cable-tension-chord-law',
     'soil-curves-references', 'frame-thermal-alpha-depth', 'free-roof-wind-minimum', 'earth-pressure-dead-load-resisting',
   ],
-  // D4-01: RC columns checked for both signs of the moment (SA-2026-023).
-  3: ['column-capacity-both-signs'],
+  // D4-01: RC columns checked for both signs of the moment (SA-2026-023); W2-01: footings and
+  // joints not designed for the unfactored loads (SA-2026-024). Merged together (#590, #588).
+  3: ['column-capacity-both-signs', 'design-on-unfactored-results'],
 };
 
 describe('results versions', () => {
