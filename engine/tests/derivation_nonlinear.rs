@@ -529,8 +529,8 @@ fn nl_material_3d_utilization_matches_hand_calculation() {
 // Fiber solver (global loop)
 // ======================================================================
 
-use dedaliano_engine::element::fiber_beam::{rectangular_fiber_section, FiberMaterial};
-use dedaliano_engine::solver::fiber_nonlinear::{solve_fiber_nonlinear_2d, FiberNonlinearInput};
+use dedaliano_engine::element::fiber_beam::{rectangular_fiber_section, Fiber, FiberMaterial, FiberSectionDef};
+use dedaliano_engine::solver::fiber_nonlinear::{solve_fiber_nonlinear_2d, solve_fiber_nonlinear_3d, FiberNonlinearInput, FiberNonlinearInput3D};
 
 const FB: f64 = 0.1;
 const FH: f64 = 0.2;
@@ -609,6 +609,80 @@ fn nl_fiber_one_increment_matches_many() {
     let (a, b) = (disp2(&many.results, 3).uz, disp2(&one.results, 3).uz);
     eprintln!("propped cantilever midspan: 40 increments {a}, 1 increment {b}");
     close(b, a, 2e-2, "midspan deflection, 1 vs 40 increments");
+}
+
+/// NL-17 (FIXED). Beyond the fiber collapse load, the solver reports the last
+/// converged increment, with its load factor and a not-converged flag (matching
+/// co-rotational).
+#[test]
+fn nl_fiber_beyond_collapse_reports_last_converged_increment() {
+    let l = 4.0;
+    let mp = FY * 1000.0 * FB * FH * FH / 4.0;
+    let p_collapse = 6.0 * mp / l; // collapse load of propped cantilever with midspan point load
+    let p = 1.5 * p_collapse; // 150% of collapse load
+    let solver = make_beam(4, l, E, FB * FH, FB * FH.powi(3) / 12.0, "fixed", Some("rollerX"),
+        vec![SolverLoad::Nodal(SolverNodalLoad { node_id: 3, fx: 0.0, fz: -p, my: 0.0 })]);
+    let mut inp = fiber_input(solver, 10, false);
+    inp.max_iter = 25;
+    let r = solve_fiber_nonlinear_2d(&inp).unwrap();
+    assert!(!r.converged, "must report not converged beyond collapse load");
+    assert!(r.load_factor > 0.0 && r.load_factor < 1.0, "load_factor must be partial, got {}", r.load_factor);
+    // Displacements and reactions must be finite and balance the applied load at the converged state
+    let total_rz: f64 = r.results.reactions.iter().map(|re| re.rz).sum();
+    let applied_pz = r.load_factor * p;
+    close(total_rz, applied_pz, 1e-4, "reactions balance applied load at last converged increment");
+}
+
+/// NL-17 (FIXED), 3D twin. Beyond the fiber collapse load, the 3D solver
+/// reports the last converged increment with its load factor and converged: false.
+#[test]
+fn nl_fiber_3d_beyond_collapse_reports_last_converged_increment() {
+    let l = 4.0;
+    let (b, h) = (0.1, 0.2);
+    let mp = FY * 1000.0 * b * h * h / 4.0;
+    let p_collapse = 6.0 * mp / l;
+    let p = 2.0 * p_collapse;
+    let solver = make_3d_beam(
+        4, l, E, 0.3, b * h, b * h.powi(3) / 12.0, h * b.powi(3) / 12.0, 1e-4,
+        vec![true; 6],
+        Some(vec![false, true, true, true, false, true]),
+        vec![SolverLoad3D::Nodal(SolverNodalLoad3D {
+            node_id: 3, fx: 0.0, fy: 0.0, fz: -p, mx: 0.0, my: 0.0, mz: 0.0, bw: None,
+        })],
+    );
+    let mut fibers = Vec::new();
+    let (ny, nz) = (4, 40);
+    let dy = b / ny as f64;
+    let dz = h / nz as f64;
+    let area = dy * dz;
+    for iy in 0..ny {
+        for iz in 0..nz {
+            let y = -b / 2.0 + dy / 2.0 + iy as f64 * dy;
+            let z = -h / 2.0 + dz / 2.0 + iz as f64 * dz;
+            fibers.push(Fiber { y, z, area, material_idx: 0 });
+        }
+    }
+    let sec = FiberSectionDef {
+        fibers,
+        materials: vec![FiberMaterial::SteelBilinear { e: E, fy: FY, hardening_ratio: 0.0 }],
+    };
+    let mut fiber_sections = HashMap::new();
+    fiber_sections.insert("1".into(), sec);
+    let inp = FiberNonlinearInput3D {
+        solver,
+        fiber_sections,
+        n_integration_points: 5,
+        max_iter: 25,
+        tolerance: 1e-10,
+        n_increments: 10,
+        modified_nr: false,
+    };
+    let r = solve_fiber_nonlinear_3d(&inp).unwrap();
+    assert!(!r.converged, "must report not converged beyond collapse load in 3D");
+    assert!(r.load_factor > 0.0 && r.load_factor < 1.0, "load_factor must be partial, got {}", r.load_factor);
+    let total_rz: f64 = r.results.reactions.iter().map(|re| re.fz).sum();
+    let applied_pz = r.load_factor * p;
+    close(total_rz, applied_pz, 1e-4, "reactions balance applied load at last converged increment in 3D");
 }
 
 // ======================================================================

@@ -48,6 +48,7 @@ fn default_tol() -> f64 { 1e-6 }
 fn default_n_inc() -> usize { 10 }
 
 /// Per-element fiber state.
+#[derive(Clone)]
 struct ElementFiberState {
     _section_id: String,
     section_states: Vec<SectionState>, // One per integration point
@@ -61,6 +62,7 @@ pub struct FiberNonlinearResult {
     pub iterations: usize,
     pub converged: bool,
     pub n_increments: usize,
+    pub load_factor: f64,
     pub fiber_status: Vec<FiberElementStatus>,
 }
 
@@ -139,6 +141,10 @@ pub fn solve_fiber_nonlinear_2d(input: &FiberNonlinearInput) -> Result<FiberNonl
     }
 
     let mut u_full = vec![0.0; n];
+    let mut u_converged = vec![0.0; n];
+    let mut converged_factor = 0.0f64;
+    let mut converged_elem_states = elem_states.clone();
+    let mut f_int_converged = vec![0.0; n];
     let mut total_iters = 0;
     let mut converged = true;
 
@@ -165,6 +171,7 @@ pub fn solve_fiber_nonlinear_2d(input: &FiberNonlinearInput) -> Result<FiberNonl
         // Modified-NR sparse cache: numeric factor of the increment's first
         // tangent (sparse analogue of cached_l).
         let mut cached_sparse_num: Option<NumericCholesky> = None;
+        let mut f_int = vec![0.0; n];
 
         for _iter in 0..input.max_iter {
             total_iters += 1;
@@ -176,7 +183,7 @@ pub fn solve_fiber_nonlinear_2d(input: &FiberNonlinearInput) -> Result<FiberNonl
             // Below SPARSE_THRESHOLD the tangent is assembled dense (n×n); at
             // or above it, as lower-triangle COO triplets that feed the CSC
             // sparse solve directly — no O(n²) dense matrix is ever built.
-            let mut f_int = vec![0.0; n];
+            f_int.fill(0.0);
             let sparse_tangent = ns >= super::linear::SPARSE_THRESHOLD;
             let mut k_t: Vec<f64> = Vec::new();
             let mut trip_rows: Vec<usize> = Vec::new();
@@ -258,6 +265,7 @@ pub fn solve_fiber_nonlinear_2d(input: &FiberNonlinearInput) -> Result<FiberNonl
             let rel_error = if f_norm > 1e-30 { r_norm / f_norm } else { r_norm };
 
             if rel_error < input.tolerance {
+                f_int_converged = f_int.clone();
                 nr_converged = true;
                 break;
             }
@@ -273,9 +281,9 @@ pub fn solve_fiber_nonlinear_2d(input: &FiberNonlinearInput) -> Result<FiberNonl
                 // Sparse path: CSC free block built directly from the
                 // lower-triangle triplets (no dense n×n tangent), then
                 // sparse Cholesky with cached symbolic.
-                if input.modified_nr {
+                let sparse_res = if input.modified_nr {
                     if let Some(ref num) = cached_sparse_num {
-                        sparse_cholesky_solve(num, &r_s)
+                        Ok(sparse_cholesky_solve(num, &r_s))
                     } else {
                         let k_csc = tangent_free_sparse_triplets(
                             &trip_rows, &trip_cols, &trip_vals, nf, &cs,
@@ -285,12 +293,12 @@ pub fn solve_fiber_nonlinear_2d(input: &FiberNonlinearInput) -> Result<FiberNonl
                             Some(num) => {
                                 let result = sparse_cholesky_solve(&num, &r_s);
                                 cached_sparse_num = Some(num);
-                                result
+                                Ok(result)
                             }
                             None => {
                                 // Sparse factorization failed — fall back to full NR
                                 // for this increment (same semantics as dense path).
-                                solve_tangent_sparse(&k_csc, &r_s, &mut sparse_sym_cache)?
+                                solve_tangent_sparse(&k_csc, &r_s, &mut sparse_sym_cache)
                             }
                         }
                     }
@@ -298,7 +306,18 @@ pub fn solve_fiber_nonlinear_2d(input: &FiberNonlinearInput) -> Result<FiberNonl
                     let k_csc = tangent_free_sparse_triplets(
                         &trip_rows, &trip_cols, &trip_vals, nf, &cs,
                     );
-                    solve_tangent_sparse(&k_csc, &r_s, &mut sparse_sym_cache)?
+                    solve_tangent_sparse(&k_csc, &r_s, &mut sparse_sym_cache)
+                };
+                match sparse_res {
+                    Ok(u) => u,
+                    Err(e) => {
+                        if converged_factor > 0.0 {
+                            nr_converged = false;
+                            break;
+                        } else {
+                            return Err(e);
+                        }
+                    }
                 }
             } else if input.modified_nr {
                 if let Some((ref l, sz)) = cached_l {
@@ -322,8 +341,17 @@ pub fn solve_fiber_nonlinear_2d(input: &FiberNonlinearInput) -> Result<FiberNonl
                         // Cholesky failed — fall back to full NR
                         let mut k_work = k_s;
                         let mut f_work = r_s;
-                        lu_solve(&mut k_work, &mut f_work, ns)
-                            .ok_or("Singular tangent stiffness in fiber N-R")?
+                        match lu_solve(&mut k_work, &mut f_work, ns) {
+                            Some(u) => u,
+                            None => {
+                                if converged_factor > 0.0 {
+                                    nr_converged = false;
+                                    break;
+                                } else {
+                                    return Err("Singular tangent stiffness in fiber N-R".into());
+                                }
+                            }
+                        }
                     }
                 }
             } else {
@@ -340,8 +368,17 @@ pub fn solve_fiber_nonlinear_2d(input: &FiberNonlinearInput) -> Result<FiberNonl
                     None => {
                         let mut k_work = k_s;
                         let mut f_work = r_s;
-                        lu_solve(&mut k_work, &mut f_work, ns)
-                            .ok_or("Singular tangent stiffness in fiber N-R")?
+                        match lu_solve(&mut k_work, &mut f_work, ns) {
+                            Some(u) => u,
+                            None => {
+                                if converged_factor > 0.0 {
+                                    nr_converged = false;
+                                    break;
+                                } else {
+                                    return Err("Singular tangent stiffness in fiber N-R".into());
+                                }
+                            }
+                        }
                     }
                 }
             };
@@ -360,8 +397,14 @@ pub fn solve_fiber_nonlinear_2d(input: &FiberNonlinearInput) -> Result<FiberNonl
 
         if !nr_converged {
             converged = false;
+            u_full.copy_from_slice(&u_converged);
+            elem_states = converged_elem_states;
             break;
         }
+
+        u_converged.copy_from_slice(&u_full);
+        converged_factor = load_factor;
+        converged_elem_states = elem_states.clone();
     }
 
     // Build results
@@ -421,10 +464,28 @@ pub fn solve_fiber_nonlinear_2d(input: &FiberNonlinearInput) -> Result<FiberNonl
         vec![]
     };
 
+    // Recover reactions at restrained DOFs and spring supports
+    let f_scaled: Vec<f64> = f_total.iter().map(|&f| converged_factor * f).collect();
+    let mut f_int_rot = f_int_converged.clone();
+    let mut f_total_rot = f_scaled.clone();
+    for it in &its {
+        assembly::rotate_inclined_f_2d(&mut f_int_rot, &it.dofs, &it.r);
+        assembly::rotate_inclined_f_2d(&mut f_total_rot, &it.dofs, &it.r);
+    }
+    let nr = n - nf;
+    let mut reactions_vec = vec![0.0; nr];
+    for i in 0..nr {
+        reactions_vec[i] = f_int_rot[nf + i] - f_total_rot[nf + i];
+    }
+    let mut reactions = super::linear::build_reactions_2d_inclined(
+        &input.solver, &dof_num, &reactions_vec, &f_total_rot[nf..], nf, &u_full, &its,
+    );
+    reactions.sort_by_key(|r| r.node_id);
+
     Ok(FiberNonlinearResult {
         results: AnalysisResults {
             displacements,
-            reactions: vec![],
+            reactions,
             element_forces,
             constraint_forces,
             diagnostics: vec![],
@@ -436,6 +497,7 @@ pub fn solve_fiber_nonlinear_2d(input: &FiberNonlinearInput) -> Result<FiberNonl
         iterations: total_iters,
         converged,
         n_increments: input.n_increments,
+        load_factor: converged_factor,
         fiber_status,
     })
 }
@@ -786,6 +848,7 @@ pub struct FiberNonlinearResult3D {
     pub iterations: usize,
     pub converged: bool,
     pub n_increments: usize,
+    pub load_factor: f64,
     pub fiber_status: Vec<FiberElementStatus>,
 }
 
@@ -853,6 +916,10 @@ pub fn solve_fiber_nonlinear_3d(input: &FiberNonlinearInput3D) -> Result<FiberNo
     }
 
     let mut u_full = vec![0.0; n];
+    let mut u_converged = vec![0.0; n];
+    let mut converged_factor = 0.0f64;
+    let mut converged_elem_states = elem_states.clone();
+    let mut f_int_converged = vec![0.0; n];
     let mut total_iters = 0;
     let mut converged = true;
 
@@ -878,6 +945,7 @@ pub fn solve_fiber_nonlinear_3d(input: &FiberNonlinearInput3D) -> Result<FiberNo
         // Modified-NR sparse cache: numeric factor of the increment's first
         // tangent (sparse analogue of cached_l).
         let mut cached_sparse_num: Option<NumericCholesky> = None;
+        let mut f_int = vec![0.0; n];
 
         for _iter in 0..input.max_iter {
             total_iters += 1;
@@ -889,7 +957,7 @@ pub fn solve_fiber_nonlinear_3d(input: &FiberNonlinearInput3D) -> Result<FiberNo
             // Below SPARSE_THRESHOLD the tangent is assembled dense (n×n); at
             // or above it, as lower-triangle COO triplets that feed the CSC
             // sparse solve directly — no O(n²) dense matrix is ever built.
-            let mut f_int = vec![0.0; n];
+            f_int.fill(0.0);
             let sparse_tangent = ns >= super::linear::SPARSE_THRESHOLD;
             let mut k_t: Vec<f64> = Vec::new();
             let mut trip_rows: Vec<usize> = Vec::new();
@@ -965,6 +1033,7 @@ pub fn solve_fiber_nonlinear_3d(input: &FiberNonlinearInput3D) -> Result<FiberNo
             let rel_error = if f_norm > 1e-30 { r_norm / f_norm } else { r_norm };
 
             if rel_error < input.tolerance {
+                f_int_converged = f_int.clone();
                 nr_converged = true;
                 break;
             }
@@ -976,12 +1045,9 @@ pub fn solve_fiber_nonlinear_3d(input: &FiberNonlinearInput3D) -> Result<FiberNo
             };
 
             let delta_u_indep = if sparse_tangent {
-                // Sparse path: CSC free block built directly from the
-                // lower-triangle triplets (no dense n×n tangent), then
-                // sparse Cholesky with cached symbolic.
-                if input.modified_nr {
+                let sparse_res = if input.modified_nr {
                     if let Some(ref num) = cached_sparse_num {
-                        sparse_cholesky_solve(num, &r_s)
+                        Ok(sparse_cholesky_solve(num, &r_s))
                     } else {
                         let k_csc = tangent_free_sparse_triplets(
                             &trip_rows, &trip_cols, &trip_vals, nf, &cs,
@@ -991,12 +1057,10 @@ pub fn solve_fiber_nonlinear_3d(input: &FiberNonlinearInput3D) -> Result<FiberNo
                             Some(num) => {
                                 let result = sparse_cholesky_solve(&num, &r_s);
                                 cached_sparse_num = Some(num);
-                                result
+                                Ok(result)
                             }
                             None => {
-                                // Sparse factorization failed — fall back to full NR
-                                // for this increment (same semantics as dense path).
-                                solve_tangent_sparse(&k_csc, &r_s, &mut sparse_sym_cache)?
+                                solve_tangent_sparse(&k_csc, &r_s, &mut sparse_sym_cache)
                             }
                         }
                     }
@@ -1004,7 +1068,18 @@ pub fn solve_fiber_nonlinear_3d(input: &FiberNonlinearInput3D) -> Result<FiberNo
                     let k_csc = tangent_free_sparse_triplets(
                         &trip_rows, &trip_cols, &trip_vals, nf, &cs,
                     );
-                    solve_tangent_sparse(&k_csc, &r_s, &mut sparse_sym_cache)?
+                    solve_tangent_sparse(&k_csc, &r_s, &mut sparse_sym_cache)
+                };
+                match sparse_res {
+                    Ok(u) => u,
+                    Err(e) => {
+                        if converged_factor > 0.0 {
+                            nr_converged = false;
+                            break;
+                        } else {
+                            return Err(e);
+                        }
+                    }
                 }
             } else if input.modified_nr {
                 if let Some((ref l, sz)) = cached_l {
@@ -1027,8 +1102,17 @@ pub fn solve_fiber_nonlinear_3d(input: &FiberNonlinearInput3D) -> Result<FiberNo
                     } else {
                         let mut k_work = k_s;
                         let mut f_work = r_s;
-                        lu_solve(&mut k_work, &mut f_work, ns)
-                            .ok_or("Singular tangent stiffness in 3D fiber N-R")?
+                        match lu_solve(&mut k_work, &mut f_work, ns) {
+                            Some(u) => u,
+                            None => {
+                                if converged_factor > 0.0 {
+                                    nr_converged = false;
+                                    break;
+                                } else {
+                                    return Err("Singular tangent stiffness in 3D fiber N-R".into());
+                                }
+                            }
+                        }
                     }
                 }
             } else {
@@ -1045,8 +1129,17 @@ pub fn solve_fiber_nonlinear_3d(input: &FiberNonlinearInput3D) -> Result<FiberNo
                     None => {
                         let mut k_work = k_s;
                         let mut f_work = r_s;
-                        lu_solve(&mut k_work, &mut f_work, ns)
-                            .ok_or("Singular tangent stiffness in 3D fiber N-R")?
+                        match lu_solve(&mut k_work, &mut f_work, ns) {
+                            Some(u) => u,
+                            None => {
+                                if converged_factor > 0.0 {
+                                    nr_converged = false;
+                                    break;
+                                } else {
+                                    return Err("Singular tangent stiffness in 3D fiber N-R".into());
+                                }
+                            }
+                        }
                     }
                 }
             };
@@ -1065,8 +1158,14 @@ pub fn solve_fiber_nonlinear_3d(input: &FiberNonlinearInput3D) -> Result<FiberNo
 
         if !nr_converged {
             converged = false;
+            u_full.copy_from_slice(&u_converged);
+            elem_states = converged_elem_states;
             break;
         }
+
+        u_converged.copy_from_slice(&u_full);
+        converged_factor = load_factor;
+        converged_elem_states = elem_states.clone();
     }
 
     // Build results
@@ -1122,10 +1221,28 @@ pub fn solve_fiber_nonlinear_3d(input: &FiberNonlinearInput3D) -> Result<FiberNo
         vec![]
     };
 
+    // Recover reactions at restrained DOFs and spring supports
+    let f_scaled: Vec<f64> = f_total.iter().map(|&f| converged_factor * f).collect();
+    let mut f_int_rot = f_int_converged.clone();
+    let mut f_total_rot = f_scaled.clone();
+    for it in &its {
+        assembly::rotate_inclined_f_3d(&mut f_int_rot, &it.dofs, &it.r);
+        assembly::rotate_inclined_f_3d(&mut f_total_rot, &it.dofs, &it.r);
+    }
+    let nr = n - nf;
+    let mut reactions_vec = vec![0.0; nr];
+    for i in 0..nr {
+        reactions_vec[i] = f_int_rot[nf + i] - f_total_rot[nf + i];
+    }
+    let mut reactions = super::linear::build_reactions_3d_inclined(
+        &input.solver, &dof_num, &reactions_vec, &f_total_rot[nf..], nf, &u_full, &its,
+    );
+    reactions.sort_by_key(|r| r.node_id);
+
     Ok(FiberNonlinearResult3D {
         results: AnalysisResults3D {
             displacements,
-            reactions: vec![],
+            reactions,
             element_forces,
             plate_stresses: super::linear::compute_plate_stresses(&input.solver, &dof_num, &u_full, None),
             quad_stresses: super::linear::compute_quad_stresses(&input.solver, &dof_num, &u_full, None),
@@ -1141,6 +1258,7 @@ pub fn solve_fiber_nonlinear_3d(input: &FiberNonlinearInput3D) -> Result<FiberNo
         iterations: total_iters,
         converged,
         n_increments: input.n_increments,
+        load_factor: converged_factor,
         fiber_status,
     })
 }

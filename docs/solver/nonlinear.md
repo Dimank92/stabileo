@@ -61,7 +61,7 @@ Newton for that increment.
 | P-Delta | $\lVert u_{k+1}-u_k\rVert_2 / \lVert u_{k+1}\rVert_2 < \text{tol}$ (displacement, free DOFs) | caller | returns last iterate, `converged=false` |
 | Co-rotational 2D/3D | $\lVert C^{\mathsf T}R\rVert_2 / \lVert C^{\mathsf T}\lambda F\rVert_2 < \text{tol}$ (force) | caller | reports **last converged increment**, its load factor and loads |
 | Material nonlinear 2D/3D | $\lVert C^{\mathsf T}R\rVert_2 < \text{tol}\cdot\lVert \lambda F_f\rVert_2$ | $10^{-6}$ | marks `converged=false` and **continues** with the next increment (NL-17) |
-| Fiber 2D/3D | as co-rotational | $10^{-6}$ | stops, reports the **unconverged iterate** (NL-17) |
+| Fiber 2D/3D | as co-rotational | $10^{-6}$ | reports **last converged increment**, its load factor and loads (NL-17, FIXED #433) |
 | Arc-length | $\lVert C^{\mathsf T}R\rVert_2 / (\lvert\lambda\rvert\lVert F\rVert_2) < \text{tol}$ | $10^{-6}$ | halves $\Delta s$, restores the last converged state |
 | Displacement control | force test as arc-length, with $\lVert\lambda F\rVert$ floored at 1, **and** $\lvert u_c - u_c^\ast\rvert \le \text{tol}\cdot\lvert\Delta d\rvert$ | $10^{-6}$ | stops |
 | Contact | no status change in one full pass (after the first) | — | `converged=false` after `max_iter` |
@@ -695,12 +695,13 @@ Neither is called by any solver. They are library utilities, tested only in
   §2.2.
 - *Test.* `nl_pdelta_matches_beam_column_and_buckling`.
 
-**NL-17. Unconverged runs of the material-nonlinear and fiber solvers. OPEN.**
+**NL-17. Unconverged runs of the material-nonlinear and fiber solvers. PARTIALLY FIXED (#433).**
 
 - *Material nonlinear.* After an unconverged increment it carries on to the full load. It reports
   `load_factor` = last converged increment, but displacements and forces from the final,
-  unconverged iterate at full load.
-- *Fiber.* It stops and reports the unconverged iterate, without a load factor.
+  unconverged iterate at full load. OPEN.
+- *Fiber.* FIXED (#433). Stops and reports the last converged increment together with its
+  `load_factor`, displacements, committed element fiber states, and reaction balance under that load factor (matching the co-rotational solvers).
 - *Comparison.* The co-rotational solvers report the last converged state together with its
   loads.
-- *Evidence.* Code path only.
+- *Evidence.* Code path, regression tests `nl_fiber_beyond_collapse_reports_last_converged_increment` and `nl_fiber_3d_beyond_collapse_reports_last_converged_increment`.
