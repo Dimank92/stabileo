@@ -216,6 +216,26 @@ describe('a physical plate', () => {
     expect(loaded.length).toBe(copy.group.members.quads!.length);
   });
 
+  it('meets the plate beside it node to node, whatever the two sizes, and stays current', () => {
+    modelStore.clear(); historyStore.clear(); uiStore.analysisMode = 'pro';
+    const n = (x: number, y: number) => modelStore.addNode(x, y, 0);
+    const a0 = n(0, 0), a1 = n(4, 0), a2 = n(4, 4), a3 = n(0, 4), b1 = n(7, 0), b2 = n(7, 4);
+    const A = (createPlate({ outline: [a0, a1, a2, a3], materialId: 1, thickness: 0.2 }) as { id: number }).id;
+    const B = (createPlate({ outline: [a1, b1, b2, a2], materialId: 1, thickness: 0.2 }) as { id: number }).id;
+    const shared = () => {
+      const on = (q: { nodes: number[] }) => q.nodes.filter((id) => Math.abs(modelStore.nodes.get(id)!.x - 4) < 1e-9);
+      const of = (id: number) => new Set((modelStore.model.groups.get(id)!.members.quads ?? []).flatMap((q) => on(modelStore.quads.get(q)!)));
+      return { a: [...of(A)].sort(), b: [...of(B)].sort() };
+    };
+    applyPlateMeshes([planPlateMesh(A, { size: 0.5, element: 'quad', followMembers: true })!, planPlateMesh(B, { size: 0.8, element: 'quad', followMembers: true })!]);
+    expect(shared().a).toEqual(shared().b);
+    expect([plateStatus(A), plateStatus(B)]).toEqual(['current', 'current']);
+    // B meshed again at another size: it still meets A, and A is not disturbed.
+    applyPlateMeshes([planPlateMesh(B, { size: 0.3, element: 'quad', followMembers: true })!]);
+    expect(shared().a).toEqual(shared().b);
+    expect([plateStatus(A), plateStatus(B)]).toEqual(['current', 'current']);
+  });
+
   it('opens again with its outline, mesh and load', () => {
     const { id } = build();
     addPlateLoad(id, 1, 3);

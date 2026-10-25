@@ -75,13 +75,25 @@ uiStore.setPlateShellResolver(plateShellKeys);
 
 const plateModel = () => ({ nodes: modelStore.nodes, elements: modelStore.elements });
 
+/**
+ * What a plate's mesh has to meet. Members are read whole through the nodes every plate's mesh
+ * created, so meshing one plate never puts its neighbours out of date; the nodes of the other
+ * shells on its outline are points the mesh passes through, so neighbouring meshes meet node to
+ * node.
+ */
 function featuresOf(e: PlateEntry) {
   const geo = plateGeometry(plateModel(), e.group);
   if (!geo) return null;
   const loops = plateLoops(e.group);
-  const owned = new Set(loops.owned);
+  const mine = new Set(loops.owned);
+  const owned = new Set<number>();
+  for (const g of modelStore.model.groups.values()) if (plateSurfaceOf(g)) for (const n of plateLoops(g).owned) owned.add(n);
+  const myShells = new Set([...(e.group.members.quads ?? []).map((q) => `q${q}`), ...(e.group.members.plates ?? []).map((p) => `p${p}`)]);
+  const neighbours = new Set<number>();
+  for (const q of modelStore.quads.values()) if (!myShells.has(`q${q.id}`)) q.nodes.forEach((n) => neighbours.add(n));
+  for (const p of modelStore.plates.values()) if (!myShells.has(`p${p.id}`)) p.nodes.forEach((n) => neighbours.add(n));
   const loopNodes = new Set([...loops.outer, ...loops.holes.flat()]);
-  return { geo, features: externalFeatures(plateModel(), geo, owned, loopNodes) };
+  return { geo, features: externalFeatures(plateModel(), geo, owned, loopNodes, { mine, neighbours }) };
 }
 
 let statusMemo: { version: number; groups: unknown; map: Map<number, PlateStatus> } | null = null;
@@ -325,7 +337,11 @@ export function applyPlateMeshes(plans: readonly PlateMeshPlan[]): PlateMeshRepo
   for (const p of plans) if (!p.mesh) report.refused.push({ id: p.id, reason: p.refused ?? 'cannotMesh' });
   if (!ok.length) return report;
   modelStore.batch(() => {
-    for (const p of ok) {
+    for (const [k, planned] of ok.entries()) {
+      // After the first, each plate is planned again on the model as it now is, so it meets the
+      // meshes just put in beside it.
+      const p = k === 0 ? planned : (planPlateMesh(planned.id, planned.spec) ?? planned);
+      if (!p.mesh || !p.input) { report.refused.push({ id: p.id, reason: p.refused ?? 'cannotMesh' }); continue; }
       const e = plateEntry(p.id);
       if (!e) continue;
       report.droppedLocalLoads += p.localLoads;
