@@ -92,6 +92,7 @@ test('a plate drawn on an outline has no mesh, meshes from its panel, and is pic
   expect((await plates(page))[0]!.shells).toBe(await quads(page));
 
   // An area load on the plate; undo takes the mesh back, the plate stays.
+  await page.getByTestId('plate-loads-toggle').click();
   await page.getByTestId('plate-load-q').fill('2');
   await page.getByTestId('plate-load-q').press('Tab');
   await page.getByTestId('plate-load-add').click();

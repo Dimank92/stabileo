@@ -115,8 +115,8 @@
     </div>
 
     {#if one && loops}
-      <div class="pp-block">
-        <span class="pp-label">{t('plates.holes')} ({loops.holes.length})</span>
+      <details class="pp-block">
+        <summary class="pp-label">{t('plates.holes')} ({loops.holes.length})</summary>
         {#each loops.holes as h, i (i)}
           <div class="pp-line"><span class="pp-dim">{h.join(', ')}</span><button class="pp-x" onclick={() => removeHole(i)} title={t('plates.removeHole')}>×</button></div>
         {/each}
@@ -124,10 +124,10 @@
           <input class="pp-text" placeholder={t('plates.holeNodes')} bind:value={holeText} data-testid="plate-hole-nodes" />
           <button class="pp-btn" disabled={!holeText.trim()} onclick={addHole} data-testid="plate-hole-add">{t('plates.addHole')}</button>
         </div>
-      </div>
+      </details>
 
-      <div class="pp-block">
-        <span class="pp-label">{t('plates.areaLoads')}</span>
+      <details class="pp-block" open={loads.length > 0}>
+        <summary class="pp-label" data-testid="plate-loads-toggle">{t('plates.areaLoads')} ({loads.length})</summary>
         {#each loads as d (d.id)}
           {@const def = d.data as { caseId: number; q: number }}
           <div class="pp-line">
@@ -143,7 +143,7 @@
           <button class="pp-btn" onclick={addLoad} data-testid="plate-load-add">{t('plates.addLoad')}</button>
         </div>
         <p class="pp-hint">{t('plates.areaLoadHint')}</p>
-      </div>
+      </details>
     {/if}
 
     {#if message}<p class="pp-msg" data-testid="plate-message">{message}</p>{/if}
@@ -162,7 +162,7 @@
   .pp-row, .pp-line, .pp-actions, .pp-mesh-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .pp-row label { display: inline-flex; align-items: center; gap: 4px; }
   .pp-block, .pp-mesh { display: flex; flex-direction: column; gap: 4px; }
-  .pp-label { font-weight: 600; color: var(--st-text-2); }
+  .pp-label { font-weight: 600; color: var(--st-text-2); cursor: pointer; }
   .pp-name { min-width: 36px; color: var(--st-text); }
   .pp-warn { color: var(--st-warn, #d9a441); }
   .pp-hint, .pp-msg { margin: 0; color: var(--st-text-3); font-size: 0.7rem; }
