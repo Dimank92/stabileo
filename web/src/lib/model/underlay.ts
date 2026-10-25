@@ -9,6 +9,8 @@
 import type { CadDocument, CadEntity, CadPt, CadUnit } from '../cad/types';
 import { CAD_UNIT_SCALE } from '../cad/types';
 import { insertCopies } from '../cad/parse';
+import { inRegion } from './underlay-regions';
+import type { CadBBox } from '../cad/types';
 
 export interface Underlay {
   id: string;
@@ -23,6 +25,25 @@ export interface Underlay {
   visible: boolean;
   /** The layers it was read from, for the record. */
   layers?: string[];
+  /** Each segment's layer, as an index into `layers` (one per segment). Absent in older files. */
+  segLayer?: number[];
+  /** Layers not drawn: neither seen nor captured. */
+  hiddenLayers?: string[];
+  /** Layers drawn but not captured by the snaps. */
+  noSnapLayers?: string[];
+  /** Locked: its placement cannot be changed or its file replaced until unlocked. */
+  locked?: boolean;
+  /** How strongly it is drawn, 0.1 to 1 (0.9 by default on its level). */
+  opacity?: number;
+  /** The unit the file was read in, and the part of it this template is (metres, drawing coordinates). */
+  unit?: import('../cad/types').CadUnit;
+  region?: { minX: number; minY: number; maxX: number; maxY: number };
+  /** The drawing point it was laid by: (dx, dy) took it to the model point chosen. */
+  ref?: { x: number; y: number };
+  /** The entities kept for a conversion (`underlay-regions.ts`), and what the file had that is not kept. */
+  shapes?: import('./underlay-regions').UnderlayShape[];
+  leftOut?: Record<string, number>;
+  source?: string;
 }
 
 /** More than this many segments is not a plan anyone models over: the rest is left out, and said. */
@@ -32,14 +53,22 @@ const ARC_STEP = Math.PI / 18;
 
 type Xf = (p: CadPt) => CadPt;
 
-/** The segments of a drawing's entities on the layers chosen, blocks drawn through. */
-export function cadSegments(doc: CadDocument, unit: CadUnit, layers?: ReadonlySet<string>): { segments: number[]; truncated: boolean } {
+/**
+ * The segments of a drawing's entities on the layers chosen, blocks drawn through; within `box`
+ * (metres, drawing coordinates) when given. With `layerOrder`, each segment's layer as an index
+ * into it (`segLayer`).
+ */
+export function cadSegments(doc: CadDocument, unit: CadUnit, layers?: ReadonlySet<string>, opts: { box?: CadBBox | null; layerOrder?: readonly string[] } = {}): { segments: number[]; truncated: boolean; segLayer?: number[] } {
   const k = CAD_UNIT_SCALE[unit];
   const out: number[] = [];
+  const segLayer: number[] = [];
+  const order = opts.layerOrder ? new Map(opts.layerOrder.map((l, i) => [l, i])) : null;
+  let current = 0;
   let truncated = false;
   const push = (a: CadPt, b: CadPt) => {
     if (out.length / 4 >= MAX_UNDERLAY_SEGMENTS) { truncated = true; return; }
     out.push(a.x * k, a.y * k, b.x * k, b.y * k);
+    if (order) segLayer.push(current);
   };
   const arc = (xf: Xf, c: CadPt, r: number, a0: number, a1: number) => {
     const n = Math.max(2, Math.ceil(Math.abs(a1 - a0) / ARC_STEP));
@@ -99,9 +128,22 @@ export function cadSegments(doc: CadDocument, unit: CadUnit, layers?: ReadonlySe
   const id: Xf = (p) => p;
   for (const e of doc.entities) {
     if (layers && !layers.has(e.layer)) continue;
+    if (opts.box && !inRegion(e, unit, opts.box, doc)) continue;
+    current = order?.get(e.layer) ?? 0;
     draw(e, id, 0);
   }
-  return { segments: out, truncated };
+  return { segments: out, truncated, ...(order ? { segLayer } : {}) };
+}
+
+/** Whether a template's segment k is drawn, and whether it is captured by the snaps. */
+export function segmentShown(u: Underlay, k: number): boolean {
+  if (!u.hiddenLayers?.length || !u.segLayer || !u.layers) return true;
+  return !u.hiddenLayers.includes(u.layers[u.segLayer[k] ?? 0] ?? '');
+}
+export function segmentSnaps(u: Underlay, k: number): boolean {
+  if (!segmentShown(u, k)) return false;
+  if (!u.noSnapLayers?.length || !u.segLayer || !u.layers) return true;
+  return !u.noSnapLayers.includes(u.layers[u.segLayer[k] ?? 0] ?? '');
 }
 
 /** A segment's ends laid on the model. */
@@ -135,10 +177,12 @@ function indexOf(u: Underlay): PointIndex {
   const span = ext ? Math.max(ext.maxX - ext.minX, ext.maxY - ext.minY, 1) : 1;
   const cell = span / 256;
   const cells = new Map<string, Array<[number, number]>>();
-  for (let i = 0; i + 1 < u.segments.length; i += 2) {
-    const p = laidPoint(u, u.segments[i]!, u.segments[i + 1]!);
-    const key = `${Math.floor(p[0] / cell)},${Math.floor(p[1] / cell)}`;
-    (cells.get(key) ?? cells.set(key, []).get(key)!).push(p);
+  const put = (p: [number, number]) => { const key = `${Math.floor(p[0] / cell)},${Math.floor(p[1] / cell)}`; (cells.get(key) ?? cells.set(key, []).get(key)!).push(p); };
+  // Each segment's two ends and its middle, on the layers that snap.
+  for (let s = 0; s * 4 + 3 < u.segments.length; s++) {
+    if (!segmentSnaps(u, s)) continue;
+    const x1 = u.segments[s * 4]!, y1 = u.segments[s * 4 + 1]!, x2 = u.segments[s * 4 + 2]!, y2 = u.segments[s * 4 + 3]!;
+    put(laidPoint(u, x1, y1)); put(laidPoint(u, x2, y2)); put(laidPoint(u, (x1 + x2) / 2, (y1 + y2) / 2));
   }
   const idx = { cell, cells };
   indexCache.set(u, idx);
@@ -146,8 +190,9 @@ function indexOf(u: Underlay): PointIndex {
 }
 
 /**
- * The end of a visible drawing's segment nearest to (x, y) within `tol`, on the drawings laid at
- * elevation `z` (any elevation when `z` is null).
+ * The end or middle of a visible drawing's segment nearest to (x, y) within `tol`, on the drawings
+ * laid at elevation `z` (any elevation when `z` is null). Hidden layers and layers taken out of
+ * the snaps are not captured, so a point never comes from something the view does not show.
  */
 export function snapToUnderlays(list: readonly Underlay[], x: number, y: number, tol: number, z: number | null): { x: number; y: number } | null {
   let best: { x: number; y: number; d: number } | null = null;
