@@ -222,8 +222,12 @@ export function createTextSprite(
 // the CPU/GPU-memory cost that makes syncLoads rebuilds stutter, so textures
 // are shared by (text, color, fontSize). Sprites made here carry
 // userData.sharedTexture so disposeObject() leaves the shared map alive.
-const TEXTURE_CACHE_MAX = 500;
+// Above the label budget (`LABEL_BUDGET`, 2000 in results-sync.ts): a cache smaller than the
+// labels on screen evicted textures still in use, which WebGL then uploaded again every frame.
+const TEXTURE_CACHE_MAX = 4096;
 const textTextureCache = new Map<string, THREE.CanvasTexture>();
+/** One material per cached texture and sizing (see `createTextSpriteCached`), freed with its texture. */
+const labelMaterials = new Map<string, THREE.SpriteMaterial>();
 
 function labelTexture(text: string, color: string, fontSize: number, strip = false): THREE.CanvasTexture {
   const key = `${text}|${color}|${strip ? 'strip' : fontSize}`;
@@ -242,14 +246,22 @@ function labelTexture(text: string, color: string, fontSize: number, strip = fal
   textTextureCache.set(key, texture);
   if (textTextureCache.size > TEXTURE_CACHE_MAX) {
     const oldest = textTextureCache.keys().next().value!;
-    textTextureCache.get(oldest)?.dispose();
+    const gone = textTextureCache.get(oldest);
+    if (gone) {
+      // Its materials go with it: kept, they held the disposed texture and were never freed.
+      for (const sizing of ['s', 'w']) {
+        const k = `${gone.uuid}|${sizing}`;
+        labelMaterials.get(k)?.dispose();
+        labelMaterials.delete(k);
+      }
+      gone.dispose();
+    }
     textTextureCache.delete(oldest);
   }
   return texture;
 }
 
 /** Like createTextSprite but with a shared cached texture (see above). */
-const labelMaterials = new Map<string, THREE.SpriteMaterial>();
 
 export function createTextSpriteCached(
   text: string,
@@ -425,4 +437,9 @@ export function disposeObject(obj: THREE.Object3D): void {
       disposeIfPrivate(child.material);
     }
   });
+}
+
+/** The label caches' sizes, for the tests that hold them bounded. */
+export function labelCacheSizes(): { textures: number; materials: number } {
+  return { textures: textTextureCache.size, materials: labelMaterials.size };
 }
