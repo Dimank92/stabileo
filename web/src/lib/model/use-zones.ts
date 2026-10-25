@@ -89,14 +89,22 @@ export interface ZonePlan {
 }
 
 /** Whether a zone has shells under it in its plane: the load goes onto the slab, else to the members. */
+/** A zone's plan box, and whether a shell's points lie wholly outside it. */
+function boxOf(outer: ReadonlyArray<readonly number[]>) {
+  const b = outer.reduce((a, p) => ({ x0: Math.min(a.x0, p[0]!), x1: Math.max(a.x1, p[0]!), y0: Math.min(a.y0, p[1]!), y1: Math.max(a.y1, p[1]!) }), { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity });
+  return (pts: ReadonlyArray<{ x: number; y: number } | undefined>) => pts.every((p) => p!.x < b.x0 - 1e-6) || pts.every((p) => p!.x > b.x1 + 1e-6) || pts.every((p) => p!.y < b.y0 - 1e-6) || pts.every((p) => p!.y > b.y1 + 1e-6);
+}
+
 export function zoneHasShells(m: DefinitionModel, zoneId: number): boolean {
   const z = zoneOutline(m, zoneId);
   if (!z) return false;
   const zLevel = z.outer[0]![2];
+  const outside = boxOf(z.outer);
   const region = { normal: [0, 0, 1] as [number, number, number], points: z.outer, ...(z.holes.length ? { holes: z.holes } : {}) };
   const reach = (kind: 'quad' | 'plate', nodes: readonly number[]) => {
     const pts = nodes.map((id) => m.nodes.get(id));
     if (pts.some((p) => !p || Math.abs((p.z ?? 0) - zLevel) > 1e-3)) return false;
+    if (outside(pts)) return false;
     return (shellLoadForces(kind, pts as Array<{ x: number; y: number; z?: number }>, { q: 1, region })?.loadedArea ?? 0) > 1e-9;
   };
   for (const q of m.quads.values()) if (reach('quad', q.nodes)) return true;
@@ -174,9 +182,11 @@ export function zoneUnsupported(m: DefinitionModel, zoneId: number): number {
   const region = { normal: [0, 0, 1] as [number, number, number], points: z.outer, ...(z.holes.length ? { holes: z.holes } : {}) };
   let loaded = 0;
   const zl = z.outer[0]![2];
+  const outside = boxOf(z.outer);
   const add = (kind: 'quad' | 'plate', nodes: readonly number[]) => {
     const pts = nodes.map((id) => m.nodes.get(id));
     if (pts.some((p) => !p || Math.abs((p.z ?? 0) - zl) > 1e-3)) return;
+    if (outside(pts)) return;
     loaded += shellLoadForces(kind, pts as Array<{ x: number; y: number; z?: number }>, { q: 1, region })?.loadedArea ?? 0;
   };
   for (const q of m.quads.values()) add('quad', q.nodes);

@@ -63,6 +63,9 @@
   import { resolveHitUserData, shellSelectionKey } from '../lib/viewport3d/picking';
   import { plateOfShell, platesInMarquee } from '../lib/store/physical-plates';
   import { selectPiece } from '../lib/store/curved-members';
+  import { zoneDraw } from '../lib/store/zone-draw.svelte';
+  import { useZoneMap } from '../lib/store/use-zone-map.svelte';
+  import { syncUseZoneMap } from '../lib/three/use-zone-map-3d';
   import { currentLoadDrawView, isLoadDrawn } from '../lib/viewport3d/load-drawn';
   import { evaluateDiagramAt, formatDiagramValue3D, type Diagram3DKind } from '../lib/engine/diagrams-3d';
   import { certificateStore, formatBound } from '../lib/store/certificate.svelte';
@@ -1916,6 +1919,17 @@
     invalidate();
   });
 
+  // The use zones over their floors, coloured by use, state or intensity (PRO).
+  let useZonesGroup: THREE.Group | null = null;
+  $effect(() => {
+    const mode = uiStore.analysisMode === 'pro' ? useZoneMap.mode : 'off';
+    const zones = [...modelStore.model.groups.values()].filter((g) => g.kind === 'loadZone');
+    const nodes = modelStore.nodes;
+    if (!scene) return;
+    useZonesGroup = syncUseZoneMap(scene, useZonesGroup, zones, nodes, mode);
+    invalidate();
+  });
+
   // The structural grid, drawn on the active level (PRO).
   function syncStructGrid() {
     const grid = uiStore.analysisMode === 'pro' ? modelStore.grid : undefined;
@@ -3221,6 +3235,22 @@
 
     raycaster.setFromCamera(mouse, camera);
     raycaster.camera = camera;
+
+    // ── Drawing a use zone: a click is a point of its outline, captured as a new node would be ──
+    if (zoneDraw.active) {
+      const place = nodePlacement3D(e);
+      if (place) {
+        const p = place.kind === 'onNode' ? modelStore.nodes.get(place.nodeId)
+          : place.kind === 'onMember' ? (() => {
+            const el = modelStore.elements.get(place.elementId);
+            const i = el ? modelStore.nodes.get(el.nodeI) : undefined, j = el ? modelStore.nodes.get(el.nodeJ) : undefined;
+            return i && j ? { x: i.x + (j.x - i.x) * place.t, y: i.y + (j.y - i.y) * place.t } : undefined;
+          })()
+            : { x: place.p.x, y: place.p.y };
+        if (p) zoneDraw.add({ x: p.x, y: p.y });
+      }
+      return;
+    }
 
     // ── Shell node-pick mode: clicks collect node ids for a shell creator ──
     if (uiStore.shellNodePick.active) {

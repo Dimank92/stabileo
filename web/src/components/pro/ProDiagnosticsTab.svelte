@@ -7,7 +7,7 @@
   import { mergeFindings, selectionOf, shellRef } from '../../lib/engine/model-findings';
   import { reviewModelSanity, sanityDiagnostics } from '../../lib/engine/model-sanity';
   import { diagnosticsWarning } from '../../lib/store/diagnostics-warning.svelte';
-  import { plateDiagnostics } from '../../lib/store/plate-diagnostics';
+  import { plateDiagnostics, zoneDiagnostics } from '../../lib/store/plate-diagnostics';
 
   // Opening Diagnostics is itself an interaction: the user has come to look, so the chip is
   // allowed to speak from here on even if nothing else has happened yet.
@@ -79,7 +79,7 @@
     const fromGates = is3D ? resultsStore.structuredDiagnostics3D : resultsStore.structuredDiagnostics;
     // The modelling objects above the analysis entities: physical plates and their meshes.
     void modelStore.modelVersion; void modelStore.model.groups;
-    const objects = is3D ? plateDiagnostics(t) : [];
+    const objects = is3D ? [...plateDiagnostics(t), ...zoneDiagnostics(t)] : [];
     return [...objects, ...mergeFindings([...autoModelDiags, ...sanityDiags], general, solver, fromGates)];
   });
 
@@ -129,6 +129,15 @@
       uiStore.selectMode = 'shells';
       uiStore.selectPlates(plates);
       uiStore.proActiveTab = 'shells';
+      frameSelection();
+      return;
+    }
+    // A use zone: its outline's nodes selected, in the loads panel where its use is stated.
+    const zones = (diag.objects ?? []).filter((o) => o.kind === 'zone').map((o) => o.id);
+    if (zones.length) {
+      const nodes = zones.flatMap((id) => modelStore.model.groups.get(id)?.members.nodes ?? []);
+      uiStore.setSelection(new Set(nodes), new Set(), false);
+      uiStore.proActiveTab = 'loads';
       frameSelection();
       return;
     }

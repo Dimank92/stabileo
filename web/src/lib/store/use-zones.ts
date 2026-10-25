@@ -83,7 +83,7 @@ export function confirmZoneUse(ids: readonly number[]): void {
  * layers given, with the room label inside it, if any (texts are not kept as shapes: labels come
  * from `labels`, already laid).
  */
-export function templateOutlines(u: Underlay, layers: readonly string[], labels: Array<{ x: number; y: number; text: string }> = []): Array<{ points: Array<{ x: number; y: number }>; label?: string }> {
+export function templateOutlines(u: Underlay, layers: readonly string[], labels: Array<{ x: number; y: number; text: string }> = templateLabels(u)): Array<{ points: Array<{ x: number; y: number }>; label?: string }> {
   const L = new Set(layers.map((l) => (u.layers ?? []).indexOf(l)));
   const out: Array<{ points: Array<{ x: number; y: number }>; label?: string }> = [];
   for (const sh of u.shapes ?? []) {
@@ -93,6 +93,11 @@ export function templateOutlines(u: Underlay, layers: readonly string[], labels:
     out.push({ points: pts, ...(inside ? { label: inside.text } : {}) });
   }
   return out;
+}
+
+/** A template's texts, laid on the model: the labels its closed outlines may hold. */
+export function templateLabels(u: Underlay): Array<{ x: number; y: number; text: string }> {
+  return (u.shapes ?? []).flatMap((sh) => (sh.k === 't' ? [{ ...(([x, y]) => ({ x, y }))(laidPoint(u, sh.at[0], sh.at[1])), text: sh.text }] : []));
 }
 
 function pointIn(p: { x: number; y: number }, poly: Array<{ x: number; y: number }>): boolean {

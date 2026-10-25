@@ -161,11 +161,14 @@ export function expandDefinition(m: DefinitionModel, def: FloorLoadDef, own: Gro
     };
     // In a zone, only the shells it reaches: every shell of its plane was given a load, those
     // outside it a load of nothing.
+    // The zone's box in plan: a shell wholly outside it is not reached, without integrating it.
+    const box = zone ? zone.outer.reduce((b, p) => ({ x0: Math.min(b.x0, p[0]), x1: Math.max(b.x1, p[0]), y0: Math.min(b.y0, p[1]), y1: Math.max(b.y1, p[1]) }), { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity }) : null;
     const reached = (kind: 'quad' | 'plate', nodes: number[] | undefined) => {
       if (!nodes) return false;
       if (!extra.region) return true;
       const pts = nodes.map((id) => m.nodes.get(id));
       if (pts.some((p) => !p)) return false;
+      if (box && (pts.every((p) => p!.x < box.x0 - TOL) || pts.every((p) => p!.x > box.x1 + TOL) || pts.every((p) => p!.y < box.y0 - TOL) || pts.every((p) => p!.y > box.y1 + TOL))) return false;
       return (shellLoadForces(kind, pts as Array<{ x: number; y: number; z?: number }>, { q: 1, region: extra.region })?.loadedArea ?? 0) > 1e-9;
     };
     for (const id of tg.quads) if (reached('quad', m.quads.get(id)?.nodes)) loads.push({ type: 'surface3d', data: { id: 0, quadId: id, q: def.q, ...extra, ...mark } });
