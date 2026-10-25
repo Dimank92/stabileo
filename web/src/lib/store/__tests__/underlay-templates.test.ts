@@ -121,7 +121,8 @@ describe('templates from a DXF with two plans', () => {
     const again = planConversion(ub, opts, modelStore.model);
     expect(again.beams.length + again.arcs.length).toBe(0);
     expect(again.existing).toBeGreaterThanOrEqual(6);
-    applyConversion(ub, { ...again, columns: [] }, { beamSection: 1, columnSection: 1, materialId: 1, tol: 0.02, columnFootZ: 3, memberLayers: ['VIGAS'], columnLayers: ['PILARES'] });
+    expect(again.columns).toHaveLength(0);
+    applyConversion(ub, again, { beamSection: 1, columnSection: 1, materialId: 1, tol: 0.02, columnFootZ: 3, memberLayers: ['VIGAS'], columnLayers: ['PILARES'] });
     expect({ nodes: modelStore.nodes.size, elements: modelStore.elements.size }).toEqual(census);
   });
 

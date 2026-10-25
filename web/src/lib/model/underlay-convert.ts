@@ -192,6 +192,17 @@ export function planConversion(u: Underlay, o: ConvertOptions, m: ConvertModel):
     const c = circle(s.a, s.mid, s.b);
     return !!c && arcEnds.some((x) => ((d2(x.a, s.a) <= o.tol && d2(x.b, s.b) <= o.tol) || (d2(x.a, s.b) <= o.tol && d2(x.b, s.a) <= o.tol)) && d2(x.c, c.c) <= o.tol && Math.abs(x.r - c.r) <= o.tol);
   };
+  // A column already there: a member from the foot to the template's level at the same point.
+  if (o.columnFootZ !== null) {
+    const foot = o.columnFootZ;
+    const upright = [...m.elements.values()].flatMap((e) => {
+      const a = m.nodes.get(e.nodeI), b = m.nodes.get(e.nodeJ);
+      if (!a || !b) return [];
+      const [lo, hi] = (a.z ?? 0) <= (b.z ?? 0) ? [a, b] : [b, a];
+      return Math.abs((lo.z ?? 0) - foot) <= o.tol && Math.abs((hi.z ?? 0) - u.z) <= o.tol && d2([lo.x, lo.y], [hi.x, hi.y]) <= o.tol ? [[lo.x, lo.y] as P2] : [];
+    });
+    plan.columns = plan.columns.filter((c) => { const there = upright.some((p) => d2(p, c.at) <= o.tol); if (there) plan.existing++; return !there; });
+  }
   for (const s of kept) { if (nearExisting(s.a, s.b)) plan.existing++; else plan.beams.push(s); }
   for (const s of keptArcs) { if (arcExisting(s)) plan.existing++; else plan.arcs.push(s); }
 
