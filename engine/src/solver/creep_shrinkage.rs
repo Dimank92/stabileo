@@ -110,6 +110,9 @@ pub fn ec2_creep_coefficient(params: &ConcreteCreepParams, t_days: f64) -> f64 {
     let beta_fcm = 16.8 / fc.sqrt();
 
     // β(t0) with cement class adjustment
+    // The solvers refuse any other class (`validate_creep_params`); an
+    // unknown one here is treated as "N" only for direct callers of this
+    // coefficient function.
     let s = match params.cement_class.as_str() {
         "S" => 0.38,
         "R" => 0.20,
@@ -160,9 +163,29 @@ pub fn ec2_shrinkage_strain(params: &ConcreteCreepParams, t_days: f64) -> f64 {
     eps_cd0 * beta_ds + eps_ca_inf * beta_as
 }
 
+/// Accepted cement classes (EN 1992-1-1 B.1).
+pub const CEMENT_CLASSES: [&str; 3] = ["S", "N", "R"];
+
+/// Refuse an unknown cement class instead of silently using "N".
+fn validate_creep_params(params: &HashMap<String, ConcreteCreepParams>) -> Result<(), String> {
+    let mut keys: Vec<&String> = params.keys().collect();
+    keys.sort();
+    for k in keys {
+        let c = &params[k].cement_class;
+        if !CEMENT_CLASSES.contains(&c.as_str()) {
+            return Err(format!(
+                "creep parameters of material {k}: unknown cement class '{c}'; accepted: {}",
+                CEMENT_CLASSES.join(", ")
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Solve time-dependent 2D analysis with creep and shrinkage.
 pub fn solve_creep_shrinkage_2d(input: &CreepShrinkageInput) -> Result<CreepShrinkageResult, String> {
     super::linear::validate_input_2d(&input.solver)?;
+    validate_creep_params(&input.creep_params)?;
 
     let dof_num = DofNumbering::build_2d(&input.solver);
     if dof_num.n_free == 0 {
@@ -175,11 +198,11 @@ pub fn solve_creep_shrinkage_2d(input: &CreepShrinkageInput) -> Result<CreepShri
 
     // Build O(1) lookup maps by numeric id
     let node_by_id: HashMap<usize, &SolverNode> =
-        input.solver.nodes.values().map(|n| (n.id, n)).collect();
+        crate::ordered::values(&input.solver.nodes).map(|n| (n.id, n)).collect();
     let section_by_id: HashMap<usize, &SolverSection> =
-        input.solver.sections.values().map(|s| (s.id, s)).collect();
+        crate::ordered::values(&input.solver.sections).map(|s| (s.id, s)).collect();
     let material_by_id: HashMap<usize, &SolverMaterial> =
-        input.solver.materials.values().map(|m| (m.id, m)).collect();
+        crate::ordered::values(&input.solver.materials).map(|m| (m.id, m)).collect();
 
     // Initial elastic solution (used for sustained stress baseline). The
     // structure is prepared once: only the load vector changes between steps
@@ -218,7 +241,7 @@ pub fn solve_creep_shrinkage_2d(input: &CreepShrinkageInput) -> Result<CreepShri
         // Build creep/shrinkage equivalent loads
         let mut cs_loads = Vec::new();
 
-        for elem in input.solver.elements.values() {
+        for elem in crate::ordered::values(&input.solver.elements) {
             let mat_key = elem.material_id.to_string();
             let params = match input.creep_params.get(&mat_key) {
                 Some(p) => p,
@@ -340,6 +363,7 @@ pub struct CreepShrinkageResult3D {
 /// Solve time-dependent 3D analysis with creep and shrinkage.
 pub fn solve_creep_shrinkage_3d(input: &CreepShrinkageInput3D) -> Result<CreepShrinkageResult3D, String> {
     super::linear::validate_input_3d(&input.solver)?;
+    validate_creep_params(&input.creep_params)?;
 
     let dof_num = DofNumbering::build_3d(&input.solver);
     if dof_num.n_free == 0 {
@@ -351,11 +375,11 @@ pub fn solve_creep_shrinkage_3d(input: &CreepShrinkageInput3D) -> Result<CreepSh
 
     // Build O(1) lookup maps by numeric id
     let node_by_id: HashMap<usize, &SolverNode3D> =
-        input.solver.nodes.values().map(|n| (n.id, n)).collect();
+        crate::ordered::values(&input.solver.nodes).map(|n| (n.id, n)).collect();
     let section_by_id: HashMap<usize, &SolverSection3D> =
-        input.solver.sections.values().map(|s| (s.id, s)).collect();
+        crate::ordered::values(&input.solver.sections).map(|s| (s.id, s)).collect();
     let material_by_id: HashMap<usize, &SolverMaterial> =
-        input.solver.materials.values().map(|m| (m.id, m)).collect();
+        crate::ordered::values(&input.solver.materials).map(|m| (m.id, m)).collect();
 
     // Initial elastic solution (used for sustained stress baseline). As in
     // 2D, the structure is prepared once and each step re-solves loads only.
@@ -385,7 +409,7 @@ pub fn solve_creep_shrinkage_3d(input: &CreepShrinkageInput3D) -> Result<CreepSh
         let mut max_eps_sh = 0.0_f64;
         let mut cs_loads = Vec::new();
 
-        for elem in input.solver.elements.values() {
+        for elem in crate::ordered::values(&input.solver.elements) {
             let mat_key = elem.material_id.to_string();
             let params = match input.creep_params.get(&mat_key) {
                 Some(p) => p,

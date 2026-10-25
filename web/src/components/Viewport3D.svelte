@@ -16,6 +16,7 @@
   import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
   import { modelStore, uiStore, resultsStore, historyStore, dsmStepsStore, verificationStore } from '../lib/store';
   import { setGeometryDrag } from '../lib/store/physical-frame';
+  import { discretizationStore } from '../lib/store/discretization.svelte';
   import { syncStructuralGrid } from '../lib/three/structural-grid-3d';
   import { syncUnderlays } from '../lib/three/underlay-3d';
   import { syncFootings } from '../lib/three/footings-3d';
@@ -1760,6 +1761,8 @@
     resultsStore.colorMapKind;
     resultsStore.shellContourComponent;
     contourOptions.signature;
+    discretizationStore.showMap;
+    discretizationStore.estimate;
     // Deformed contours follow the deformed view's scale.
     if (contourOptions.onDeformed) resultsStore.deformedScale;
     // Shell meshes rebuild on render-mode / geometry change → re-apply contour.

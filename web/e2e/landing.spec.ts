@@ -48,6 +48,7 @@ const SECTIONS = [
   'pro-calc',
   'pro-design',
   'ai',
+  'verification',
   'education',
   'pricing',
   'blog',
@@ -74,12 +75,31 @@ async function bootLanding(page: Page, opts: { locale?: string; manual?: boolean
 }
 
 test.describe('@landing landing page', () => {
+  test('the nav\'s Blog item opens the blog, not the teaser at the foot of the page', async ({ page }) => {
+    // It used to be a button scrolling to the #blog section. Now a real link:
+    // crawlable, middle-clickable, in the reader's language.
+    await bootLanding(page, { locale: 'es' });
+    const blog = page.locator('.landing nav.nav .nav-links a.nav-link');
+    await expect(blog).toHaveText('Blog');
+    await expect(blog).toHaveAttribute('href', '/es/blog/');
+    // Nav items are written as words, not as the uppercase section eyebrows
+    // ("PRECIOS" used to sit between "Educativo" and "Blog").
+    await expect(page.locator('.landing nav.nav .nav-links button', { hasText: 'Precios' })).toHaveText('Precios');
+    await blog.click();
+    await expect(page).toHaveURL(/\/es\/blog\/$/);
+    await expect(page.locator('.post-card')).not.toHaveCount(0);
+  });
+
   test('renders the landing overlay at /', async ({ page }) => {
+    // The engine is never fetched for a public page: it is half of what the landing used to download.
+    const wasm: string[] = [];
+    page.on('request', (r) => { if (r.url().endsWith('.wasm')) wasm.push(r.url()); });
     await bootLanding(page);
 
     await expect(page.locator('.landing')).toBeVisible();
-    // The application stays mounted behind the overlay rather than unmounting.
-    await expect(page.locator('.app-container.hidden-behind-landing')).toHaveCount(1);
+    // The application is not loaded behind the landing (Root.svelte): it loads on the first app route.
+    await expect(page.locator('.app-container')).toHaveCount(0);
+    expect(wasm).toEqual([]);
 
     const h1 = page.locator('.landing h1');
     await expect(h1).toHaveCount(1);
@@ -417,7 +437,7 @@ test.describe('@landing landing page', () => {
    */
   test.describe('metadata', () => {
     const SOCIAL = 'https://stabileo.com/og/stabileo-social.png';
-    const EN_TITLE = 'Stabileo — Structural analysis, in a browser tab.';
+    const EN_TITLE = 'Stabileo — Free structural analysis software, in your browser';
 
     function readHead(page: Page) {
       return page.evaluate(() => {
@@ -459,7 +479,7 @@ test.describe('@landing landing page', () => {
        * file a crawler receives already holds the page's real metadata — there
        * is no longer a generic head to be refined later.
        */
-      expect(one(h, 'description')).toMatch(/open structural-analysis platform/i);
+      expect(one(h, 'description')).toMatch(/Free, open-source structural analysis/i);
       expect(one(h, 'theme-color')).toBe('#0c1620');
       expect(one(h, 'og:type')).toBe('website');
       // og:url names the page, and the page here is /en — the same address
@@ -530,15 +550,15 @@ test.describe('@landing landing page', () => {
 
       expect(h.headTitles).toBe(1);
       expect(h.lang).toBe('es');
-      expect(h.title).toBe('Stabileo — Cálculo estructural, en una pestaña del navegador.');
+      expect(h.title).toBe('Stabileo — Software de cálculo estructural gratis, en el navegador');
       expect(one(h, 'og:title')).toBe(h.title);
       expect(one(h, 'og:locale')).toBe('es_AR');
       expect(h.meta['og:locale:alternate']).toEqual(['en_US', 'pt_BR']);
       expect(h.canonicals).toEqual(['https://stabileo.com/es/']);
       // The description is the hero lead, which now carries the positioning:
       // a free, open platform with three modes, rather than live re-solving.
-      expect(one(h, 'description')).toMatch(/plataforma abierta de análisis estructural/);
-      expect(one(h, 'description')).toMatch(/plataforma abierta de análisis estructural/);
+      expect(one(h, 'description')).toMatch(/Programa de cálculo estructural gratis/);
+      expect(one(h, 'description')).toMatch(/Programa de cálculo estructural gratis/);
       expect(one(h, 'twitter:description')).toBe(one(h, 'description'));
       // The canonical DOES vary by locale now: each language is its own
       // indexable page, which is the whole reason the prefixes exist.
@@ -553,7 +573,7 @@ test.describe('@landing landing page', () => {
 
       expect(h.headTitles).toBe(1);
       expect(h.lang).toBe('pt');
-      expect(h.title).toBe('Stabileo — Cálculo estrutural, numa aba do navegador.');
+      expect(h.title).toBe('Stabileo — Software de cálculo estrutural grátis, no navegador');
       expect(one(h, 'og:title')).toBe(h.title);
       expect(one(h, 'og:locale')).toBe('pt_BR');
       expect(h.meta['og:locale:alternate']).toEqual(['en_US', 'es_AR']);
@@ -580,7 +600,7 @@ test.describe('@landing landing page', () => {
       await bootLanding(page, { manual: false });
       const h = await readHead(page);
       expect(h.lang).toBe('es');
-      expect(h.title).toMatch(/Cálculo estructural/);
+      expect(h.title).toMatch(/cálculo estructural/);
       expect(h.headTitles).toBe(1);
       await ctx.close();
     });
@@ -609,7 +629,7 @@ test.describe('@landing landing page', () => {
        * file a crawler receives already holds the page's real metadata — there
        * is no longer a generic head to be refined later.
        */
-      expect(one(h, 'description')).toMatch(/open structural-analysis platform/i);
+      expect(one(h, 'description')).toMatch(/Free, open-source structural analysis/i);
     });
 
     test('the social card exists, resolves, and is a 1200x630 PNG', async ({ page }) => {
@@ -631,7 +651,17 @@ test.describe('@landing landing page', () => {
       // pass; this is the guard that says so.
       await bootLanding(page);
       await expect(page.locator('.landing')).toBeVisible();
-      await expect(page.locator('.app-container.hidden-behind-landing')).toHaveCount(1);
+      await expect(page.locator('.app-container')).toHaveCount(0);
+
+      // Entering the application from the landing loads it in place.
+      await page.locator('.landing .btn-primary').first().click();
+      await expect(page).toHaveURL(/\/app\/basic/);
+      await expect(page.locator('.app-container')).toBeVisible();
+
+      // A shared model at the root (`/#data=…`) still loads the application, which restores it
+      // behind the landing as it always did.
+      await page.goto('/#data=x');
+      await expect(page.locator('.app-container')).toHaveCount(1);
 
       await page.goto('/app/basic');
       await expect(page.locator('.landing')).toHaveCount(0);
@@ -901,7 +931,7 @@ test.describe('@landing every language gets the whole deck', () => {
   const FREE = { es: 'Gratis', en: 'Free', pt: 'Grátis' } as const;
 
   for (const locale of ['es', 'en', 'pt'] as const) {
-    test(`${locale}: eight sections, no raw keys, and a priced table`, async ({ page }) => {
+    test(`${locale}: nine sections, no raw keys, and a priced table`, async ({ page }) => {
       await bootLanding(page, { locale });
 
       const order = await page

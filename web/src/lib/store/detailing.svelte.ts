@@ -11,6 +11,7 @@
  */
 
 import { memberConformityGates } from './detailing-conformity-gates';
+import { errorText } from './engine-action';
 import { modelStore } from './model.svelte';
 import { designFingerprint } from './design-fingerprint';
 import { isModelStale, revisionAfterChange, withStamps } from './detailing-stamps';
@@ -372,8 +373,7 @@ function createDetailingStore() {
         void requestAutosave('detailing');
         return result;
       } catch (e) {
-        lastError = String(e instanceof Error ? e.message : e);
-        return null;
+        lastError = errorText(e); return null; // an engine error in the reader's language
       } finally {
         generating = false;
       }
@@ -535,8 +535,7 @@ function createDetailingStore() {
         void requestAutosave('floorDesign');
         return result;
       } catch (e) {
-        lastError = String(e instanceof Error ? e.message : e);
-        return null;
+        lastError = errorText(e); return null; // an engine error in the reader's language
       } finally {
         generating = false;
       }

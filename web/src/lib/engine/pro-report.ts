@@ -3,6 +3,7 @@
 // (`lib/report/memoria`).
 // Uses window.print() for PDF output (browser native)
 
+import { provenanceBlockHtml, type ResultProvenance as ProvenanceRecord, type ProvenanceLabels } from '../provenance/result-provenance';
 import { memberSectionLabel } from '../section/variable';
 import { plainNumber } from '../utils/units';
 import katex from 'katex';
@@ -88,6 +89,8 @@ export interface ReportResultFigures {
 }
 
 export interface ReportData {
+  /** Which build produced the results from which model and settings (`provenance/result-provenance.ts`). */
+  resultProvenance?: { record: ProvenanceRecord; labels: ProvenanceLabels };
   /** The job's data, for the cover. */
   projectInfo?: ProjectInfo;
   /** The result sets the envelope reads (the active combinations, else the cases). */
@@ -776,6 +779,7 @@ export function generateReportHtml(data: ReportData): string {
     }
   }
 
+  if (data.resultProvenance) html.push(provenanceBlockHtml(data.resultProvenance.record, data.resultProvenance.labels));
   html.push(`</body></html>`);
   return html.join('\n');
 }

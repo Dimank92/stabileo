@@ -14,7 +14,7 @@ test.describe('@smoke PRO project workbook', () => {
   test.describe.configure({ timeout: 180_000 });
 
   test('downloads the model and every result at the stations asked for', async ({ pro: page }) => {
-    await expect.poll(() => page.evaluate(() => window.__stabileo.solverReady()), { timeout: 60_000 }).toBe(true);
+    await expect.poll(() => page.evaluate(() => window.__stabileo?.solverReady() ?? false), { timeout: 60_000 }).toBe(true);
     await page.getByTestId('pr-project').click();
     await page.getByTestId('pp-examples').click();
     await page.getByTestId('pp-gallery').locator('[data-example="pro-plane-frame-seismic"] .pp-ex').click();

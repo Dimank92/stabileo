@@ -1,4 +1,7 @@
 <script lang="ts">
+  // First: every dictionary entry, before anything here renders (the store starts with the public
+  // pages' entries only; Root.svelte loads this component on the first app route).
+  import './lib/i18n/full-dictionaries';
   import { seedProStarterLibrary } from './lib/pro/pro-starter-library';
   import ProQuickEdit from './components/pro/ProQuickEdit.svelte';
   import { is3DWorkspace } from './lib/utils/workspace';
@@ -22,6 +25,7 @@
   import SectionEditor from './components/SectionEditor.svelte';
   import { modelStore, uiStore, resultsStore, dsmStepsStore, fmStepsStore, tabManager, historyStore } from './lib/store';
   import { explainedSteps } from './lib/store/explained-steps.svelte';
+  import { markEngineReady, markEngineFailed } from './lib/store/engine-status.svelte';
   import { EDIT_TOOLS } from './lib/store/ui.svelte';
   import { syncModelTabWithResults } from './lib/store/view-mode';
   import { t, i18n, setLocale } from './lib/i18n';
@@ -34,7 +38,7 @@
   import {
     loadAutosave, clearAutosave,
     loadWorkspaceFromLocalStorage, saveWorkspaceToLocalStorage,
-    downloadCanvasPNG, downloadDataUrlPNG, noteAxisConventionMigrationIfNeeded, noteBasicSelfWeightRuleIfNeeded,
+    downloadCanvasPNG, downloadDataUrlPNG, onProjectOpened, noteBasicSelfWeightRuleIfNeeded,
     type DedalFile,
   } from './lib/store/file';
   import { requestAutosave } from './lib/store/autosave-service';
@@ -310,6 +314,9 @@
   import StressPickHint from './components/stress/StressPickHint.svelte';
   import ColourScaleLegend from './components/ColourScaleLegend.svelte';
   import SwitchTo2DDialog from './components/SwitchTo2DDialog.svelte';
+  import RecheckNotice from './components/RecheckNotice.svelte';
+  import { prepareExportProvenance, pngWithProvenance } from './lib/export/provenance-attach';
+  import ReproduceDialog from './components/ReproduceDialog.svelte';
   import TabBar from './components/TabBar.svelte';
   import MobileResultsPanel from './components/MobileResultsPanel.svelte';
   import KeyboardShortcuts from './components/KeyboardShortcuts.svelte';
@@ -352,6 +359,8 @@
   import LandingPage from './components/LandingPage.svelte';
   import BlogPage from './components/blog/BlogPage.svelte';
   import { parsePublicPath, publicHref } from './lib/i18n/public-routes';
+  import { routeKind, isAppPath, isDemoPath } from './lib/public-route';
+  import { modeToPath, pathToMode, slugifyTabName, type AppMode } from './lib/app-mode';
   import { publicI18n } from './lib/i18n/store.svelte';
   import AiDrawer from './components/AiDrawer.svelte';
   import { splitAllAtNodes } from './lib/model/edit/cut-members';
@@ -362,51 +371,26 @@
     uiStore.toast(message, 'success');
   }
 
-  if (typeof window !== 'undefined') {
-    const redirectedRoute = new URLSearchParams(location.search).get('route');
-    if (redirectedRoute) {
-      /*
-       * Restored through the URL builder, not verbatim.
-       *
-       * 404.html hands the path over exactly as it was typed or shared, and
-       * putting that straight back in the address bar reinstates whatever
-       * shape it had — including the unslashed form the site no longer
-       * publishes. A reader arriving on an old link would then be looking at
-       * an address that disagrees with the page's own canonical.
-       */
-      const { locale, path } = parsePublicPath(redirectedRoute.split('?')[0]);
-      const normalised = locale ? publicHref(path, locale) : redirectedRoute;
-      // 404.html keeps the fragment out of `route` (a shared model's `#data=` is too long for
-      // the host's request line), so it is still on this address and goes back after the path.
-      history.replaceState(null, '', normalised + (redirectedRoute.includes('#') ? '' : location.hash));
-    }
-  }
-
-  function isAppRoute(pathname: string) {
-    return pathname === '/app' || pathname === '/app/' || pathname.startsWith('/app/');
-  }
-
-  function isDemoRoute(pathname: string) {
-    return pathname === '/demo' || pathname === '/demo/';
-  }
+  // The 404.html redirect is restored by main.ts (`restoreRedirectedRoute`) before this mounts,
+  // and the route rules are `lib/public-route.ts`'s, the same ones Root.svelte reads.
+  const isAppRoute = isAppPath;
+  const isDemoRoute = isDemoPath;
 
   /**
    * The public routes, read through their language prefix.
    *
    * `/es/blog/x` and `/blog/x` are the same route; the first names its
    * language and the second is an old link that still has to work. Everything
-   * below asks these two rather than matching `location.pathname` directly,
+   * below asks these rather than matching `location.pathname` directly,
    * because a prefix would otherwise turn every public page into an app route.
    */
   function publicRoute(pathname: string) {
     return parsePublicPath(pathname);
   }
 
-  /** `/blog`, `/blog/` and `/blog/<slug>`, under any language prefix. */
+  /** `/blog`, `/blog/<slug>` and the standing pages (/cirsoc, /reliability, …), under any prefix. */
   function isBlogRoute(pathname: string) {
-    const { path } = publicRoute(pathname);
-    // `/blog/` is covered by the prefix test; only the bare form needs naming.
-    return path === '/blog' || path.startsWith('/blog/');
+    return routeKind({ pathname, search: '', hash: '' }).kind === 'blog';
   }
 
   /**
@@ -422,30 +406,6 @@
     if (locale && locale !== publicI18n.locale) setLocale(locale);
   }
   adoptLocaleFromPath();
-
-  type AppMode = 'basico' | 'educativo' | 'pro';
-
-  function slugifyTabName(name: string) {
-    return (name || '')
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'new-structure';
-  }
-
-  function modeToPath(mode: AppMode) {
-    if (mode === 'educativo') return '/app/education';
-    if (mode === 'pro') return '/app/pro';
-    return '/app/basic';
-  }
-
-  function pathToMode(pathname: string): AppMode {
-    if (pathname === '/app/pro' || pathname === '/app/pro/') return 'pro';
-    if (pathname === '/app/education' || pathname === '/app/education/') return 'educativo';
-    if (pathname === '/app/basic' || pathname === '/app/basic/') return 'basico';
-    return 'basico';
-  }
 
   function replaceAppUrl(mode: AppMode, tabName?: string) {
     const url = new URL(location.href);
@@ -586,10 +546,12 @@
     return tabManager.tabs.find(tab => slugifyTabName(tab.name) === tabSlug) ?? null;
   }
 
+  /**
+   * The landing, unless the address is the application's or the blog's. The fragment is not read:
+   * a shared model at the root (`/#data=…`) shows the landing while it is restored behind it.
+   */
   function shouldShowLanding() {
-    const params = new URLSearchParams(location.search);
-    return !params.has('embed') && !isAppRoute(location.pathname) && !isDemoRoute(location.pathname)
-      && !isBlogRoute(location.pathname);
+    return routeKind({ pathname: location.pathname, search: location.search, hash: '' }).kind === 'landing';
   }
 
   let showLanding = $state(shouldShowLanding());
@@ -741,7 +703,7 @@
       modelStore.model.name = autosaveData.name;
       // Same convention note as a .ded open — an autosave predating the metadata
       // is restored under the corrected convention, so warn if it's a legacy 3D model.
-      noteAxisConventionMigrationIfNeeded(autosaveData.snapshot, autosaveData.analysisMode);
+      onProjectOpened(autosaveData.snapshot, autosaveData.analysisMode);
       // Restore analysis mode and axis convention from autosave
       if (autosaveData.analysisMode) uiStore.analysisMode = autosaveData.analysisMode;
       if (autosaveData.axisConvention3D) uiStore.axisConvention3D = autosaveData.axisConvention3D;
@@ -880,12 +842,16 @@
     if (typeof panel === 'string') openBasicPanel(panel, { toggle: false });
   }
 
-  function handleExportPNG() {
+  async function handleExportPNG() {
     // Captioned, with the colour scale drawn into the image (`lib/export/figure.ts`).
     const fig = captureFigure();
-    if (fig) { downloadDataUrlPNG(fig.dataUrl); return; }
-    const canvas = viewportCanvas();
-    if (canvas) downloadCanvasPNG(canvas);
+    const canvas = fig ? null : viewportCanvas();
+    // The picture carries its provenance (a PNG tEXt chunk), prepared like every export's.
+    const record = await prepareExportProvenance();
+    if (!record) return;
+    const embed = (png: Uint8Array) => pngWithProvenance(png, record);
+    if (fig) { downloadDataUrlPNG(fig.dataUrl, embed); return; }
+    if (canvas) downloadCanvasPNG(canvas, embed);
   }
 
   onMount(() => {
@@ -900,14 +866,19 @@
       uiStore.analysisMode = '2d';
     }
 
-    // Initialize WASM solver (non-blocking, fallback to JS if it fails)
+    // Initialize the engine (non-blocking). There is no JS fallback: if it fails, every result
+    // that needs it says "engine not available", and the reader is told once here.
     import('./lib/engine/wasm-solver').then(m => m.initSolver()).then(() => {
+      markEngineReady();
       // Canonical section geometry needs the engine. Sections created or
       // loaded before it was ready could only resolve as properties-only, and
       // nothing else revisits that, so resolve them now that it is up.
       modelStore.refreshCanonicalSections();
-    }).catch(() => {
-      console.warn('WASM solver unavailable, using JS fallback');
+    }).catch((err) => {
+      const message = String((err as Error)?.message ?? err);
+      console.error('The calculation engine failed to load:', message);
+      markEngineFailed(message);
+      uiStore.toast(t('engine.unavailable'), 'error');
     });
 
     // Initialize tab manager with current state
@@ -2283,6 +2254,13 @@
   viewport-scoped act.
 -->
 <SwitchTo2DDialog bind:open={uiStore.switchTo2DPrompt} />
+
+<!--
+  The re-check notice for a project last solved with an older version, and the banner that keeps
+  its results marked stale until they are re-run (`lib/store/recheck.svelte.ts`).
+-->
+<RecheckNotice />
+<ReproduceDialog />
 
 <DxfImportDialog
   open={showDxfImport}

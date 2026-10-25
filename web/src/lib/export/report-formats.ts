@@ -87,31 +87,46 @@ export function blocksWorkbook(X: typeof Xlsx, title: string, blocks: readonly D
   return X.write(wb, { type: 'array', bookType: 'xlsx' }) as Uint8Array;
 }
 
+/**
+ * Which build produced the results the report prints, as `key: value` lines with the status line
+ * first (`export/provenance-attach.ts`). Each format carries it the way it can: CSV as `# key:
+ * value` comment lines before the header, the DOCX and the workbook as a closing table (its own
+ * sheet in the workbook). The HTML and the PDF carry the block the caller put in the html.
+ */
+export interface ReportProvenance { title: string; lines: ReadonlyArray<readonly [string, string]> }
+
+const provenanceTable = (p: ReportProvenance): DocBlock[] => [
+  { kind: 'heading', text: p.title, level: 2 },
+  { kind: 'table', head: [p.lines[0]?.[0] ?? '', p.lines[0]?.[1] ?? ''], rows: p.lines.slice(1).map(([k, v]) => [k, v]) },
+];
+const csvComments = (p?: ReportProvenance) => (p ? p.lines.map(([k, v]) => `# ${k}: ${v.replace(/[\r\n]+/g, ' ')}`).join('\r\n') + '\r\n' : '');
+
 const csvOf = (rows: string[][]) => rows.map((r) => r.map((c) => (/[;"\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(';')).join('\r\n') + '\r\n';
 
 /** The blocks' tables as CSV: one file when there is one table, a zip of them when there are more. */
-export function blocksCsv(blocks: readonly DocBlock[]): { name: 'csv' | 'zip'; bytes: Uint8Array } {
+export function blocksCsv(blocks: readonly DocBlock[], provenance?: ReportProvenance): { name: 'csv' | 'zip'; bytes: Uint8Array } {
   const tables = blocks.flatMap((b, i) => (b.kind === 'table' ? [{ b, title: [...blocks.slice(0, i)].reverse().find((x) => x.kind === 'heading') as { text: string } | undefined }] : []));
-  if (tables.length === 1) return { name: 'csv', bytes: strToU8(csvOf([tables[0]!.b.head, ...tables[0]!.b.rows])) };
+  if (tables.length === 1) return { name: 'csv', bytes: strToU8(csvComments(provenance) + csvOf([tables[0]!.b.head, ...tables[0]!.b.rows])) };
   const used = new Map<string, number>();
   return {
     name: 'zip',
     bytes: zipSync(Object.fromEntries(tables.map(({ b, title }, i) => {
       const base = (title?.text ?? `tabla-${i + 1}`).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.-]+/g, '-').slice(0, 40) || `tabla-${i + 1}`;
       const n = (used.get(base) ?? 0) + 1; used.set(base, n);
-      return [`${String(i + 1).padStart(2, '0')}-${base}${n > 1 ? `-${n}` : ''}.csv`, strToU8(csvOf([b.head, ...b.rows]))];
+      return [`${String(i + 1).padStart(2, '0')}-${base}${n > 1 ? `-${n}` : ''}.csv`, strToU8(csvComments(provenance) + csvOf([b.head, ...b.rows]))];
     }))),
   };
 }
 
 /** A report in a format, as a file: name and bytes (or null for the PDF, which the browser prints). */
-export async function reportFile(format: ReportFormat, r: { title: string; html: string; stem: string; blocks?: DocBlock[]; loadXlsx: () => Promise<typeof Xlsx | null> }): Promise<{ filename: string; mime: string; bytes: Uint8Array | string } | null> {
-  const blocks = () => r.blocks ?? htmlToBlocks(r.html);
+export async function reportFile(format: ReportFormat, r: { title: string; html: string; stem: string; blocks?: DocBlock[]; provenance?: ReportProvenance; loadXlsx: () => Promise<typeof Xlsx | null> }): Promise<{ filename: string; mime: string; bytes: Uint8Array | string } | null> {
+  const own = () => r.blocks ?? htmlToBlocks(r.html);
+  const blocks = () => (r.provenance ? [...own(), ...provenanceTable(r.provenance)] : own());
   switch (format) {
     case 'pdf': return null;
     case 'html': return { filename: `${r.stem}.html`, mime: 'text/html', bytes: r.html };
     case 'docx': return { filename: `${r.stem}.docx`, mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', bytes: docxBytes({ title: r.title, blocks: blocks(), landscape: blocks().some((b) => b.kind === 'table' && b.head.length > 7) }) };
     case 'xlsx': { const X = await r.loadXlsx(); return X ? { filename: `${r.stem}.xlsx`, mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', bytes: blocksWorkbook(X, r.title, blocks()) } : null; }
-    case 'csv': { const c = blocksCsv(blocks()); return { filename: `${r.stem}${c.name === 'zip' ? '-csv.zip' : '.csv'}`, mime: c.name === 'zip' ? 'application/zip' : 'text/csv', bytes: c.bytes }; }
+    case 'csv': { const c = blocksCsv(own(), r.provenance); return { filename: `${r.stem}${c.name === 'zip' ? '-csv.zip' : '.csv'}`, mime: c.name === 'zip' ? 'application/zip' : 'text/csv', bytes: c.bytes }; }
   }
 }

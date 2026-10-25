@@ -1,5 +1,7 @@
 <script lang="ts">
   import { centerlineInput, dynamicInput } from '../../lib/store/dynamic-input';
+  import { engineStatus } from '../../lib/store/engine-status.svelte';
+  import { isWasmReady } from '../../lib/engine/wasm-solver';
   import { userSpectrumPointsInG } from '../../lib/engine/spectral-case';
   import { lateralPatternLoads } from '../../lib/engine/pushover-pattern';
   import { incrementalOutcome, convergedPercent } from '../../lib/engine/incremental-outcome';
@@ -25,7 +27,7 @@
   import { hasLoadCarrying3D } from '../../lib/engine/solver-service';
   import { plasticInput3D } from '../../lib/engine/plastic-moments';
   import {
-    withNotionalLoads, creepSteps, concreteMaterials, stagedLoadsByCase, stagedStagesPayload,
+    withNotionalLoads, notionalLoadsRefusal, creepSteps, concreteMaterials, stagedLoadsByCase, stagedStagesPayload,
     stagedRefusal, plasticForSolve, pushoverNonSteel,
   } from '../../lib/engine/advanced-analyses';
   import { caseSolverLoads3D } from '../../lib/engine/solver-service';
@@ -315,7 +317,12 @@
   /** Damping ratio for the modal combination (CQC correlation). The spectrum is the code's. */
   let spectralXi = $state(0.05);
   const fromProject = seismicSettings?.zone !== undefined;
-  const codeSpectrum = $derived(designSpectrum({ zone: seismicZone, site: siteClass }));
+  const codeSpectrum = $derived(
+    // The spectrum is the engine's: until it is loaded the code spectrum is refused, by name.
+    (engineStatus.ready || isWasmReady())
+      ? designSpectrum({ zone: seismicZone, site: siteClass })
+      : { blocked: { key: 'engine.unavailable' }, refs: [] },
+  );
 
   function handleSpectral() {
     solveError = null;
@@ -567,7 +574,11 @@
        * only, so a frame loaded along its members took a fraction of its sway force or none
        * (78 % short on the seven-storey building). The input with them is solved as it stands.
        */
-      const { input: withN, totalH } = withNotionalLoads(buildInput({ caseDisplacements: true }), imperfRatio, imperfDir);
+      const base = buildInput({ caseDisplacements: true });
+      // Loads that would move nothing are refused, not solved and shown as the imperfect structure.
+      const refusal = notionalLoadsRefusal(base, imperfRatio, imperfDir);
+      if (refusal) throw new Error(t(refusal === 'noGravity' ? 'adv.imperfNoGravity' : 'adv.imperfRestrained').replace('{dir}', imperfDir));
+      const { input: withN, totalH } = withNotionalLoads(base, imperfRatio, imperfDir);
       // Shown in this panel only; see `handleStaged` for why it is not published.
       imperfResult = { ...asModel(solve3D(withN)), notionalTotal: totalH };
     } catch (e: any) {
@@ -627,6 +638,10 @@
   let ssiDirection = $state<'Y' | 'Z'>('Y');
   let ssiCurveType = $state<'softClay' | 'sand' | 'stiffClay'>('softClay');
   let ssiEps50 = $state(0.01);
+  /** Matlock's J (0.25–0.5; 0.5 for soft Gulf of Mexico clays): the engine refuses a curve without it. */
+  let ssiJ = $state(0.5);
+  /** API sand: static or cyclic loading sets the factor A; the engine refuses a curve without it. */
+  let ssiLoading = $state<'static' | 'cyclic'>('static');
   let ssiSu = $state(50);
   let ssiGamma = $state(18);
   let ssiDiameter = $state(0.6);
@@ -649,11 +664,11 @@
 
   function ssiCurvePayload(): Record<string, unknown> {
     const common = { gamma_eff: ssiGamma, d: ssiDiameter, depth: ssiDepth };
-    if (ssiCurveType === 'sand') return { type: 'py_sand', phi: ssiPhi, ...common };
-    return {
-      type: ssiCurveType === 'stiffClay' ? 'py_stiff_clay' : 'py_soft_clay',
-      su: ssiSu, eps_50: ssiEps50, ...common,
-    };
+    if (ssiCurveType === 'sand') return { type: 'py_sand', phi: ssiPhi, loading: ssiLoading, ...common };
+    // The engine's stiff clay is Welch & Reese's, without free water: the
+    // option says so, and the payload states it rather than leaving it assumed.
+    if (ssiCurveType === 'stiffClay') return { type: 'py_stiff_clay', su: ssiSu, eps_50: ssiEps50, j: ssiJ, free_water: false, ...common };
+    return { type: 'py_soft_clay', su: ssiSu, eps_50: ssiEps50, j: ssiJ, ...common };
   }
 
   function addSsiSpring() {
@@ -1445,10 +1460,17 @@
             <!-- Matlock/Reese both key the curve on ε50; it has no default in
                  the engine, so the run needs it. -->
             <label class="adv-label">&#949;50: <input type="number" class="adv-num" bind:value={ssiEps50} min={0.001} max={0.05} step={0.001} /></label>
+            <label class="adv-label">{t('adv.ssiJ')}: <input type="number" class="adv-num" bind:value={ssiJ} min={0.25} max={0.5} step={0.05} /></label>
           </div>
         {:else if ssiCurveType === 'sand'}
           <div class="adv-form">
-            <label class="adv-label">&#966; (deg): <input type="number" class="adv-num" bind:value={ssiPhi} min={0} max={50} step={1} /></label>
+            <label class="adv-label">&#966; (deg): <input type="number" class="adv-num" bind:value={ssiPhi} min={25} max={40} step={1} /></label>
+            <label class="adv-label">{t('adv.ssiLoading')}:
+              <select class="adv-sel" bind:value={ssiLoading}>
+                <option value="static">{t('adv.ssiStatic')}</option>
+                <option value="cyclic">{t('adv.ssiCyclic')}</option>
+              </select>
+            </label>
             <label class="adv-label">&#947;: <QuantityInput cls="adv-num" bind:value={ssiGamma} quantity="density" min={0} /></label>
             <label class="adv-label">d: <QuantityInput cls="adv-num" bind:value={ssiDiameter} quantity="length" min={0.1} /></label>
             <label class="adv-label">{t('adv.ssiDepth')}: <QuantityInput cls="adv-num" bind:value={ssiDepth} quantity="length" min={0} /></label>

@@ -796,7 +796,7 @@ export function generateColumnStack(input: ColumnStackInput): GeneratedColumnSta
       }
     }
     if (roofHook) {
-      refs.push(...standardHook(lift.bars.diameterMm, 90, 'longitudinal', input.edition).refs);
+      refs.push(...standardHook(lift.bars.diameterMm, 90, 'longitudinal').refs);
       trace.push('Terminación en cubierta: las barras longitudinales rematan con gancho a 90°.');
     }
 

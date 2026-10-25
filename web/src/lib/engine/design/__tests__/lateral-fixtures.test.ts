@@ -57,10 +57,15 @@ function lost(a: ReturnType<typeof run>['s'], b: ReturnType<typeof run>['s']) {
 describe('rc-design-qa-8', () => {
   const gravity = run(qa8, { beams: 'gravity' }), undeclared = run(qa8, null), lateral = run(qa8, { beams: 'lateral' });
 
-  it('outside the system 8 of 8; not declared 6 of 8, the 6 m beams refused on their anchorage', () => {
+  /*
+   * Not declared, the 6 m beams (5, 6) were refused on their anchorage until the verifier took the
+   * axial force acting with each moment (main's concrete in the engine): the compression they carry
+   * lifts their φMn enough for 7Ø10, whose ends anchor. With that check off they are refused again.
+   */
+  it('outside the system 8 of 8; not declared 8 of 8 too', () => {
     expect(counts(gravity.s)).toEqual({ verified: 8, searchExhausted: 0, provisionalBiaxial: 0, sectionInadequate: 0 });
-    expect(counts(undeclared.s)).toEqual({ verified: 6, searchExhausted: 2, provisionalBiaxial: 0, sectionInadequate: 0 });
-    expect(lost(gravity.s, undeclared.s)).toEqual({ ids: [5, 6], by: { 'SEARCH_EXHAUSTED anchorage': 2 } });
+    expect(counts(undeclared.s)).toEqual({ verified: 8, searchExhausted: 0, provisionalBiaxial: 0, sectionInadequate: 0 });
+    expect(lost(gravity.s, undeclared.s)).toEqual({ ids: [], by: {} });
     expect(lost(undeclared.s, gravity.s).ids).toEqual([]);
   });
 
@@ -76,12 +81,13 @@ describe('rc-design-qa-8', () => {
 describe('rc-design-frame, 408 members', () => {
   const gravity = run(frame, { beams: 'gravity' }), undeclared = run(frame, null);
 
-  it('outside the system 383 designed; not declared 360, the 23 it loses refusing on their anchorage or congestion', () => {
-    expect(counts(gravity.s)).toEqual({ verified: 383, searchExhausted: 12, provisionalBiaxial: 13, sectionInadequate: 0 });
-    expect(counts(undeclared.s)).toEqual({ verified: 360, searchExhausted: 35, provisionalBiaxial: 13, sectionInadequate: 0 });
+  // 372 since main's concrete in the engine (rc-baseline-digest.test.ts, fingerprint): the columns read on the load contour carry bars on every face, and 11 more edge beams find no layout through those cages. Not declared: 359; of the 13 it loses, 6 refuse on their anchorage and 7 on congestion.
+  it('outside the system 372 designed; not declared 359, the 13 it loses refusing on their anchorage or congestion', () => {
+    expect(counts(gravity.s)).toEqual({ verified: 372, searchExhausted: 23, provisionalBiaxial: 13, sectionInadequate: 0 });
+    expect(counts(undeclared.s)).toEqual({ verified: 359, searchExhausted: 36, provisionalBiaxial: 13, sectionInadequate: 0 });
     const l = lost(gravity.s, undeclared.s);
-    expect(l.ids).toHaveLength(23);
-    expect(l.by).toEqual({ 'SEARCH_EXHAUSTED anchorage': 7, 'SEARCH_EXHAUSTED anchorage,congestion': 2, 'SEARCH_EXHAUSTED anchorage,congestion,shear': 1, 'SEARCH_EXHAUSTED congestion': 13 });
+    expect(l.ids).toHaveLength(13);
+    expect(l.by).toEqual({ 'SEARCH_EXHAUSTED anchorage': 6, 'SEARCH_EXHAUSTED congestion': 7 });
     expect(lost(undeclared.s, gravity.s).ids).toEqual([]);
   });
 });

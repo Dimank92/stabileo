@@ -15,7 +15,7 @@ import { momentCapacityAtAxial } from '../codes/argentina/cirsoc-flex-surface';
 import { axialRange } from '../codes/argentina/cirsoc-flex-surface';
 import { CIRSOC201_DESIGN_EDITION } from '../codes/argentina/cirsoc201-basis';
 import type { Bar, Outline } from '../codes/argentina/cirsoc201-section';
-import { teePolygon, polygonArea, type Pt } from '../codes/argentina/section-polygon';
+import { teePolygon, isCounterClockwise, type Pt } from '../codes/argentina/section-polygon';
 import { isSolidCircle } from '../../section/solid-circle';
 
 export type ColumnShape =
@@ -57,7 +57,7 @@ export function grossAreaOf(shape: ColumnShape): number {
 
 /** A polygon's vertices moved in by `e` along both sides at each right-angled corner. */
 function inset(poly: readonly Pt[], e: number): Pt[] {
-  const ccw = polygonArea(poly) > 0;
+  const ccw = isCounterClockwise(poly);
   const n = poly.length;
   const normal = (a: Pt, b: Pt) => {
     const dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy) || 1;

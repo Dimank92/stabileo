@@ -126,18 +126,28 @@ function loop(): DesignFeedbackLoopResult {
  * from its face, and the two seats differ by 0,29 mm. Less depth lost, so 7 and 8 fail at their
  * final geometry by a hair less (before: hash b12.0/t10.0/d15.0, utilization 1,031; after:
  * b11.7/t10.0/d15.0, 1,030), and still on the same check.
+ *
+ * Since the verifier takes the axial force acting with each moment (main's concrete in the
+ * engine), the compression in 5 and 6 lifts their φMn and the search gives them 7Ø10 at 0,995
+ * where they had 6Ø12. Three things follow, all measured on this run:
+ *   - 5 and 6 now also fail their span FLEXURE at the final geometry (1,023): the 15 mm they lose
+ *     is what the 0,995 had left. Their spacing limit is d/2 = 249 mm (Ø10 sits 1 mm deeper).
+ *   - 7 and 8 rise over Ø10 crossing bars, 10,0 mm, not 11,7 over Ø12: d = 487, d/2 = 243,5 mm,
+ *     250/243,5 = 1,027. They still fail on the spacing alone.
+ *   - The repair of 5 and 6 closes the spacing AND changes their bottom steel (7Ø10 → 6Ø12),
+ *     because flexure failed too; 7 and 8 are repaired by the spacing alone.
  */
 const REPAIRED = [5, 6, 7, 8];
 /** The two pairs, and the geometry each actually lost. */
 const PAIRS = {
-  noLayerMovement: { ids: [5, 6], hash: 'b0.0/t0.0/d15.0', sMaxCm: 24.8, util: 1.008, raise: 0 },
-  layerMoved: { ids: [7, 8], hash: 'b11.7/t10.0/d15.0', sMaxCm: 24.3, util: 1.030, raise: 0.0117071 },
+  noLayerMovement: { ids: [5, 6], hash: 'b0.0/t0.0/d15.0', sMaxCm: 24.9, util: 1.023, raise: 0 },
+  layerMoved: { ids: [7, 8], hash: 'b10.0/t10.0/d15.0', sMaxCm: 24.4, util: 1.027, raise: 0.010 },
 } as const;
 const pairOf = (id: number) =>
   PAIRS.noLayerMovement.ids.includes(id as never) ? PAIRS.noLayerMovement : PAIRS.layerMoved;
 
 describe('the four beams: the failure, the repair and the arithmetic behind both', () => {
-  it('the governing check is Table 9.7.6.2.2 maximum stirrup spacing, not flexure', () => {
+  it('the spacing check fails on all four, alone on 7 and 8, with flexure on 5 and 6', () => {
     // This corrects a recorded diagnosis. The 1,031 was read as a lever-arm/flexure result
     // and it is not: every flexural check passes at the final geometry. What fails is the
     // MAXIMUM STIRRUP SPACING limit, which is proportional to d and therefore moves when
@@ -152,11 +162,15 @@ describe('the four beams: the failure, the repair and the arithmetic behind both
       // supports of 5 and 6 were already at 225 mm and only their span failed.)
       expect(fails.length).toBeGreaterThan(0);
       expect(fails.map((c) => c.category)).toContain('Shear Span (Vz) s,max');
-      for (const c of fails) {
-        expect(c.limiting).toBe('tieSpacing');
+      const spacing = fails.filter((c) => c.limiting === 'tieSpacing');
+      expect(spacing.map((c) => c.category).sort()).toEqual(['Shear Span (Vz) s,max', 'Shear Support (Vz) s,max']);
+      for (const c of spacing) {
         expect(c.required).toBeCloseTo(pair.sMaxCm, 1);   // cm
         expect(c.provided).toBeCloseTo(25.0, 1);          // cm
       }
+      const others = fails.filter((c) => c.limiting !== 'tieSpacing');
+      if (pair === PAIRS.layerMoved) expect(others).toEqual([]);
+      else expect(others.map((c) => [c.category, c.limiting])).toEqual([['Bottom Span (My+)', 'flexure']]);
       expect(fb.finalUtilization).toBeCloseTo(pair.util, 3);
     }
   });
@@ -180,12 +194,12 @@ describe('the four beams: the failure, the repair and the arithmetic behind both
 
   it('the arithmetic behind each failure, from the table', () => {
     // d/2 is row 1 of Table 9.7.6.2.2, whose 400 mm cap does not govern at this depth.
-    // 5, 6: 512 − 15      = 497 → 248,5 mm; 250/248,5 = 1,006 → reported 1,008
-    // 7, 8: 512 − 12 − 15 = 485 → 242,5 mm; 250/242,5 = 1,031 (the run raises 11,7 mm: 1,030)
-    expect(250 / 248.5).toBeCloseTo(1.006, 3);
-    expect(250 / 242.5).toBeCloseTo(1.031, 3);
+    // 5, 6 (7Ø10): 513 − 15      = 498 → 249 mm;   250/249   = 1,004 (flexure governs them: 1,023)
+    // 7, 8:        512 − 10 − 15 = 487 → 243,5 mm; 250/243,5 = 1,027
+    expect(250 / 249).toBeCloseTo(1.004, 3);
+    expect(250 / 243.5).toBeCloseTo(1.027, 3);
     // The old rule permitted 300 mm in all four span regions. Both real limits are below it.
-    for (const cm of [24.8, 24.3]) expect(cm * 10).toBeLessThan(300);
+    for (const cm of [24.9, 24.4]) expect(cm * 10).toBeLessThan(300);
   });
 
   it('reports no reinforcement deficit, because the governing check is not an area', () => {
@@ -196,10 +210,10 @@ describe('the four beams: the failure, the repair and the arithmetic behind both
     }
   });
 
-  it('repairs all four by closing the stirrup spacing one grid step, and nothing else', () => {
-    // 250 → 225 mm. The longitudinal steel is untouched: the failure was never flexural, so
-    // adding bars would have been the wrong repair even though it would have "helped" the
-    // utilisation number.
+  it('repairs all four by closing the stirrup spacing one grid step, and 5 and 6 by their bottom steel too', () => {
+    // 250 → 225 mm on all four. 7 and 8 keep their longitudinal steel: their failure was never
+    // flexural, so adding bars would have been the wrong repair. 5 and 6 failed flexure as well,
+    // and take 6Ø12 for their 7Ø10.
     const before = harness().outcomes;
     for (const r of loop().iterations[0].repairs) {
       expect(r.kind).toBe('FINAL_GEOMETRY_VERIFIED');
@@ -213,9 +227,13 @@ describe('the four beams: the failure, the repair and the arithmetic behind both
       // centres against a 400 mm across-width limit, so no crosstie is required.
       expect(r.accepted!.regions!.stirrupsSpan!.legs).toBe(2);
       expect(r.accepted!.regions!.stirrupsSupport!.legs).toBe(2);
-      // Same longitudinal arrangement, region for region.
-      expect(r.accepted!.regions!.bottomSpanLayers)
-        .toEqual(prev.regions!.bottomSpanLayers);
+      // Same longitudinal arrangement, region for region, except 5 and 6's bottom.
+      if (PAIRS.layerMoved.ids.includes(r.elementId as never)) {
+        expect(r.accepted!.regions!.bottomSpanLayers).toEqual(prev.regions!.bottomSpanLayers);
+      } else {
+        expect(prev.regions!.bottomSpanLayers).toEqual([{ count: 7, diameter: 10, row: 0 }]);
+        expect(r.accepted!.regions!.bottomSpanLayers).toEqual([{ count: 6, diameter: 12, row: 0 }]);
+      }
       expect(r.accepted!.regions!.topStartLayers).toEqual(prev.regions!.topStartLayers);
       expect(r.accepted!.regions!.topEndLayers).toEqual(prev.regions!.topEndLayers);
     }
@@ -240,8 +258,16 @@ describe('the four beams: the failure, the repair and the arithmetic behind both
     //
     // 0,910 rather than 0,922 since shear follows CIRSOC 201-2025: Vc = [0,17·√f'c + Nu/(6·Ag)]
     // with Ag the gross area, where the 2005 expression read √f'c/6 and (1 + Nu/(14·b·d)).
+    //
+    // 0,893 rather than 0,910 since a beam's flexure takes the axial force acting with the moment
+    // (refactor/concrete-in-engine, finding 17: 22.4 with 22.2, the axial force at the gross
+    // centroid). These two members carry some compression at the governing station, which below
+    // the balanced point raises φ·Mn; the governing utilisation came down accordingly.
+    //
+    // 0,886 and 0,851 since main's concrete in the engine: 7 and 8 rise 10,0 mm, not 11,7, and 5
+    // and 6 are repaired with 6Ø12 (see PAIRS). All four now clear the 0,95 preference.
     for (const r of loop().iterations[0].repairs) {
-      const expected = PAIRS.layerMoved.ids.includes(r.elementId as never) ? 0.883 : 0.910;
+      const expected = PAIRS.layerMoved.ids.includes(r.elementId as never) ? 0.886 : 0.851;
       expect(r.certificate!.worstUtilization).toBeCloseTo(expected, 3);
       // The hard code boundary, independent of the characterisation above.
       expect(r.certificate!.worstUtilization).toBeLessThanOrEqual(1.0);
@@ -476,7 +502,9 @@ describe('locked reinforcement is a hard constraint', () => {
     expect(l.unrepaired.map((u) => u.elementId)).toEqual([7, 8]);
     for (const u of l.unrepaired) {
       expect(u.kind).toBe('LOCKED_REINFORCEMENT_PREVENTS_REPAIR');
-      expect(u.finalUtilization).toBeCloseTo(PAIRS.layerMoved.util, 3);
+      // 1,030, not the 1,027 of the free run: 5 and 6 are repaired to 6Ø12 here, so 7 and 8 rise
+      // 11,7 mm over Ø12 crossing bars (d = 485,3, 250/242,6).
+      expect(u.finalUtilization).toBeCloseTo(1.030, 3);
     }
     // The pinned steel is untouched and the honest verdict is preserved.
     for (const id of [7, 8]) {
@@ -531,8 +559,26 @@ describe('bounds and termination', () => {
     expect(l.stats.detailingRuns).toBe(1);
     expect(l.unrepaired.map((u) => u.elementId)).toEqual(REPAIRED);
     for (const a of l.result.assemblies) {
-      expect(a.constructibility?.verdict).toBe('NOT_ESTABLISHED');
+      // Never a pass. Not established, unless the detailing records a prohibited overlap, which
+      // makes the assembly CONFLICTED (see the defect below).
+      const prohibited = a.conflicts.filter((c) => c.pairClass === 'prohibitedOverlap');
+      expect(a.constructibility?.verdict).toBe(prohibited.length > 0 ? 'CONFLICTED' : 'NOT_ESTABLISHED');
     }
+  });
+
+  /*
+   * A detailing defect the zero-budget run shows. Beam 6's 7Ø10 bottom does not fit in one row as
+   * the detailing seats it, so its curtailed bars go to a second layer, one of them stacked over
+   * the corner bar, and the §9.7.3.5(c) stirrups at the cut-off cross it by 4,25 mm (a prohibited
+   * overlap, reported, never certified). The loop's repair removes it here (6Ø12), but the
+   * placement is wrong on its own. Flips when the detailing keeps a curtailed bar clear of them.
+   */
+  it.fails('a curtailed bar in a second layer stays clear of the cut-off stirrups (beam 6, 7Ø10)', () => {
+    const h = harness();
+    const r = h.detail(h.outcomes);
+    const crossing = r.assemblies.flatMap((a) => a.conflicts)
+      .filter((c) => c.pairClass === 'prohibitedOverlap' && c.elementIds.includes(6));
+    expect(crossing).toEqual([]);
   });
 
   it('a candidate budget of one truncates rather than claiming the envelope is exhausted', () => {

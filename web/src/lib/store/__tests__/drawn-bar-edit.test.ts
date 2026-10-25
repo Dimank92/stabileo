@@ -13,7 +13,7 @@ import { verificationStore } from '../verification.svelte';
 import { detailingStore } from '../detailing.svelte';
 import { placeFrame } from '../../model/building/build-on-grid';
 import { modelBeamLines } from '../frame-equalize';
-import { openLine } from '../beam-line-store';
+import { openLine, saveLine } from '../beam-line-store';
 import { canTakeAsDrawn, drawnBar, editDrawnBar, lineBarOf, takeAsDrawn } from '../drawn-bar-edit';
 import type { StructuralGrid } from '../../model/grid';
 import * as wasmSolver from '../../engine/wasm-solver';
@@ -63,19 +63,29 @@ const steel = (ids: readonly number[]) => {
 };
 
 describe('a detailed bar, edited where it was selected', () => {
-  it('taking a beam as drawn changes no bar the detailing laid', () => {
+  /*
+   * Taking a beam as drawn changes no bar: the detailing laid again from the saved line lays the
+   * bars it laid before, or the take is undone and refused. Here it is refused: the detailing fused
+   * and extended the support bars of the two spans across their shared support (e3's top bars run
+   * 2,7 m into e5), which the line reads as e5's own at its start, so laid again e5 fails the cage
+   * at that joint and would lose its bars. Nothing changes, and the line stays unsaved.
+   */
+  it('taking a beam as drawn changes no bar the detailing laid, or is refused', () => {
     const line = detailedFrame();
     const before = steel(line.members);
     expect(canTakeAsDrawn(line.members[0]!)).toBe(true);
-    expect(takeAsDrawn(line.members[0]!)).toBe(true);
-    expect(openLine(line.members[0]!)!.saved).toBe(true);
+    expect(takeAsDrawn(line.members[0]!)).toBe(false);
     expect(steel(line.members)).toEqual(before);
-    expect(canTakeAsDrawn(line.members[0]!)).toBe(false);
+    expect(openLine(line.members[0]!)!.saved).toBe(false);
+    expect(canTakeAsDrawn(line.members[0]!)).toBe(true);
   });
 
   it('an edit of a drawn bar reaches the line, the check, the detailing and survives a regeneration', () => {
     const line = detailedFrame();
-    takeAsDrawn(line.members[0]!);
+    // The line saved as its members' regions hold it (the frame editor's reading), then laid.
+    const open0 = openLine(line.members[0]!)!;
+    saveLine(open0.line, open0.model);
+    detailingStore.generate();
     const bar = detailingStore.assemblies.flatMap((a) => a.bars).find((b) => b.role === 'longitudinal' && lineBarOf(b.id) && drawnBar(b.id)?.bar.face === 'bottom')!;
     const d = drawnBar(bar.id)!;
     const changes = editDrawnBar(bar.id, { diameter: d.bar.diameter + 2, hookEnd: !d.bar.hookEnd })!;

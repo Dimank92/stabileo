@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { phiTable2122 } from '../cirsoc201-basis';
+import { phiFromStrain } from '../cirsoc201-basis';
+
+// The engine's φ (`cirsoc201_phi`), asked for the 2025 edition.
+const phiTable2122 = (epsT: number, fy: number, c: 'ties' | 'spiral' = 'ties') => phiFromStrain(epsT, fy, c, '2025');
 
 // CIRSOC 201-2025 Tabla 21.2.2, for fy = 420 MPa: εty = 420 / 200 000 = 0,0021.
 describe('φ by CIRSOC 201-2025 Tabla 21.2.2', () => {

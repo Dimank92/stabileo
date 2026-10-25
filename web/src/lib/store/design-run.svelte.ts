@@ -37,6 +37,7 @@ import { activePerCombo3D, activeCombinations, noLinearCombinationActive } from 
 import { applyStoreySway } from './storey-sway';
 import { applySoftStoreys } from './seismic-design.svelte';
 import { modelStore } from './model.svelte';
+import { isEngineUnavailable } from '../engine/engine-unavailable';
 import { requestAutosave } from './autosave-service';
 import { regulationsStore } from './regulations.svelte';
 import type { RegulationEdition } from '../codes/regulation';
@@ -53,7 +54,7 @@ import {
 import { catalogueGradeFamily } from '../engine/steel/grade-family';
 import { runOrientationDiagnostic } from '../engine/design/orientation-diagnostic';
 import { runDesign, designMember, DEFAULT_RUN_MS } from '../engine/design/candidate-search';
-import { getDesignCode, type DesignCodeId } from '../engine/design/code-adapter';
+import { getDesignCode } from '../engine/design/code-adapter';
 import { emptyRunSummary, type DesignRunSummary, type MemberDesignOutcome } from '../engine/design/outcome';
 import type { RunProgress } from '../engine/design/candidate-search';
 import { designDemands, isDesignedMember } from '../engine/design/behaviour-demands';
@@ -253,6 +254,10 @@ function createDesignRunStore() {
         if (a) return failNothingChecked(a.name);
       }
       return { ok: true };
+    } catch (err) {
+      // The station forces come from the engine only; without it there are no demands to design for.
+      if (isEngineUnavailable(err)) return fail('engine.unavailable');
+      throw err;
     } finally {
       phase = 'idle';
     }

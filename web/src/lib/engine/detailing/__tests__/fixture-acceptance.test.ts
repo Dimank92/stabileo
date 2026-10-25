@@ -159,10 +159,17 @@ describe('rc-design-qa-8 reaches CONSTRUCTIBLE through the production path', () 
     // also under the final geometry's d/2, so the authoritative re-verification passes and the
     // loop has nothing to repair. The loop's own mechanics keep their scenario in
     // `design-feedback-loop.test.ts`, where the beams get Ø8 stirrups (Av,min met at 250 mm).
+    //
+    // CHANGED EXPECTATION: [] → [5, 6]. Since the verifier takes the axial force acting with each
+    // moment (main's concrete in the engine), the compression in beams 5 and 6 lifts their φMn and
+    // the search settles on 7Ø10 at 0,995. At the final geometry (Table 26.6.2.1(a)'s 15 mm) their
+    // span flexure reads 1,023, and the loop repairs them with 6Ø12 (0,893): one iteration, no
+    // solve, and every assembly CONSTRUCTIBLE below.
     const l = loop();
     expect(l.outcome).toBe('FINAL_GEOMETRY_VERIFIED');
     expect(l.unrepaired).toEqual([]);
-    expect(l.iterations.flatMap((i) => i.changed)).toEqual([]);
+    expect(l.iterations.flatMap((i) => i.changed)).toEqual([5, 6]);
+    expect(l.iterations).toHaveLength(1);
     // Reinforcement is downstream of analysis: repairing it can never require a solve.
     expect(l.stats.structuralSolves).toBe(0);
     for (const a of run().assemblies) {

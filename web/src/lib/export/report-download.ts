@@ -4,7 +4,7 @@
  * HTML as a file, a real deliverable and not a silent failure); the other four are downloaded.
  */
 import { loadXlsxModule } from './excel';
-import { reportFile, type ReportFormat } from './report-formats';
+import { reportFile, type ReportFormat, type ReportProvenance } from './report-formats';
 import type { DocBlock } from './docx';
 
 function save(name: string, type: string, data: BlobPart) {
@@ -20,7 +20,7 @@ export function printHtml(html: string, stem: string): void {
   else save(`${stem}.html`, 'text/html', html);
 }
 
-export async function downloadReport(format: ReportFormat, r: { title: string; html: string; stem: string; blocks?: DocBlock[] }): Promise<string | null> {
+export async function downloadReport(format: ReportFormat, r: { title: string; html: string; stem: string; blocks?: DocBlock[]; provenance?: ReportProvenance }): Promise<string | null> {
   if (format === 'pdf') { printHtml(r.html, r.stem); return `${r.stem}.pdf`; }
   const f = await reportFile(format, { ...r, loadXlsx: loadXlsxModule });
   if (!f) return null;
