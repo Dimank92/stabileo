@@ -24,6 +24,7 @@ describe('other materials in the design', () => {
 
   function model() {
     modelStore.clear();
+    for (const c of [...modelStore.combinations]) modelStore.removeCombination(c.id);
     const timber = modelStore.addMaterial({ name: 'Pino', e: 10000, nu: 0.3, rho: 5, timber: { fb: 10, ft: 6, fc: 8, fv: 1, e: 10000, kind: 'sawn' } } as never);
     const alu = modelStore.addMaterial({ name: '6061-T6', e: 70000, nu: 0.3, rho: 27, fy: 240, gradeId: 'alu-6061-t6' } as never);
     const steel = modelStore.addMaterial({ name: 'F-36', e: 200000, nu: 0.3, rho: 78.5, fy: 355 } as never);

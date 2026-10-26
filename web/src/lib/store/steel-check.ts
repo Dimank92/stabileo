@@ -7,14 +7,14 @@
 import { modelStore } from './model.svelte';
 import { resultsStore } from './results.svelte';
 import { verificationStore } from './verification.svelte';
-import { activeCombinations, activePerCombo3D } from './active-results';
+import { activeCombinations, activePerCombo3D, designCombinationsWithheld } from './active-results';
 import { computeStationDemands, runSteelVerification } from '../engine/verification-service';
 import { memberLengths } from '../engine/steel/unbraced-length';
 import type { AnalysisResults3D } from '../engine/types-3d';
 
 export function runSteelCheck(): { checked: number } | { refused: 'noResults' } {
   const results3D = resultsStore.results3D;
-  if (!results3D) return { refused: 'noResults' };
+  if (!results3D || designCombinationsWithheld()) return { refused: 'noResults' };
   const md = { elements: modelStore.elements, nodes: modelStore.nodes, sections: modelStore.sections, materials: modelStore.materials, supports: modelStore.supports };
   let perCombo: Map<number, AnalysisResults3D> = activePerCombo3D();
   let combos = activeCombinations();

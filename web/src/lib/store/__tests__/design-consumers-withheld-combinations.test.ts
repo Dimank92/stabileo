@@ -25,6 +25,10 @@ import { detailingStore } from '../detailing.svelte';
 import { designRunStore } from '../design-run.svelte';
 import { jointDesignStore } from '../joint-design.svelte';
 import { steelOptimise } from '../steel-optimise.svelte';
+import { runSteelCheck } from '../steel-check';
+import { runMaterialChecks } from '../material-check.svelte';
+import { typologyContext } from '../joint-typology';
+import { envelopeAt } from '../special-elements';
 import { runLiveCalc, runGlobalSolve } from '../../engine/live-calc';
 
 beforeAll(async () => { await initSolver(); });
@@ -129,6 +133,23 @@ describe('the steel optimiser with the combinations unsolved', () => {
     steelOptimise.run('section');
     expect(steelOptimise.error).toBe('design.error.combinationsUnsolved');
     expect(steelOptimise.rows).toEqual([]);
+  });
+});
+
+describe('member and connection checks with the combinations unsolved', () => {
+  it('refuse the single solve that live calc leaves, after reading the full solve', async () => {
+    const { n3, c1, beam, D } = portal();
+    solveAll();
+    expect(runSteelCheck()).toEqual({ checked: 3 });
+    expect(runMaterialChecks()).toEqual({ checked: 0 });
+    expect(typologyContext(n3, [c1, beam])).not.toBeNull();
+    expect(envelopeAt(c1, 0)).not.toBeNull();
+
+    await editAndLiveCalc(n3, D);
+    expect(runSteelCheck()).toEqual({ refused: 'noResults' });
+    expect(runMaterialChecks()).toEqual({ refused: 'noResults' });
+    expect(typologyContext(n3, [c1, beam])).toBeNull();
+    expect(envelopeAt(c1, 0)).toBeNull();
   });
 });
 

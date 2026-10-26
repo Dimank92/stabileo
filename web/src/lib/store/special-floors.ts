@@ -16,8 +16,7 @@ import { modelStore } from './model.svelte';
 import { physicalGroups } from './physical';
 import { designData, patchOwnDesignData } from './design-data';
 import { detailingStore } from './detailing.svelte';
-import { activePerCombo3D } from './active-results';
-import { resultsStore } from './results.svelte';
+import { activePerCombo3D, activeResultSet3D } from './active-results';
 import { collectNodeReactions } from './detailing-footing-inputs';
 import { readSlabPanel, type PanelReading } from './slab-panel-reading';
 import { concreteFc } from '../model/design-data';
@@ -143,7 +142,8 @@ export function matChecks(): { rows: CheckRow[]; status: CheckRow['status']; nod
   const qadm = profile && profile.bearing.kind === 'allowablePressure' ? profile.bearing.allowableBearingKPa : null;
   const comboName = new Map(modelStore.model.combinations.map((c) => [c.id, c.name]));
   let per = [...activePerCombo3D()].map(([id, r]) => ({ name: comboName.get(id) ?? String(id), r }));
-  if (!per.length && resultsStore.results3D) per = [{ name: 'solve', r: resultsStore.results3D }];
+  const single = per.length === 0 ? activeResultSet3D() : null;
+  if (single) per = [{ name: 'solve', r: single }];
   let worst: CheckRow[] | null = null, worstQ = -Infinity;
   for (const { name, r } of per) {
     const reactions = new Map((r.reactions ?? []).map((x) => [x.nodeId, x.fz]));
