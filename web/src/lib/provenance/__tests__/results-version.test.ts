@@ -37,6 +37,16 @@ const RELEASED: Record<number, string[]> = {
   // D4-01: RC columns checked for both signs of the moment (SA-2026-023); W2-01: footings and
   // joints not designed for the unfactored loads (SA-2026-024). Merged together (#590, #588).
   3: ['column-capacity-both-signs', 'design-on-unfactored-results'],
+  // The design chain: #460 and #461 reached main on 2026-10-25 without entries (their builds
+  // stamped 3), and #462–#475 entered with the design switch (#624) in one merge. Written up in
+  // docs/results-changes/2026-10-design-chain.md.
+  4: [
+    'dynamic-analyses-refuse-eccentricities', 'cirsoc301-refused-limit-state-holds',
+    'cirsoc301-undeclared-fabrication-and-load-height', 'cirsoc301-concurrent-forces-and-lengths',
+    'cold-formed-not-checked-by-cirsoc301', 'other-materials-not-checked-as-steel',
+    'rc-beams-lateral-role-shear-minimum-torsion', 'rc-flanged-beams-designed-about-depth',
+    'strip-footings-under-walls-whole-strip',
+  ],
 };
 
 describe('results versions', () => {

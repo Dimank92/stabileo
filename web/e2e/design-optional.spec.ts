@@ -10,7 +10,7 @@ import { test, expect } from '@playwright/test';
  */
 test.use({ storageState: { cookies: [], origins: [] } });
 
-test('PRO starts without the Design stage, and offers it once turned on in its settings', async ({ page }) => {
+test('@smoke PRO starts without the Design stage, and offers it once turned on in its settings', async ({ page }) => {
   await page.goto('/app/pro?e2e=1');
   await page.waitForFunction(() => !!window.__stabileo, null, { timeout: 60_000 });
   await expect(page.getByTestId('pr-stage-model')).toBeVisible();

@@ -201,6 +201,9 @@ test.describe('changing language keeps the work', () => {
       try {
         if (!sessionStorage.getItem('e2e-storage-cleared')) {
           localStorage.clear();
+          // The step it reads is the design desk's, off by default in PRO: turned on, as a reader
+          // turns it on, before the language is chosen. The language is what this test follows.
+          localStorage.setItem('stabileo-design-in-pro', '1');
           sessionStorage.setItem('e2e-storage-cleared', '1');
         }
       } catch { /* private mode */ }
