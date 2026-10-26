@@ -25,6 +25,7 @@ beforeAll(async () => {
  */
 function beam(section: Record<string, unknown>, q: number): number {
   modelStore.clear(); historyStore.clear(); resultsStore.clear(); verificationStore.clear(); uiStore.analysisMode = 'pro';
+  for (const c of [...modelStore.combinations]) modelStore.removeCombination(c.id);
   const mat = modelStore.addMaterial({ name: 'F-24', e: 200000, nu: 0.3, rho: 78.5, fy: 235, fu: 360 } as never);
   const sec = modelStore.addSection(section as never);
   const a = modelStore.addNode(0, 0, 3), b = modelStore.addNode(4, 0, 3);

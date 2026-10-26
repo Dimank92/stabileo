@@ -1162,11 +1162,19 @@ export function floorDesignReadiness(input: {
    * readable answer, where a globally disabled button is not.
    */
   footings?: readonly { id: number }[];
+  /**
+   * The key of the reason the model's combinations are not there to design for
+   * (`designCombinationsWithheld`). Shells and footings alike would read the loads at factor 1,
+   * so the command waits, and says why rather than "solve the model first".
+   */
+  combinationsWithheld?: string | null;
 }): FloorDesignReadiness {
   const reasons: EngineMessage[] = [];
   const withResults = input.stresses.length;
   const hasFootings = (input.footings?.length ?? 0) > 0;
-  if (input.shells.length === 0 && !hasFootings) {
+  if (input.combinationsWithheld && (input.shells.length > 0 || hasFootings)) {
+    reasons.push(msg(input.combinationsWithheld));
+  } else if (input.shells.length === 0 && !hasFootings) {
     reasons.push(msg('detailing.floorRun.noShells'));
   } else if (input.shells.length > 0 && withResults === 0 && !hasFootings) {
     reasons.push(msg('detailing.floorRun.notSolved'));

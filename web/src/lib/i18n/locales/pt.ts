@@ -1391,7 +1391,7 @@ const pt: Translations = {
   'design.error.noConcreteMembersMixed': '{code} não encontrou nenhum elemento verificável: {steel} de aço e {other} sem seção ou material utilizável.',
   'design.error.noDemands': 'Não foi possível extrair solicitações de dimensionamento dos resultados atuais.',
   'design.error.noLinearCombination': 'Nenhuma combinação linear está ativa: as combinações SRSS e ABS são magnitudes sem sinal e não são usadas no dimensionamento. Ative uma combinação linear.',
-  'design.error.combinationsUnsolved': 'Há combinações definidas e não resolvidas, então só há as cargas sem majorar para dimensionar. Calcule de novo para dimensionar com as combinações.',
+  'design.error.combinationsUnsolved': 'Há combinações definidas e nenhuma tem resultados, então só há as cargas sem majorar, e nada é dimensionado com elas. Um cálculo completo com as combinações dá os resultados delas, ou diz por que as deixou de fora.',
   'design.error.noRectangularSections': '{code} só pode verificar seções retangulares b×h, e {n} elemento(s) de concreto não declaram uma. Atribua-lhes uma seção retangular para poder dimensioná-los.',
   'design.error.nothingChecked': 'Nenhum elemento foi verificado por {code} para este modelo.',
   'design.error.solveFirst': 'Calcule o modelo primeiro para obter as solicitações de dimensionamento.',

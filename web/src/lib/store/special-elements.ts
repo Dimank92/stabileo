@@ -14,7 +14,7 @@
  */
 import { modelStore } from './model.svelte';
 import { resultsStore } from './results.svelte';
-import { activePerCombo3D } from './active-results';
+import { activePerCombo3D, activeResultSet3D } from './active-results';
 import { physicalGroups } from './physical';
 import { coverOf, designData, patchOwnDesignData } from './design-data';
 import { concreteFc } from '../model/design-data';
@@ -44,7 +44,8 @@ export function removeEntry(key: 'corbels' | 'openings' | 'infills' | 'hss' | 'd
 /** Largest |M|, |V| and |N| at a station of a member over the active combinations (or the single solve). */
 export function envelopeAt(elementId: number, t: number): { m: number; v: number; n: number } | null {
   let sets = [...activePerCombo3D().values()];
-  if (!sets.length && resultsStore.results3D) sets = [resultsStore.results3D];
+  const single = sets.length === 0 ? activeResultSet3D() : null;
+  if (single) sets = [single];
   let m = 0, v = 0, n = 0, found = false;
   for (const r of sets) {
     const ef = r.elementForces.find((f) => f.elementId === elementId);

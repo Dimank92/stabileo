@@ -7203,7 +7203,7 @@ const es: Record<string, string> = {
   'design.error.noCombinations': 'Definí al menos una combinación de carga antes de diseñar.',
   'design.error.noDemands': 'No se pudieron extraer solicitaciones de diseño de los resultados actuales.',
   'design.error.noLinearCombination': 'No hay ninguna combinación lineal activa: las combinaciones SRSS y ABS son magnitudes sin signo y no se diseña con ellas. Activá una combinación lineal.',
-  'design.error.combinationsUnsolved': 'Hay combinaciones definidas y sin resolver, así que solo están las cargas sin mayorar para diseñar. Volvé a calcular para diseñar con las combinaciones.',
+  'design.error.combinationsUnsolved': 'Hay combinaciones definidas y ninguna tiene resultados, así que solo están las cargas sin mayorar, y no se diseña nada con ellas. Un cálculo completo con las combinaciones da sus resultados, o dice por qué las dejó afuera.',
   'design.error.noAdapter': 'No hay adaptador de norma registrado para el código seleccionado.',
   'design.error.codeUnsupported': '{code} no puede diseñar armadura — solo puede calificar una disposición dada.',
   'design.error.noConcreteMembers': '{code} es la norma de hormigón armado y este modelo no tiene ningún elemento de hormigón: sus {n} barras son de acero. El flujo de diseño de armaduras no aplica a esta estructura.',

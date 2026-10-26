@@ -380,7 +380,7 @@
   import { tourStore } from './lib/store/tour.svelte';
   import { startDemo, DEFAULT_DEMO } from './lib/tour/demos';
   import { whatIf } from './lib/store/whatif.svelte';
-  import { runLiveCalc, runGlobalSolve } from './lib/engine/live-calc';
+  import { runLiveCalc, runGlobalSolve, registerLiveCalcCanceller } from './lib/engine/live-calc';
   import LandingPage from './components/LandingPage.svelte';
   import BlogPage from './components/blog/BlogPage.svelte';
   import { parsePublicPath, publicHref } from './lib/i18n/public-routes';
@@ -1160,6 +1160,11 @@
       liveCalcTimer = null;
     }
   }
+  // Every manual solve cancels it, from any entry point (`runGlobalSolve`).
+  $effect(() => {
+    registerLiveCalcCanceller(cancelPendingLiveCalc);
+    return () => registerLiveCalcCanceller(null);
+  });
 
   $effect(() => {
     const _v = modelStore.modelVersion;
