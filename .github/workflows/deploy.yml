@@ -2,7 +2,7 @@ name: Deploy
 
 on:
   push:
-    branches: [klaus/staging-deploy]
+    branches: [main]
   workflow_dispatch:
     inputs:
       environment:
@@ -15,17 +15,17 @@ permissions: {}
 
 jobs:
   build:
-    name: Build (${{ inputs.environment || 'staging' }})
+    name: Build (${{ inputs.environment || 'production' }})
     runs-on: ubicloud-standard-8
     timeout-minutes: 60
-    environment: ${{ inputs.environment || 'staging' }}
+    environment: ${{ inputs.environment || 'production' }}
     concurrency:
-      group: deploy-${{ inputs.environment || 'staging' }}-build
+      group: deploy-${{ inputs.environment || 'production' }}-build
       cancel-in-progress: true
     permissions:
       contents: read
     env:
-      TARGET: ${{ inputs.environment || 'staging' }}
+      TARGET: ${{ inputs.environment || 'production' }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -147,14 +147,14 @@ jobs:
           if-no-files-found: error
 
   deploy:
-    name: Deploy (${{ inputs.environment || 'staging' }})
+    name: Deploy (${{ inputs.environment || 'production' }})
     needs: [build]
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: ${{ inputs.environment || 'staging' }}
+    environment: ${{ inputs.environment || 'production' }}
     # Shared with the rollback, so neither runs while the other holds the host.
     concurrency:
-      group: deploy-${{ inputs.environment || 'staging' }}-host
+      group: deploy-${{ inputs.environment || 'production' }}-host
       cancel-in-progress: false
     permissions:
       contents: read

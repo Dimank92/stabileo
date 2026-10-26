@@ -13,7 +13,7 @@ signed Nix closure, and swapped into place over SSH.
 
 | Workflow | Trigger |
 |---|---|
-| `deploy.yml` | push to `klaus/staging-deploy` deploys staging; manual run picks the environment |
+| `deploy.yml` | every push to `main` deploys production; a manual run picks the environment (default staging) |
 | `rollback.yml` | manual, picks the environment (typed `CONFIRM` for a migration rollback) |
 
 Per environment, a newer build cancels an older one still building, and the deploy and
@@ -144,5 +144,4 @@ and Caddy keeps retrying certificate issuance until the names resolve to it.
    answers the landing (self-signed until DNS moves), `/api/v1/health` passes.
 3. In Cloudflare, point `stabileo.com` (A), `www` and `admin` at the host, DNS only. Caddy
    obtains the three certificates within a minute.
-4. Remove `web/public/CNAME`, retire `deploy-gh-pages.yml`, and move `deploy.yml`'s push
-   trigger to `main` behind a `DEPLOY_ON_PUSH` variable, as scasaas does.
+4. Remove `web/public/CNAME` and retire `deploy-gh-pages.yml`.
