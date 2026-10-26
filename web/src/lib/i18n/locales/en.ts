@@ -13697,5 +13697,16 @@ const en: Record<string, string> = {
   "provenance.reproduce.buildDiffers": "The report was made with a different build ({fields}); a difference in results may be a registered change rather than a defect.",
   "provenance.reproduce.solveFailed": "The model did not solve: {error}",
   "provenance.reproduce.menu": "Reproduce from provenance…",
+  "config.designLimits.title": "What it does not cover yet",
+  "config.designLimits.rule": "What the design cannot evaluate reads «not evaluated» or «held», with its reason, and never as passing.",
+  "config.designLimits.coldFormed": "Cold-formed steel: CIRSOC 303 is not implemented, so those members are not designed.",
+  "config.designLimits.e4": "Steel: flexural-torsional buckling (E.4) of singly symmetric sections is not evaluated.",
+  "config.designLimits.ec3": "EC3: lateral-torsional buckling (6.3.3) is evaluated in part, with Cm = 1.0.",
+  "config.designLimits.punching": "Footings: the moment transfer of punching (§8.4.4.2) is not evaluated, and the production file says so.",
+  "config.designLimits.joints": "Congested joints: the detailing may hold members whose design verifies.",
+  "config.designLimits.torsion": "Compatibility torsion is taken only through the analysis's cracked torsional stiffness, and strap beams are not designed as members of their own.",
+  "config.designLimits.spectrum": "The response spectrum refuses models with eccentricities, such as those imported from IFC to be analysed.",
+  "config.designLimits.issue": "Drawings and the calculation report have no formal issued state and no signature.",
+  "design.enabledNotice": "Normative design is on. It is in development: its limits are listed in Settings, under the switch.",
 };
 export default en;

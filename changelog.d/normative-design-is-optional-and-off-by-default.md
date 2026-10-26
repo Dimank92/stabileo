@@ -5,7 +5,7 @@ The design stages (#462–#475: concrete design, detailing, other materials and 
 the design workspace, polish and reliability on a real building) enter main in one merge with the
 switch of #624, so no intermediate state was deployed. PRO starts without the Design stage;
 modelling, buildings and levels, loads and combinations, the analysis and its results, the
-calculation exports and IFC need none of it. Settings → PRO → «Enable normative design (in
+calculation exports and IFC need none of it. Settings → PRO → «Turn on normative design (in
 development)» adds it, with the module's open limitations listed there. A project that already
 holds design (bars, detailing, decisions) opened with design off keeps all of it and offers to turn
 design on; a link that names a place of design asks first and turns it on for that visit only.
