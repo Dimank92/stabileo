@@ -16,6 +16,7 @@
   import HelpTip from '../HelpTip.svelte';
   import UnitInput from '../UnitInput.svelte';
   import { toQ, unitQ } from '../../lib/store/display-units.svelte';
+  import { announceDesignOn, DESIGN_LIMITS } from '../../lib/store/design-presence';
 
   /*
    * The grid is kept in metres and shown in the chosen length unit. The xz
@@ -499,12 +500,19 @@
           <input
             type="checkbox"
             checked={uiStore.designInPro}
-            onchange={(e) => { uiStore.designInPro = e.currentTarget.checked; }}
+            onchange={(e) => { uiStore.designInPro = e.currentTarget.checked; if (e.currentTarget.checked) announceDesignOn(); }}
             data-testid="cfg-design-in-pro"
           />
           <span>{t('config.designInPro')}</span>
         </label>
         <p class="cfg-hint">{t('config.designInProHint')}</p>
+        <details class="cfg-limits" data-testid="cfg-design-limits">
+          <summary>{t('config.designLimits.title')}</summary>
+          <p class="cfg-hint">{t('config.designLimits.rule')}</p>
+          <ul>
+            {#each DESIGN_LIMITS as key (key)}<li>{t(`config.designLimits.${key}`)}</li>{/each}
+          </ul>
+        </details>
       </div>
     {/if}
 
@@ -527,6 +535,9 @@
     cursor: pointer;
   }
 
+  .cfg-limits { margin: 2px 0 6px; font-size: 0.72rem; color: var(--st-text-2, var(--st-text)); }
+  .cfg-limits summary { cursor: pointer; }
+  .cfg-limits ul { margin: 4px 0 0; padding-left: 16px; display: flex; flex-direction: column; gap: 3px; }
   .cfg-hint {
     margin: 0.2rem 0 0 1.35rem;
     font-size: 0.62rem;

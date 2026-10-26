@@ -33,6 +33,18 @@ export function noteDesignHeldIfOff(analysisMode: string | undefined = uiStore.a
   uiStore.toast(t('design.heldWhileOff'), 'info', 'enable-design');
 }
 
+/**
+ * The module's open limits, listed under the switch (`config.designLimits.<key>`). Each one is a
+ * limitation the chain declares or measured, so turning design on says what it does not cover yet
+ * rather than a general warning.
+ */
+export const DESIGN_LIMITS = ['coldFormed', 'e4', 'ec3', 'punching', 'joints', 'torsion', 'spectrum', 'issue'] as const;
+
+/** Design was just turned on by the reader: say it is in development and where its limits are. */
+export function announceDesignOn(): void {
+  uiStore.toast(t('config.designEnabledNotice'), 'info');
+}
+
 /** The place of design a link asked for while design was off, opened if the reader turns it on. */
 let askedTab: string | null = null;
 
@@ -49,6 +61,7 @@ export function askDesignForLink(tab: string): void {
 /** The reader's yes to `askDesignForLink`: design on for the session, and the place it asked for. */
 export function enableDesignForLink(): void {
   uiStore.designForSession();
+  announceDesignOn();
   if (askedTab) uiStore.proActiveTab = askedTab;
   askedTab = null;
 }

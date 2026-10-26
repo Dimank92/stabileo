@@ -13891,5 +13891,16 @@ const es: Record<string, string> = {
   "plates.resultsError": "Error de discretización estimado: hasta {pct} % en el elemento",
   "plates.showMesh": "Ver la malla",
   "plates.showMeshHint": "Apagado, cada placa mallada se dibuja como pieza (su contorno). Sólo cambia el dibujo: la selección y los resultados siguen igual.",
+  "config.designLimits.title": "Qué no cubre todavía",
+  "config.designLimits.rule": "Lo que el diseño no puede evaluar figura como «no evaluado» o «retenido», con su motivo, y nunca como aprobado.",
+  "config.designLimits.coldFormed": "Acero conformado en frío: el CIRSOC 303 no está implementado, así que esas barras no se diseñan.",
+  "config.designLimits.e4": "Acero: el pandeo flexotorsional (E.4) de secciones con un solo eje de simetría no se evalúa.",
+  "config.designLimits.ec3": "EC3: el pandeo lateral torsional (6.3.3) se evalúa en forma parcial, con Cm = 1,0.",
+  "config.designLimits.punching": "Bases: la transferencia de momento del punzonado (§8.4.4.2) no se evalúa, y el archivo de obra lo declara.",
+  "config.designLimits.joints": "Nudos congestionados: el detallado puede retener barras que el diseño verifica.",
+  "config.designLimits.torsion": "La torsión de compatibilidad sólo se toma con la rigidez torsional fisurada del análisis, y las vigas de fundación no se diseñan como barras propias.",
+  "config.designLimits.spectrum": "El espectro de respuesta rechaza modelos con excentricidades, como los importados de IFC para calcular.",
+  "config.designLimits.issue": "Los planos y la memoria no tienen un estado formal de emitido ni firma.",
+  "config.designEnabledNotice": "Diseño normativo activado. Está en desarrollo: sus límites están en Configuración, debajo del interruptor.",
 };
 export default es;
