@@ -63,6 +63,7 @@ BIN_NOROT = os.environ.get("FRAME3DD_NOROT_BIN", os.path.join(TOOLS, "frame3dd-n
 
 NAME = "frame3dd"
 ANALYSES = ("static", "modal", "pdelta")
+TOL = {"static": (1e-6, None), "modal": (1e-6, None), "pdelta": (2e-3, None)}
 
 
 def available():

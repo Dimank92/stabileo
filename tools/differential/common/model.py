@@ -371,10 +371,13 @@ def lift_2d(model, allow_hinges=False):
                 if s_.get(k2):
                     t[k3] = s_[k2]
         if s_:
-            # Settlements act on restrained DOFs only (as in the engine).
+            # Settlements act on restrained DOFs only; unrestrained settlements
+            # are rejected by stabileo's validator.
             for d2, d3, k, sg in (("dx", "dx", 0, 1), ("dz", "dz", 1, 1), ("dy", "dz", 1, 1),
                                   ("dry", "dry", 2, -1), ("drz", "dry", 2, -1)):
-                if s_.get(d2) and r[k]:
+                if s_.get(d2):
+                    if not r[k]:
+                        raise Unsupported(f"settlement on an unrestrained 2D DOF ({d2})")
                     t[d3] = sg * s_[d2]
         m3["supports"][str(len(m3["supports"]) + 1)] = t
     for ld in model["loads"]:
