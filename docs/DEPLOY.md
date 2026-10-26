@@ -1,21 +1,28 @@
-# Deploying to one host (staging)
+# Deploying to one host per environment
 
-The staging site, `staging.stabileo.com` (landing + editor) and `admin.staging.stabileo.com`
-(admin site), runs on one Hetzner VM. Production stays on GitHub Pages until the cut-over at
-the end of this page. The model is scasaas's one-host deploy: the release is built inside Nix on
-the CI runner, shipped with its signed Nix closure, and swapped into place over SSH.
+Each environment is one Hetzner VM serving the app (landing + editor) and the admin site:
+
+| Environment | App | Admin | GitHub environment | cloud-init |
+|---|---|---|---|---|
+| staging | `staging.stabileo.com` | `admin.staging.stabileo.com` | `staging` | `infra/cloud-init/staging.yaml` |
+| production | `stabileo.com` (+ `www` redirect) | `admin.stabileo.com` | `production` | `infra/cloud-init/production.yaml` |
+
+Production stays on GitHub Pages until the cut-over at the end of this page. The model is
+scasaas's one-host deploy: the release is built inside Nix on the CI runner, shipped with its
+signed Nix closure, and swapped into place over SSH.
 
 | Workflow | Trigger |
 |---|---|
-| `deploy-staging.yml` | push to `klaus/staging-deploy`; manual |
-| `rollback-staging.yml` | manual (typed `CONFIRM` for a migration rollback) |
+| `deploy.yml` | push to `klaus/staging-deploy` deploys staging; manual run picks the environment |
+| `rollback.yml` | manual, picks the environment (typed `CONFIRM` for a migration rollback) |
 
-Both share one concurrency group, so neither starts while the other holds the host.
+Per environment, a newer build cancels an older one still building, and the deploy and
+rollback jobs share one group, so neither starts while the other holds the host.
 
 ## What runs where
 
 ```
-host (Debian 13, infra/cloud-init/staging.yaml)
+host (Debian 13, infra/cloud-init/<environment>.yaml)
 +-- Caddy                 TLS, both static sites, /api/* -> backend     (infra/caddy/Caddyfile)
 +-- PostgreSQL            stabileo_staging, owner stabileo
 +-- Nix (multi-user)      the release's runtime closure, imported on every deploy
@@ -33,7 +40,8 @@ Google sign-in starts and ends on the admin origin, which is why `API_URL` is th
 
 ## Host prerequisites
 
-`infra/cloud-init/staging.yaml` does all of it at first boot. Fill its three placeholders
+`infra/cloud-init/<environment>.yaml` does all of it at first boot; `make cloud-init.render`
+regenerates both files from `infra/caddy/` and `infra/systemd/`. Fill the three placeholders
 (deploy public key, database password, Nix public key) and paste it as the server's cloud
 config. Open 22, 80 and 443 in the Hetzner Cloud Firewall. Check with `cloud-init status --wait`
 and `/var/log/cloud-init-output.log`.
@@ -46,7 +54,10 @@ What it leaves behind, for reference:
   `app` is an ordinary Nix user, never a `trusted-user`, so the daemon admits only signed paths;
 - PostgreSQL role `stabileo` (`CREATEDB`, `pg_signal_backend` for a later restore flow) and the
   database `stabileo_staging`;
-- Caddy with `/etc/caddy/Caddyfile` and `/etc/caddy/stabileo.env` (the domains and root), from Caddy's own apt repository (Debian 13 ships 2.6.2, too old for this Caddyfile);
+- Caddy with `/etc/caddy/Caddyfile`, `/etc/caddy/stabileo.env` (the domains, root and
+  `ROBOTS_TAG`: `noindex, nofollow` on staging, `all` on production) and, on production,
+  `/etc/caddy/sites.d/www-redirect.caddy`; from Caddy's own apt repository (Debian 13 ships
+  2.6.2, too old for this Caddyfile);
 - the `stabileo-backend` unit, enabled, started by the first deploy.
 
 Generate the keys once:
@@ -59,7 +70,9 @@ nix key convert-secret-to-public < nix-signing.sec     # the cloud-init placehol
 
 ## Settings
 
-All in the GitHub environment **`staging`**. Variables are plain, secrets are masked.
+One set per GitHub environment (`staging`, `production`). Variables are plain, secrets are
+masked. Values below are staging's; production uses `stabileo.com`, `admin.stabileo.com`,
+database `stabileo` and `DEPLOY_ENV=prod`.
 
 | Name | Kind | Value |
 |---|---|---|
@@ -74,7 +87,8 @@ All in the GitHub environment **`staging`**. Variables are plain, secrets are ma
 | `API_URL` | variable | `https://admin.staging.stabileo.com` (the Google callback is built on it) |
 | `ADMIN_FRONTEND_URL` | variable | `https://admin.staging.stabileo.com` |
 | `TRUSTED_PROXIES` | variable | `127.0.0.1` (Caddy's `X-Forwarded-For` is believed) |
-| `DEPLOY_ENV` | variable | `staging` |
+| `DEPLOY_ENV` | variable | `staging` or `prod` |
+| `VITE_ACCOUNTS` | variable | `1` compiles the account UI in; login itself is switched on from the admin site's Settings |
 | `GOOGLE_CLIENT_ID` | variable | OAuth client with redirect URI `https://admin.staging.stabileo.com/api/v1/admin/auth/google/callback` |
 | `GOOGLE_CLIENT_SECRET` | secret | |
 | `PORT`, `BIND_ADDRESS`, `POOL_SIZE`, `DATABASE_SSL`, `CORS_ALLOWED_ORIGINS`, `ADMIN_DOMAINS`, `*_TTL` | variable | optional; `backend/config/runtime.exs` is the reference |
@@ -83,9 +97,9 @@ Without the Google pair the admin site shows no sign-in button; add them and red
 
 ## What a deploy does
 
-`deploy-staging.yml`:
+`deploy.yml`:
 
-1. `make backend.release.build`, `make web.build` (with `VITE_ACCOUNTS=1`), `make admin.build`,
+1. `make backend.release.build`, `make web.build`, `make admin.build`,
    the prerender gate from the Pages deploy, `caddy validate`;
 2. packages `backend/`, `frontends/app`, `frontends/admin`, `caddy/Caddyfile`, the store paths
    the release references (`.github/scripts/release-store-paths.sh`) and their closure, signed
@@ -97,7 +111,8 @@ Without the Google pair the admin site shows no sign-in button; add them and red
 
 ## First deploy, then the first admin
 
-1. Host up, both DNS names pointing at it, settings filled: Actions -> **Deploy staging** -> Run.
+1. Host up, both DNS names pointing at it, settings filled: Actions -> **Deploy** -> Run
+   workflow, pick the environment.
 2. Allow the admins on the host (Google sign-in is limited to the allowlist plus the Workspace
    domains in `ADMIN_DOMAINS`):
 
@@ -112,14 +127,22 @@ Logs: `journalctl -u stabileo-backend -f` (the `app` user is in `systemd-journal
 
 ## Rollback
 
-Actions -> **Rollback staging** swaps `live/` for the newest entry in `releases/` and restarts
+Actions -> **Rollback** (pick the environment) swaps `live/` for the newest entry in `releases/` and restarts
 the backend; one step back per run. Tick **rollback_db** and type `CONFIRM` only if the release
 being rolled back ran a bad migration.
 
-## Production cut-over (later)
+## Production cut-over
 
-- drop `X-Robots-Tag` from `infra/caddy/Caddyfile` and set the production domains in
-  `infra/caddy/stabileo.env`;
-- move the push trigger to `main` behind a `DEPLOY_ON_PUSH` variable, as scasaas does, with a
-  `production` environment;
-- point `stabileo.com` at the host, remove `web/public/CNAME`, retire `deploy-gh-pages.yml`.
+Production can be deployed before any DNS changes: the release runs and answers on the host,
+and Caddy keeps retrying certificate issuance until the names resolve to it.
+
+1. Create the production host with `infra/cloud-init/production.yaml`, fill the `production`
+   environment (`DEPLOY_HOST`, `DEPLOY_KNOWN_HOSTS`, the Google client with
+   `https://admin.stabileo.com/api/v1/admin/auth/google/callback` registered), run **Deploy**
+   for `production`, allow the admin emails.
+2. Check the host directly: `curl -sk --resolve stabileo.com:443:<ip> https://stabileo.com/`
+   answers the landing (self-signed until DNS moves), `/api/v1/health` passes.
+3. In Cloudflare, point `stabileo.com` (A), `www` and `admin` at the host, DNS only. Caddy
+   obtains the three certificates within a minute.
+4. Remove `web/public/CNAME`, retire `deploy-gh-pages.yml`, and move `deploy.yml`'s push
+   trigger to `main` behind a `DEPLOY_ON_PUSH` variable, as scasaas does.

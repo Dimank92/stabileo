@@ -1,20 +1,31 @@
-name: Deploy staging
+name: Deploy
 
 on:
   push:
     branches: [klaus/staging-deploy]
   workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        type: choice
+        options: [staging, production]
+        default: staging
 
 permissions: {}
 
 jobs:
   build:
-    name: Build
+    name: Build (${{ inputs.environment || 'staging' }})
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    environment: staging
+    environment: ${{ inputs.environment || 'staging' }}
+    concurrency:
+      group: deploy-${{ inputs.environment || 'staging' }}-build
+      cancel-in-progress: true
     permissions:
       contents: read
+    env:
+      TARGET: ${{ inputs.environment || 'staging' }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -38,13 +49,22 @@ jobs:
           ./.github/scripts/require-env.sh DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS
           NIX_SIGNING_KEY SECRET_KEY_BASE JWT_SECRET DATABASE_URL PHX_HOST API_URL ADMIN_FRONTEND_URL
 
-      - uses: ./.github/actions/free-disk
+      - name: Free disk space in the background
+        run: >
+          sudo nohup bash -c 'rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/lib/android
+          /usr/local/share/powershell /usr/share/swift /opt/hostedtoolcache/CodeQL /usr/local/.ghcup'
+          >/dev/null 2>&1 &
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
 
       - name: Cache Nix store
         uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: engine
+          shared-key: wasm
 
       - name: Install web dependencies
         run: make web.deps
@@ -57,14 +77,14 @@ jobs:
       - name: Build backend release
         env:
           GIT_COMMIT_SHA: ${{ github.sha }}
-          DEPLOY_ENV: staging
+          DEPLOY_ENV: ${{ vars.DEPLOY_ENV }}
         run: make backend.release.build
 
       # VITE_API_URL stays unset: both sites call /api/* on their own origin through Caddy.
       - name: Build the app
         env:
           BASE_PATH: /
-          VITE_ACCOUNTS: "1"
+          VITE_ACCOUNTS: ${{ vars.VITE_ACCOUNTS }}
         run: make web.build
 
       - name: Build the admin site
@@ -90,7 +110,7 @@ jobs:
           echo "prerendered pages verified"
 
       - name: Validate the Caddyfile
-        run: nix run nixpkgs#caddy -- validate --config infra/caddy/Caddyfile --adapter caddyfile --envfile infra/caddy/stabileo.env
+        run: nix run nixpkgs#caddy -- validate --config infra/caddy/Caddyfile --adapter caddyfile --envfile "infra/caddy/$TARGET.env"
 
       - name: Package release
         env:
@@ -117,6 +137,7 @@ jobs:
           {
             echo "commit=$COMMIT"
             echo "ref=$REF"
+            echo "environment=$TARGET"
             echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } > "$pkg/VERSION"
 
@@ -132,14 +153,14 @@ jobs:
           if-no-files-found: error
 
   deploy:
-    name: Deploy
+    name: Deploy (${{ inputs.environment || 'staging' }})
     needs: [build]
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: staging
+    environment: ${{ inputs.environment || 'staging' }}
     # Shared with the rollback, so neither runs while the other holds the host.
     concurrency:
-      group: deploy-staging-host
+      group: deploy-${{ inputs.environment || 'staging' }}-host
       cancel-in-progress: false
     permissions:
       contents: read

@@ -1,8 +1,9 @@
 #cloud-config
-# Hetzner user data for the staging host (Debian 13). Replace before pasting:
+# Hetzner user data for the staging host (Debian 13), rendered by infra/cloud-init/render.py.
+# Replace before pasting:
 #   __DEPLOY_PUBKEY__    public half of DEPLOY_SSH_KEY
 #   __DB_PASSWORD__      password in DATABASE_URL (ecto://stabileo:<it>@localhost/stabileo_staging)
-#   __NIX_TRUSTED_KEY__  public half of NIX_SIGNING_KEY (stabileo-staging-1:...)
+#   __NIX_TRUSTED_KEY__  public half of NIX_SIGNING_KEY
 # Open 22, 80 and 443 in the Hetzner Cloud Firewall. See docs/DEPLOY.md.
 
 hostname: staging-stabileo
@@ -16,7 +17,7 @@ apt:
       source: "deb [signed-by=$KEY_FILE] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main"
       key: |
         -----BEGIN PGP PUBLIC KEY BLOCK-----
-        
+
         mQINBFb+quEBEACl3/YkFekflvauEASL+neZjCctYWyt57Dv5AdRmUPO4zkxylLG
         d/9JawlUfHuYYU4emz7940S2wR8kbBimiLgxMqyGP5+RQnggNZhjYIXoqkkh0G8v
         purq+58d+VNYf0LWnWlwuJC0dtpi4bPqZTc5ST4QOItFK0s7F2xZJyOkuAPDI782
@@ -171,6 +172,8 @@ write_files:
       	}
       }
 
+      import /etc/caddy/sites.d/*.caddy
+
       (common) {
       	encode zstd gzip
 
@@ -178,8 +181,7 @@ write_files:
       		X-Content-Type-Options "nosniff"
       		Referrer-Policy "strict-origin-when-cross-origin"
       		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
-      		# Staging only: remove on the production cut-over or stabileo.com drops out of search.
-      		X-Robots-Tag "noindex, nofollow"
+      		X-Robots-Tag "{$ROBOTS_TAG}"
       		-Server
       	}
 
@@ -242,6 +244,7 @@ write_files:
       ADMIN_DOMAIN=admin.staging.stabileo.com
       STABILEO_ROOT=/srv/stabileo
       BACKEND_PORT=4100
+      ROBOTS_TAG=noindex, nofollow
   - path: /etc/systemd/system/caddy.service.d/stabileo.conf
     permissions: "0644"
     defer: true
@@ -302,7 +305,7 @@ write_files:
       APT::Periodic::Unattended-Upgrade "1";
 
 runcmd:
-  - mkdir -p /srv/stabileo/releases /srv/stabileo/gcroots /srv/stabileo/caddy /srv/stabileo/incoming
+  - mkdir -p /srv/stabileo/releases /srv/stabileo/gcroots /srv/stabileo/caddy /srv/stabileo/incoming /etc/caddy/sites.d
   - chown -R app:app /srv/stabileo
   - chmod 0755 /srv/stabileo
   - sudo -u postgres psql -v ON_ERROR_STOP=1 -c "CREATE ROLE stabileo LOGIN PASSWORD '__DB_PASSWORD__' CREATEDB;"

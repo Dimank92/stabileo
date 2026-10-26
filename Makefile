@@ -11,7 +11,7 @@
        release.secrets backend.release.build backend.release.run backend.release.migrate \
        services services.stop postgres.start postgres.stop \
        inst inst.check inst.claim inst.release inst.list ports \
-       docker.build docker.up docker.down \
+       docker.build docker.up docker.down cloud-init.render \
        check-pins check.changelog check.test-targets worktree worktree-prune hooks \
        fmt check clean
 
@@ -522,6 +522,9 @@ postgres.stop:
 	@if [ -f "$(POSTGRES_DIR)/postmaster.pid" ]; then \
 		$(NIX_RUN) bash -c "pg_ctl -D $(POSTGRES_DIR) stop" || true; \
 	fi
+
+cloud-init.render:
+	$(NIX_RUN) python3 -I infra/cloud-init/render.py
 
 docker.build:
 	docker compose build

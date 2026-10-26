@@ -1,8 +1,13 @@
-name: Rollback staging
+name: Rollback
 
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: Target environment
+        type: choice
+        options: [staging, production]
+        default: staging
       rollback_db:
         description: 'Also roll back database migrations (only if a bad migration was deployed)'
         required: false
@@ -17,12 +22,12 @@ permissions: {}
 
 jobs:
   rollback:
-    name: Rollback to the previous release
+    name: Rollback (${{ inputs.environment }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: staging
+    environment: ${{ inputs.environment }}
     concurrency:
-      group: deploy-staging-host
+      group: deploy-${{ inputs.environment }}-host
       cancel-in-progress: false
     permissions:
       contents: read
