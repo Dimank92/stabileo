@@ -16,7 +16,7 @@ const plan = (x0: number) => [
 ];
 const DXF = buildDxf({ insunits: 5, layers: ['VIGAS', 'PILARES', 'TEXTOS'], entities: [...plan(0), ...plan(1000)].join('\n') });
 
-test('two plans of one DXF become templates at two levels, and one is converted', async ({ pro: page }) => {
+test('@smoke two plans of one DXF become templates at two levels, and one is converted', async ({ pro: page }) => {
   await page.getByTestId('pr-stage-model').click();
   await page.getByTestId('pr-cmd-grid').click();
   await page.getByTestId('grid-heights').fill('3; 3');
