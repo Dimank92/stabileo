@@ -7,4 +7,9 @@ defmodule StabileoAuth.GoogleOAuthTest do
     assert :inets in applications
     assert :ssl in applications
   end
+
+  test "Assent's httpc client can verify Google's certificate" do
+    assert Code.ensure_loaded?(:ssl_verify_hostname)
+    assert Code.ensure_loaded?(:certifi)
+  end
 end

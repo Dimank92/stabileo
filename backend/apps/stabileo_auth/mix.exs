@@ -32,6 +32,8 @@ defmodule StabileoAuth.MixProject do
       {:phoenix, "~> 1.7"},
       {:joken, "~> 2.6"},
       {:assent, "~> 0.3"},
+      {:ssl_verify_fun, "~> 1.1"},
+      {:certifi, "~> 2.4"},
       {:jason, "~> 1.4"}
     ]
   end
