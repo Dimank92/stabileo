@@ -10,11 +10,9 @@ test.describe('@smoke end-to-end certificate', () => {
     await page.waitForFunction(() => !!window.__stabileoActions, null, { timeout: 60_000 });
   });
 
-  // 2D only: with the 3D examples tried (3d-portal-frame, 3d-cantilever-load) the 3D results
-  // panel shows no certificate line at all, end-to-end or not, before and after this change
-  // (a separate gap); the 3D end-to-end level is checked through the engine in
-  // engine/tests/certify_end_to_end*.rs.
-  for (const example of ['portal-frame', 'simply-supported']) {
+  // 2D and 3D examples: both show the certificate status line and the end-to-end check
+  // in the results panel once solved.
+  for (const example of ['portal-frame', 'simply-supported', '3d-portal-frame', '3d-cantilever-load']) {
     test(`a solved ${example} shows the end-to-end check`, async ({ page }) => {
       const errors: string[] = [];
       page.on('pageerror', (e) => errors.push(e.message));

@@ -46,7 +46,7 @@ import { jointDesignStore } from '../store/joint-design.svelte';
 import { designRunStore } from '../store/design-run.svelte';
 import { isSolverReady } from '../engine/wasm-solver';
 import { getStructuralSolveCount } from './solve-counter';
-import { runGlobalSolve } from '../engine/live-calc';
+import { solveNow } from '../actions/solve';
 import { tourStore } from '../store/tour.svelte';
 import {
   liveRebarSceneCensus, liveRebarSceneConflictAt, rebarSceneBuilds, type RebarSceneCensus,
@@ -889,7 +889,7 @@ export function installE2EHooks(): void {
     },
     /** Reset the selection between gestures — the position, not the subject. */
     clearSelection: () => { uiStore.clearSelection(); },
-    solve: async () => { await runGlobalSolve(); },
+    solve: async () => { await solveNow(); },
     solveOnMainThread: () => {
       const isPro = uiStore.analysisMode === 'pro';
       if (uiStore.is3DWorkspace) {

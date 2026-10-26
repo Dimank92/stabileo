@@ -99,6 +99,52 @@ describe('the certificate store', () => {
     resultsStore.setResults({ displacements: [], reactions: [], elementForces: [] } as never);
     expect(certificateStore.state.status).toBe('idle');
   });
+
+  it('certifies a published 3D linear solve after it', async () => {
+    vi.useFakeTimers();
+    try {
+      const { resultsStore, modelStore } = await import('../../store');
+      const { certificateStore } = await import('../../store/certificate.svelte');
+      await modelStore.loadExample('3d-portal-frame');
+      const r = await modelStore.solve3DAsync();
+      expect(typeof r).toBe('object');
+      resultsStore.setResults3D(r as never);
+      expect(certificateStore.state.status).toBe('pending');
+      await vi.runAllTimersAsync();
+      const s = certificateStore.shown(true);
+      expect(s.status).toBe('done');
+      if (s.status === 'done') {
+        expect(s.certificate.status).toBe('certified');
+        expect(s.endToEnd?.status).toBe('certified');
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  for (const example of ['3d-portal-frame', '3d-cantilever-load']) {
+    it(`certifies ${example} through solveNow and shows the certificate line`, async () => {
+      vi.useFakeTimers();
+      try {
+        const { modelStore, uiStore } = await import('../../store');
+        const { certificateStore } = await import('../../store/certificate.svelte');
+        const { solveNow } = await import('../../actions/solve');
+        uiStore.analysisMode = '3d';
+        await modelStore.loadExample(example);
+        await solveNow();
+        expect(certificateStore.state.status).toBe('pending');
+        await vi.runAllTimersAsync();
+        const s = certificateStore.shown(true);
+        expect(s.status).toBe('done');
+        if (s.status === 'done') {
+          expect(s.certificate.status).toBe('certified');
+          expect(s.endToEnd?.status).toBe('certified');
+        }
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  }
 });
 
 describe('a printed bound is still a bound', () => {
