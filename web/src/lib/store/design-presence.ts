@@ -42,7 +42,7 @@ export const DESIGN_LIMITS = ['coldFormed', 'e4', 'ec3', 'punching', 'joints', '
 
 /** Design was just turned on by the reader: say it is in development and where its limits are. */
 export function announceDesignOn(): void {
-  uiStore.toast(t('design.enabledNotice'), 'info');
+  uiStore.toast(t('config.designEnabledNotice'), 'info');
 }
 
 /** The place of design a link asked for while design was off, opened if the reader turns it on. */

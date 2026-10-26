@@ -13347,6 +13347,6 @@ const pt: Translations = {
   "config.designLimits.torsion": "A torção de compatibilidade só é considerada pela rigidez à torção fissurada da análise, e as vigas de fundação não são dimensionadas como barras próprias.",
   "config.designLimits.spectrum": "O espectro de resposta recusa modelos com excentricidades, como os importados de IFC para cálculo.",
   "config.designLimits.issue": "As pranchas e o memorial não têm estado formal de emitido nem assinatura.",
-  "design.enabledNotice": "Dimensionamento normativo ativado. Está em desenvolvimento: os seus limites estão em Configurações, abaixo do interruptor.",
+  "config.designEnabledNotice": "Dimensionamento normativo ativado. Está em desenvolvimento: os seus limites estão em Configurações, abaixo do interruptor.",
 };
 export default pt;

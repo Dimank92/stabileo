@@ -13705,8 +13705,8 @@ const en: Record<string, string> = {
   "config.designLimits.punching": "Footings: the moment transfer of punching (§8.4.4.2) is not evaluated, and the production file says so.",
   "config.designLimits.joints": "Congested joints: the detailing may hold members whose design verifies.",
   "config.designLimits.torsion": "Compatibility torsion is taken only through the analysis's cracked torsional stiffness, and strap beams are not designed as members of their own.",
-  "config.designLimits.spectrum": "The response spectrum refuses models with eccentricities, such as those imported from IFC to be analysed.",
+  "config.designLimits.spectrum": "The response spectrum refuses models with eccentricities, such as those imported from IFC to be analyzed.",
   "config.designLimits.issue": "Drawings and the calculation report have no formal issued state and no signature.",
-  "design.enabledNotice": "Normative design is on. It is in development: its limits are listed in Settings, under the switch.",
+  "config.designEnabledNotice": "Normative design is on. It is in development: its limits are listed in Settings, under the switch.",
 };
 export default en;

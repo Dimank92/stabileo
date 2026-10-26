@@ -13696,6 +13696,6 @@ const es: Record<string, string> = {
   "config.designLimits.torsion": "La torsión de compatibilidad sólo se toma con la rigidez torsional fisurada del análisis, y las vigas de fundación no se diseñan como barras propias.",
   "config.designLimits.spectrum": "El espectro de respuesta rechaza modelos con excentricidades, como los importados de IFC para calcular.",
   "config.designLimits.issue": "Los planos y la memoria no tienen un estado formal de emitido ni firma.",
-  "design.enabledNotice": "Diseño normativo activado. Está en desarrollo: sus límites están en Configuración, debajo del interruptor.",
+  "config.designEnabledNotice": "Diseño normativo activado. Está en desarrollo: sus límites están en Configuración, debajo del interruptor.",
 };
 export default es;
