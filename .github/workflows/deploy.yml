@@ -16,7 +16,7 @@ permissions: {}
 jobs:
   build:
     name: Build (${{ inputs.environment || 'staging' }})
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-8
     timeout-minutes: 60
     environment: ${{ inputs.environment || 'staging' }}
     concurrency:
@@ -48,12 +48,6 @@ jobs:
         run: >
           ./.github/scripts/require-env.sh DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS
           NIX_SIGNING_KEY SECRET_KEY_BASE JWT_SECRET DATABASE_URL PHX_HOST API_URL ADMIN_FRONTEND_URL
-
-      - name: Free disk space in the background
-        run: >
-          sudo nohup bash -c 'rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/lib/android
-          /usr/local/share/powershell /usr/share/swift /opt/hostedtoolcache/CodeQL /usr/local/.ghcup'
-          >/dev/null 2>&1 &
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
