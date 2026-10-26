@@ -178,7 +178,7 @@
       "id": "design-on-unfactored-results",
       "resultsVersion": 3,
       "date": "2026-10-22",
-      "prs": [588],
+      "prs": [588, 649],
       "area": "design",
       "when": { "allOf": [["footings", "jointDesigns", "shells", "steelMembers"], ["combinations"]] },
       "title": {

@@ -17,4 +17,4 @@
   model, or published its single solve in place of the combinations.
 - **A solve that left the combinations out keeps the project stale** from any entry point; a plain
   Calcular after the refused re-run stamped it current over the same single solve. In Basic 3D the
-  combinations' failure is information, not an error, when the single solve stands in.
+  combinations' failure is information, not an error, when the single solve stands in. (#649)
