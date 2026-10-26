@@ -37,7 +37,10 @@ The registry is seeded with every behaviour change of the October 2026 safety wa
 all at results version 1 (#328, 2026-10-21). Version 2 holds the fixes merged with 0.3.0 after
 that (SA-2026-013 to 017 and 019) and the first entries taken under the rule above (the free-roof
 wind minimum and the earth-pressure dead load, #581 and #593); version 3, the column moment sign
-(SA-2026-023) and design on unfactored results (SA-2026-024), merged together (#590, #588).
+(SA-2026-023) and design on unfactored results (SA-2026-024), merged together (#590, #588);
+version 4, the design chain (`docs/results-changes/2026-10-design-chain.md`): #460 and #461
+reached main without entries and their builds stamped 3, so their changes are told at 4 with
+those of #462–#475, which entered with the design switch (#624) in one merge.
 
 ## Solve stamps and the re-check prompt
 

@@ -13446,5 +13446,16 @@ const pt: Translations = {
   "plates.resultsError": "Erro de discretização estimado: até {pct} % no elemento",
   "plates.showMesh": "Ver a malha",
   "plates.showMeshHint": "Desligado, cada placa malhada é desenhada como peça (seu contorno). Só muda o desenho: a seleção e os resultados continuam iguais.",
+  "config.designLimits.title": "O que ainda não cobre",
+  "config.designLimits.rule": "O que o dimensionamento não consegue avaliar aparece como «não avaliado» ou «retido», com o motivo, e nunca como aprovado.",
+  "config.designLimits.coldFormed": "Aço formado a frio: o CIRSOC 303 não está implementado, então essas barras não são dimensionadas.",
+  "config.designLimits.e4": "Aço: a flambagem por flexo-torção (E.4) de seções com um só eixo de simetria não é avaliada.",
+  "config.designLimits.ec3": "EC3: a flambagem lateral com torção (6.3.3) é avaliada em parte, com Cm = 1,0.",
+  "config.designLimits.punching": "Sapatas: a transferência de momento da punção (§8.4.4.2) não é avaliada, e o arquivo de obra o declara.",
+  "config.designLimits.joints": "Nós congestionados: o detalhamento pode reter barras cujo dimensionamento verifica.",
+  "config.designLimits.torsion": "A torção de compatibilidade só é considerada pela rigidez à torção fissurada da análise, e as vigas de fundação não são dimensionadas como barras próprias.",
+  "config.designLimits.spectrum": "O espectro de resposta recusa modelos com excentricidades, como os importados de IFC para cálculo.",
+  "config.designLimits.issue": "As pranchas e o memorial não têm estado formal de emitido nem assinatura.",
+  "config.designEnabledNotice": "Dimensionamento normativo ativado. Está em desenvolvimento: os seus limites estão em Configurações, abaixo do interruptor.",
 };
 export default pt;
