@@ -107,6 +107,8 @@ describe('propose, apply, re-verify', () => {
 
   function portal() {
     modelStore.clear();
+    // The one solve is the design load only with no combination defined; a new model has four.
+    for (const c of [...modelStore.combinations]) modelStore.removeCombination(c.id);
     historyStore.clear();
     const heavy = PROFILE_FAMILIES.IPE[PROFILE_FAMILIES.IPE.length - 1]!;
     const full = profileToSectionFull(heavy);
@@ -269,6 +271,8 @@ describe('by named group', () => {
 
   it.each([false, true])('keeps each member orientation and applies a common profile when the heaviest already has it: %s', (sameAsHeaviest) => {
     modelStore.clear();
+    // The one solve is the design load only with no combination defined; a new model has four.
+    for (const c of [...modelStore.combinations]) modelStore.removeCombination(c.id);
     const heavy = PROFILE_FAMILIES.IPE[PROFILE_FAMILIES.IPE.length - 1]!;
     const light = PROFILE_FAMILIES.IPE.find(p => p.name === 'IPE 300')!;
     const mid = modelStore.addMaterial({ name: 'S235', e: 200000, nu: .3, rho: 78.5, fy: 250, fu: 400 } as never);
@@ -301,6 +305,8 @@ describe('by named group', () => {
 
   it('one profile for all the group\'s members, named by the group', () => {
     modelStore.clear();
+    // The one solve is the design load only with no combination defined; a new model has four.
+    for (const c of [...modelStore.combinations]) modelStore.removeCombination(c.id);
     const heavy = PROFILE_FAMILIES.IPE[PROFILE_FAMILIES.IPE.length - 1]!;
     const sid = modelStore.addSection({ name: heavy.name, profileFamily: heavy.family, ...profileToSectionFull(heavy) } as never);
     const mid = modelStore.addMaterial({ name: 'S235', e: 200000, nu: 0.3, rho: 78.5, fy: 250, fu: 400 } as never);

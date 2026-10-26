@@ -7047,7 +7047,7 @@ const en: Record<string, string> = {
   'design.error.noCombinations': 'Define at least one load combination before designing.',
   'design.error.noDemands': 'No design demands could be extracted from the current results.',
   'design.error.noLinearCombination': 'No linear combination is active: SRSS and ABS combinations are magnitudes without a sign and are not designed for. Activate a linear combination.',
-  'design.error.combinationsUnsolved': 'Combinations are defined and not solved, so there are only the unfactored loads to design for. Solve again (Calcular) to design with the combinations.',
+  'design.error.combinationsUnsolved': 'Combinations are defined and none of them has results, so there are only the unfactored loads, and nothing is designed over them. A full solve with the combinations gives their results, or says why it left them out.',
   'design.error.noAdapter': 'No design-code adapter is registered for the selected code.',
   'design.error.codeUnsupported': '{code} cannot design reinforcement — it can only rate a given arrangement.',
   'design.error.noConcreteMembers': '{code} is the reinforced-concrete code and this model has no concrete member: all {n} of its members are steel. The reinforcement design workflow does not apply to this structure.',

@@ -9,8 +9,7 @@
  */
 import { modelStore } from './model.svelte';
 import { designData } from './design-data';
-import { activeCombinations, activePerCombo3D } from './active-results';
-import { resultsStore } from './results.svelte';
+import { activeCombinations, activePerCombo3D, activeResultSet3D } from './active-results';
 import { memberContexts } from '../engine/design/other-codes/run';
 import { runOtherCode } from '../engine/design/other-codes/run';
 import { AISI_S100 } from '../engine/design/other-codes/cfs-code';
@@ -70,8 +69,9 @@ export function runMaterialChecks(): { checked: number } | { refused: 'noResults
   const m = modelStore.model;
   let perCombo = activePerCombo3D(), combos = activeCombinations();
   // A single solve without combinations: read as one, holding every load case.
-  if (perCombo.size === 0 && resultsStore.results3D) {
-    perCombo = new Map([[0, resultsStore.results3D]]);
+  const single = perCombo.size === 0 ? activeResultSet3D() : null;
+  if (single) {
+    perCombo = new Map([[0, single]]);
     combos = [{ id: 0, name: 'solve', factors: m.loadCases.map((c) => ({ caseId: c.id, factor: 1 })) }];
   }
   if (perCombo.size === 0) { results = new Map(); return { refused: 'noResults' }; }

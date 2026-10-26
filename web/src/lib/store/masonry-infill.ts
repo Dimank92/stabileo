@@ -13,8 +13,7 @@
  *    (the wall's weight is already a load). Putting them again replaces them; one undo step.
  */
 import { modelStore } from './model.svelte';
-import { resultsStore } from './results.svelte';
-import { activePerCombo3D } from './active-results';
+import { activePerCombo3D, activeResultSet3D } from './active-results';
 import { physicalGroups, physicalThickness } from './physical';
 import { patchSpecialElements, specialElements, statusOf } from './special-elements';
 import { confinedWallRows, type ConfinedWallResult } from '../engine/design/masonry/confined-masonry';
@@ -55,7 +54,8 @@ function wallGeometry(quadIds: readonly number[]) {
 /** Forces at the wall's base in each active combination: P (compression +), in-plane V and M, out-of-plane m per metre. */
 function wallBaseForces(g: NonNullable<ReturnType<typeof wallGeometry>>) {
   let sets = [...activePerCombo3D().values()];
-  if (!sets.length && resultsStore.results3D) sets = [resultsStore.results3D];
+  const single = sets.length === 0 ? activeResultSet3D() : null;
+  if (single) sets = [single];
   const ids = new Set(g.base.map((q) => q.id));
   let nMin = Infinity, vu = 0, mu = 0, nu = 0, muOut = 0, found = false;
   for (const r of sets) {
@@ -129,10 +129,13 @@ export function infillChecks(): InfillCheck[] {
     let demand: number | null = null;
     if (entry.strutIds?.length) {
       let sets = [...activePerCombo3D().values()];
-      if (!sets.length && resultsStore.results3D) sets = [resultsStore.results3D];
-      let c = 0;
-      for (const r of sets) for (const id of entry.strutIds) { const ef = r.elementForces.find((f) => f.elementId === id); if (ef) c = Math.max(c, -extractForcesAtStation(ef, 0.5).n); }
-      demand = 2 * Math.max(0, c);
+      const single = sets.length === 0 ? activeResultSet3D() : null;
+      if (single) sets = [single];
+      if (sets.length) {
+        let c = 0;
+        for (const r of sets) for (const id of entry.strutIds) { const ef = r.elementForces.find((f) => f.elementId === id); if (ef) c = Math.max(c, -extractForcesAtStation(ef, 0.5).n); }
+        demand = 2 * Math.max(0, c);
+      }
     }
     const rows = demand === null
       ? [{ code: 'fema-356', clause: '7.5.2.1', title: 'Strut force', titleKey: 'check.infill.demand', formula: 'put the struts in the model and solve', inputs: [], ratio: null, status: 'notVerified' } as CheckRow]
