@@ -413,7 +413,7 @@ fn make_truss_connector_model() -> SolverInput {
     connectors.insert("1".to_string(), ConnectorElement {
         id: 1, node_i: 17, node_j: 18,
         k_axial: 5.0e4, k_shear: 0.0, k_moment: 1.0e3,
-        k_shear_z: 0.0, k_bend_y: 0.0, k_bend_z: 0.0,
+        k_shear_z: 0.0, k_bend_y: 0.0, k_bend_z: 0.0, ..Default::default()
     });
 
     let top_left = (levels - 1) * 2 + 1;

@@ -1021,12 +1021,10 @@ fn connector_zero_length_3d_axis_mapping() {
     assert_eq!([d(3), d(4), d(5)], [4.0, 6.0, 5.0], "rotations X, Y, Z ← k_moment, k_bend_z, k_bend_y");
 }
 
-/// SP-17 (OPEN). The 3D connector frame jumps where its reference vector
-/// switches (global X while |dir·X| < 0.9, else global Y). With anisotropic
-/// transverse springs two connectors 1e-6 apart in direction get very different local axes.
-/// There is no local_y / roll input to fix the orientation.
+/// SP-17 (FIXED, #419). The 3D connector frame now varies continuously with
+/// direction (using global Y as continuous default reference, and global Z if
+/// aligned with Y).
 #[test]
-#[ignore = "open question SP-17: 3D connector local axes are discontinuous at |dir_x| = 0.9 and not user-settable"]
 fn connector_3d_axes_are_continuous_in_direction() {
     // Out of the XY plane (in it both references give local y = ±Z).
     let dir = |x: f64| { let t = ((1.0 - x * x) / 2.0).sqrt(); [x, t, t] };
@@ -1034,6 +1032,36 @@ fn connector_3d_axes_are_continuous_in_direction() {
     let k2 = connector_stiffness_3d(1.0, 100.0, 1.0, 1.0, 1.0, 1.0, dir(0.9 + 1e-6), 0.0);
     let diff = (0..144).map(|i| (k1[i] - k2[i]).abs()).fold(0.0, f64::max);
     assert!(diff < 0.1, "stiffness jumps by {diff} across the reference switch");
+}
+
+/// SP-17 (FIXED, #419). Connectors accept user-specified local_y and roll_angle.
+#[test]
+fn connector_3d_user_orientation_and_roll() {
+    use dedaliano_engine::element::{connector_axes_3d, connector_stiffness_3d_oriented};
+
+    // User specifies explicit local_y along global Y for an axial element along X
+    let (ex, ey, ez) = connector_axes_3d([1.0, 0.0, 0.0], Some([0.0, 1.0, 0.0]), None);
+    assert_eq!(ex, [1.0, 0.0, 0.0]);
+    assert_eq!(ey, [0.0, 1.0, 0.0]);
+    assert_eq!(ez, [0.0, 0.0, 1.0]);
+
+    // User specifies 90 deg roll
+    let (_, ey_roll, ez_roll) = connector_axes_3d([1.0, 0.0, 0.0], Some([0.0, 1.0, 0.0]), Some(90.0));
+    assert!((ey_roll[0].abs() < 1e-12) && (ey_roll[1].abs() < 1e-12) && ((ey_roll[2] - 1.0).abs() < 1e-12));
+    assert!((ez_roll[0].abs() < 1e-12) && ((ez_roll[1] + 1.0).abs() < 1e-12) && (ez_roll[2].abs() < 1e-12));
+
+    // Stiffness matrix respects user orientation
+    let k_default = connector_stiffness_3d(10.0, 100.0, 20.0, 5.0, 50.0, 15.0, [1.0, 0.0, 0.0], 0.0);
+    let k_user = connector_stiffness_3d_oriented(
+        10.0, 100.0, 20.0, 5.0, 50.0, 15.0, [1.0, 0.0, 0.0], 0.0,
+        Some([0.0, 1.0, 0.0]), None,
+    );
+    // In k_default, ey = -Z, ez = +Y (SP-16): shear along Y is 20, along Z is 100
+    // In k_user, ey = +Y, ez = +Z: shear along Y is 100, along Z is 20
+    assert_eq!(k_default[1 * 12 + 1], 20.0);
+    assert_eq!(k_default[2 * 12 + 2], 100.0);
+    assert_eq!(k_user[1 * 12 + 1], 100.0);
+    assert_eq!(k_user[2 * 12 + 2], 20.0);
 }
 
 /// SP-7 follow-up (review of #330). The fiber force correction must remove the same elastic

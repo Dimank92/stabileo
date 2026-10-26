@@ -866,7 +866,7 @@ fn cases_2d() -> Vec<Case2> {
             if conn {
                 m.s.connectors.insert(
                     "1".into(),
-                    ConnectorElement { id: 1, node_i: 7, node_j: 50, k_axial: k, k_shear: 0.0, k_moment: 0.0, k_shear_z: 0.0, k_bend_y: 0.0, k_bend_z: 0.0 },
+                    ConnectorElement { id: 1, node_i: 7, node_j: 50, k_axial: k, k_shear: 0.0, k_moment: 0.0, k_shear_z: 0.0, k_bend_y: 0.0, k_bend_z: 0.0, ..Default::default() },
                 );
             }
             if stub {
@@ -2394,7 +2394,7 @@ fn cases_3d() -> Vec<Case3> {
             if conn {
                 m.s.connectors.insert(
                     "1".into(),
-                    ConnectorElement { id: 1, node_i: 7, node_j: 50, k_axial: k, k_shear: 0.0, k_moment: 0.0, k_shear_z: 0.0, k_bend_y: 0.0, k_bend_z: 0.0 },
+                    ConnectorElement { id: 1, node_i: 7, node_j: 50, k_axial: k, k_shear: 0.0, k_moment: 0.0, k_shear_z: 0.0, k_bend_y: 0.0, k_bend_z: 0.0, ..Default::default() },
                 );
             }
             if stub {

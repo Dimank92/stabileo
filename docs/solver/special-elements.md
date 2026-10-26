@@ -273,16 +273,15 @@ $T$ the rigid-arm matrix; there are no other offsets or rigid links in the conne
 - Chord $L > 10^{-15}$: $e_x$ along the chord. Otherwise (zero length) $e_x = X$ in 3D and
   $(c,s) = (1,0)$ in 2D.
 - 3D transverse axes come from the connector's **own** rule, not the frame rule: reference
-  $r = X$ if $|e_{x,X}| < 0.9$, else $r = Y$; $e_y = r\times e_x/\lVert\cdot\rVert$,
-  $e_z = e_x\times e_y$. There is no `local_y` or roll input.
+  $r = Y$ if $|e_{x,Y}| \le 0.999$, else $r = Z$; $e_y = r\times e_x/\lVert\cdot\rVert$,
+  $e_z = e_x\times e_y$. Users can also supply explicit orientation (`local_y` or
+  `local_yx`, `local_yy`, `local_yz`) and a `roll_angle` (degrees) about $e_x$.
   - Zero-length connector: $e_y = -Z$, $e_z = +Y$. So `k_shear` (documented as "local Y") acts
     along global **Z**, `k_shear_z` along global Y, `k_bend_y` about Z, `k_bend_z` about Y
     (SP-16, pinned by `connector_zero_length_3d_axis_mapping`). In 2D the shear spring of a
     zero-length connector is along global Z, consistent with the 3D `k_shear`.
-  - The triad jumps where the reference switches ($|e_{x,X}| = 0.9$) for directions with a Z
-    component (SP-17, open): with $k_\text{shear}\ne k_{\text{shear},z}$ or
-    $k_{\text{bend},y}\ne k_{\text{bend},z}$ two nearly parallel connectors get very different
-    stiffness. Isotropic transverse springs are unaffected.
+  - The default transverse triad is continuous in direction for general orientations; the
+    historical jump at $|e_{x,X}| = 0.9$ is eliminated (SP-17 fixed in #419).
 
 ### 3.3 Assembly, validation, nonlinear use
 
@@ -512,5 +511,5 @@ All tests are in `engine/tests/derivation_special_elements.rs` unless stated.
 | SP-14 | Outside the cable solver a cable is a truss bar: the linear solver lets it carry compression (−25.5 kN in the example) with no diagnostic. | OPEN | `linear_solver_does_not_report_cable_compression_silently` |
 | SP-15 | Curved-beam segments take default local axes; near-vertical segments switch reference, so outside the X–Z plane $I_y$/$I_z$ swap on them (semicircle, N = 40: 15 % crown-deflection difference between the X–Z and Y–Z planes). Fixed (#418): every segment takes its axes from the arc's plane, the same relative to the curve. | FIXED | `curved_beam_arch_is_invariant_under_plan_rotation`, `curved_beam_arch_matches_explicit_members_with_plane_normal_axes` |
 | SP-16 | Zero-length 3D connector axes are $e_x=X$, $e_y=-Z$, $e_z=Y$ (its own reference rule), so `k_shear` acts along global Z and `k_shear_z` along Y; the "local Y" in the type doc is not the frame's local y. | DOCUMENTED-CHOICE | `connector_zero_length_3d_axis_mapping` |
-| SP-17 | 3D connector triad is discontinuous where its reference switches ($|e_{x,X}|=0.9$) for directions with a Z component, and has no user orientation input: anisotropic transverse springs change by O(k) between nearly parallel connectors. | OPEN | `connector_3d_axes_are_continuous_in_direction` |
+| SP-17 | 3D connector triad is discontinuous where its reference switches ($|e_{x,X}|=0.9$) for directions with a Z component, and has no user orientation input: anisotropic transverse springs change by O(k) between nearly parallel connectors. Fixed (#419): continuous default reference ($r=Y$ unless $|e_{x,Y}| > 0.999$, then $r=Z$) and user orientation support (`local_y`, `roll_angle`). | FIXED | `connector_3d_axes_are_continuous_in_direction`, `connector_3d_user_orientation_and_roll` |
 | SP-18 | Fiber solvers return an empty `reactions` list. | OPEN | `fiber_solver_reports_reactions` |

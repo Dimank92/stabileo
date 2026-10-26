@@ -691,7 +691,7 @@ pub fn random_2d_model_rich(seed: u64) -> (SolverInput, HashMap<String, f64>) {
                 id: 1, node_i: a, node_j: b,
                 k_axial: spring_k(&mut rng), k_shear: spring_k(&mut rng),
                 k_moment: if truss_only { 0.0 } else { spring_k(&mut rng) },
-                k_shear_z: 0.0, k_bend_y: 0.0, k_bend_z: 0.0,
+                k_shear_z: 0.0, k_bend_y: 0.0, k_bend_z: 0.0, ..Default::default()
             });
         }
     }
@@ -1066,6 +1066,7 @@ pub fn random_3d_model_rich(seed: u64) -> (SolverInput3D, HashMap<String, f64>) 
                 id: 1, node_i: a, node_j: b,
                 k_axial: spring_k(&mut rng), k_shear: spring_k(&mut rng), k_moment: spring_k(&mut rng),
                 k_shear_z: spring_k(&mut rng), k_bend_y: spring_k(&mut rng), k_bend_z: spring_k(&mut rng),
+                ..Default::default()
             });
         }
     }

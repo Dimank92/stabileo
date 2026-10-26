@@ -75,26 +75,90 @@ pub fn connector_stiffness_2d(
     k
 }
 
-/// Build the 3D connector element stiffness matrix (12×12 for 6-DOF nodes),
-/// nodes `l` apart along `dir`.
-pub fn connector_stiffness_3d(
-    k_axial: f64,
-    k_shear_y: f64,
-    k_shear_z: f64,
-    k_torsion: f64,
-    k_bend_y: f64,
-    k_bend_z: f64,
-    dir: [f64; 3],  // unit direction from node_i to node_j (or [1,0,0] for zero-length)
-    l: f64,
-) -> [f64; 144] {
-    // Build local-to-global rotation from direction vector
-    // Local x = dir, local y and z are perpendicular
+/// Compute local axes (ex, ey, ez) for a 3D connector.
+///
+/// `dir`: unit direction along the connector chord (or [1,0,0] for zero length).
+/// `local_y`: optional reference vector for local Y.
+/// `roll_angle`: optional rotation angle (in degrees) about `ex`.
+///
+/// Default orientation:
+/// When `local_y` is None, the reference vector is global Y ([0, 1, 0]) unless
+/// the connector is aligned with global Y (|dir·Y| > 0.999), where global Z ([0, 0, 1])
+/// is used as fallback.
+/// This ensures local axes vary continuously with direction, without artificial
+/// jumps (fixing SP-17), while preserving the canonical zero-length axis mapping
+/// ex = X, ey = -Z, ez = +Y (fixing SP-16).
+pub fn connector_axes_3d(
+    dir: [f64; 3],
+    local_y: Option<[f64; 3]>,
+    roll_angle: Option<f64>,
+) -> ([f64; 3], [f64; 3], [f64; 3]) {
     let (lx, ly, lz) = (dir[0], dir[1], dir[2]);
+    let len = (lx * lx + ly * ly + lz * lz).sqrt();
+    let ex = if len > 1e-15 {
+        [lx / len, ly / len, lz / len]
+    } else {
+        [1.0, 0.0, 0.0]
+    };
 
-    // Choose a reference vector not parallel to dir
-    let ref_vec = if lx.abs() < 0.9 { [1.0, 0.0, 0.0] } else { [0.0, 1.0, 0.0] };
+    let (mut ey, mut ez) = if let Some(y_ref) = local_y {
+        let mag = (y_ref[0] * y_ref[0] + y_ref[1] * y_ref[1] + y_ref[2] * y_ref[2]).sqrt();
+        if mag > 1e-10 {
+            let y_norm = [y_ref[0] / mag, y_ref[1] / mag, y_ref[2] / mag];
+            // ez = ex × y_ref
+            let ez_vec = [
+                ex[1] * y_norm[2] - ex[2] * y_norm[1],
+                ex[2] * y_norm[0] - ex[0] * y_norm[2],
+                ex[0] * y_norm[1] - ex[1] * y_norm[0],
+            ];
+            let ez_mag = (ez_vec[0] * ez_vec[0] + ez_vec[1] * ez_vec[1] + ez_vec[2] * ez_vec[2]).sqrt();
+            if ez_mag > 1e-10 {
+                let ez = [ez_vec[0] / ez_mag, ez_vec[1] / ez_mag, ez_vec[2] / ez_mag];
+                // ey = ez × ex
+                let ey = [
+                    ez[1] * ex[2] - ez[2] * ex[1],
+                    ez[2] * ex[0] - ez[0] * ex[2],
+                    ez[0] * ex[1] - ez[1] * ex[0],
+                ];
+                (ey, ez)
+            } else {
+                default_connector_transverse_axes(&ex)
+            }
+        } else {
+            default_connector_transverse_axes(&ex)
+        }
+    } else {
+        default_connector_transverse_axes(&ex)
+    };
 
-    // local_y = ref × dir (normalized)
+    if let Some(angle_deg) = roll_angle {
+        let angle = angle_deg * std::f64::consts::PI / 180.0;
+        let (c, s) = (angle.cos(), angle.sin());
+        let ey_new = [
+            c * ey[0] + s * ez[0],
+            c * ey[1] + s * ez[1],
+            c * ey[2] + s * ez[2],
+        ];
+        let ez_new = [
+            -s * ey[0] + c * ez[0],
+            -s * ey[1] + c * ez[1],
+            -s * ey[2] + c * ez[2],
+        ];
+        ey = ey_new;
+        ez = ez_new;
+    }
+
+    (ex, ey, ez)
+}
+
+fn default_connector_transverse_axes(ex: &[f64; 3]) -> ([f64; 3], [f64; 3]) {
+    let (lx, ly, lz) = (ex[0], ex[1], ex[2]);
+    let ref_vec = if ly.abs() > 0.999 {
+        [0.0, 0.0, 1.0]
+    } else {
+        [0.0, 1.0, 0.0]
+    };
+    // local_y = ref × ex (normalized)
     let mut yy = [
         ref_vec[1] * lz - ref_vec[2] * ly,
         ref_vec[2] * lx - ref_vec[0] * lz,
@@ -104,22 +168,30 @@ pub fn connector_stiffness_3d(
     if yn > 1e-15 {
         yy[0] /= yn; yy[1] /= yn; yy[2] /= yn;
     }
-
-    // local_z = dir × local_y
+    // local_z = ex × local_y
     let zz = [
         ly * yy[2] - lz * yy[1],
         lz * yy[0] - lx * yy[2],
         lx * yy[1] - ly * yy[0],
     ];
+    (yy, zz)
+}
 
-    // Rotation matrix R (3×3): rows are local x, y, z in global components
-    let r = [
-        [lx, ly, lz],
-        [yy[0], yy[1], yy[2]],
-        [zz[0], zz[1], zz[2]],
-    ];
-
-    let [ex, ey, ez] = r;
+/// Build the 3D connector element stiffness matrix (12×12 for 6-DOF nodes),
+/// nodes `l` apart along `dir`, with optional user local_y and roll_angle.
+pub fn connector_stiffness_3d_oriented(
+    k_axial: f64,
+    k_shear_y: f64,
+    k_shear_z: f64,
+    k_torsion: f64,
+    k_bend_y: f64,
+    k_bend_z: f64,
+    dir: [f64; 3],  // unit direction from node_i to node_j (or [1,0,0] for zero-length)
+    l: f64,
+    local_y: Option<[f64; 3]>,
+    roll_angle: Option<f64>,
+) -> [f64; 144] {
+    let (ex, ey, ez) = connector_axes_3d(dir, local_y, roll_angle);
     let a = CONNECTOR_SHEAR_POSITION;
 
     // Spring deformations over [u_i, θ_i, u_j, θ_j] (3 components each). A shear
@@ -155,6 +227,24 @@ pub fn connector_stiffness_3d(
     k
 }
 
+/// Build the 3D connector element stiffness matrix (12×12 for 6-DOF nodes),
+/// nodes `l` apart along `dir`, with default continuous orientation.
+pub fn connector_stiffness_3d(
+    k_axial: f64,
+    k_shear_y: f64,
+    k_shear_z: f64,
+    k_torsion: f64,
+    k_bend_y: f64,
+    k_bend_z: f64,
+    dir: [f64; 3],  // unit direction from node_i to node_j (or [1,0,0] for zero-length)
+    l: f64,
+) -> [f64; 144] {
+    connector_stiffness_3d_oriented(
+        k_axial, k_shear_y, k_shear_z, k_torsion, k_bend_y, k_bend_z,
+        dir, l, None, None,
+    )
+}
+
 /// Global stiffness of one 2D connector (3 DOFs per node, [ux, uz, θ]).
 pub fn connector_element_2d(conn: &ConnectorElement, ni: &SolverNode, nj: &SolverNode) -> [f64; 36] {
     let dx = nj.x - ni.x;
@@ -171,9 +261,10 @@ pub fn connector_element_3d(conn: &ConnectorElement, ni: &SolverNode3D, nj: &Sol
     let dz = nj.z - ni.z;
     let l = (dx * dx + dy * dy + dz * dz).sqrt();
     let (dir, l) = if l > ZERO_LENGTH { ([dx / l, dy / l, dz / l], l) } else { ([1.0, 0.0, 0.0], 0.0) };
-    connector_stiffness_3d(
+    connector_stiffness_3d_oriented(
         conn.k_axial, conn.k_shear, conn.k_shear_z,
-        conn.k_moment, conn.k_bend_y, conn.k_bend_z, dir, l,
+        conn.k_moment, conn.k_bend_y, conn.k_bend_z,
+        dir, l, conn.local_y_ref(), conn.roll_angle,
     )
 }
 
@@ -233,6 +324,16 @@ pub fn validate_connectors(
         let ks = [c.k_axial, c.k_shear, c.k_moment, c.k_shear_z, c.k_bend_y, c.k_bend_z];
         if ks.iter().any(|k| !k.is_finite()) {
             return Err(format!("Connector {}: stiffness must be finite", c.id));
+        }
+        if let Some(y) = c.local_y_ref() {
+            if !y[0].is_finite() || !y[1].is_finite() || !y[2].is_finite() {
+                return Err(format!("Connector {}: local_y reference vector must be finite", c.id));
+            }
+        }
+        if let Some(roll) = c.roll_angle {
+            if !roll.is_finite() {
+                return Err(format!("Connector {}: roll_angle must be finite", c.id));
+            }
         }
         let l = ((pj[0] - pi[0]).powi(2) + (pj[1] - pi[1]).powi(2) + (pj[2] - pi[2]).powi(2)).sqrt();
         if !has_rotations && l > ZERO_LENGTH && (c.k_shear != 0.0 || c.k_shear_z != 0.0) {
@@ -527,7 +628,10 @@ pub fn corotational_connectors_3d(
         let (l0, dir) = chord_3d(ni, nj);
         let dofs = connector_dofs(dof_num, c.node_i, c.node_j, 6);
         if l0 <= ZERO_LENGTH {
-            let ke = connector_stiffness_3d(c.k_axial, c.k_shear, c.k_shear_z, c.k_moment, c.k_bend_y, c.k_bend_z, dir, 0.0);
+            let ke = connector_stiffness_3d_oriented(
+                c.k_axial, c.k_shear, c.k_shear_z, c.k_moment, c.k_bend_y, c.k_bend_z,
+                dir, 0.0, c.local_y_ref(), c.roll_angle,
+            );
             for (i, j, v) in entries(&ke, &dofs) {
                 scatter(i, j, v);
                 f_int[i] += v * u[j];

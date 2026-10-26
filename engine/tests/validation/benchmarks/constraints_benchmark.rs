@@ -579,6 +579,7 @@ fn benchmark_connector_axial_spring() {
         k_shear_z: 0.0,
         k_bend_y: 0.0,
         k_bend_z: 0.0,
+        ..Default::default()
     });
 
     let results = linear::solve_2d(&input).unwrap();
@@ -656,6 +657,7 @@ fn benchmark_connector_3d_bearing() {
         k_shear_z: k_low,
         k_bend_y: k_high,
         k_bend_z: k_high,
+        ..Default::default()
     });
 
     let results = linear::solve_3d(&input).unwrap();

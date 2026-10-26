@@ -10,7 +10,7 @@ use dedaliano_engine::solver::linear::{solve_2d, solve_3d};
 use dedaliano_engine::types::*;
 
 fn connector(id: usize, i: usize, j: usize, ka: f64, ks: f64, km: f64) -> ConnectorElement {
-    ConnectorElement { id, node_i: i, node_j: j, k_axial: ka, k_shear: ks, k_moment: km, k_shear_z: ks, k_bend_y: km, k_bend_z: km }
+    ConnectorElement { id, node_i: i, node_j: j, k_axial: ka, k_shear: ks, k_moment: km, k_shear_z: ks, k_bend_y: km, k_bend_z: km, ..Default::default() }
 }
 
 /// FINDING 1 (fixed): a FINITE-length connector with shear stiffness violated
@@ -150,6 +150,7 @@ fn connector_cantilever_analytic_3d() {
     input.connectors.insert("1".into(), ConnectorElement {
         id: 1, node_i: 1, node_j: 2, k_axial: ka, k_shear: ks, k_moment: kt,
         k_shear_z: ks, k_bend_y: kb, k_bend_z: kb,
+        ..Default::default()
     });
     let res = solve_3d(&input).unwrap();
     let d = res.displacements.iter().find(|d| d.node_id == 2).unwrap();
@@ -289,6 +290,7 @@ fn connector_model_rotation_invariance_3d() {
         input.connectors.insert("1".into(), ConnectorElement {
             id: 1, node_i: 1, node_j: 2, k_axial: 3e4, k_shear: 2e4, k_moment: 1e3,
             k_shear_z: 2e4, k_bend_y: 4e3, k_bend_z: 4e3,
+            ..Default::default()
         });
         solve_3d(&input).unwrap()
     };
@@ -382,6 +384,7 @@ fn connector_assembly_paths_agree() {
         input.connectors.insert("1".into(), ConnectorElement {
             id: 1, node_i: 1, node_j: 2, k_axial: 3e4, k_shear: ks, k_moment: 1e3,
             k_shear_z: ksz, k_bend_y: 4e3, k_bend_z: 5e3,
+            ..Default::default()
         });
         input.connectors.insert("2".into(), connector(2, 2, 4, 1e4, 5e3, 6e3));
         let dof = DofNumbering::build_3d(&input);

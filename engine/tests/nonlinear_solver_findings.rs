@@ -566,7 +566,7 @@ fn nonlinear_2d_solvers_accept_truss_only_nodes() {
 }
 
 fn conn(id: usize, i: usize, j: usize, k: [f64; 6]) -> ConnectorElement {
-    ConnectorElement { id, node_i: i, node_j: j, k_axial: k[0], k_shear: k[1], k_moment: k[2], k_shear_z: k[3], k_bend_y: k[4], k_bend_z: k[5] }
+    ConnectorElement { id, node_i: i, node_j: j, k_axial: k[0], k_shear: k[1], k_moment: k[2], k_shear_z: k[3], k_bend_y: k[4], k_bend_z: k[5], ..Default::default() }
 }
 
 /// 3 m cantilever column (4 members) loaded at its top (node 5) by a large

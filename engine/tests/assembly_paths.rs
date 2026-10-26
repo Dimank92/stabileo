@@ -1278,7 +1278,7 @@ fn known_ex_spring_on_restrained_dof() {
 /// the same translational stiffness as in a 3-DOF model.
 #[test]
 fn known_connector_on_two_dof_nodes() {
-    let conn = ConnectorElement { id: 1, node_i: 2, node_j: 3, k_axial: 1e5, k_shear: 3e4, k_moment: 0.0, k_shear_z: 0.0, k_bend_y: 0.0, k_bend_z: 0.0 };
+    let conn = ConnectorElement { id: 1, node_i: 2, node_j: 3, k_axial: 1e5, k_shear: 3e4, k_moment: 0.0, k_shear_z: 0.0, k_bend_y: 0.0, k_bend_z: 0.0, ..Default::default() };
     let mut truss = model_2d_from(
         &[(1, 0.0, 0.0), (2, 3.0, 0.0), (3, 4.0, 1.0)],
         &[(1, "truss", 1, 2, false, false)],
@@ -1311,7 +1311,7 @@ fn known_connector_on_warping_nodes() {
         vec![sup_3d(1, [true; 6])],
         vec![],
     );
-    m.connectors.insert("1".into(), ConnectorElement { id: 1, node_i: 2, node_j: 3, k_axial: 1e5, k_shear: 3e4, k_moment: 1e3, k_shear_z: 2e4, k_bend_y: 5e3, k_bend_z: 4e3 });
+    m.connectors.insert("1".into(), ConnectorElement { id: 1, node_i: 2, node_j: 3, k_axial: 1e5, k_shear: 3e4, k_moment: 1e3, k_shear_z: 2e4, k_bend_y: 5e3, k_bend_z: 4e3, ..Default::default() });
     let dn = DofNumbering::build_3d(&m);
     let k = std::panic::catch_unwind(|| assemble_stiffness_3d(&m, &dn).k).expect("3D assembly panicked");
     let mut plain = m.clone();

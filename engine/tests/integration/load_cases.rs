@@ -467,7 +467,7 @@ fn load_cases_2d_connectors_are_not_dropped() {
     model.connectors.insert("1".to_string(), ConnectorElement {
         id: 1, node_i: 2, node_j: 4,
         k_axial: 1.0e6, k_shear: 1.0e6, k_moment: 0.0,
-        k_shear_z: 0.0, k_bend_y: 0.0, k_bend_z: 0.0,
+        k_shear_z: 0.0, k_bend_y: 0.0, k_bend_z: 0.0, ..Default::default()
     });
 
     let loads = vec![SolverLoad::Nodal(SolverNodalLoad {
@@ -520,7 +520,7 @@ fn load_cases_3d_connectors_are_not_dropped() {
     model.connectors.insert("1".to_string(), ConnectorElement {
         id: 1, node_i: 2, node_j: 4,
         k_axial: 1.0e6, k_shear: 1.0e6, k_moment: 0.0,
-        k_shear_z: 1.0e6, k_bend_y: 0.0, k_bend_z: 0.0,
+        k_shear_z: 1.0e6, k_bend_y: 0.0, k_bend_z: 0.0, ..Default::default()
     });
 
     let loads = vec![SolverLoad3D::Nodal(SolverNodalLoad3D {

@@ -1539,6 +1539,54 @@ pub struct ConnectorElement {
     /// 3D only: bending stiffness about local Z
     #[serde(default)]
     pub k_bend_z: f64,
+    /// 3D only: optional user reference vector for local Y (X component)
+    #[serde(default)]
+    pub local_yx: Option<f64>,
+    /// 3D only: optional user reference vector for local Y (Y component)
+    #[serde(default)]
+    pub local_yy: Option<f64>,
+    /// 3D only: optional user reference vector for local Y (Z component)
+    #[serde(default)]
+    pub local_yz: Option<f64>,
+    /// 3D only: optional user reference vector for local Y as [x, y, z]
+    #[serde(default)]
+    pub local_y: Option<[f64; 3]>,
+    /// 3D only: optional roll angle about connector axis in degrees
+    #[serde(default)]
+    pub roll_angle: Option<f64>,
+}
+
+impl Default for ConnectorElement {
+    fn default() -> Self {
+        Self {
+            id: 0,
+            node_i: 0,
+            node_j: 0,
+            k_axial: 0.0,
+            k_shear: 0.0,
+            k_moment: 0.0,
+            k_shear_z: 0.0,
+            k_bend_y: 0.0,
+            k_bend_z: 0.0,
+            local_yx: None,
+            local_yy: None,
+            local_yz: None,
+            local_y: None,
+            roll_angle: None,
+        }
+    }
+}
+
+impl ConnectorElement {
+    pub fn local_y_ref(&self) -> Option<[f64; 3]> {
+        if let Some(y) = self.local_y {
+            return Some(y);
+        }
+        match (self.local_yx, self.local_yy, self.local_yz) {
+            (Some(x), Some(y), Some(z)) => Some([x, y, z]),
+            _ => None,
+        }
+    }
 }
 
 /// Eccentric connection: rigid link with explicit offset vector and optional releases.

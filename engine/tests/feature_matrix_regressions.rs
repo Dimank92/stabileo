@@ -114,7 +114,7 @@ fn influence_line_keeps_connectors() {
     input.supports.insert("50".into(), SolverSupport {
         id: 50, node_id: 50, support_type: "fixed".into(), kx: None, ky: None, kz: None, dx: None, dz: None, dry: None, angle: None,
     });
-    input.connectors.insert("1".into(), ConnectorElement { id: 1, node_i: 7, node_j: 50, k_axial: 5000.0, k_shear: 0.0, k_moment: 0.0, k_shear_z: 0.0, k_bend_y: 0.0, k_bend_z: 0.0 });
+    input.connectors.insert("1".into(), ConnectorElement { id: 1, node_i: 7, node_j: 50, k_axial: 5000.0, k_shear: 0.0, k_moment: 0.0, k_shear_z: 0.0, k_bend_y: 0.0, k_bend_z: 0.0, ..Default::default() });
     let il = influence::compute_influence_line(&influence::InfluenceLineInput {
         solver: input.clone(), quantity: "M".into(), target_node_id: None, target_element_id: Some(2), target_position: 0.5, n_points_per_element: 2,
     })
@@ -185,7 +185,7 @@ fn connector_in_all_truss_model_acts_as_bar() {
             vec![SolverLoad::Nodal(SolverNodalLoad { node_id: 2, fx: 10.0, fz: 3.0, my: 0.0 })],
         );
         if conn {
-            s.connectors.insert("1".into(), ConnectorElement { id: 1, node_i: 2, node_j: 3, k_axial: k, k_shear: 0.0, k_moment: 0.0, k_shear_z: 0.0, k_bend_y: 0.0, k_bend_z: 0.0 });
+            s.connectors.insert("1".into(), ConnectorElement { id: 1, node_i: 2, node_j: 3, k_axial: k, k_shear: 0.0, k_moment: 0.0, k_shear_z: 0.0, k_bend_y: 0.0, k_bend_z: 0.0, ..Default::default() });
         }
         s
     };
@@ -208,7 +208,7 @@ fn connector_in_all_truss_model_acts_as_bar() {
             vec![nodal3(2, [10.0, 2.0, 3.0, 0.0, 0.0, 0.0])],
         );
         if conn {
-            s.connectors.insert("1".into(), ConnectorElement { id: 1, node_i: 2, node_j: 3, k_axial: k, k_shear: 0.0, k_moment: 0.0, k_shear_z: 0.0, k_bend_y: 0.0, k_bend_z: 0.0 });
+            s.connectors.insert("1".into(), ConnectorElement { id: 1, node_i: 2, node_j: 3, k_axial: k, k_shear: 0.0, k_moment: 0.0, k_shear_z: 0.0, k_bend_y: 0.0, k_bend_z: 0.0, ..Default::default() });
         }
         s
     };
