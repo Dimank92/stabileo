@@ -1,13 +1,13 @@
-# SA-2026-024: footings and joints were designed for the unfactored loads when the combinations had not been re-solved
+# SA-2026-024: footings, joints, slabs, walls and the steel optimiser designed for the unfactored loads when the combinations had not been re-solved
 
 | | |
 |---|---|
 | Severity | High |
 | Status | Fixed on `main`; to be published with the next release |
 | Issue | — (W2-01 in the 2026-10 audit) |
-| Fix | PR [#588](https://github.com/lambdaclass/stabileo/pull/588), merged with the integration PR of #589, #590, #588 and #487 |
+| Fix | PR [#588](https://github.com/lambdaclass/stabileo/pull/588) (footings and joints), merged with the integration PR of #589, #590, #588 and #487; the follow-up on `fix/588-follow-up` (slabs, walls, the steel optimiser, an empty active list) |
 | Affected versions | 0.2.0 and 0.3.0 (the single result set design falls back to, `activeResultSet3D`, is in both); earlier deployments not yet bisected |
-| Re-check registry | entry `design-on-unfactored-results` (models with footings or joint designs, and combinations) |
+| Re-check registry | entry `design-on-unfactored-results` (models with footings, joint designs, shells or steel members, and combinations) |
 
 ## Affected features
 
@@ -15,7 +15,17 @@ PRO, 3D. The designs that read one result set when no combination is solved:
 
 - footings (the foundations of the floor families panel: `collectFootingReactions` and the
   footing run's member forces, `detailing-footing-inputs.ts`);
-- joints (the Connections tab's joint design, `joint-design.svelte.ts`).
+- joints (the Connections tab's joint design, `joint-design.svelte.ts`);
+- slabs and walls (the floor families' design and detailing: `collectStresses`,
+  `detailing-floor-inputs.ts`, which designed bending face by face from the result on screen's
+  mx and my, while the panel showed that the combinations were unsolved and ran anyway);
+- the steel optimiser (`membersFor`, `steel-optimise.svelte.ts`, which took the result on screen
+  as its one combination and sized the profiles for it).
+
+Found after #588 merged: #588 fixed the footings and joints, and the others are fixed by its
+follow-up. The same state was also reached with an **empty active combination list**: the
+combination solve refuses it and the single solve stands in, and that state did not count as
+unsolved, so footings and joints too designed over it.
 
 ## What was wrong
 
@@ -57,25 +67,31 @@ combination solved)" while the model has combinations was designed this way.
 
 ## Fixed in
 
-On `main` with PR #588, to ship in the next release. With combinations defined and none solved,
-`activeResultSet3D` is empty (`combinationsUnsolved`): the footings and joints refuse to design,
-and the floor families and Connections panels say why ("Combinations are defined and not solved…
-Solve again"). A model with no combinations is still designed over its one solve. Every manual
-solve (Enter, the ribbon, the exports, Calcular) solves the combinations, and "Re-run analysis
-and design" fails when they were left out. Tests:
+On `main` with PR #588 (footings and joints), and with its follow-up (slabs, walls, the steel
+optimiser, an empty active list), to ship in the next release. With combinations to design for
+and none of them there to read, every design refuses and says why (`designCombinationsWithheld`,
+`active-results.ts`): not solved; only SRSS or ABS combinations active; or an active list that
+names no solved combination. The model has combinations to design for when its active list names
+some or it defines any linear, non-service combination. A model with no combinations is still
+designed over its one solve. Every manual solve (Enter, the ribbon, the exports, Calcular) solves
+the combinations; one that left them out keeps the project stale, and "Re-run analysis and
+design" fails. Tests:
 `web/src/lib/store/__tests__/design-inputs-unsolved-combinations.test.ts`,
+`web/src/lib/store/__tests__/design-consumers-withheld-combinations.test.ts`,
 `web/src/lib/engine/__tests__/solve-entry-point.test.ts`,
-`web/src/lib/actions/__tests__/recheck-rerun.test.ts`.
+`web/src/lib/actions/__tests__/recheck-rerun.test.ts`,
+`web/src/lib/actions/__tests__/recheck-stays-stale.test.ts`.
 
 ## Workaround
 
 Solve with Calcular (which solves the combinations) immediately before reading or exporting a
-footing or joint design, and check that the footing lists the model's combinations, not "Active
-result set (no combination solved)".
+footing, joint, slab, wall or optimised steel design, and check that the footing lists the
+model's combinations, not "Active result set (no combination solved)".
 
 ## What to do with results you already have
 
-Re-solve and re-run the design of the footings and joints of every PRO model with combinations
+Re-solve and re-run the design of the footings, joints, slabs and walls, and the steel
+optimiser's proposals, of every PRO model with combinations
 that was designed with live calc on, or after a combination solve failed, and compare: a footing or
 joint designed on "Active result set (no combination solved)" in a model with combinations was designed for the service
 loads.
