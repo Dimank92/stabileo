@@ -1,7 +1,5 @@
 name: Rollback staging
 
-# Swaps the live release for the previous one kept in /srv/stabileo/releases (one step back
-# per run) and restarts the backend. Code only, unless rollback_db is ticked and confirmed.
 on:
   workflow_dispatch:
     inputs:

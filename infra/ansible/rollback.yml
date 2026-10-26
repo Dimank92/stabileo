@@ -1,6 +1,3 @@
-# Swaps live/ for the most recent release in releases/ and restarts the backend: one step back
-# per run. Code only unless rollback_db=true, which first rolls the migrations down to the
-# target release's last one. Run by .github/workflows/rollback-staging.yml.
 - name: Rollback stabileo to the previous release
   hosts: app
 

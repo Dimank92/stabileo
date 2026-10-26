@@ -1,7 +1,3 @@
-# The staging host: the app (landing + editor) and the admin site, each with /api/* proxied
-# same-origin to the Phoenix release on loopback. Placeholders come from Caddy's environment,
-# /etc/caddy/stabileo.env (infra/caddy/stabileo.env), which infra/systemd/caddy-dropin.conf
-# hands to the caddy unit. Deploys reinstall this file: see infra/ansible/deploy-app.yml.
 {
 	log {
 		format console
@@ -18,13 +14,11 @@
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
-		# Staging must never compete with stabileo.com in search. Drop on the production cut-over.
+		# Staging only: remove on the production cut-over or stabileo.com drops out of search.
 		X-Robots-Tag "noindex, nofollow"
 		-Server
 	}
 
-	# The Phoenix release. Caddy adds X-Forwarded-For, which the backend believes only from
-	# TRUSTED_PROXIES (127.0.0.1). The Rust AI service would take /api/ai/* here once deployed.
 	handle /api/* {
 		reverse_proxy 127.0.0.1:{$BACKEND_PORT:4100}
 	}
@@ -34,17 +28,13 @@
 	root * {$STABILEO_ROOT}/live/frontends/app
 	import common
 
-	# The prerendered pages live at <path>/index.html and their canonical form ends in a slash
-	# (web/src/lib/i18n/public-routes.ts). GitHub Pages answered /en with a 301 to /en/, and the
-	# sitemap lists only the slashed form; keep that here.
+	# The sitemap and canonicals carry only the slashed form; /en must answer 301, not 200.
 	@dirNoSlash {
 		not path */
 		file {path}/index.html
 	}
 	redir @dirNoSlash {path}/ 301
 
-	# Anything with an extension is a real file: hashed bundles under /assets/ for a year, HTML
-	# revalidated (a stale entry would point at bundles the next deploy removed).
 	@static path_regexp \.
 	handle @static {
 		@assets path /assets/*
@@ -54,8 +44,6 @@
 		file_server
 	}
 
-	# Prerendered directories serve their index.html; everything else (/app/*, /demo, ?embed,
-	# shared-model hashes) is the SPA shell. No 404.html bounce is needed here.
 	handle {
 		header Cache-Control "no-cache"
 		try_files {path} {path}/index.html /index.html
@@ -76,8 +64,6 @@
 		file_server
 	}
 
-	# The client routes (/, /settings, /allowlist, /oauth/callback: ADMIN_CLIENT_ROUTES in
-	# web/vite.config.ts) all load admin.html.
 	handle {
 		header Cache-Control "no-cache"
 		try_files {path} /admin.html

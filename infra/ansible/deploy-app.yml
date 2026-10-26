@@ -1,7 +1,3 @@
-# Installs one release artifact (built by .github/workflows/deploy-staging.yml) on the host:
-# imports its signed Nix closure, writes .env, boots the new runtime config once while the old
-# release still serves, stops the backend, migrates, swaps live/, starts, waits for health.
-# Privileged steps are the exact `sudo -n` commands the cloud-init sudoers allow for `app`.
 - name: Deploy stabileo (artifact-based deployment)
   hosts: app
 
@@ -42,9 +38,7 @@
         dest: "{{ tmp_dir }}"
         remote_src: yes
 
-    # The release's scripts and ERTS link against these store paths; without them it cannot
-    # start. The daemon admits them only with a signature by a key in trusted-public-keys
-    # (infra/cloud-init/staging.yaml): never pass --no-check-sigs.
+    # The daemon admits only paths signed by the trusted key: never pass --no-check-sigs.
     - name: Import the release's signed Nix closure
       shell: |
         set -euo pipefail
@@ -70,7 +64,6 @@
         dest: "{{ tmp_dir }}/.env"
         mode: '0600'
 
-    # Caddy runs as its own user and only needs to read the static builds.
     - name: Let Caddy read the frontends
       shell: |
         find {{ tmp_dir }} -type d -exec chmod o+x {} \;
@@ -78,8 +71,6 @@
       args:
         executable: /bin/bash
 
-    # Evaluates the new release's runtime config while the old one still serves, so a
-    # missing setting aborts the deploy with zero downtime instead of after the stop.
     - name: Preflight - validate the new release boots its runtime config
       shell: |
         cd {{ tmp_dir }}
@@ -88,7 +79,6 @@
       args:
         executable: /bin/bash
 
-    # The Caddyfile ships with the artifact so the repository stays its source of truth.
     - name: Stage the Caddyfile
       copy:
         src: "{{ tmp_dir }}/caddy/Caddyfile"

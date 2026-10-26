@@ -1,11 +1,5 @@
 name: Deploy staging
 
-# Builds the Elixir release, the app and the admin site inside Nix, packages them with the
-# release's signed Nix closure, and hands the artifact to infra/ansible/deploy-app.yml on the
-# staging host. Settings live in the GitHub environment `staging` (docs/DEPLOY.md).
-#
-# Runs from this branch until #277 merges; then move the push trigger to main behind a
-# DEPLOY_ON_PUSH variable, as scasaas does.
 on:
   push:
     branches: [klaus/staging-deploy]
@@ -55,8 +49,6 @@ jobs:
       - name: Install web dependencies
         run: make web.deps
 
-      # The build prerenders the public pages by driving the real application in a browser
-      # (web/scripts/prerender.ts), exactly as deploy-gh-pages.yml does.
       - name: Install Chromium for prerendering
         run: |
           make e2e.web.setup
@@ -69,7 +61,6 @@ jobs:
         run: make backend.release.build
 
       # VITE_API_URL stays unset: both sites call /api/* on their own origin through Caddy.
-      # VITE_ACCOUNTS=1 turns the account UI on (off by default in production builds).
       - name: Build the app
         env:
           BASE_PATH: /
@@ -101,8 +92,6 @@ jobs:
       - name: Validate the Caddyfile
         run: nix run nixpkgs#caddy -- validate --config infra/caddy/Caddyfile --adapter caddyfile --envfile infra/caddy/stabileo.env
 
-      # The release's scripts and ERTS point into /nix/store. The closure travels with the
-      # artifact, signed, and the host's daemon admits only paths signed by this key.
       - name: Package release
         env:
           NIX_SIGNING_KEY: ${{ secrets.NIX_SIGNING_KEY }}

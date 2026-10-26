@@ -1,5 +1,3 @@
-# The host layout infra/cloud-init/staging.yaml creates. Every path is owned by `app`, the
-# user CI deploys as and the systemd unit runs as (infra/systemd/stabileo-backend.service).
 app_root: /srv/stabileo
 deploy_dir: "{{ app_root }}/live"
 releases_dir: "{{ app_root }}/releases"
@@ -11,8 +9,6 @@ service_name: stabileo-backend
 backend_port: "{{ lookup('env', 'PORT') | default('4100', true) }}"
 nix_bin: /nix/var/nix/profiles/default/bin
 
-# Written to live/.env from the controller's environment (templates/env.j2).
-# backend/config/runtime.exs is the reference.
 required_env:
   - SECRET_KEY_BASE
   - JWT_SECRET
