@@ -144,4 +144,6 @@ and Caddy keeps retrying certificate issuance until the names resolve to it.
    answers the landing (self-signed until DNS moves), `/api/v1/health` passes.
 3. In Cloudflare, point `stabileo.com` (A), `www` and `admin` at the host, DNS only. Caddy
    obtains the three certificates within a minute.
-4. Remove `web/public/CNAME` and retire `deploy-gh-pages.yml`.
+
+Done on 2026-10-26. The Pages workflow and `web/public/CNAME` are gone; the repository's Pages
+custom domain is kept so pointing DNS back at GitHub Pages remains a rollback path.
