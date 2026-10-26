@@ -1,0 +1,50 @@
+# Installed as /etc/systemd/system/stabileo-backend.service by infra/cloud-init/staging.yaml.
+# The Phoenix release in /srv/stabileo/live/backend, run as the unprivileged `app` user that
+# infra/ansible/deploy-app.yml deploys as. Its settings come from /srv/stabileo/live/.env,
+# which every deploy rewrites (backend/config/runtime.exs is the reference).
+[Unit]
+Description=Stabileo backend (Phoenix release)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=app
+Group=app
+WorkingDirectory=/srv/stabileo/live/backend
+EnvironmentFile=/srv/stabileo/live/.env
+Environment=HOME=/srv/stabileo LANG=C.UTF-8 LC_ALL=C.UTF-8
+# One node, no epmd. `bin/stabileo eval` (migrations) still works; `stop` and `rpc` do not,
+# so the unit stops the BEAM with SIGTERM, which it handles as a clean init:stop/0.
+Environment=RELEASE_DISTRIBUTION=none
+# The release writes its generated sys.config and vm.args here at boot; everything else it
+# owns is read-only under ProtectSystem=strict.
+Environment=RELEASE_TMP=/run/stabileo-backend
+RuntimeDirectory=stabileo-backend
+ExecStart=/srv/stabileo/live/backend/bin/stabileo start
+KillSignal=SIGTERM
+KillMode=mixed
+TimeoutStopSec=30
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+UMask=0077
+
+# Sandboxing. /nix/store stays readable (the ERTS lives there). No MemoryDenyWriteExecute:
+# the OTP JIT needs writable+executable pages.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+
+[Install]
+WantedBy=multi-user.target

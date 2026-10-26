@@ -1,0 +1,248 @@
+#cloud-config
+# Hetzner Cloud user data for the staging host. Image: Debian 13. Paste it into "Cloud config"
+# when creating the server, with these placeholders replaced (docs/DEPLOY.md):
+#   __DEPLOY_PUBKEY__    the public half of DEPLOY_SSH_KEY, the key CI deploys with
+#   __DB_PASSWORD__      the password in DATABASE_URL: ecto://stabileo:<it>@localhost/stabileo_staging
+#   __NIX_TRUSTED_KEY__  the public half of NIX_SIGNING_KEY, e.g. stabileo-staging-1:AbC...=
+#
+# What it sets up: the `app` user CI deploys as (and the services run as), PostgreSQL with the
+# staging database, multi-user Nix trusting CI's signing key, Caddy, and the stabileo-backend
+# unit, which the first deploy starts. The embedded files are copies of infra/caddy/Caddyfile,
+# infra/caddy/stabileo.env, infra/systemd/caddy-dropin.conf and infra/systemd/stabileo-backend.service;
+# every deploy reinstalls the Caddyfile from the repo, the others change only here.
+#
+# Open 22, 80 and 443 in the Hetzner Cloud Firewall; nothing below manages a firewall.
+# Progress: `cloud-init status --wait` on the host; details in /var/log/cloud-init-output.log.
+
+hostname: staging-stabileo
+timezone: UTC
+package_update: true
+package_upgrade: true
+
+packages:
+  - caddy
+  - postgresql
+  - postgresql-client
+  - curl
+  - rsync
+  - gnupg
+  - ca-certificates
+  - unattended-upgrades
+  - util-linux
+  - xz-utils
+  - zstd
+
+users:
+  - default
+  - name: app
+    gecos: Stabileo deploy and service user
+    shell: /bin/bash
+    lock_passwd: true
+    # journald access for `journalctl -u stabileo-backend`; nothing else.
+    groups: [systemd-journal]
+    ssh_authorized_keys:
+      - __DEPLOY_PUBKEY__
+    # Exactly the privileged commands infra/ansible/*.yml run with `sudo -n`; nothing else.
+    sudo:
+      - "ALL=(root) NOPASSWD: /usr/bin/systemctl start stabileo-backend"
+      - "ALL=(root) NOPASSWD: /usr/bin/systemctl stop stabileo-backend"
+      - "ALL=(root) NOPASSWD: /usr/bin/systemctl restart stabileo-backend"
+      - "ALL=(root) NOPASSWD: /usr/bin/systemctl status stabileo-backend"
+      - "ALL=(root) NOPASSWD: /usr/bin/systemctl reload caddy"
+      - "ALL=(root) NOPASSWD: /usr/bin/caddy validate --config /srv/stabileo/caddy/Caddyfile.next --adapter caddyfile --envfile /etc/caddy/stabileo.env"
+      - "ALL=(root) NOPASSWD: /usr/bin/install -m 0644 -o root -g root /srv/stabileo/caddy/Caddyfile.next /etc/caddy/Caddyfile"
+
+# Deferred: written after the packages are installed, so dpkg does not see a pre-existing
+# /etc/caddy/Caddyfile and keep the package's one.
+write_files:
+  - path: /etc/caddy/Caddyfile
+    permissions: "0644"
+    defer: true
+    content: |
+      # The staging host: the app (landing + editor) and the admin site, each with /api/* proxied
+      # same-origin to the Phoenix release on loopback. Placeholders come from Caddy's environment,
+      # /etc/caddy/stabileo.env (infra/caddy/stabileo.env), which infra/systemd/caddy-dropin.conf
+      # hands to the caddy unit. Deploys reinstall this file: see infra/ansible/deploy-app.yml.
+      {
+      	log {
+      		format console
+      		output stdout
+      		level INFO
+      		include http.log.access
+      	}
+      }
+      
+      (common) {
+      	encode zstd gzip
+      
+      	header {
+      		X-Content-Type-Options "nosniff"
+      		Referrer-Policy "strict-origin-when-cross-origin"
+      		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+      		# Staging must never compete with stabileo.com in search. Drop on the production cut-over.
+      		X-Robots-Tag "noindex, nofollow"
+      		-Server
+      	}
+      
+      	# The Phoenix release. Caddy adds X-Forwarded-For, which the backend believes only from
+      	# TRUSTED_PROXIES (127.0.0.1). The Rust AI service would take /api/ai/* here once deployed.
+      	handle /api/* {
+      		reverse_proxy 127.0.0.1:{$BACKEND_PORT:4100}
+      	}
+      }
+      
+      {$APP_DOMAIN} {
+      	root * {$STABILEO_ROOT}/live/frontends/app
+      	import common
+      
+      	# The prerendered pages live at <path>/index.html and their canonical form ends in a slash
+      	# (web/src/lib/i18n/public-routes.ts). GitHub Pages answered /en with a 301 to /en/, and the
+      	# sitemap lists only the slashed form; keep that here.
+      	@dirNoSlash {
+      		not path */
+      		file {path}/index.html
+      	}
+      	redir @dirNoSlash {path}/ 301
+      
+      	# Anything with an extension is a real file: hashed bundles under /assets/ for a year, HTML
+      	# revalidated (a stale entry would point at bundles the next deploy removed).
+      	@static path_regexp \.
+      	handle @static {
+      		@assets path /assets/*
+      		header @assets Cache-Control "public, max-age=31536000, immutable"
+      		@html path *.html
+      		header @html Cache-Control "no-cache"
+      		file_server
+      	}
+      
+      	# Prerendered directories serve their index.html; everything else (/app/*, /demo, ?embed,
+      	# shared-model hashes) is the SPA shell. No 404.html bounce is needed here.
+      	handle {
+      		header Cache-Control "no-cache"
+      		try_files {path} {path}/index.html /index.html
+      		file_server
+      	}
+      }
+      
+      {$ADMIN_DOMAIN} {
+      	root * {$STABILEO_ROOT}/live/frontends/admin
+      	import common
+      
+      	@static path_regexp \.
+      	handle @static {
+      		@assets path /assets/*
+      		header @assets Cache-Control "public, max-age=31536000, immutable"
+      		@html path *.html
+      		header @html Cache-Control "no-cache"
+      		file_server
+      	}
+      
+      	# The client routes (/, /settings, /allowlist, /oauth/callback: ADMIN_CLIENT_ROUTES in
+      	# web/vite.config.ts) all load admin.html.
+      	handle {
+      		header Cache-Control "no-cache"
+      		try_files {path} /admin.html
+      		file_server
+      	}
+      }
+  - path: /etc/caddy/stabileo.env
+    permissions: "0644"
+    defer: true
+    content: |
+      # Installed as /etc/caddy/stabileo.env by infra/cloud-init/staging.yaml. Caddy reads these as
+      # {$NAME} placeholders in infra/caddy/Caddyfile; `caddy validate --envfile` reads the same file.
+      APP_DOMAIN=staging.stabileo.com
+      ADMIN_DOMAIN=admin.staging.stabileo.com
+      STABILEO_ROOT=/srv/stabileo
+      BACKEND_PORT=4100
+  - path: /etc/systemd/system/caddy.service.d/stabileo.conf
+    permissions: "0644"
+    defer: true
+    content: |
+      # Installed as /etc/systemd/system/caddy.service.d/stabileo.conf by infra/cloud-init/staging.yaml.
+      [Service]
+      EnvironmentFile=/etc/caddy/stabileo.env
+  - path: /etc/systemd/system/stabileo-backend.service
+    permissions: "0644"
+    defer: true
+    content: |
+      # Installed as /etc/systemd/system/stabileo-backend.service by infra/cloud-init/staging.yaml.
+      # The Phoenix release in /srv/stabileo/live/backend, run as the unprivileged `app` user that
+      # infra/ansible/deploy-app.yml deploys as. Its settings come from /srv/stabileo/live/.env,
+      # which every deploy rewrites (backend/config/runtime.exs is the reference).
+      [Unit]
+      Description=Stabileo backend (Phoenix release)
+      After=network-online.target postgresql.service
+      Wants=network-online.target
+      
+      [Service]
+      Type=exec
+      User=app
+      Group=app
+      WorkingDirectory=/srv/stabileo/live/backend
+      EnvironmentFile=/srv/stabileo/live/.env
+      Environment=HOME=/srv/stabileo LANG=C.UTF-8 LC_ALL=C.UTF-8
+      # One node, no epmd. `bin/stabileo eval` (migrations) still works; `stop` and `rpc` do not,
+      # so the unit stops the BEAM with SIGTERM, which it handles as a clean init:stop/0.
+      Environment=RELEASE_DISTRIBUTION=none
+      # The release writes its generated sys.config and vm.args here at boot; everything else it
+      # owns is read-only under ProtectSystem=strict.
+      Environment=RELEASE_TMP=/run/stabileo-backend
+      RuntimeDirectory=stabileo-backend
+      ExecStart=/srv/stabileo/live/backend/bin/stabileo start
+      KillSignal=SIGTERM
+      KillMode=mixed
+      TimeoutStopSec=30
+      Restart=always
+      RestartSec=5
+      LimitNOFILE=65536
+      UMask=0077
+      
+      # Sandboxing. /nix/store stays readable (the ERTS lives there). No MemoryDenyWriteExecute:
+      # the OTP JIT needs writable+executable pages.
+      NoNewPrivileges=yes
+      ProtectSystem=strict
+      ProtectHome=yes
+      PrivateTmp=yes
+      PrivateDevices=yes
+      ProtectKernelTunables=yes
+      ProtectKernelModules=yes
+      ProtectControlGroups=yes
+      RestrictNamespaces=yes
+      LockPersonality=yes
+      RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+      SystemCallArchitectures=native
+      SystemCallFilter=@system-service
+      
+      [Install]
+      WantedBy=multi-user.target
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    permissions: "0644"
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+
+runcmd:
+  # Release layout (docs/DEPLOY.md). Caddy must traverse to live/frontends, hence 0755.
+  - mkdir -p /srv/stabileo/releases /srv/stabileo/gcroots /srv/stabileo/caddy /srv/stabileo/incoming
+  - chown -R app:app /srv/stabileo
+  - chmod 0755 /srv/stabileo
+  # The database and its owner. CREATEDB and pg_signal_backend are for a later restore flow.
+  - sudo -u postgres psql -v ON_ERROR_STOP=1 -c "CREATE ROLE stabileo LOGIN PASSWORD '__DB_PASSWORD__' CREATEDB;"
+  - sudo -u postgres psql -v ON_ERROR_STOP=1 -c "GRANT pg_signal_backend TO stabileo;"
+  - sudo -u postgres psql -v ON_ERROR_STOP=1 -c "CREATE DATABASE stabileo_staging OWNER stabileo;"
+  # Multi-user Nix. The release is built by Nix on the CI runner, so its ERTS points into
+  # /nix/store; each deploy imports exactly the signed paths it needs. `app` stays an ordinary
+  # Nix user (never a trusted-user), so the daemon admits only paths signed by this key.
+  - curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix -o /root/nix-installer.sh
+  - sh /root/nix-installer.sh install linux --no-confirm
+  - printf '\nextra-trusted-public-keys = __NIX_TRUSTED_KEY__\n' >> /etc/nix/nix.conf
+  - systemctl restart nix-daemon
+  # Services. The backend unit stays stopped until the first deploy fills /srv/stabileo/live.
+  - systemctl daemon-reload
+  - systemctl enable stabileo-backend
+  - systemctl enable --now caddy
+  - systemctl restart caddy
+  - echo "stabileo cloud-init done" > /srv/stabileo/cloud-init-done
+
+final_message: "stabileo staging host ready after $UPTIME seconds"
