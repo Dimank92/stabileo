@@ -42,11 +42,11 @@ What it leaves behind, for reference:
 
 - user `app`, SSH key = the public half of `DEPLOY_SSH_KEY`, sudo only for the exact
   `systemctl`, `caddy validate` and `install` commands the playbooks run;
-- multi-user Nix with `extra-trusted-public-keys` = the public half of `NIX_SIGNING_KEY`.
+- multi-user Determinate Nix with `extra-trusted-public-keys` = the public half of `NIX_SIGNING_KEY` in `/etc/nix/nix.custom.conf`.
   `app` is an ordinary Nix user, never a `trusted-user`, so the daemon admits only signed paths;
 - PostgreSQL role `stabileo` (`CREATEDB`, `pg_signal_backend` for a later restore flow) and the
   database `stabileo_staging`;
-- Caddy with `/etc/caddy/Caddyfile` and `/etc/caddy/stabileo.env` (the domains and root);
+- Caddy with `/etc/caddy/Caddyfile` and `/etc/caddy/stabileo.env` (the domains and root), from Caddy's own apt repository (Debian 13 ships 2.6.2, too old for this Caddyfile);
 - the `stabileo-backend` unit, enabled, started by the first deploy.
 
 Generate the keys once:
