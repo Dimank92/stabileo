@@ -327,7 +327,7 @@
   import DesignDesk from './components/pro/desk/DesignDesk.svelte';
   import { deskUi, deskLayout } from './lib/store/design-desk-ui.svelte';
   import { isDesignTab, syncDeskWithTab, syncTabWithDesk } from './lib/pro/design-navigation';
-  import { askDesignForLink, enableDesignForLink } from './lib/store/design-presence';
+  import { askDesignForLink, enableDesignForLink, announceDesignOn } from './lib/store/design-presence';
   import { rebarWorkspace } from './lib/store/rebar-workspace.svelte';
   /** Design docks beside the viewer on a desktop PRO screen; elsewhere it is a full-screen sheet. */
   const deskDocked = $derived(uiStore.appMode === 'pro' && !uiStore.isMobile);
@@ -353,9 +353,16 @@
     untrack(() => {
       if (deskUi.open) deskUi.open = false;
       if (rebarWorkspace.open) rebarWorkspace.close();
-      if (resultsStore.diagramType === 'verification') resultsStore.diagramType = 'none';
       if (uiStore.appMode === 'pro') syncDeskWithTab(uiStore.proActiveTab);
     });
+  });
+  /*
+   * The verification colouring is design's, and a restored tab or session can ask for it after
+   * the switch was read: watched on its own, so it never paints verdicts while design is off.
+   */
+  $effect(() => {
+    if (uiStore.designInPro || uiStore.appMode !== 'pro') return;
+    if (resultsStore.diagramType === 'verification') untrack(() => { resultsStore.diagramType = 'none'; });
   });
   import ProProjectFileActions from './components/pro/ProProjectFileActions.svelte';
   import ProRibbon from './components/pro/ProRibbon.svelte';
@@ -2240,7 +2247,7 @@
           </button>
         {/if}
         {#if toast.actionId === 'enable-design'}
-          <button class="toast-action" data-testid="toast-enable-design" onclick={() => { uiStore.designInPro = true; uiStore.dismissToast(toast.id); }}>
+          <button class="toast-action" data-testid="toast-enable-design" onclick={() => { uiStore.designInPro = true; uiStore.dismissToast(toast.id); announceDesignOn(); }}>
             {t('design.enable')}
           </button>
         {/if}

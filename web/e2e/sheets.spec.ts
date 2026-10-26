@@ -96,6 +96,13 @@ test.describe('@slow sheets', () => {
     const panel = stage.getByTestId('sheets-panel');
     await panel.scrollIntoViewIfNeeded();
     await panel.getByTestId('sheets-build').click();
+    /*
+     * The set is laid out entry by entry, yielding to the page between them (`projectSheetSetAsync`),
+     * and the button is disabled until it is done: wait on that, as `openSheetsPlace` does. 22
+     * entries on the 729-member hall took 0.6 s here; on CI, where the viewer behind them renders
+     * in software, the run stood at «22 of 22» past the default 10 s and the list was read early.
+     */
+    await expect(panel.getByTestId('sheets-build')).toBeEnabled({ timeout: 120_000 });
     const list = page.getByTestId('sheets-list');
     for (const re of [/Steel framing|Estructura metálica/, /Anchors|Anclajes/, /Connections|Uniones/]) await expect(list).toContainText(re);
     if (process.env.SHOT) {

@@ -6,8 +6,8 @@
  * The store-level proof is `store/__tests__/held-verdict-surfaces.test.ts`; this reads the same
  * rule where it is painted. qa-seismic with its chapter-18 checks run: every member they cover
  * runs them only as a substitute (ACI 318-19 ch. 18 for INPRES-CIRSOC 103 II), so its verdict is
- * held while its section's local checks pass. qa-8 with its beams' role not declared: two beams
- * refused, held by the refusal, the others verified.
+ * held while its section's local checks pass. The 408-member frame: the members no layout
+ * threads and anchors are refused, held by the refusal, and the others read their verdict.
  */
 import { test, expect, loadModel, designAll, openDeskStage, deskTab, openClassicDesign, designPlace } from './fixtures';
 
@@ -79,16 +79,23 @@ test.describe('held verdicts in the browser', () => {
     expect(errors).toEqual([]);
   });
 
-  test('qa-8, lateral role not declared: a refused beam reads held by its refusal, a verified one reads ok', async ({ pro: page }) => {
-    await loadModel(page, 'rc-design-qa-8');
-    await designAll(page);
+  test('the 408-member frame: a refused member reads held by its refusal, a verified one reads ok', async ({ pro: page }) => {
+    test.setTimeout(240_000);
+    await loadModel(page, 'rc-design-frame');
+    const run = await designAll(page);
     await openDeskStage(page);
-    const ids = await page.evaluate(() => window.__stabileo.elementIds());
-    const verdicts = await Promise.all(ids.map(async (id) => [id, await verdictOf(page, id)] as const));
+    const verdicts = await page.evaluate(() => {
+      const h = window.__stabileo as unknown as { elementIds(): number[]; memberVerdict(id: number): Verdict };
+      return h.elementIds().map((id) => [id, h.memberVerdict(id)] as const);
+    });
     const refused = verdicts.filter(([, x]) => x.holds.includes('refused')).map(([id]) => id);
     const free = verdicts.filter(([, x]) => x.holds.length === 0 && x.status === 'ok').map(([id]) => id);
-    expect(refused).toHaveLength(2);
-    expect(free).toHaveLength(6);
+    // The refusals are the run's exhausted searches, 36 as B9 counts them; 62 verify with nothing
+    // holding them (B9's «ok»). qa-8 had two refusals until the verifier took the compression
+    // acting with each moment, and now verifies every beam (B10), so it shows no refusal to read.
+    expect(refused).toHaveLength(run.searchExhausted);
+    expect(refused).toHaveLength(36);
+    expect(free).toHaveLength(62);
 
     await page.getByTestId(`desk-row-${refused[0]}`).click();
     await expect(page.getByTestId('desk-status')).not.toHaveAttribute('data-status', /^(ok|warn)$/);
