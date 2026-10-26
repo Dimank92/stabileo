@@ -38,7 +38,7 @@ test.beforeEach(async ({ pro: page }) => {
   await page.getByTestId('pr-cmd-shells').click();
 });
 
-test('a plate drawn on an outline has no mesh, meshes from its panel, and is picked whole', async ({ pro: page }) => {
+test('@smoke a plate drawn on an outline has no mesh, meshes from its panel, and is picked whole', async ({ pro: page }) => {
   await page.getByTestId('draw-plate').click();
   await expect(page.getByTestId('draw-corners-outline')).toHaveAttribute('aria-pressed', 'true');
   for (const n of [5, 6, 8, 7]) await click(page, n);
@@ -103,7 +103,7 @@ test('a plate drawn on an outline has no mesh, meshes from its panel, and is pic
   await expect.poll(async () => (await plates(page))[0]!.loads).toBe(1);
 });
 
-test('an analysis meshes the plate first, and stops when told not to', async ({ pro: page }) => {
+test('@smoke an analysis meshes the plate first, and stops when told not to', async ({ pro: page }) => {
   await page.getByTestId('draw-plate').click();
   for (const n of [5, 6, 8, 7, 5]) await click(page, n);
   await expect.poll(() => plates(page)).toHaveLength(1);
