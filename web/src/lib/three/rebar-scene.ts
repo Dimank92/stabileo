@@ -1148,7 +1148,9 @@ export function createRebarScene(
             || (r.fb !== null && familyVisible(r.fb, f, kinds));
         if (!visible) continue;
         if (n !== i) {
-          dst.set(src.subarray(i * 16, i * 16 + 16), n * 16);
+          const s = i * 16;
+          const d = n * 16;
+          for (let k = 0; k < 16; k++) dst[d + k] = src[s + k];
           markersCompacted = true;
           touched = true;
         }

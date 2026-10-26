@@ -195,11 +195,11 @@ test.describe('@slow the standing notices, on the building that carries both', (
      */
     await filter.click();
     /*
-     * Sixty seconds, not the default ten. On a CI runner the page is busy for 40 s after this
-     * press (the trace of a failure on main: 28.7 s before `aria-pressed` read true, then a
-     * first `count()` that had not answered 15 s later), so the poll expired before the page
-     * could answer a single query. This test is about the filter narrowing the list; how long
-     * the press blocks the page is issue #608.
+     * Issue #608 diagnosis: the 40 s freeze observed on main was SwiftShader software-rasterizing
+     * the initial 408-member frame asynchronously behind the click because the open helper did
+     * not wait for the first frame to render. The app's own work for this filter is ~4 ms (zero rebuilds).
+     * With `openWorkspaceFromCommandRow` now waiting for the initial frame to settle, the click
+     * executes on an idle page. The 60 s timeout remains as an upper bound for slow CI runners.
      */
     await expect(filter).toHaveAttribute('aria-pressed', 'true', { timeout: 60_000 });
     await expect

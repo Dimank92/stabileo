@@ -522,7 +522,13 @@
    */
   $effect(() => {
     const next = { filter, concrete: showConcrete, conflicts: showConflicts };
+    if (typeof performance !== 'undefined' && typeof performance.mark === 'function') {
+      try { performance.mark('stabileo:3d:filter:start'); } catch { /* ignore */ }
+    }
     built?.setVisibility(next);
+    if (typeof performance !== 'undefined' && typeof performance.mark === 'function') {
+      try { performance.mark('stabileo:3d:filter:end'); } catch { /* ignore */ }
+    }
     invalidate(2);
   });
 

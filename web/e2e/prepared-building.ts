@@ -178,6 +178,24 @@ export async function openWorkspaceFromCommandRow(page: Page): Promise<void> {
     .poll(() => page.evaluate(() => window.__stabileo.rebarSceneCensus() !== null),
       { timeout: 60_000 })
     .toBe(true);
+
+  /**
+   * Wait for the first frame to render and settle (#608).
+   *
+   * Geometry build and scene census happen inside requestAnimationFrame before the WebGL renderer
+   * has executed its first draw. On a 2-core headless runner using SwiftShader software rasterization,
+   * rendering the first frame of a large model (408 members, 20k tubes, 40k markers) takes 25-35 s of CPU time.
+   * If the helper returns before that first frame completes, subsequent clicks (such as status filters)
+   * get queued behind the initial render while the runner appears frozen for 40 s.
+   */
+  const building = page.getByTestId('rebar-workspace-building');
+  if (await building.isVisible()) {
+    await expect(building).toBeHidden({ timeout: 180_000 });
+  }
+  await expect
+    .poll(() => page.evaluate(() => window.__stabileo.openTimeline()?.frame !== undefined
+      || window.__stabileo.canvasInkRatio() > 0), { timeout: 180_000 })
+    .toBe(true);
 }
 
 /**

@@ -889,4 +889,29 @@ describe('the 7-storey building keeps its steel where it belongs', { timeout: 30
     expect(left).not.toContain('column');
     built.setVisibility({ filter: {} });
   });
+
+  it('filtering by status does not rebuild geometry (#608)', () => {
+    const buildsBefore = rebarSceneBuilds();
+    const buffersBefore = tubeFingerprint(built);
+
+    const targetElementIds = scene.solids
+      .flatMap((s) => s.elementIds)
+      .filter((id, i, arr) => arr.indexOf(id) === i)
+      .slice(0, 13);
+
+    const t0 = performance.now();
+    built.setVisibility({ filter: { elementIds: targetElementIds } });
+    const elapsed = performance.now() - t0;
+
+    expect(rebarSceneBuilds() - buildsBefore, '0 tubes rebuilt on filter press').toBe(0);
+    expect(tubeFingerprint(built), 'vertex buffers are untouched').toEqual(buffersBefore);
+    expect(elapsed, 'app-level filter application stays well under 50 ms').toBeLessThan(50);
+
+    const census = built.census();
+    expect(census.triangles).toBeGreaterThan(0);
+
+    built.setVisibility({ filter: {} });
+    expect(rebarSceneBuilds() - buildsBefore).toBe(0);
+  });
 });
+
