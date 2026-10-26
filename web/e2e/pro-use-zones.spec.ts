@@ -9,7 +9,7 @@ test.use({ viewport: { width: 1440, height: 900 } });
  */
 const loads = (page: import('@playwright/test').Page) => page.evaluate(() => window.__stabileo.modelCensus().loads);
 
-test('a zone told its use loads the plate under it, once', async ({ pro: page }) => {
+test('@smoke a zone told its use loads the plate under it, once', async ({ pro: page }) => {
   await loadModel(page, '3d-portal-frame');
   await page.getByTestId('pr-stage-model').click();
   await page.getByTestId('pr-cmd-shells').click();
