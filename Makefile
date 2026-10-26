@@ -1,8 +1,8 @@
 .PHONY: help install-nix shell setup setup.run git.setup deps backend.run console routes \
        lint.engine check.engine.acceptance-models test.engine.gates test.engine.metamorphic test.engine.suite bench.engine \
-       web.deps typecheck.web test.web.unit test.web.build test.web.determinism e2e.web.setup e2e.web.build e2e.web.smoke e2e.web.slow e2e.web.visual \
+       web.deps typecheck.web test.web.unit test.web.build test.web.determinism e2e.web.setup e2e.web.build e2e.web.smoke e2e.web.slow e2e.web.visual e2e.web.flaky \
        test.ci-scripts \
-       test test.engine test.backend test.backend.file test.web test.ai-backend test.inventory \
+       test test.engine test.backend test.backend.file test.web test.ai-backend test.inventory test-changed \
        lint.backend format format.backend \
        wasm web.setup web.run web.build admin.run admin.build \
        ai-backend.run ai-backend.build \
@@ -12,7 +12,7 @@
        services services.stop postgres.start postgres.stop \
        inst inst.check inst.claim inst.release inst.list ports \
        docker.build docker.up docker.down \
-       check-pins check.changelog worktree worktree-prune \
+       check-pins check.changelog check.test-targets worktree worktree-prune hooks \
        fmt check clean
 
 NIX_RUN = nix develop --command
@@ -85,8 +85,12 @@ help:
 	@echo "  make test.web.build       - Production build + build-pass tests"
 	@echo "  make test.web.determinism - WASM results bit-identical across Node and three browsers"
 	@echo "  make e2e.web.build        - The VITE_E2E=1 site the e2e suites run on with E2E_PREBUILT=1"
-	@echo "  make e2e.web.smoke [SHARD=1/5] - Playwright smoke suite"
-	@echo "  make e2e.web.slow [SHARD=1/5] / e2e.web.visual - The heavier Playwright suites"
+	@echo "  make e2e.web.smoke [SHARD=1/10] - Playwright smoke suite"
+	@echo "  make e2e.web.slow [SHARD=1/10] / e2e.web.visual - The heavier Playwright suites"
+	@echo "  make e2e.web.flaky       - The quarantined (@flaky) tests, two retries"
+	@echo "  make check.test-targets  - Every engine test file is in exactly one test binary"
+	@echo "  make test-changed        - Only the tests your changes most likely affect"
+	@echo "  make hooks               - The versioned pre-push hook (typecheck + related unit tests)"
 	@echo "  make lint.backend   - Format check and credo over the backend"
 	@echo "  make format         - Format Elixir and Rust"
 	@echo ""
@@ -148,6 +152,18 @@ deps:
 backend.run: services
 	$(NIX_RUN) bash -c "cd backend && MIX_ENV=dev INST=$(INST) mix ecto.migrate && MIX_ENV=dev INST=$(INST) iex -S mix phx.server"
 
+## Use the versioned git hooks (scripts/hooks): pre-push runs the web typecheck and the related
+## unit tests. Set in the repository's config, so every worktree of this clone gets it; skip one
+## push with `git push --no-verify`; undo with `git config --unset core.hooksPath`.
+hooks:
+	git config core.hooksPath scripts/hooks
+	@echo "hooks: core.hooksPath = scripts/hooks (pre-push: typecheck + related unit tests)"
+
+## Only the tests your changes most likely affect (vs origin/main, uncommitted work included);
+## prints what it runs and what it skips. BASE=<rev> to compare with something else.
+test-changed:
+	scripts/test-changed.sh $(if $(BASE),--base $(BASE))
+
 console: services
 	$(NIX_RUN) bash -c "cd backend && MIX_ENV=dev INST=$(INST) iex -S mix"
 
@@ -172,15 +188,21 @@ test.web:
 
 # Each named gate runs once on its own; the suite runs everything else, so no
 # test runs twice. Add a gate here and it is excluded from the suite automatically.
+#
+# The gate files are modules of the `gates` and `certificates` test binaries
+# (engine/tests/<binary>/main.rs, autotests = false): a test's name starts with its file's
+# module, so test(/^acceptance::/) is the old acceptance binary. nextest fails a filter that
+# matches no test, and make check.test-targets fails on a file in no binary or two.
 GATE_SHELL_BENCH = test(/benchmark_shell/) + test(/benchmark_beam_shell/) + test(/benchmark_plate/) + test(/benchmark_navier/) + test(/benchmark_scordelis/) + test(/benchmark_cantilever/) + test(/benchmark_pinched/) + test(/test_quad_thin_plate/)
 GATE_SHELL_ACCEPTANCE = test(/acceptance_.*shell/) + test(/acceptance_.*diaphragm/)
 GATE_CONSTRAINT_BENCH = test(/benchmark_.*constraint/)
-GATE_BINARIES = sparse_shell_gates solver_invariants solver_ci_coverage conditioning_adversarial kfull_overbuild_gates acceptance certify properties_2d properties_3d
+GATE_MODULES = sparse_shell_gates solver_invariants solver_ci_coverage conditioning_adversarial kfull_overbuild_gates acceptance
 # Wall-clock gates run single-threaded, so elapsed time is CPU work, not contention.
-GATE_TIMED_BINARIES = perf_regression_gates perf_regression_advanced
+GATE_TIMED_MODULES = perf_regression_gates perf_regression_advanced
+GATE_CERTIFICATES = test(/^certify::/) + test(/^properties_2d::/) + test(/^properties_3d::/)
 # Metamorphic tests run apart, in release: unoptimised they outlast a suite shard.
 GATE_RELEASE_BINARIES = metamorphic
-SUITE_FILTER = all() - test(harmonic_phase_breakdown) - test(harmonic_modal_vs_direct_timing) $(foreach b,$(GATE_TIMED_BINARIES) $(GATE_RELEASE_BINARIES),- binary($(b)) )- ($(GATE_SHELL_BENCH)) - ($(GATE_SHELL_ACCEPTANCE)) - $(GATE_CONSTRAINT_BENCH) $(foreach b,$(GATE_BINARIES),- binary($(b)) )
+SUITE_FILTER = all() - test(harmonic_phase_breakdown) - test(harmonic_modal_vs_direct_timing) - (binary(gates) & (test(/^perf_regression_advanced::/) + test(/^perf_regression_gates::/))) - ($(GATE_SHELL_BENCH)) - ($(GATE_SHELL_ACCEPTANCE)) - $(GATE_CONSTRAINT_BENCH) - (binary(gates) & (test(/^sparse_shell_gates::/) + test(/^solver_invariants::/) + test(/^solver_ci_coverage::/) + test(/^conditioning_adversarial::/) + test(/^kfull_overbuild_gates::/) + test(/^acceptance::/))) - (binary(certificates) & ($(GATE_CERTIFICATES))) $(foreach b,$(GATE_RELEASE_BINARIES),- binary($(b)) )
 NEXTEST = cd engine && $(NIX_RUN) cargo nextest run --profile ci
 
 lint.engine:
@@ -195,8 +217,9 @@ test.engine.gates: check.engine.acceptance-models
 	$(NEXTEST) -E '$(GATE_SHELL_BENCH)'
 	$(NEXTEST) -E '$(GATE_SHELL_ACCEPTANCE)'
 	$(NEXTEST) -E '$(GATE_CONSTRAINT_BENCH)'
-	$(foreach b,$(GATE_BINARIES),($(NEXTEST) --test $(b)) &&) true
-	$(foreach b,$(GATE_TIMED_BINARIES),($(NEXTEST) --test $(b) --test-threads 1) &&) true
+	$(foreach m,$(GATE_MODULES),($(NEXTEST) --test gates -E 'test(/^$(m)::/)') &&) true
+	$(foreach m,$(GATE_TIMED_MODULES),($(NEXTEST) --test gates -E 'test(/^$(m)::/)' --test-threads 1) &&) true
+	$(NEXTEST) --test certificates -E '$(GATE_CERTIFICATES)'
 
 test.engine.metamorphic:
 	$(NEXTEST) --cargo-profile release $(foreach b,$(GATE_RELEASE_BINARIES),--test $(b))
@@ -235,11 +258,16 @@ e2e.web.build:
 	$(NIX_RUN) bash -c 'cd web && VITE_E2E=1 npm run build && echo "VITE_E2E=1 build of $${GITHUB_SHA:-$$(git rev-parse HEAD)}" > dist/e2e-build.txt'
 
 # SHARD=i/n picks whole spec files balanced by measured duration (web/scripts/e2e-shard.mjs).
+# `@flaky` tests are quarantined (web/e2e/README.md): left out here, run by e2e.web.flaky.
 e2e.web.smoke:
-	$(NIX_RUN) bash -c 'cd web && npx playwright test --grep @smoke $(if $(SHARD),$$(node scripts/e2e-shard.mjs $(subst /, ,$(SHARD))))'
+	$(NIX_RUN) bash -c 'cd web && E2E_JSON_REPORT=e2e/.results/smoke.json npx playwright test --grep @smoke --grep-invert @flaky $(if $(SHARD),$$(node scripts/e2e-shard.mjs $(subst /, ,$(SHARD))))'
 
 e2e.web.slow:
-	$(NIX_RUN) bash -c 'cd web && npx playwright test --grep "@slow" --grep-invert "visual baselines" $(if $(SHARD),--shard=$(SHARD))'
+	$(NIX_RUN) bash -c 'cd web && E2E_JSON_REPORT=e2e/.results/slow.json npx playwright test --grep "@slow" --grep-invert "visual baselines|@flaky" $(if $(SHARD),$$(node scripts/e2e-shard.mjs --suite slow $(subst /, ,$(SHARD))))'
+
+# --pass-with-no-tests: an empty quarantine is the goal, not an error.
+e2e.web.flaky:
+	$(NIX_RUN) bash -c 'cd web && npx playwright test --grep @flaky --retries=2 --pass-with-no-tests'
 
 e2e.web.visual:
 	$(NIX_RUN) bash -c 'cd web && npx playwright test --grep "visual baselines" $(if $(UPDATE_SNAPSHOTS),--update-snapshots)'
@@ -251,9 +279,11 @@ test.ai-backend:
 ## Engine-coupled = every target except `reference`, whose tests recompute
 ## textbook/code formulas inline and never call the engine (see
 ## engine/tests/reference/main.rs). Single pass: attributes each `test result`
-## line to the target announced by the preceding `Running` line.
+## line to the target announced by the preceding `Running` line. A complete run
+## reports every [[test]] binary in engine/Cargo.toml plus the library's unit tests.
 test.inventory:
-	@cd engine && $(NIX_RUN) cargo test 2>&1 | awk -v sha="$$(git rev-parse --short HEAD)" -v day="$$(date +%Y-%m-%d)" ' \
+	@cd engine && $(NIX_RUN) cargo test 2>&1 | awk -v sha="$$(git rev-parse --short HEAD)" -v day="$$(date +%Y-%m-%d)" \
+		-v expected="$$(( $$(grep -c '^\[\[test\]\]' Cargo.toml) + 1 ))" ' \
 		/^[[:space:]]*Running / { target = $$2 } \
 		/^[[:space:]]*Doc-tests / { target = "doc-tests" } \
 		/^test result:/ { \
@@ -262,7 +292,7 @@ test.inventory:
 			failed += $$6; seen++; \
 		} \
 		END { \
-			if (seen < 20 || ref == 0) { \
+			if (seen < expected || ref == 0) { \
 				printf "INCOMPLETE RUN (%d target(s) reported, reference=%d) — do not publish these numbers.\n", seen, ref; \
 				exit 1; \
 			} \
@@ -279,6 +309,11 @@ check-pins:
 ## Unreleased changes are one file each in changelog.d/ (scripts/changelog.py)
 check.changelog:
 	$(NIX_RUN) python3 -I scripts/changelog.py --check
+
+# The engine's test files are modules of a few listed binaries (autotests = false): a file
+# in no binary would never run, one in two would run twice.
+check.test-targets:
+	python3 -I scripts/check-test-targets.py
 
 test.ci-scripts:
 	$(NIX_RUN) bash -c 'shellcheck -S warning .github/scripts/*.sh'
