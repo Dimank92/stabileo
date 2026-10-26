@@ -19,6 +19,7 @@ import { nodesOnMembers } from './nodes-on-members';
 import { localizeEngineText } from '../i18n/engine-text';
 import { modelStore, resultsStore, uiStore } from '../store';
 import { instability } from '../store/instability.svelte';
+import { recheckStore } from '../store/recheck.svelte';
 import { is3DWorkspace } from '../utils/workspace';
 import { requestAutosave } from '../store/autosave-service';
 import { publishCombinations3D, activePerCombo3D } from '../store/active-results';
@@ -224,7 +225,24 @@ async function liveCalc2D(isStale: () => boolean): Promise<void> {
  * `actions/solve.ts`). Handles 2D and 3D, combinations, toasts and mobile panel, and says how it
  * ended. Throws only when the solver cannot be started.
  */
+/**
+ * The shell's pending live calc (App.svelte debounces it after each edit), cancelled by every manual
+ * solve: Enter, the ribbon, an export, the re-run. A live calc firing during the manual solve would
+ * supersede it under the solve guard, and the manual solve would report "the model changed" for a
+ * model nobody touched, or publish the live calc's single solve in its place.
+ */
+let cancelPendingLiveCalc: (() => void) | null = null;
+
+export function registerLiveCalcCanceller(cancel: (() => void) | null): void {
+  cancelPendingLiveCalc = cancel;
+}
+
 export async function runGlobalSolve(options: { directBase?: boolean } = {}): Promise<GlobalSolveOutcome> {
+  cancelPendingLiveCalc?.();
+  // A solve that was asked for the combinations and did not get them must not end the stale state
+  // (`store/recheck.svelte.ts`): its single-solve publish stamps the project, so the stamp before it
+  // is put back below. Every entry point, not only the re-check's re-run.
+  const stampBefore = recheckStore.capture();
   // Slabs placed to be meshed at the analysis get their mesh first, so what follows (the floor
   // loads, the solve, the results, the slab design) reads the mesh (`deferred-slabs.ts`).
   if (uiStore.is3DWorkspace) {
@@ -273,6 +291,7 @@ export async function runGlobalSolve(options: { directBase?: boolean } = {}): Pr
     lastFailure = outcome.ok ? null : { input, error: outcome.error };
     resultsStore.restoreView(uiStore.is3DWorkspace);
   }
+  if (outcome.ok && outcome.combinationsLeftOut !== null) recheckStore.restoreStamp(stampBefore);
   // A solve is minutes of computed state produced by one click. Waiting for the 30 s timer
   // to notice is how a run gets lost to a closed tab.
   void requestAutosave('solve');
@@ -393,6 +412,13 @@ async function globalSolve3D(isStale: () => boolean, directBase: boolean): Promi
       if (firstCaseResult) markAllLoads(firstCaseResult, comboResult.perCase, factors);
     }
     if (!firstCaseResult) return t('results.emptyModelError');
+    // The same check the single solve makes, on everything this path would publish: the base and
+    // every case and combination. A NaN here goes back as the combinations' failure, and the
+    // single-solve fallback refuses a NaN base by itself.
+    const invalid = (r: { displacements: unknown[] }) => hasInvalid3DDisplacements(r.displacements as Array<{ ux: number; uy: number; uz: number }>);
+    if (invalid(firstCaseResult) || [...comboResult.perCase.values(), ...comboResult.perCombo.values()].some(invalid)) {
+      return t('results.numericError3d');
+    }
 
     resultsStore.setResults3D(firstCaseResult);
     // A case, or the sum of the cases, has no engine input of its own: the provenance names the
@@ -443,16 +469,20 @@ async function globalSolve3D(isStale: () => boolean, directBase: boolean): Promi
       }
     }
 
+    // As in PRO: the single solve stands in, and the combinations' failure is said as
+    // information next to its success, or as the error (with its action) when it failed too.
     try {
       const combo = await runComboSolve();
       if (typeof combo !== 'string') return combo;
       console.warn('[globalSolve3D] Combination solve returned error, falling back to single solve:', combo);
-      uiStore.toast(localizeEngineText(combo), 'error', solveErrorAction(combo));
-      return withoutCombinations(await runSingleSolve(), combo);
+      const fallback = await runSingleSolve();
+      uiStore.toast(localizeEngineText(combo), fallback.ok ? 'info' : 'error', fallback.ok ? undefined : solveErrorAction(combo));
+      return withoutCombinations(fallback, combo);
     } catch (e: any) {
       console.error('[globalSolve3D] Combination solving failed:', e.message);
-      uiStore.toast(localizeEngineText(e.message), 'error', solveErrorAction(e.message));
-      return withoutCombinations(await runSingleSolve(), e.message);
+      const fallback = await runSingleSolve();
+      uiStore.toast(localizeEngineText(e.message), fallback.ok ? 'info' : 'error', fallback.ok ? undefined : solveErrorAction(e.message));
+      return withoutCombinations(fallback, e.message);
     }
   }
 

@@ -39,7 +39,9 @@ export async function rerunAnalysisAndDesign(): Promise<{ ok: boolean; error?: s
   /*
    * The combinations refused (an empty active list) or failed, and the single solve stood in for
    * them: the model is not what was asked for, and design has nothing to read. The project stays
-   * stale, as the message says; the single solve's publish had already stamped it.
+   * stale, as the message says: `runGlobalSolve` put the earlier stamp back (for every entry point,
+   * so a plain Calcular after this does not end it either). Restored here too, as this re-run's
+   * own guarantee.
    */
   if (outcome.combinationsLeftOut !== null) {
     recheckStore.restoreStamp(before);
