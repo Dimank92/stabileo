@@ -106,6 +106,8 @@ export interface Material {
    * reads this should warn about its absence.
    */
   gradeId?: string;
+  /** Timber reference design values, MPa: the material is timber and is designed by CIRSOC 601. */
+  timber?: import('../engine/design/materials/timber').TimberReference;
   /**
    * Maximum nominal coarse-aggregate size, mm, or null when the project has not stated it.
    *
@@ -460,6 +462,8 @@ export interface Element extends Element3DMetadata {
    * reading would pass (`cirsoc301-verdict.ts`).
    */
   steelLoadHeight?: 'web' | 'topFlange';
+  /** A steel-concrete member (filled or encased column, beam under a slab): AISC 360-10 Chapter I. */
+  composite?: import('../engine/design/materials/composite').CompositeSpec;
 }
 
 /** A camera the user named: where it stands and what it looks at, in scene coordinates. */
@@ -1069,6 +1073,32 @@ const VIEW_CHANNEL_FIELDS = ['views', 'grid', 'notes', 'underlays', 'designData'
 
 /** Whether a floor-load definition wrote the load (`model/loads/floor-definitions.ts` `isDefinedLoad`). */
 const isDefinedLoadData = (l: Load | undefined): boolean => (l?.data as { fromDef?: number } | undefined)?.fromDef !== undefined;
+
+
+/**
+ * The detailing as a snapshot carries it, each of its parts copied once per version of it.
+ *
+ * The detailing of a detailed building runs to tens of megabytes (every bar of every assembly),
+ * and every edit pushes an undo entry. Its parts are only ever replaced whole: an edit that
+ * retires the document writes a new detailing object holding the SAME assemblies, refusals and
+ * floor readings. So each part is copied once, keyed by the object the model holds, and every
+ * snapshot taken until that part is replaced shares the copy. Nothing writes into a snapshot's
+ * detailing: `restore()` copies what it receives before adopting it.
+ */
+let detailingCopies = new WeakMap<object, unknown>();
+function copyDetailing(d: DetailingStore | undefined): DetailingStore {
+  if (!d) return emptyDetailingStore();
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(d)) {
+    if (v === null || typeof v !== 'object') { out[k] = v; continue; }
+    let copy = detailingCopies.get(v);
+    if (copy === undefined) { copy = JSON.parse(JSON.stringify($state.snapshot(v))); detailingCopies.set(v, copy); }
+    out[k] = copy;
+  }
+  return out as unknown as DetailingStore;
+}
+/** For the tests that compare a snapshot's cost before and after: forget the copies made. */
+export function forgetDetailingCopies(): void { detailingCopies = new WeakMap(); }
 
 function createModelStore() {
   /**
@@ -1727,6 +1757,31 @@ function createModelStore() {
      * elements, so an in-place edit could previously corrupt an undo snapshot that
      * shared the same `reinforcement` object.
      */
+    /**
+     * A design-only attribute of an element (its composite definition): undoable, and the solve
+     * survives it, as with reinforcement — it changes how the member is checked, not its stiffness.
+     */
+    setElementDesign(elemId: number, patch: { composite?: Element['composite'] }): void {
+      const elem = model.elements.get(elemId);
+      if (!elem) return;
+      _pushUndoSilent?.();
+      const plain = { ...($state.snapshot(elem) as Element), ...JSON.parse(JSON.stringify(patch)) } as Element;
+      if ('composite' in patch && patch.composite === undefined) delete plain.composite;
+      model.elements.set(elemId, plain);
+      model.elements = new Map(model.elements);
+    },
+
+    /** The timber reference values of a material: design data, the analysis reads E, not these. */
+    setMaterialDesign(materialId: number, patch: { timber?: Material['timber'] }): void {
+      const mat = model.materials.get(materialId);
+      if (!mat) return;
+      _pushUndoSilent?.();
+      const plain = { ...($state.snapshot(mat) as Material), ...JSON.parse(JSON.stringify(patch)) } as Material;
+      if ('timber' in patch && patch.timber === undefined) delete plain.timber;
+      model.materials.set(materialId, plain);
+      model.materials = new Map(model.materials);
+    },
+
     reinforcementTransaction(
       fn: (api: {
         setReinforcement(elemId: number, r: ProvidedReinforcement | undefined): void;
@@ -2096,7 +2151,9 @@ function createModelStore() {
     snapshot(): ModelSnapshot {
       // $state.snapshot() is the official Svelte 5 API to deeply unwrap reactive proxies
       // into plain JavaScript objects. This avoids all proxy-related serialization issues.
-      const snap = $state.snapshot(model);
+      // The detailing is left out of it and copied once per version (`detailingSnapshot`): it is
+      // the largest part of a detailed project and an edit never changes it in place.
+      const snap = $state.snapshot({ ...model, detailing: undefined }) as unknown as ReturnType<typeof $state.snapshot<typeof model>>;
       const snapId = $state.snapshot(nextId);
       const result: ModelSnapshot = {
         name: snap.name,
@@ -2198,9 +2255,7 @@ function createModelStore() {
         codeSettings: snap.codeSettings
           ? (JSON.parse(JSON.stringify(snap.codeSettings)) as ProjectCodeSettings)
           : defaultCodeSettings(),
-        detailing: snap.detailing
-          ? (JSON.parse(JSON.stringify(snap.detailing)) as DetailingStore)
-          : emptyDetailingStore(),
+        detailing: copyDetailing(model.detailing),
         // Both of these were declared on StructureModel AND on ModelSnapshot and
         // emitted by neither, so the regulation stack and the revision vector were
         // dropped by every path that goes through snapshot(): .ded save, undo/redo,
@@ -3287,7 +3342,7 @@ function createModelStore() {
         ...(data.materialId !== undefined ? { materialId: data.materialId } : {}),
         ...(data.thickness !== undefined ? { thickness: data.thickness } : {}),
       });
-      model.quads = new Map(model.quads);
+      if (!_bulkMutating) model.quads = new Map(model.quads);
     },
 
     /**
@@ -3321,12 +3376,14 @@ function createModelStore() {
       // also rewrite the offset that undo is supposed to restore.
       const next = { ...shell };
       if (offset) next.offset = { ...offset }; else delete next.offset;
+      // In a bulk edit the maps are committed once at its end (`bulkMutate`): a copy per shell
+      // made meshing a floor of thousands of shells quadratic.
       if (kind === 'plate') {
         model.plates.set(id, next as Plate);
-        model.plates = new Map(model.plates);
+        if (!_bulkMutating) model.plates = new Map(model.plates);
       } else {
         model.quads.set(id, next as Quad);
-        model.quads = new Map(model.quads);
+        if (!_bulkMutating) model.quads = new Map(model.quads);
       }
     },
 

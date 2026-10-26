@@ -11,6 +11,7 @@
  * stays thin.
  */
 
+import { meshDeferredSlabs, representFootprints } from '../model/building/deferred-slabs';
 import { noteBaseSolveInput } from '../store/result-provenance';
 import { syncDefinedLoadsForAnalysis } from '../store/defined-loads';
 import { spectralOrSay } from '../actions/solve';
@@ -21,7 +22,7 @@ import { instability } from '../store/instability.svelte';
 import { is3DWorkspace } from '../utils/workspace';
 import { requestAutosave } from '../store/autosave-service';
 import { publishCombinations3D, activePerCombo3D } from '../store/active-results';
-import { t } from '../i18n';
+import { t, tp } from '../i18n';
 import { initSolver, isWasmReady, combineResults3D } from './wasm-solver';
 import { computeGoverning2D, computeGoverning3D } from './governing-case';
 import { hasNonlinearBehaviour } from './member-behaviour';
@@ -224,6 +225,16 @@ async function liveCalc2D(isStale: () => boolean): Promise<void> {
  * ended. Throws only when the solver cannot be started.
  */
 export async function runGlobalSolve(options: { directBase?: boolean } = {}): Promise<GlobalSolveOutcome> {
+  // Slabs placed to be meshed at the analysis get their mesh first, so what follows (the floor
+  // loads, the solve, the results, the slab design) reads the mesh (`deferred-slabs.ts`).
+  if (uiStore.is3DWorkspace) {
+    // A slab meshed before its columns' sections were represented is meshed again with them
+    // (`column-footprints.ts`): held at one node, its load split is the mesh's, not the building's.
+    const f = representFootprints();
+    if (f.slabs > 0) uiStore.toast(tp('building.slabs.footprintsAtSolve', { n: f.slabs }), 'info');
+    const m = meshDeferredSlabs();
+    if (m.slabs > 0) uiStore.toast(tp('building.slabs.meshedAtSolve', { n: m.slabs, shells: m.shells }), 'info');
+  }
   // Floor loads kept as definitions are rewritten first when the model moved under them, so the
   // guard below starts from the model that is solved (`store/defined-loads.ts`).
   if (uiStore.is3DWorkspace) syncDefinedLoadsForAnalysis();

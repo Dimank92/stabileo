@@ -184,7 +184,20 @@ export interface SlabBand {
   dir: 'x' | 'y';
   x0: number; x1: number; y0: number; y1: number;
   diameter: number; spacing: number;
+  /** Bars in each rib of a ribbed slab; `spacing` is then the rib spacing over this count. */
+  perRib?: number;
   hookStart?: boolean; hookEnd?: boolean;
+  /**
+   * The bars' direction in plan, degrees from x; absent, along `dir` (0 or 90). A band at an
+   * angle carries cos² of its area per metre in x and sin² in y.
+   */
+  angle?: number;
+  /** A free outline in plan, m; absent, the rectangle x0–x1 × y0–y1 (which stays its bounding box). */
+  outline?: Array<{ x: number; y: number }>;
+  /** Equal bands drawn and scheduled as one package, under one mark. */
+  group?: string;
+  /** Where the band's text sits on the plan, m; absent, at the middle of its bars. */
+  label?: { x: number; y: number };
 }
 
 /**
@@ -192,7 +205,7 @@ export interface SlabBand {
  * bands of extra bars where the strips need more than the base.
  */
 export interface SlabPanelReinforcement {
-  base: Partial<Record<'topX' | 'topY' | 'bottomX' | 'bottomY', { diameter: number; spacing: number }>>;
+  base: Partial<Record<'topX' | 'topY' | 'bottomX' | 'bottomY', { diameter: number; spacing: number; perRib?: number }>>;
   bands: SlabBand[];
 }
 

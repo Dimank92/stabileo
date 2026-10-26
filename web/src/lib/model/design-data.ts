@@ -9,6 +9,8 @@
  * CIRSOC 201-2025 Table 20.5.1.3.1 is known for it: a cover under it is said, and a click sets
  * every cover to it.
  */
+import { migrateSeismicDesign } from './seismic-design';
+import { migrateLateralSystem } from './lateral-system';
 import { REBAR_DB } from '../engine/codes/argentina/cirsoc201';
 
 export type DesignKind = 'beam' | 'column' | 'slab' | 'wall' | 'footing';
@@ -20,6 +22,18 @@ export const DESIGN_KINDS: readonly DesignKind[] = ['beam', 'column', 'slab', 'w
  * with the ground.
  */
 export type Exposure = 'interior' | 'exterior' | 'ground';
+
+export interface LoadBasis {
+  /** ISO time the plan was applied. */
+  at: string;
+  generatedBy?: string;
+  factors: Record<string, import('../codes/regulation').ProvenancedValue<number>>;
+  levels: Array<Omit<import('../engine/loads/load-plan').LevelMass, 'nodeIds'>>;
+  seismic?: import('../engine/loads/load-plan').LoadPlan['seismic'];
+  derivation: import('../codes/message').EngineMessage[];
+  assumptions: import('../codes/message').EngineMessage[];
+  refs: import('../codes/regulation').ClauseRef[];
+}
 
 export interface ProjectDesignData {
   version: 1;
@@ -41,6 +55,69 @@ export interface ProjectDesignData {
    * lo = max(largest side, clear height/6, 450 mm) at half the spacing. Absent: off.
    */
   columnEndZones?: boolean;
+  /** The project's own joist types (its makers' sheets, or geometric definitions). */
+  joistTypes?: import('../engine/joists/library').JoistType[];
+  /** The sheet set: format, numbering, the documents' language and the revisions per sheet. */
+  /**
+   * The basis of the loads the last applied plan wrote: its provenanced factors, the weight by
+   * level, the seismic derivation, the assumptions and the clauses. Kept so the memoria's actions
+   * chapter can justify the loads after the dialog that computed them is closed.
+   */
+  loadBasis?: LoadBasis;
+  /** Ribbed, hollow-core and composite-deck systems, drop panels and capitals, pile steel (`store/special-floors.ts`). */
+  specialFloors?: import('./special-floors').SpecialFloorsData;
+  /** Parametric stairs and the post-tensioned slabs' tendons (`store/stairs-pt.ts`). */
+  stairs?: import('./stairs-pt').StairEntry[];
+  postTension?: import('./stairs-pt').PostTensionData;
+  /** Fire rating and how each material meets it (`store/fire.ts`). */
+  fire?: import('./special-elements').FireSettings;
+  /** Corbels, coupling beams, beam openings, masonry walls, infills and connections (`store/special-elements.ts`). */
+  specialElements?: import('./special-elements').SpecialElementsData;
+  /** The foreign codes the project also designs to, by material (`store/foreign-design.ts`). */
+  foreignCodes?: import('./foreign-codes').ForeignCodes;
+  /** The price bases, the one in use and the summary shares of the budget (`store/budget.ts`). */
+  budget?: { bases: import('../engine/budget/budget').PriceBase[]; activeBaseId?: string; shares?: import('../engine/budget/budget').SummaryShares };
+  /** Models of other disciplines linked to the project, and the versions published (`store/federation.svelte.ts`). */
+  federation?: { links: import('../engine/federation/linked').LinkedModel[]; versions: import('../engine/federation/versions').PublishedVersion[] };
+  /** Constructions, walls and partitions, rooms (`store/architecture.ts`). */
+  /** Construction phases and what each builds (`store/site.svelte.ts`). */
+  site?: import('../engine/site/phases').SiteData;
+  architecture?: { constructions: import('../engine/architecture/architecture').Construction[]; walls: import('../engine/architecture/architecture').ArchWall[]; rooms: import('../engine/architecture/architecture').Room[] };
+  /** Service condition and temperature of the timber members (CIRSOC 601 CM and Ct). */
+  timber?: import('../engine/design/materials/timber').TimberSettings;
+  /**
+   * How the project goes to other programs. `ifcColumnTop`: where a column's body ends in the IFC
+   * against the slab it meets: the slab's top (the whole joint in the column, the default), the
+   * slab's soffit, or the node's axis; what is above goes to the slab, or to the deepest beam where
+   * there is no slab.
+   */
+  exchange?: { ifcColumnTop?: 'slabTop' | 'slabSoffit' | 'axis' };
+  /** How far apart, mm, two members' lengths may be and their frames still repeat (`repeatedFrames`). Absent: 0, the same to the millimetre. */
+  frameToleranceMm?: number;
+  /** Cover a person set for one member, m, by element id: it replaces its kind's (`covers`). */
+  coverByElement?: Record<string, number>;
+  /** The listings' columns and filters, and the waste added to the quantities (`store/listings.ts`). */
+  listings?: { configs?: Record<string, { columns?: string[]; text?: string; failingOnly?: boolean }>; wastePct?: number };
+  sheets?: {
+    format: import('../sheets/formats').SheetFormat; prefix: string; start: number; language?: string; kinds?: string[]; revisions?: Record<string, { code: string; date?: string; note?: string }>;
+    /** The set as an ordered list of entries (`sheets/sheet-entries.ts`); absent, one per kind. */
+    entries?: import('../sheets/sheet-entries').SheetEntry[];
+    display?: import('../sheets/display').SheetDisplay;
+    titleBlock?: import('../sheets/sheet-entries').TitleBlockTemplate;
+    /** The person's adjustments to the composed sheets, by drawing key (`sheets/sheet-layout.ts`). */
+    layout?: import('../sheets/sheet-layout').SheetLayout;
+    /** The construction details chosen from the catalogue and the plan kind each goes on; absent, the defaults (`sheets/details/catalog.ts`). */
+    details?: Array<{ id: string; target: string }>;
+  };
+  /** How a seismic project designs its concrete (`seismic-design.ts`). Absent: the defaults. */
+  seismic?: import('./seismic-design').SeismicDesignSettings;
+  /**
+   * Which members are part of the lateral-force-resisting system (`lateral-system.ts`): by
+   * physical element, by member, and the default for the beams. Absent: nothing declared.
+   */
+  lateralSystem?: import('./lateral-system').LateralSystemData;
+  /** A predetermined slab base mat, deducted before bands are added (absent: the minimum). */
+  slabBase?: Partial<Record<'topX' | 'topY' | 'bottomX' | 'bottomY', { diameter: number; spacing: number }>>;
 }
 
 /** Every diameter the bar table knows, mm. */
@@ -113,6 +190,33 @@ export function migrateDesignData(raw: unknown): ProjectDesignData {
     stirrupDiametersMm: known(e.stirrupDiametersMm, def.stirrupDiametersMm),
     wallBarDiaMm: BAR_DIAMETERS_MM.includes(e.wallBarDiaMm as number) ? (e.wallBarDiaMm as number) : def.wallBarDiaMm,
     ...(e.columnEndZones === true ? { columnEndZones: true } : {}),
+    ...(Array.isArray(e.joistTypes) ? { joistTypes: (e.joistTypes as Array<{ id?: unknown; name?: unknown }>).filter((t) => typeof t?.id === 'string' && typeof t?.name === 'string') as never } : {}),
+    ...(e.slabBase && typeof e.slabBase === 'object' ? { slabBase: e.slabBase as ProjectDesignData['slabBase'] } : {}),
+    // The seismic roles fixed by hand are the lateral-system declaration under its older name:
+    // they move there (`migrateLateralSystem`), and the seismic settings keep none of their own.
+    ...(e.seismic && typeof e.seismic === 'object' ? { seismic: { ...migrateSeismicDesign(e.seismic), roles: {} } } : {}),
+    ...((lateral) => (lateral ? { lateralSystem: lateral } : {}))(migrateLateralSystem(e.lateralSystem, (e.seismic as { roles?: Record<string, unknown> } | undefined)?.roles)),
+    ...(e.sheets && typeof e.sheets === 'object' ? { sheets: e.sheets as ProjectDesignData['sheets'] } : {}),
+    ...(e.loadBasis && typeof e.loadBasis === 'object' ? { loadBasis: e.loadBasis as LoadBasis } : {}),
+    ...(e.timber && typeof e.timber === 'object' ? { timber: e.timber as ProjectDesignData['timber'] } : {}),
+    ...(e.specialFloors && typeof e.specialFloors === 'object' ? { specialFloors: e.specialFloors as ProjectDesignData['specialFloors'] } : {}),
+    ...(Array.isArray(e.stairs) ? { stairs: (e.stairs as Array<{ id?: unknown }>).filter((x) => typeof x?.id === 'string') as ProjectDesignData['stairs'] } : {}),
+    ...(e.postTension && typeof e.postTension === 'object' ? { postTension: e.postTension as ProjectDesignData['postTension'] } : {}),
+    ...(e.fire && typeof e.fire === 'object' ? { fire: e.fire as ProjectDesignData['fire'] } : {}),
+    ...(e.specialElements && typeof e.specialElements === 'object' ? { specialElements: e.specialElements as ProjectDesignData['specialElements'] } : {}),
+    ...(e.foreignCodes && typeof e.foreignCodes === 'object' ? { foreignCodes: e.foreignCodes as ProjectDesignData['foreignCodes'] } : {}),
+    ...(e.site && typeof e.site === 'object' && Array.isArray((e.site as { phases?: unknown }).phases) ? { site: e.site as ProjectDesignData['site'] } : {}),
+    ...(e.architecture && typeof e.architecture === 'object' && Array.isArray((e.architecture as { walls?: unknown }).walls) ? { architecture: e.architecture as ProjectDesignData['architecture'] } : {}),
+    ...(e.federation && typeof e.federation === 'object' && Array.isArray((e.federation as { links?: unknown }).links) ? { federation: e.federation as ProjectDesignData['federation'] } : {}),
+    ...(e.budget && typeof e.budget === 'object' && Array.isArray((e.budget as { bases?: unknown }).bases) ? { budget: e.budget as ProjectDesignData['budget'] } : {}),
+    ...((x) => (x && typeof x === 'object' && ['slabTop', 'slabSoffit', 'axis'].includes(String((x as { ifcColumnTop?: unknown }).ifcColumnTop))
+      ? { exchange: { ifcColumnTop: (x as { ifcColumnTop: 'slabTop' | 'slabSoffit' | 'axis' }).ifcColumnTop } } : {}))(e.exchange),
+    ...(e.listings && typeof e.listings === 'object' && !Array.isArray(e.listings) ? { listings: e.listings as ProjectDesignData['listings'] } : {}),
+    ...(typeof e.frameToleranceMm === 'number' && Number.isFinite(e.frameToleranceMm) && e.frameToleranceMm > 0 ? { frameToleranceMm: Math.min(e.frameToleranceMm, 500) } : {}),
+    ...((c) => (Object.keys(c).length ? { coverByElement: c } : {}))(
+      e.coverByElement && typeof e.coverByElement === 'object' && !Array.isArray(e.coverByElement)
+        ? Object.fromEntries(Object.entries(e.coverByElement as Record<string, unknown>).filter((x): x is [string, number] => typeof x[1] === 'number' && Number.isFinite(x[1]) && x[1] >= 0 && x[1] < 0.2))
+        : {}),
   };
 }
 

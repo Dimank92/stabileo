@@ -19,6 +19,8 @@
  *   - autoVerifyFromResults is the JS orchestrator (Phase 3 replaces with WASM call)
  */
 
+import { materialFamilyOf } from './steel/material-family';
+import { catalogueGradeFamily } from './steel/grade-family';
 import type { AnalysisResults3D, BeamStationInput3D, GroupedBeamStationResult3D, MemberStationGroup3D } from './types-3d';
 import { decodeStationBuffer } from './station-buffer';
 import { steelSectionConstants } from './steel/section-constants';
@@ -31,7 +33,7 @@ import {
   type StationForces,
 } from './station-design-forces';
 import { extractBeamStationBuffer3D, extractBeamStationsGrouped3D, isSolverReady } from './wasm-solver';
-import { autoVerifyFromResults, type AutoVerifyModelData } from './auto-verify';
+import { autoVerifyFromResults, type AutoVerifyModelData, type AutoVerifyOptions } from './auto-verify';
 import type { ElementVerification } from './codes/argentina/cirsoc201';
 import {
   checkSteelInteraction, interactionRatios, steelShapeOf, verifyByFlange, withUndeclaredData, worseSteelVerification,
@@ -221,12 +223,13 @@ export function runUnifiedVerification(
   model: AutoVerifyModelData,
   governing: Map<number, GoverningPerElement3D> | null,
   stationDemands?: Map<number, ElementDesignDemands>,
+  options?: AutoVerifyOptions,
 ): ElementVerification[] {
   const { concrete } = autoVerifyFromResults(
     results3D,
     model,
     governing,
-    undefined,
+    options,
     stationDemands,
   );
   return concrete;
@@ -255,8 +258,9 @@ export function runCirsocDesign(
   stationDemands: Map<number, ElementDesignDemands> | undefined,
   sectionNames: Map<number, string>,
   governing: Map<number, GoverningPerElement3D> | null,
+  options?: AutoVerifyOptions,
 ): { normalized: MemberResult[]; concrete: ElementVerification[]; summary: DesignCheckSummary | null } {
-  const concrete = runUnifiedVerification(results3D, model, governing, stationDemands);
+  const concrete = runUnifiedVerification(results3D, model, governing, stationDemands, options);
   const normalized = normalizeCirsoc201(concrete, sectionNames);
 
   // PURE: this function no longer writes to any store. Publishing the code-check
@@ -390,6 +394,7 @@ export function steelInputCompleteness(model: AutoVerifyModelData): SteelInputCo
     const material = model.materials.get(elem.materialId);
     if (!section || !material) continue;
     if (!material.fy || material.fy <= 80) continue;  // concrete, not steel
+    if (materialFamilyOf(material as never, catalogueGradeFamily).family !== 'steel' || (elem as { composite?: unknown }).composite) continue;
     const gaps = missingSteelInputs(section as SteelSectionData, material as SteelMaterialData);
     if (gaps.length > 0) out.push({ elementId: elem.id, gaps });
   }
@@ -425,6 +430,8 @@ export function runSteelVerification(
     const material = model.materials.get(elem.materialId);
     if (!section || !material) continue;
     if (!material.fy || material.fy <= 80) continue; // RC, not steel
+    // Aluminium, timber and composite members have checkers of their own (`design/materials`).
+    if (materialFamilyOf(material as never, catalogueGradeFamily).family !== 'steel' || (elem as { composite?: unknown }).composite) continue;
 
     const nI = model.nodes.get(elem.nodeI);
     const nJ = model.nodes.get(elem.nodeJ);
@@ -1166,7 +1173,7 @@ export function getCodeDetail(v: ElementVerification | undefined | null): CodeDe
   }
 
   const interactionParams = v.column ? {
-    b: v.b, h: v.h, fc: v.fc, fy: 420,
+    b: v.b, h: v.h, fc: v.fc, fy: v.fy,
     cover: v.cover + (v.shear.stirrupDia / 2000) + (v.flexure.barDia / 2000),
     AsProv: v.column.AsProv, barCount: v.column.barCount,
     barDia: v.column.barDia ?? v.flexure.barDia,

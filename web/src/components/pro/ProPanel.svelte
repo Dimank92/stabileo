@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { ReportFormat } from '../../lib/export/report-formats';
   /**
    * The PRO panel: which destination is open, and the three commands the ribbon delegates here.
    *
@@ -48,6 +49,7 @@
   import ProGroupsPanel from './ProGroupsPanel.svelte';
   import ProPhysicalPanel from './ProPhysicalPanel.svelte';
   import ProBuildingPanel from './ProBuildingPanel.svelte';
+  import ProFoundationModelPanel from './ProFoundationModelPanel.svelte';
   import ProCodePanel from './ProCodePanel.svelte';
   import ProViewPanel from './ProViewPanel.svelte';
   import ProProjectFileActions from './ProProjectFileActions.svelte';
@@ -68,15 +70,11 @@
   import ProLoadsTab from './ProLoadsTab.svelte';
   import ProResultsTab from './ProResultsTab.svelte';
   import ProInstabilityReport from './ProInstabilityReport.svelte';
-  import ProRcWorkflowTab from './ProRcWorkflowTab.svelte';
   import ProShellTab from './ProShellTab.svelte';
   import ProSpecificationsTab from './spec/ProSpecificationsTab.svelte';
-  import ProDesignCompleteness from './design/ProDesignCompleteness.svelte';
   import { resetProjectProvenance } from '../../lib/store/project-provenance';
   import ProAdvancedTab from './ProAdvancedTab.svelte';
   import ProDiagnosticsTab from './ProDiagnosticsTab.svelte';
-  import ProConnectionsTab from './ProConnectionsTab.svelte';
-  import ProOtherCodesPanel from './ProOtherCodesPanel.svelte';
   /*
    * The metallic tab renders the WORKFLOW, and the workflow renders `SteelPanel` as its last
    * stage — so the inventory is still there, one disclosure in, rather than replaced or duplicated.
@@ -85,14 +83,13 @@
    * a subset of the other, and a user having to know which. This is the same tab with the stages
    * around it.
    */
-  import ProSteelWorkflowTab from './ProSteelWorkflowTab.svelte';
   import ProGeneratorsPanel from './generators/ProGeneratorsPanel.svelte';
   import { checkCurrentModel } from '../../lib/engine/solve-diagnostics';
   import { createPhoneShell } from '../../lib/pro/phone-shell.svelte';
   import ProPhoneNav from './ProPhoneNav.svelte';
   import ProPhoneGrid from './ProPhoneGrid.svelte';
 
-  type ProTab = 'selection' | 'project' | 'nodes' | 'elements' | 'shells' | 'materials' | 'sections' | 'specifications' | 'supports' | 'loads' | 'advanced' | 'results' | 'design' | 'steel' | 'generators' | 'connections' | 'diagnostics' | 'settings' | 'grid' | 'transform' | 'edit' | 'groups' | 'physical' | 'building' | 'foundations' | 'designData' | 'code' | 'view' | 'otherCodes';
+  type ProTab = 'selection' | 'project' | 'nodes' | 'elements' | 'shells' | 'materials' | 'sections' | 'specifications' | 'supports' | 'loads' | 'advanced' | 'results' | 'design' | 'desk' | 'steel' | 'generators' | 'connections' | 'diagnostics' | 'settings' | 'grid' | 'transform' | 'edit' | 'groups' | 'physical' | 'building' | 'foundations' | 'designData' | 'code' | 'view' | 'otherCodes';
 
 
   // activeTab is shared via uiStore.proActiveTab so App.svelte can render the nav strip
@@ -177,15 +174,14 @@
 
   /* The assembly lives in `lib/pro/report-export.ts`: this component is a
      layout shell, and the 600-line ceiling on it is what said so. */
-  function exportReport(config: ReportConfig, figureOptions: ReportFigureChoices) {
+  function exportReport(config: ReportConfig, figureOptions: ReportFigureChoices, format?: ReportFormat) {
     showReportDialog = false;
     void exportReportAs({
       config,
-      // The report prints the Design panel's verification (`reportDesignChecks`), not a design of its own.
-      verifications: [],
       advancedResults: advancedResultsRef,
       t,
       figureOptions,
+      ...(format ? { format } : {}),
     });
   }
 
@@ -348,6 +344,8 @@
           <ProPhysicalPanel />
         {:else if activeTab === 'building'}
           <ProBuildingPanel />
+        {:else if activeTab === 'foundations'}
+          <ProFoundationModelPanel />
         {:else if activeTab === 'code'}
           <ProCodePanel />
         {:else if activeTab === 'view'}
@@ -374,18 +372,15 @@
           <ProAdvancedTab bind:advancedResults={advancedResultsRef} />
         {:else if activeTab === 'results'}
           <ProResultsTab />
-        {:else if activeTab === 'design'}
-          <ProDesignCompleteness />
-          <ProRcWorkflowTab />
-        {:else if activeTab === 'steel'}
-          <ProDesignCompleteness />
-          <ProSteelWorkflowTab />
+        <!--
+          Design's views (design, designData, steel, connections, otherCodes, desk) have no
+          branch here: the Design stage is the desk, docked around the viewer, and those panels
+          are its places (`DesignDesk.svelte`). A design view opens the desk on its place
+          (`syncDeskWithTab`), so this panel never shows one, and mounting a second copy beside
+          the desk's would give every control in it two elements.
+        -->
         {:else if activeTab === 'generators'}
           <ProGeneratorsPanel />
-        {:else if activeTab === 'connections'}
-          <ProConnectionsTab />
-        {:else if activeTab === 'otherCodes'}
-          <ProOtherCodesPanel />
         {:else if activeTab === 'ai'}
       <AiDrawer docked />
     {:else if activeTab === 'diagnostics'}

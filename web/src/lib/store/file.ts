@@ -1,5 +1,6 @@
 // File operations: save/load projects, export results, autosave
 
+import { noteDesignHeldIfOff } from './design-presence';
 import { adoptLoadCases } from './load-cases-mode';
 import { modelStore } from './model.svelte';
 import { resultsStore } from './results.svelte';
@@ -338,6 +339,8 @@ export function adoptStoredProject(snapshot: ModelSnapshot, name: string): void 
 export function onProjectOpened(snap: ModelSnapshot | undefined, analysisMode: string | undefined): void {
   noteAxisConventionMigrationIfNeeded(snap, analysisMode);
   if (snap) recheckStore.openProject(snap as never, analysisMode);
+  // Design kept in the project while it is off in PRO's settings: offered, not switched on.
+  noteDesignHeldIfOff(analysisMode);
 }
 
 /**

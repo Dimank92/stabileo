@@ -93,6 +93,7 @@
       nodeId: number; columnElementId: number; status: string;
       position: string | null; utilization: number; Vu: number;
       governingCombination: string | null;
+      reinforcement?: { legs: number; legDiameter: number; spacing: number; lines: number; overCeiling: boolean };
     }>>();
     for (const a of detailingStore.assemblies) {
       for (const r of a.families ?? []) {
@@ -101,6 +102,7 @@
           nodeId: p.nodeId, columnElementId: p.columnElementId, status: p.status,
           position: p.position, utilization: p.utilization, Vu: p.Vu,
           governingCombination: p.governingCombination,
+          ...(p.reinforcement ? { reinforcement: p.reinforcement } : {}),
         })));
       }
     }
@@ -323,6 +325,7 @@
                 <th>Vu</th>
                 <th>{t('detailing.floorRun.shearUtil')}</th>
                 <th>{t('detailing.floorRun.combination')}</th>
+                <th>{t('detailing.floorRun.punchingBars')}</th>
               </tr>
             </thead>
             <tbody>
@@ -344,6 +347,7 @@
                     {un ? '—' : j.utilization.toFixed(2)}
                   </td>
                   <td>{j.governingCombination ?? '—'}</td>
+                  <td data-testid="slab-punching-bars-{j.nodeId}">{j.reinforcement ? (j.reinforcement.overCeiling ? t('detailing.floorRun.punchingOverCeiling') : `${j.reinforcement.legs}Ø${j.reinforcement.legDiameter} c/${(j.reinforcement.spacing * 100).toFixed(1)} ×${j.reinforcement.lines}`) : '—'}</td>
                 </tr>
               {/each}
             </tbody>
