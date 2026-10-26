@@ -34,7 +34,7 @@ function modelFlanges() {
 import { physicalKindIndex } from '../model/physical';
 import { groupSpanContexts, oneContextPerSpan, spanOutcomesToPieces, withSpanPieces } from './design-spans-store';
 import { applySlabColumnJoints } from './analysis-validity-store';
-import { activePerCombo3D, activeCombinations, noLinearCombinationActive } from './active-results';
+import { activePerCombo3D, activeCombinations, designCombinationsWithheld, noLinearCombinationActive } from './active-results';
 import { applyStoreySway } from './storey-sway';
 import { applySoftStoreys } from './seismic-design.svelte';
 import { modelStore } from './model.svelte';
@@ -160,6 +160,9 @@ function createDesignRunStore() {
     lastError = null;
     const results3D = resultsStore.results3D;
     if (!results3D) return fail('design.error.solveFirst');
+    // Defined and not solved, or none of them active, is not "define at least one".
+    const withheld = designCombinationsWithheld();
+    if (withheld) return fail(withheld);
     if (!resultsStore.hasCombinations3D) return fail('design.error.noCombinations');
 
     phase = 'demands';
@@ -606,7 +609,13 @@ function createDesignRunStore() {
     }
 
     // ── Floor families ─────────────────────────────────────────
-    if (needsFloorPass(selection)) {
+    const floorsWithheld = needsFloorPass(selection) ? designCombinationsWithheld() : null;
+    if (floorsWithheld) {
+      // `generateFloors` refuses, and the last floor run on hand is not this one's.
+      for (const f of FLOOR_FAMILIES) {
+        families.push(chosen.has(f) ? { ...emptyFamilyResult(f, 'failed'), errorKey: floorsWithheld } : emptyFamilyResult(f, 'skipped'));
+      }
+    } else if (needsFloorPass(selection)) {
       const floorSel = FLOOR_FAMILIES.filter((f) => chosen.has(f));
       detailingStore.generateFloors({
         verifierId: opts.verifierId,

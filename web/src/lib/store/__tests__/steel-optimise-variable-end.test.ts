@@ -24,6 +24,8 @@ describe('optimiser with a section that is a tapered member\'s end J', () => {
 
   it('leaves the end J where it is and gives the portal a section of its own', () => {
     modelStore.clear();
+    // The one solve is the design load only with no combination defined; a new model has four.
+    for (const c of [...modelStore.combinations]) modelStore.removeCombination(c.id);
     historyStore.clear();
     const ipe = (name: string) => {
       const p = PROFILE_FAMILIES.IPE.find((x) => x.name === name)!;
