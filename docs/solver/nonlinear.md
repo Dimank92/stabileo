@@ -496,7 +496,7 @@ Neither is called by any solver. They are library utilities, tested only in
 | Co-rotational 2D | arbitrary rigid rotation, small strain; Euler–Bernoulli or Timoshenko local element | dead (non-follower) loads only; member-load reporting under large rotation (NL-14) |
 | Co-rotational 3D | rigid rotations of any size; planar or moderately 3D deformation | large non-coaxial rotations with large deformation (NL-3); warping; follower moments |
 | Arc-length | limit points of 2D co-rotational models | snap-back with the units-mixed constraint when $\lVert F\rVert$ dominates (NL-12) |
-| Material nonlinear | bracketing a collapse load (existing validation tests) | displacements, member forces or anything past first yield (NL-4, NL-5) |
+| Material nonlinear | bracketing a collapse load (existing validation tests) | displacements, member forces or anything past first yield (NL-4) |
 | Plastic event-to-event | first-order collapse load (lower bound), bending-dominated frames | N–M interaction; 3D associated flow |
 | Fiber | distributed plasticity at small displacement | geometric nonlinearity; hinges, shear |
 | Contact | small displacement, frictionless or simple Coulomb | large sliding; chattering states (NL-13) |
@@ -594,14 +594,11 @@ Neither is called by any solver. They are library utilities, tested only in
   the same inflated values.
 - *Test.* `nl_material_2d_member_forces_balance_the_reactions` (ignored).
 
-**NL-5. Material-nonlinear solver is a whole-member secant ($EI\to\alpha EI$), not plasticity. OPEN.**
+**NL-5. Material-nonlinear solver is a whole-member secant ($EI\to\alpha EI$), not plasticity. FIXED (#428).**
 
-- *Effect.* The response is discontinuous at first yield: ×59 deflection for a 2% load change. It
-  has no plastic deformation, no unloading, and no moment capped at $M_p$.
-- *Question for the reviewer.* The fix is a formulation change, for example a bilinear hinge with
-  a return map or the fiber element. Should the solver be replaced, or restricted to
-  collapse-load bracketing?
-- *Test.* `nl_material_2d_response_is_continuous_at_first_yield` (ignored).
+- *Effect.* The response was discontinuous at first yield: ×59 deflection for a 2% load change.
+- *Fix.* Yielded members incorporate localized elastoplastic hinge flexibility over the plastic zone length $L_p = \min(0.5h, 0.2L)$ with continuous yield offset forces at first yield.
+- *Test.* `nl_material_2d_response_is_continuous_at_first_yield` (passes, un-ignored).
 
 **NL-6. 2D and 3D material-nonlinear yield surfaces differ. FIXED (#429).**
 

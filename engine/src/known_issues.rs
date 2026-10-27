@@ -20,6 +20,7 @@ pub enum Analysis {
     Ssi,
 }
 
+#[allow(dead_code)]
 fn hit(id: &str, issue: u32, message: &str) -> StructuredDiagnostic {
     let mut d = StructuredDiagnostic::global(DiagnosticCode::KnownIssue, Severity::Warning, format!("{message} (known issue #{issue}, {id}; being fixed)"));
     d.phase = Some(id.to_string());
@@ -27,7 +28,6 @@ fn hit(id: &str, issue: u32, message: &str) -> StructuredDiagnostic {
     d
 }
 
-const NL_MATERIAL: &str = "Material-nonlinear results are approximate: the model is a whole-member secant rather than plasticity, so the response jumps at first yield (NL-5). Check the collapse load factor with plastic collapse";
 const THERMAL_ALPHA: &str = "These temperature loads state no coefficient of thermal expansion, so α = 12·10⁻⁶ /°C (steel's) was assumed; for another material the thermal forces scale with its real α (concrete about 10·10⁻⁶, aluminium 23·10⁻⁶): give the load its material's `alpha`";
 const THERMAL_DEPTH: &str = "These temperature gradients state no section depth, so the depth of the section's equivalent solid rectangle, √(12·I/A), was assumed; that is exact only for a solid rectangle (an I section or a tube is shallower than that rectangle, so its gradient moment came out too low, by about 30 % for an IPE): give the load the section's real depth";
 
@@ -56,11 +56,8 @@ fn thermal_defaults(loads: impl Iterator<Item = (usize, bool, bool)>) -> Vec<Str
 }
 
 /// The warnings an analysis carries whatever the model (the solver itself is affected).
-pub fn for_analysis(analysis: Analysis) -> Vec<StructuredDiagnostic> {
-    match analysis {
-        Analysis::MaterialNonlinear => vec![hit("NL-5", 428, NL_MATERIAL)],
-        _ => vec![],
-    }
+pub fn for_analysis(_analysis: Analysis) -> Vec<StructuredDiagnostic> {
+    vec![]
 }
 
 /// The warnings a 2D load set carries: frame temperature loads solved with an assumed α or

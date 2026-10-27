@@ -49,7 +49,7 @@ fn a_frame_temperature_load_is_no_known_issue_but_an_unstated_alpha_is_named() {
 }
 
 #[test]
-fn material_nonlinear_results_are_flagged() {
+fn material_nonlinear_results_are_no_longer_flagged() {
     let input = NonlinearMaterialInput {
         solver: make_beam(4, 4.0, E, 0.045, 3.375e-4, "fixed", None, tip(-100.0)),
         material_models: HashMap::from([("1".into(), MaterialModel { model_type: "elastic_perfectly_plastic".into(), fy: 250.0, alpha: Some(0.01) })]),
@@ -59,7 +59,7 @@ fn material_nonlinear_results_are_flagged() {
         n_increments: 5,
     };
     let r = solve_nonlinear_material_2d(&input).unwrap();
-    assert!(ids(&r.results.structured_diagnostics).contains(&"NL-5".to_string()));
+    assert!(!ids(&r.results.structured_diagnostics).contains(&"NL-5".to_string()));
 }
 
 fn beam3d() -> SolverInput3D {

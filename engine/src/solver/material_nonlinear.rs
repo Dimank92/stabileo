@@ -42,6 +42,8 @@ struct ElementState {
     yielded_end: bool,
     /// Hardening ratio: EI_effective = alpha * EI when yielded.
     alpha: f64,
+    /// Local displacement vector [u_i, v_i, theta_i, u_j, v_j, theta_j] when the element first reached yield.
+    u_yield: Option<[f64; 6]>,
 }
 
 /// Solve a 2D nonlinear material analysis using incremental load-stepping
@@ -113,6 +115,7 @@ fn solve_nonlinear_material_2d_inner(
                     yielded_start: false,
                     yielded_end: false,
                     alpha,
+                    u_yield: None,
                 },
             )
         })
@@ -298,35 +301,24 @@ fn solve_nonlinear_material_2d_inner(
         load_displacement.push([load_factor, max_disp]);
     }
 
-    // Compute reactions: R = K * u - F for restrained DOFs.
-    // Use the tangent stiffness at final state for reaction computation.
-    // k_final has no u-dependence, so rotate it directly to match f_final's
-    // (already-rotated, from f_total = asm.f.clone()) convention; the dummy
-    // F output of apply_inclined_transform_2d is discarded.
-    let mut k_final = assemble_tangent_stiffness(solver, &dof_num, &states, &art);
-    let mut k_final_f_dummy = vec![0.0; n];
-    for it in &asm.inclined_transforms_2d {
-        assembly::apply_inclined_transform_2d(&mut k_final, &mut k_final_f_dummy, n, &it.dofs, &it.r);
-    }
-    let f_final: Vec<f64> = f_total.iter().map(|&f| f).collect(); // load_factor = 1.0 at end
-    let mut reactions_vec = vec![0.0; nr];
-    for i in 0..nr {
-        let row = nf + i;
-        let mut ku = 0.0;
-        for j in 0..n {
-            // u_full stays in the rotated ("mixed") convention here — matches
-            // k_final's just-applied rotation (K'@u_mixed == R∘f_int_true_global,
-            // the same identity the NR loop relies on).
-            ku += k_final[row * n + j] * u_full[j];
-        }
-        reactions_vec[i] = ku - f_final[row];
-    }
-
     // Reverse inclined transforms to get TRUE global displacements for
     // reporting — mirrors linear::solve_2d.
     let mut u_geom = u_full.clone();
     for it in &asm.inclined_transforms_2d {
         assembly::reverse_inclined_transform_2d(&mut u_geom, &it.dofs, &it.r);
+    }
+
+    // Compute reactions: R = f_int - f_final for restrained DOFs.
+    // Reactions balance the actual internal resisting forces in equilibrium.
+    let mut f_int_final = compute_global_internal_forces(solver, &dof_num, &u_geom, &states, &art);
+    for it in &asm.inclined_transforms_2d {
+        assembly::rotate_inclined_f_2d(&mut f_int_final, &it.dofs, &it.r);
+    }
+    let f_final: Vec<f64> = f_total.iter().map(|&f| f).collect(); // load_factor = 1.0 at end
+    let mut reactions_vec = vec![0.0; nr];
+    for i in 0..nr {
+        let row = nf + i;
+        reactions_vec[i] = f_int_final[row] - f_final[row];
     }
 
     let displacements = super::linear::build_displacements_2d(&dof_num, &u_geom);
@@ -389,16 +381,47 @@ fn secant_member_forces_2d(solver: &SolverInput, states: &[(usize, ElementState)
     unloaded.loads.clear();
     let elastic: std::collections::HashMap<usize, ElementForces> =
         super::linear::compute_internal_forces_2d(&unloaded, dof, u).into_iter().map(|f| (f.element_id, f)).collect();
-    let secant: std::collections::HashMap<usize, ElementForces> =
-        super::linear::compute_internal_forces_2d(&secant_model_2d(&unloaded, states), dof, u).into_iter().map(|f| (f.element_id, f)).collect();
+
+    let node_by_id: std::collections::HashMap<usize, &SolverNode> =
+        crate::ordered::values(&solver.nodes).map(|n| (n.id, n)).collect();
+    let mat_by_id: std::collections::HashMap<usize, &SolverMaterial> =
+        crate::ordered::values(&solver.materials).map(|m| (m.id, m)).collect();
+    let sec_by_id: std::collections::HashMap<usize, &SolverSection> =
+        crate::ordered::values(&solver.sections).map(|s| (s.id, s)).collect();
+
     for f in &mut forces {
-        let (Some(e), Some(c)) = (elastic.get(&f.element_id), secant.get(&f.element_id)) else { continue };
-        f.n_start += c.n_start - e.n_start;
-        f.n_end += c.n_end - e.n_end;
-        f.v_start += c.v_start - e.v_start;
-        f.v_end += c.v_end - e.v_end;
-        f.m_start += c.m_start - e.m_start;
-        f.m_end += c.m_end - e.m_end;
+        let Some(elem) = solver.elements.values().find(|e| e.id == f.element_id && e.elem_type == "frame") else { continue };
+        let state = states.iter().find(|&&(id, _)| id == elem.id).map(|&(_, ref st)| st);
+        if !state.map_or(false, |st| st.yielded_start || st.yielded_end) {
+            continue;
+        }
+        let Some(e) = elastic.get(&f.element_id) else { continue };
+        let node_i = node_by_id[&elem.node_i];
+        let node_j = node_by_id[&elem.node_j];
+        let mat = mat_by_id[&elem.material_id];
+        let sec = sec_by_id[&elem.section_id];
+        let dx = node_j.x - node_i.x;
+        let dy = node_j.z - node_i.z;
+        let l = (dx * dx + dy * dy).sqrt();
+        let cos = dx / l;
+        let sin = dy / l;
+        let elem_dofs = dof.element_dofs(elem.node_i, elem.node_j);
+        let u_global: Vec<f64> = elem_dofs.iter().map(|&d| u[d]).collect();
+
+        let (_, f_local) = compute_element_local_forces_2d(elem, mat, sec, l, cos, sin, &u_global, state);
+        let c_n_start = -f_local[0];
+        let c_v_start = f_local[1];
+        let c_m_start = f_local[2];
+        let c_n_end = f_local[3];
+        let c_v_end = -f_local[4];
+        let c_m_end = -f_local[5];
+
+        f.n_start += c_n_start - e.n_start;
+        f.n_end += c_n_end - e.n_end;
+        f.v_start += c_v_start - e.v_start;
+        f.v_end += c_v_end - e.v_end;
+        f.m_start += c_m_start - e.m_start;
+        f.m_end += c_m_end - e.m_end;
     }
     forces
 }
@@ -430,24 +453,6 @@ fn secant_member_forces_3d(solver: &SolverInput3D, states: &[(usize, ElementStat
     forces
 }
 
-/// The model as the converged state sees it: every yielded member on a section of its own with
-/// α·Iz, the stiffness `compute_global_internal_forces` balanced. Used to recover member forces.
-fn secant_model_2d(solver: &SolverInput, states: &[(usize, ElementState)]) -> SolverInput {
-    let mut m = solver.clone();
-    let mut next = crate::ordered::values(&m.sections).map(|s| s.id).max().unwrap_or(0) + 1;
-    for (id, st) in states {
-        if !(st.yielded_start || st.yielded_end) {
-            continue;
-        }
-        let Some(e) = m.elements.values_mut().find(|e| e.id == *id && e.elem_type == "frame") else { continue };
-        let Some(sec) = crate::ordered::values(&solver.sections).find(|s| s.id == e.section_id) else { continue };
-        let reduced = SolverSection { id: next, iz: st.alpha * sec.iz, ..sec.clone() };
-        m.sections.insert(next.to_string(), reduced);
-        e.section_id = next;
-        next += 1;
-    }
-    m
-}
 
 /// As `secant_model_2d`, for 3D: α on both bending inertias.
 fn secant_model_3d(solver: &SolverInput3D, states: &[(usize, ElementState3D)]) -> SolverInput3D {
@@ -585,23 +590,9 @@ fn assemble_tangent_stiffness_scatter(
                 }
             }
         } else {
-            // Determine effective EI based on yield state.
-            let state = states.iter().find(|&&(id, _)| id == elem.id);
-            let iz_eff = match state {
-                Some(&(_, ref st)) => {
-                    if st.yielded_start || st.yielded_end {
-                        st.alpha * sec.iz
-                    } else {
-                        sec.iz
-                    }
-                }
-                None => sec.iz,
-            };
-
-            let k_local = frame_local_stiffness_2d(
-                e, sec.a, iz_eff, l, elem.hinge_start, elem.hinge_end,
-                timoshenko_phi_2d(e, mat.nu, iz_eff, sec.as_y, l),
-            );
+            let state = states.iter().find(|&&(id, _)| id == elem.id).map(|&(_, ref st)| st);
+            let u_dummy = [0.0; 6];
+            let (k_local, _) = compute_element_local_forces_2d(elem, mat, sec, l, cos, sin, &u_dummy, state);
             let t = frame_transform_2d(cos, sin);
             let k_glob = transform_stiffness(&k_local, &t, 6);
 
@@ -630,6 +621,131 @@ fn assemble_tangent_stiffness_scatter(
     // truss-only node in a frame left the tangent singular.
     for &(d, k) in art {
         scatter_diag(d, d, k);
+    }
+}
+
+/// Tangent stiffness of a 2D frame member with elastoplastic hinges at yielded ends.
+/// When elastic, matches `frame_local_stiffness_2d` exactly. When yielded at start and/or end,
+/// adds rotational flexibility representing the plastic hinge zone over Lp = min(0.5h, 0.2L),
+/// giving continuous bilinear behavior with hardening ratio `alpha` (NL-5, #428).
+fn frame_local_stiffness_with_hinges_2d(
+    e: f64,
+    a: f64,
+    iz: f64,
+    l: f64,
+    hinge_start: bool,
+    hinge_end: bool,
+    phi: f64,
+    yielded_start: bool,
+    yielded_end: bool,
+    alpha: f64,
+) -> Vec<f64> {
+    if !yielded_start && !yielded_end {
+        return frame_local_stiffness_2d(e, a, iz, l, hinge_start, hinge_end, phi);
+    }
+    let mut k = vec![0.0; 36];
+    let ea_l = e * a / l;
+    k[0 * 6 + 0] = ea_l;
+    k[0 * 6 + 3] = -ea_l;
+    k[3 * 6 + 0] = -ea_l;
+    k[3 * 6 + 3] = ea_l;
+
+    let ei = e * iz;
+    let h = (12.0 * iz / a).sqrt();
+    let l_p = (0.5 * h).min(0.2 * l).max(1e-4);
+    let fp = (1.0 - alpha) / (alpha.max(1e-6)) * (l_p / ei);
+
+    let fp1 = if yielded_start && !hinge_start { fp } else if hinge_start { 1e12 } else { 0.0 };
+    let fp2 = if yielded_end && !hinge_end { fp } else if hinge_end { 1e12 } else { 0.0 };
+
+    let f11 = l * (4.0 + phi) / (12.0 * ei) + fp1;
+    let f22 = l * (4.0 + phi) / (12.0 * ei) + fp2;
+    let f12 = l * (-2.0 + phi) / (12.0 * ei);
+
+    let det = f11 * f22 - f12 * f12;
+    if det.abs() < 1e-30 {
+        return frame_local_stiffness_2d(e, a, alpha * iz, l, hinge_start, hinge_end, phi);
+    }
+    let kb11 = f22 / det;
+    let kb22 = f11 / det;
+    let kb12 = -f12 / det;
+
+    let inv_l = 1.0 / l;
+    let inv_l2 = inv_l * inv_l;
+    let s_kb = kb11 + 2.0 * kb12 + kb22;
+
+    let c1 = s_kb * inv_l2;
+    let c2_1 = (kb11 + kb12) * inv_l;
+    let c2_2 = (kb12 + kb22) * inv_l;
+
+    k[1 * 6 + 1] = c1;
+    k[1 * 6 + 2] = c2_1;
+    k[1 * 6 + 4] = -c1;
+    k[1 * 6 + 5] = c2_2;
+
+    k[2 * 6 + 1] = c2_1;
+    k[2 * 6 + 2] = kb11;
+    k[2 * 6 + 4] = -c2_1;
+    k[2 * 6 + 5] = kb12;
+
+    k[4 * 6 + 1] = -c1;
+    k[4 * 6 + 2] = -c2_1;
+    k[4 * 6 + 4] = c1;
+    k[4 * 6 + 5] = -c2_2;
+
+    k[5 * 6 + 1] = c2_2;
+    k[5 * 6 + 2] = kb12;
+    k[5 * 6 + 4] = -c2_2;
+    k[5 * 6 + 5] = kb22;
+
+    k
+}
+
+/// Compute (k_local, f_local) for a 2D frame element, incorporating plastic offset if yielded.
+fn compute_element_local_forces_2d(
+    elem: &SolverElement,
+    mat: &SolverMaterial,
+    sec: &SolverSection,
+    l: f64,
+    cos: f64,
+    sin: f64,
+    u_global: &[f64],
+    state: Option<&ElementState>,
+) -> (Vec<f64>, Vec<f64>) {
+    let t = frame_transform_2d(cos, sin);
+    let u_local = transform_displacement(u_global, &t, 6);
+    let e = mat.e * 1000.0;
+    let phi = timoshenko_phi_2d(e, mat.nu, sec.iz, sec.as_y, l);
+    let k_elastic = frame_local_stiffness_2d(e, sec.a, sec.iz, l, elem.hinge_start, elem.hinge_end, phi);
+
+    match state {
+        Some(st) if (st.yielded_start || st.yielded_end) && st.u_yield.is_some() => {
+            let k_tan = frame_local_stiffness_with_hinges_2d(
+                e, sec.a, sec.iz, l, elem.hinge_start, elem.hinge_end, phi,
+                st.yielded_start, st.yielded_end, st.alpha,
+            );
+            let uy = st.u_yield.as_ref().unwrap();
+            let mut fl = vec![0.0; 6];
+            for i in 0..6 {
+                let mut f_tan_i = 0.0;
+                let mut f_off_i = 0.0;
+                for j in 0..6 {
+                    f_tan_i += k_tan[i * 6 + j] * u_local[j];
+                    f_off_i += (k_elastic[i * 6 + j] - k_tan[i * 6 + j]) * uy[j];
+                }
+                fl[i] = f_tan_i + f_off_i;
+            }
+            (k_tan, fl)
+        }
+        _ => {
+            let mut fl = vec![0.0; 6];
+            for i in 0..6 {
+                for j in 0..6 {
+                    fl[i] += k_elastic[i * 6 + j] * u_local[j];
+                }
+            }
+            (k_elastic, fl)
+        }
     }
 }
 
@@ -697,38 +813,12 @@ fn compute_global_internal_forces(
                 f_int[truss_dofs[i]] += val;
             }
         } else {
-            let state = states.iter().find(|&&(id, _)| id == elem.id);
-            let iz_eff = match state {
-                Some(&(_, ref st)) => {
-                    if st.yielded_start || st.yielded_end {
-                        st.alpha * sec.iz
-                    } else {
-                        sec.iz
-                    }
-                }
-                None => sec.iz,
-            };
-
+            let state = states.iter().find(|&&(id, _)| id == elem.id).map(|&(_, ref st)| st);
             let elem_dofs = dof_num.element_dofs(elem.node_i, elem.node_j);
             let u_global: Vec<f64> = elem_dofs.iter().map(|&d| u[d]).collect();
 
+            let (_, f_local) = compute_element_local_forces_2d(elem, mat, sec, l, cos, sin, &u_global, state);
             let t = frame_transform_2d(cos, sin);
-            let u_local = transform_displacement(&u_global, &t, 6);
-
-            let k_local = frame_local_stiffness_2d(
-                e, sec.a, iz_eff, l, elem.hinge_start, elem.hinge_end,
-                timoshenko_phi_2d(e, mat.nu, iz_eff, sec.as_y, l),
-            );
-
-            // f_local = k_local * u_local
-            let mut f_local = vec![0.0; 6];
-            for i in 0..6 {
-                for j in 0..6 {
-                    f_local[i] += k_local[i * 6 + j] * u_local[j];
-                }
-            }
-
-            // Transform back to global: f_global_elem = T^T * f_local
             let f_global_elem = transform_force(&f_local, &t, 6);
 
             let ndof = elem_dofs.len();
@@ -803,6 +893,30 @@ fn update_element_states(
         if let Some(state_entry) = states.iter_mut().find(|s| s.0 == ef.element_id) {
             state_entry.1.yielded_start = yielded_start;
             state_entry.1.yielded_end = yielded_end;
+            if (yielded_start || yielded_end) && state_entry.1.u_yield.is_none() {
+                let node_map: std::collections::HashMap<usize, &SolverNode> =
+                    crate::ordered::values(&solver.nodes).map(|n| (n.id, n)).collect();
+                let node_i = node_map[&elem.node_i];
+                let node_j = node_map[&elem.node_j];
+                let dx = node_j.x - node_i.x;
+                let dy = node_j.z - node_i.z;
+                let l = (dx * dx + dy * dy).sqrt();
+                let cos = dx / l;
+                let sin = dy / l;
+                let elem_dofs = dof_num.element_dofs(elem.node_i, elem.node_j);
+                let u_global: Vec<f64> = elem_dofs.iter().map(|&d| u[d]).collect();
+                let t = frame_transform_2d(cos, sin);
+                let u_local = transform_displacement(&u_global, &t, 6);
+                let util = util_start.max(util_end);
+                state_entry.1.u_yield = Some([
+                    u_local[0] / util,
+                    u_local[1] / util,
+                    u_local[2] / util,
+                    u_local[3] / util,
+                    u_local[4] / util,
+                    u_local[5] / util,
+                ]);
+            }
         }
     }
 }

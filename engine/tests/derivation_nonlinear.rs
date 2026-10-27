@@ -401,7 +401,6 @@ fn nl_material_2d_member_forces_keep_the_assembled_thermal_loads() {
 /// 1% below it. The solver replaces EI by α·EI over the whole yielded member
 /// (secant), so the deflection jumps by about 1/α.
 #[test]
-#[ignore = "open question NL-5: yielding replaces EI by alpha*EI over the whole member (secant), the load-deflection curve jumps at first yield"]
 fn nl_material_2d_response_is_continuous_at_first_yield() {
     let l = 4.0;
     let tip = |p: f64| {
