@@ -23,6 +23,12 @@ export default mergeConfig(rest, defineConfig({
       // tried. It checks source structure, not behaviour, so it has nothing to say about a
       // mutant; it runs in the normal unit pass.
       'src/lib/engine/design/__tests__/run-summary-reported.test.ts',
+      // Multi-member building autodesign integration benchmarks: each run takes 15-80 s,
+      // which causes Stryker dry-run timeouts and ballooned mutation cycles.
+      // Mutant verification for design logic is covered by unit test suites.
+      'src/lib/engine/design/__tests__/autodesign-regression.test.ts',
+      'src/lib/engine/design/__tests__/settle-not-clocked.test.ts',
+      'src/lib/engine/design/__tests__/beam-line-flagship.test.ts',
     ],
     include: [
       'src/lib/engine/__tests__/differential/**/*.test.ts',

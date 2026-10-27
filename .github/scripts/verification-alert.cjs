@@ -17,7 +17,7 @@ const BAD = new Set(['failure', 'timed_out', 'cancelled', 'startup_failure']);
 
 // Matrix values that change from one night to the next must not create a new
 // issue per value.
-const dedupeKey = (name) => name.replace(/^(mutants) \(.*\)$/, '$1');
+const dedupeKey = (name) => name.replace(/^(mutants|stryker) \(.*\)$/, '$1');
 
 module.exports = async ({ github, context, core }) => {
   const { owner, repo } = context.repo;

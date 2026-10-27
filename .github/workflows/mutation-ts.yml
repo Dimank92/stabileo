@@ -2,8 +2,9 @@ name: Mutation testing (TypeScript engine logic)
 
 # Stryker over the safety-relevant TypeScript in web/src/lib/engine (web/stryker.config.json
 # lists the modules). Nightly, because a full run takes far longer than a PR should wait; on
-# demand from the Actions tab. The HTML report is uploaded; surviving mutants in the critical
-# modules are listed in docs/verification/TS_ENGINE_LOGIC.md.
+# demand from the Actions tab. Sharded into 4 matrix jobs so runs complete within reasonable
+# timeouts (~30-60 min each) rather than hitting the single-runner 345 min cap.
+# Surviving mutants in the critical modules are listed in docs/verification/TS_ENGINE_LOGIC.md.
 
 on:
   schedule:
@@ -19,8 +20,20 @@ env:
 jobs:
   stryker:
     runs-on: ubuntu-latest
-    # The first full run reached 3300 of 3322 mutants at 300 min (concurrency 3).
-    timeout-minutes: 345
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - name: cirsoc-codes
+            mutate: "src/lib/engine/codes/argentina/cirsoc201-basis.ts,src/lib/engine/codes/argentina/cirsoc201-beam-kernel.ts,src/lib/engine/codes/argentina/cirsoc201-engine-gate.ts,src/lib/engine/codes/argentina/cirsoc301.ts,src/lib/engine/codes/argentina/serviceability.ts"
+          - name: detailing
+            mutate: "src/lib/engine/detailing/foundation-check.ts,src/lib/engine/detailing/punching-shear.ts,src/lib/engine/design-check-results.ts"
+          - name: design-engine
+            mutate: "src/lib/engine/auto-verify.ts,src/lib/engine/design/candidate-search.ts,src/lib/engine/design/outcome.ts"
+          - name: cirsoc-spacing
+            mutate: "src/lib/codes/cirsoc201/anchorage.ts,src/lib/codes/cirsoc201/spacing.ts,src/lib/codes/cirsoc201/transverse-spacing.ts"
+    name: stryker (${{ matrix.shard.name }})
     steps:
       - uses: actions/checkout@v7
 
@@ -58,12 +71,12 @@ jobs:
 
       - name: Stryker
         working-directory: web
-        run: npm run test:mutation
+        run: npx stryker run --mutate "${{ matrix.shard.mutate }}"
 
       - name: Upload report
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: stryker-report
+          name: stryker-report-${{ matrix.shard.name }}
           path: web/reports/mutation/
           retention-days: 30
