@@ -61,6 +61,7 @@
   import { ElementsPicking } from '../lib/three/elements-picking';
   import { fatLineResolution } from '../lib/three/create-element-mesh';
   import { resolveHitUserData, shellSelectionKey } from '../lib/viewport3d/picking';
+  import { plateOfShell, platesInMarquee } from '../lib/store/physical-plates';
   import { currentLoadDrawView, isLoadDrawn } from '../lib/viewport3d/load-drawn';
   import { evaluateDiagramAt, formatDiagramValue3D, type Diagram3DKind } from '../lib/engine/diagrams-3d';
   import { certificateStore, formatBound } from '../lib/store/certificate.svelte';
@@ -1458,6 +1459,13 @@
       syncNodes(); syncElements(); syncSupports(); syncLoads(); syncShells();
       syncLocalAxes(); syncDiagrams3D(); syncDeformed(); syncLabels3D(); syncReactions();
     });
+    invalidate();
+  });
+
+  // Meshed plates as pieces or with their mesh: only the drawing changes.
+  $effect(() => {
+    void uiStore.platesShowMesh;
+    syncShells();
     invalidate();
   });
 
@@ -3016,6 +3024,19 @@
 
         // Reassign sets to trigger Svelte reactivity (manual box-select)
         uiStore.setSelection(newNodes, newElems, true, newShells);
+        // Picking plates whole: the plates the marquee takes (by their shells, or by their outline
+        // when they have no mesh) are selected whole, mesh and all.
+        if (allowShells && uiStore.shellPickScope === 'plate') {
+          const cornerIn = (nodeId: number): boolean => {
+            const nd = modelStore.getNode(nodeId);
+            if (!nd) return false;
+            const sp = projectNodeToScene(nd, project2D);
+            const sc = projectToScreen(sp.x, sp.y, sp.z);
+            return sc.x >= x1 && sc.x <= x2 && sc.y >= y1 && sc.y <= y2;
+          };
+          const plates = platesInMarquee(newShells, cornerIn, isWindow);
+          if (plates.length) uiStore.selectPlates(plates, true);
+        }
       } else {
         // Small drag = click → delegate to normal click selection
         boxSelect3D = null;
@@ -3212,10 +3233,9 @@
       const nodeHits = raycaster.intersectObjects(nodesParent.children, true);
       for (const hit of nodeHits) {
         const ud = resolveHitUserData(hit);
-        if (ud?.type === 'node') { uiStore.pushShellNodePick(ud.id); break; }
+        // The last corner, or the first one again on an outline, makes the plate (`drawState`).
+        if (ud?.type === 'node') { drawState.pickPlateNode(ud.id); break; }
       }
-      // The last corner makes the plate; see `drawState.finishPlate`.
-      drawState.finishPlate();
       return; // consume the click while picking (no normal selection / clear)
     }
 
@@ -3303,16 +3323,27 @@
     // select mode, only that entity class is pickable. This also keeps
     // selectedElements type-consistent — frame elements and plates/quads have
     // overlapping numeric ids, disambiguated only by selectMode. ──
-    if (sm === 'shells') {
-      const shellHits = raycaster.intersectObjects(shellsParent.children, true);
-      for (const hit of shellHits) {
-        const key = shellSelectionKey(resolveHitUserData(hit));
+    /**
+     * The plate or shell under the pointer, selected as the shell scope says: a physical plate with no
+     * mesh is only ever the plate; an element of a plate's mesh is the plate when picking plates whole.
+     */
+    const pickShell = (): boolean => {
+      for (const hit of raycaster.intersectObjects(shellsParent.children, true)) {
+        const ud = resolveHitUserData(hit);
+        if (ud?.type === 'physicalPlate') { uiStore.selectPlates([ud.id], addToSel); return true; }
+        const key = shellSelectionKey(ud);
         if (key) {
-          uiStore.selectShell(key, addToSel);
-          return;
+          const plate = uiStore.shellPickScope === 'plate' ? plateOfShell(key) : null;
+          if (plate !== null) uiStore.selectPlates([plate], addToSel);
+          else uiStore.selectShell(key, addToSel);
+          return true;
         }
       }
-      if (!addToSel) uiStore.clearSelection();
+      return false;
+    };
+
+    if (sm === 'shells') {
+      if (!pickShell() && !addToSel) uiStore.clearSelection();
       return;
     }
 
@@ -3353,6 +3384,8 @@
           }
         }
       }
+      // Plates and shells last: a node, member, load or support on them is what the click meant.
+      if (!hit && uiStore.selectsKind('shells')) pickShell();
       return;
     }
 
@@ -3396,6 +3429,17 @@
       // Sync with DSM Matrix Explorer if wizard is open
       if (dsmStepsStore.isOpen) dsmStepsStore.selectElement(pick.id);
       return;
+    }
+    /*
+     * No member under the pointer, and a plate is: a plate is an object of PRO's model, and a click
+     * on it with nothing else there takes it, in the plates' mode (as opening the Plates panel
+     * does). A member under the pointer still wins. Basic draws no physical plates.
+     */
+    if (uiStore.appMode === 'pro' && !addToSel && sm === 'elements') {
+      const before = uiStore.selectMode;
+      uiStore.selectMode = 'shells';
+      if (pickShell()) return;
+      uiStore.selectMode = before;
     }
 
     // Clicked on empty space → clear selection
