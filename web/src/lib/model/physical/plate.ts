@@ -33,6 +33,23 @@ export interface PlateMeshSpec {
    * nodes it passes through, so plate and members share them.
    */
   followMembers: boolean;
+  /**
+   * The cells' shape, quadrilaterals only: free (the mesher's), or a grid of rectangles of sides
+   * `size` along the grid's u and `sizeV` along its v, or of squares of side `size`
+   * (`edit/grid-mesh.ts`). Absent: free.
+   */
+  pattern?: 'free' | 'rect' | 'square';
+  /** The rectangles' side along v, m (pattern 'rect'). */
+  sizeV?: number;
+  /** The grid's u: the plate's first side, or global X laid in its plane. Absent: the first side. */
+  orient?: 'plate' | 'globalX';
+}
+
+/** The grid a spec asks for, when it asks for one: the cells' sides and the axis they follow. */
+export function gridOfSpec(spec: PlateMeshSpec): { a: number; b: number; orient: 'plate' | 'globalX' } | null {
+  if (spec.element !== 'quad' || !spec.pattern || spec.pattern === 'free') return null;
+  const a = spec.size, b = spec.pattern === 'square' ? spec.size : (spec.sizeV ?? spec.size);
+  return a > 0 && b > 0 ? { a, b, orient: spec.orient ?? 'plate' } : null;
 }
 
 export interface PlateSurface {
@@ -380,7 +397,10 @@ export function plateSignature(geo: PlateGeometry, spec: PlateMeshSpec, features
   const ft = features && spec.followMembers
     ? `${features.points.map(key3).sort().join(';')}#${features.segments.map(([a, b]) => [key3(a), key3(b)].sort().join('>')).sort().join(';')}`
     : '';
-  return `${loops}@${r6(spec.size)}/${spec.element}/${spec.followMembers ? 1 : 0}@${ft}`;
+  // A grid adds its shape to the string; a free mesh's string is what it always was.
+  const grid = gridOfSpec(spec);
+  const g = grid ? `/grid:${r6(grid.a)}x${r6(grid.b)}:${grid.orient}` : '';
+  return `${loops}@${r6(spec.size)}/${spec.element}/${spec.followMembers ? 1 : 0}${g}@${ft}`;
 }
 
 /** The mesher's input for a plate. */
