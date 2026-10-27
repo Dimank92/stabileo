@@ -32,3 +32,5 @@ mod shell_transverse_shear;
 mod solid_shell_analyses;
 #[path = "../solid_shell_locking.rs"]
 mod solid_shell_locking;
+#[path = "../convergence_orders.rs"]
+mod convergence_orders;
