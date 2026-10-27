@@ -1,35 +1,7 @@
-/**
- * Several floor plans drawn in one DXF, side by side or one above the other, read as the floors
- * of one building.
- *
- * ── Finding them ──────────────────────────────────────────────────
- *
- * The drawing's structural layers are split into clusters (`drawingRegions`); clusters much
- * smaller than the largest (a detail, a north arrow, a title block) are left out. They are given
- * in reading order for a sheet: left to right when they are laid in a row, bottom to top when
- * they are stacked in a column, so the first one is offered as the lowest floor.
- *
- * ── Laying them on each other ─────────────────────────────────────
- *
- * Each plan keeps its own drawing coordinates, so two plans drawn 30 m apart would be stacked
- * 30 m apart. Each plan gets a reference point, the point that goes to the model's origin:
- *
- *   the lowest plan  its lower-left column (its box's lower-left corner when it has none)
- *   every other one  the translation that lays most of its columns on the columns of the plan
- *                    below it; found by voting on the translations between every pair of
- *                    columns, then counting the matches of the best few. When fewer than two
- *                    columns (or under a third of the smaller plan's) match, its lower-left corner
- *                    is laid on the lower-left corner of the plan below.
- *
- * A reference given by hand is kept and the plans above it are laid on it.
- *
- * Pure: the drawing and its extracted plans in, windows and points out.
- */
 import { CAD_UNIT_SCALE, type ArchPlan, type CadDocument, type CadEntity, type CadPt, type CadUnit, type LayerMapping } from './types';
 import { drawingRegions } from '../model/underlay-regions';
 import type { PlanWindow } from './infer';
 
-/** The separate plans of a drawing, as crop windows in its raw units, in reading order. */
 export function detectPlanWindows(doc: CadDocument, unit: CadUnit, mappings: readonly LayerMapping[]): PlanWindow[] {
   const k = CAD_UNIT_SCALE[unit];
   const structural = new Set(mappings.filter((m) => m.role !== 'ignore').map((m) => m.layer));
@@ -45,13 +17,12 @@ export function detectPlanWindows(doc: CadDocument, unit: CadUnit, mappings: rea
   const order = kept.map((_, i) => i).sort((a, b) => (inRow ? cx[a]! - cx[b]! || cy[a]! - cy[b]! : cy[a]! - cy[b]! || cx[a]! - cx[b]!));
   return order.map((i) => {
     const b = kept[i]!.box;
-    // A margin, so the crop (which keeps entities wholly inside) keeps the ones on the border.
+    // cropDoc keeps only entities wholly inside: without the margin it drops the ones on the border.
     const pad = 0.01 * Math.max(b.maxX - b.minX, b.maxY - b.minY) + 0.05;
     return { x0: (b.minX - pad) / k, x1: (b.maxX + pad) / k, y0: (b.minY - pad) / k, y1: (b.maxY + pad) / k };
   });
 }
 
-/** The drawing moved by (dx, dy) in its raw units. */
 export function shiftDoc(doc: CadDocument, dx: number, dy: number): CadDocument {
   if (dx === 0 && dy === 0) return doc;
   const p = (q: CadPt): CadPt => ({ x: q.x + dx, y: q.y + dy });
@@ -69,17 +40,14 @@ export function shiftDoc(doc: CadDocument, dx: number, dy: number): CadDocument 
 }
 
 export interface PlanAlignment {
-  /** The point that goes to the model's origin, metres, in the drawing's coordinates. */
+  /** Metres, in the drawing's coordinates. */
   ref: CadPt;
-  /** How it was found: the lowest plan's own point, matching columns, the corners, or by hand. */
   method: 'base' | 'columns' | 'corner' | 'manual';
-  /** Columns laid on columns of the plan below (method 'columns'). */
   matched: number;
 }
 
 const MAX_POINTS = 500;
 
-/** The points a plan is laid by: its columns, or its members' ends when it has under three. */
 function anchors(plan: ArchPlan): CadPt[] {
   const pts = plan.columns.map((c) => c.at);
   if (pts.length >= 3) return pts.slice(0, MAX_POINTS);
@@ -101,7 +69,6 @@ function lowerLeft(plan: ArchPlan): CadPt | null {
   return Number.isFinite(x) ? { x, y } : null;
 }
 
-/** The translation laying most of `Q` on `P` (within `tol`), and how many points it lays. */
 function bestTranslation(P: CadPt[], Q: CadPt[], tol: number, prefer: CadPt): { t: CadPt; score: number } | null {
   if (!P.length || !Q.length) return null;
   const votes = new Map<string, { n: number; t: CadPt }>();
@@ -135,10 +102,7 @@ function bestTranslation(P: CadPt[], Q: CadPt[], tol: number, prefer: CadPt): { 
   return best && { t: best.t, score: best.score };
 }
 
-/**
- * The reference point of each plan, given lowest floor first; `fixed[i]` (metres) is a point
- * chosen by hand for plan i, kept as is. `tol` is how close two columns must land, metres.
- */
+/** `plans` lowest floor first; each plan's ref is chained to the plan below it, so a `fixed` ref moves every plan above it too. */
 export function alignPlans(plans: readonly ArchPlan[], fixed: ReadonlyArray<CadPt | null | undefined> = [], tol = 0.05): PlanAlignment[] {
   const out: PlanAlignment[] = [];
   plans.forEach((plan, i) => {
@@ -154,7 +118,6 @@ export function alignPlans(plans: readonly ArchPlan[], fixed: ReadonlyArray<CadP
     }
     const below = plans[i - 1]!, prev = out[i - 1]!;
     const belowCorner = lowerLeft(below) ?? { x: 0, y: 0 };
-    // The corners laid on each other: the fallback, and the tie-break between equal matches.
     const cornerT = { x: belowCorner.x - corner.x, y: belowCorner.y - corner.y };
     const found = bestTranslation(anchors(below), own, tol, cornerT);
     const enough = found && found.score >= 2 && found.score >= Math.ceil(0.3 * Math.min(anchors(below).length, own.length));
