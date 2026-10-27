@@ -164,6 +164,26 @@ export function setPlateProperties(id: number, props: { materialId?: number; thi
   });
 }
 
+/**
+ * A shell's material or thickness, as every table and panel edits it. A shell of a physical
+ * plate's mesh is the plate's: the edit goes to the plate (its definition and its whole mesh),
+ * so a remesh does not undo it and the plate never says one thing while its elements say another.
+ * Returns the plates edited that way, for the caller to say so.
+ */
+export function setShellProperties(keys: readonly string[], patch: { materialId?: number; thickness?: number }): number[] {
+  const plates = new Set<number>();
+  modelStore.batch(() => {
+    for (const k of keys) {
+      const plate = plateOfShell(k);
+      if (plate !== null) { plates.add(plate); continue; }
+      const id = Number(k.slice(1));
+      if (k[0] === 'p') modelStore.updatePlate(id, patch); else modelStore.updateQuad(id, patch);
+    }
+    for (const id of plates) setPlateProperties(id, patch);
+  });
+  return [...plates];
+}
+
 /** Change how a plate is to be meshed. Its mesh, if any, is then out of date. */
 export function setPlateMeshSpec(ids: readonly number[], spec: Partial<PlateMeshSpec>): void {
   modelStore.batch(() => { for (const id of ids) writeSurface(id, (s) => ({ ...s, mesh: { ...s.mesh, ...spec } })); });

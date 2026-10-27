@@ -13820,5 +13820,6 @@ const es: Record<string, string> = {
   "plates.meshKind.rectangles": "{n} rectángulos de {a} × {b} {unit}",
   "plates.meshKind.squares": "{n} cuadrados de {a} {unit}",
   "plates.meshKind.band": "y {n} de transición ({tri} triángulos)",
+  "plates.editedWhole": "Se aplicó a toda la placa: {names}. Un elemento de su malla se edita con la placa.",
 };
 export default es;

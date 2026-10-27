@@ -13831,5 +13831,6 @@ const en: Record<string, string> = {
   "plates.meshKind.rectangles": "{n} rectangles of {a} × {b} {unit}",
   "plates.meshKind.squares": "{n} squares of {a} {unit}",
   "plates.meshKind.band": "and {n} in the transition ({tri} triangles)",
+  "plates.editedWhole": "Applied to the whole plate: {names}. An element of its mesh is edited with the plate.",
 };
 export default en;

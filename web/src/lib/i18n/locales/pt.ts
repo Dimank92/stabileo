@@ -13471,5 +13471,6 @@ const pt: Translations = {
   "plates.meshKind.rectangles": "{n} retângulos de {a} × {b} {unit}",
   "plates.meshKind.squares": "{n} quadrados de {a} {unit}",
   "plates.meshKind.band": "e {n} de transição ({tri} triângulos)",
+  "plates.editedWhole": "Aplicado à placa inteira: {names}. Um elemento da sua malha é editado com a placa.",
 };
 export default pt;
