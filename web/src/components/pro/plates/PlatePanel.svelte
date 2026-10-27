@@ -65,6 +65,7 @@
   }
   function showElements() {
     const keys = ids.flatMap(plateShellKeys);
+    if (uiStore.shellPickScope !== 'element') uiStore.toast(t('plates.scopeNowElement'), 'info');
     uiStore.shellPickScope = 'element';
     uiStore.setSelection(new Set(), new Set(), false, new Set(keys));
   }

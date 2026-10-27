@@ -173,6 +173,30 @@ describe('a physical plate', () => {
     expect(plateStatus(id)).toBe('current');
   });
 
+  it('never remeshes before an analysis a plate whose old mesh carries loads put on its elements', () => {
+    const { id, corners } = build();
+    mesh(id, 1);
+    const quad = [...plateShellKeys(id)][0]!;
+    modelStore.addSurfaceLoad3D(Number(quad.slice(1)), -3);
+    modelStore.updateNode(corners[2]!, 6.5, 4, 0);
+    expect(plateStatus(id)).toBe('stale');
+    meshBeforeAnalysis.value = true;
+    const loads = modelStore.loads.length, quads = modelStore.quads.size;
+    expect(preparePlatesForAnalysis()).toEqual({ ok: false, reason: 'localLoads', plates: ['P1'] });
+    expect(modelStore.loads.length).toBe(loads);
+    expect(modelStore.quads.size).toBe(quads);
+  });
+
+  it('names a new plate after the ones left, never twice', () => {
+    modelStore.clear(); historyStore.clear(); uiStore.analysisMode = 'pro';
+    const sq = (x: number) => [[x, 0], [x + 2, 0], [x + 2, 2], [x, 2]].map(([a, b]) => modelStore.addNode(a!, b!, 0));
+    const a = createPlate({ outline: sq(0), materialId: 1, thickness: 0.2 }) as { id: number };
+    createPlate({ outline: sq(3), materialId: 1, thickness: 0.2 });
+    deletePlate(a.id);
+    createPlate({ outline: sq(6), materialId: 1, thickness: 0.2 });
+    expect(physicalPlates().map((p) => p.name).sort()).toEqual(['P2', 'P3']);
+  });
+
   it('undoes and redoes its creation and its mesh without orphans', () => {
     modelStore.clear(); historyStore.clear(); uiStore.analysisMode = 'pro';
     const c = [[0, 0], [4, 0], [4, 4], [0, 4]].map(([x, y]) => modelStore.addNode(x!, y!, 0));
