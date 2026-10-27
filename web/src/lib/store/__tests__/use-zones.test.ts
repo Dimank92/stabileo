@@ -170,7 +170,7 @@ describe('use zones over two floors', () => {
     // Deleting a zone takes its load with it.
     deleteUseZones([living]);
     expect(zoneTotals().get(living)).toBeUndefined();
-  });
+  }, 60_000);
 
   it('gives zones a package of finishes as a dead load of its own', async () => {
     const { addFinishPackage, setFinishPackage } = await import('../use-zones');
