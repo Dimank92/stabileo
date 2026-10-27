@@ -22,6 +22,7 @@ import type { StaticsRows } from '../store/statics-rows';
 import type { ProjectInfo } from '../model/project-info';
 import type { SolverDiagnostic } from './types';
 import { principalStresses } from './shell-stress';
+import type { SlabDesignResult } from './detailing/slab-design';
 
 /** Translation function type — accepts key, returns translated string */
 type TFunc = (key: string) => string;
@@ -63,6 +64,7 @@ export interface ReportConfig {
     statics?: boolean;
     deflections?: boolean;
     figures?: boolean;
+    slabReinforcement?: boolean;
     /** The model data's tables, each printed unless false. */
     parts?: Partial<Record<ReportPart, boolean>>;
   };
@@ -141,6 +143,7 @@ export interface ReportData {
   screenshot?: string;
   /** Figures drawn from the model, placed in their sections. */
   resultFigures?: ReportResultFigures;
+  slabDesigns?: SlabDesignResult[];
   // Translation function (defaults to identity)
   t?: TFunc;
   // Report configuration (project info + section toggles)
@@ -644,6 +647,81 @@ export function generateReportHtml(data: ReportData): string {
   if (showSection('deflections') && data.deflections?.length) html.push(...deflectionSectionHtml(data.deflections, tr, `2.7 ${tr('defl.title')}`));
 
   } // end showSection('results')
+
+  // ─── Slab reinforcement ─────────────────────────────────
+  const hasSlabDesigns = !!(data.slabDesigns && data.slabDesigns.length > 0);
+  const showSlabSteel = showSection('slabReinforcement') !== false;
+
+  if (showSlabSteel && (hasSlabDesigns || (data.quads && data.quads.length > 0))) {
+    html.push(`<div class="page-break"></div>`);
+    html.push(`<h2>${escHtml(tr('report.slabReinforcement'))}</h2>`);
+
+    if (hasSlabDesigns) {
+      for (const s of data.slabDesigns!) {
+        const inp = s.input;
+        const panelInp = s.panel?.input;
+        const lx = inp?.lx ?? (panelInp ? panelInp.x1 - panelInp.x0 : undefined);
+        const ly = inp?.ly ?? (panelInp ? panelInp.y1 - panelInp.y0 : undefined);
+        const thick = inp?.thickness ?? panelInp?.thickness ?? 0.15;
+        const fc = inp?.fc;
+        const fy = inp?.fy ?? panelInp?.fy ?? 420;
+        const qu = inp?.qu;
+
+        const isUnidirectional = s.behaviour === 'oneWay';
+        const spanText = lx !== undefined && ly !== undefined ? ` (${lx.toFixed(2)}×${ly.toFixed(2)} m)` : '';
+        html.push(`<h3>${escHtml(s.panelId)} — e=${(thick * 100).toFixed(0)} cm — ${isUnidirectional ? escHtml(tr('report.unidirectional')) : escHtml(tr('report.bidirectional'))}${spanText}</h3>`);
+
+        const details: string[] = [];
+        if (qu !== undefined) details.push(`qu = ${qu.toFixed(2)} kN/m²`);
+        if (fc !== undefined) details.push(`f'c = ${fc} MPa`);
+        if (fy !== undefined) details.push(`fy = ${fy} MPa`);
+        if (s.aspect !== undefined && isFinite(s.aspect)) details.push(`aspect = ${s.aspect.toFixed(2)}`);
+        if (details.length) {
+          html.push(`<p class="design-code-ref">${escHtml(details.join(' · '))}</p>`);
+        }
+
+        if (s.layers && s.layers.length > 0) {
+          html.push(`<table><thead><tr>`
+            + `<th>${escHtml(tr('report.face') || 'Face')}</th>`
+            + `<th>${escHtml(tr('report.direction') || 'Direction')}</th>`
+            + `<th>${escHtml(tr('report.bars') || 'Bars')}</th>`
+            + `<th>${escHtml(tr('report.spacing') || 'Spacing')} (mm)</th>`
+            + `<th>${escHtml(tr('report.asRequired') || 'As,req')} (cm²/m)</th>`
+            + `<th>${escHtml(tr('report.asProvided') || 'As,prov')} (cm²/m)</th>`
+            + `<th>${escHtml(tr('report.status') || 'Status')}</th>`
+            + `</tr></thead><tbody>`);
+
+          for (const l of s.layers) {
+            const faceStr = l.face === 'top' ? (tr('report.top') || 'Top') : (tr('report.bottom') || 'Bottom');
+            const dirStr = l.direction.toUpperCase();
+            const barStr = `Ø${l.diameterMm}`;
+            const spacingMm = Math.round(l.spacing * 1000);
+            const asReqCm2 = (l.asRequired * 1e4).toFixed(2);
+            const asProvCm2 = (l.asProvided * 1e4).toFixed(2);
+            const statusStr = l.minimumGoverns ? (tr('report.minimumGoverns') || 'Min. governs') : '✓ OK';
+
+            html.push(`<tr>`
+              + `<td>${escHtml(faceStr)}</td>`
+              + `<td>${escHtml(dirStr)}</td>`
+              + `<td>${escHtml(barStr)}</td>`
+              + `<td class="num">${spacingMm}</td>`
+              + `<td class="num">${asReqCm2}</td>`
+              + `<td class="num">${asProvCm2}</td>`
+              + `<td>${escHtml(statusStr)}</td>`
+              + `</tr>`);
+          }
+          html.push(`</tbody></table>`);
+        }
+
+        if (s.shear) {
+          const okStr = s.shear.ok ? '✓ OK' : '✗ FAIL';
+          html.push(`<p class="memo-step">${escHtml(tr('report.oneWayShear') || 'One-way shear')}: vu = ${s.shear.vu.toFixed(1)} kN/m, φvc = ${s.shear.phiVc.toFixed(1)} kN/m (utilization ${(s.shear.utilization * 100).toFixed(1)}%) — <strong>${okStr}</strong></p>`);
+        }
+      }
+    } else {
+      html.push(`<p class="note">${escHtml(tr('report.noSlabDesign') || tr('report.slabNotDesignedHere'))}</p>`);
+    }
+  }
 
   // ─── Figures ────────────────────────────────────────────
   if (showSection('figures') && cfg?.figures?.length) html.push(...figuresSectionHtml(cfg.figures, tr, tr('report.figures'), figureNo + 1));

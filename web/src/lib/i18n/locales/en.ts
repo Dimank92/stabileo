@@ -4242,6 +4242,7 @@ const en: Record<string, string> = {
   'report.jointDetails': 'Joint Details',
   'report.slabReinforcement': 'Slab Reinforcement',
   'report.slabNotDesignedHere': 'Slab reinforcement is not designed in this report. It is designed from the analysis moments in the slab design; this report used to print an estimate from an assumed load, which has been removed.',
+  'report.noSlabDesign': 'No slab design results available. Run slab design in the Detailing panel to compute reinforcement from analysis moments.',
   'report.slabLabel': 'Slab',
   'report.unidirectional': 'One-way',
   'report.bidirectional': 'Two-way',

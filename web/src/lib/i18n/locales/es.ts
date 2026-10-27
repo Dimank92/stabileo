@@ -4235,6 +4235,7 @@ const es: Record<string, string> = {
   'report.jointDetails': 'Detalle de Nudos',
   'report.slabReinforcement': 'Armado de Losas',
   'report.slabNotDesignedHere': 'La armadura de losas no se diseña en este informe. Se diseña con los momentos del análisis en el diseño de losas; este informe imprimía una estimación con una carga supuesta, que fue eliminada.',
+  'report.noSlabDesign': 'No hay resultados de diseño de losas disponibles. Ejecute el diseño de losas en el panel de Detalle para calcular la armadura a partir de los momentos del análisis.',
   'report.slabLabel': 'Losa',
   'report.unidirectional': 'Unidireccional',
   'report.bidirectional': 'Bidireccional',

@@ -236,6 +236,7 @@ export function buildProReportData(opts: {
   advancedResults?: ReportData['advancedResults'];
   screenshot?: string;
   t: Translate;
+  slabDesigns?: import('./detailing/slab-design').SlabDesignResult[];
 }): ReportData | null {
   const { config, advancedResults, screenshot, t } = opts;
   const results = resultsStore.results3D;
@@ -260,6 +261,7 @@ export function buildProReportData(opts: {
     screenshot,
     t,
     config,
+    slabDesigns: opts.slabDesigns ?? (detailingStore.lastFloorRun?.slabs?.length ? detailingStore.lastFloorRun.slabs : undefined),
   };
 
   // From the geometry and the bar schedule of the detailing, whether or not a design ran.

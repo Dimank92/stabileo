@@ -398,6 +398,7 @@
   advancedRan={Object.keys(advancedResultsRef)}
   hasDiagnostics={resultsStore.diagnostics3D.length > 0}
   hasQuantities={hasLoadCarrying3D(modelStore.model)}
+  hasSlabDesign={!!detailingStore.lastFloorRun?.slabs?.length}
   ongenerate={exportReport}
 />
 

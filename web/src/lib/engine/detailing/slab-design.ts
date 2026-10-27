@@ -300,6 +300,8 @@ export interface SlabDesignResult {
   memo: string[];
   refs: ClauseRef[];
   unsupported: string[];
+  /** What it was designed from: load, span, materials, thickness. */
+  input?: SlabPanelInput;
   /** A panel designed by strips (`slab-panel.ts`): its bars, its strip checks, what it read. */
   panel?: {
     reinforcement: import('../../design-contract/reinforcement').SlabPanelReinforcement;
@@ -419,6 +421,6 @@ export function designSlabPanel(input: SlabPanelInput): SlabDesignResult {
 
   return {
     panelId: input.panelId, behaviour: cls.behaviour, aspect: cls.aspect,
-    design, layers, shear, maturity, memo, refs, unsupported,
+    design, layers, shear, maturity, memo, refs, unsupported, input,
   };
 }

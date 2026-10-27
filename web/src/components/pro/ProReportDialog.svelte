@@ -34,10 +34,11 @@
     advancedRan: string[];
     hasDiagnostics: boolean;
     hasQuantities: boolean;
+    hasSlabDesign?: boolean;
     ongenerate: (config: ReportConfig, figures: ReportFigureChoices, format?: ReportFormat) => void;
   }
 
-  let { open = $bindable(false), hasResults, hasAdvanced, advancedRan, hasDiagnostics, hasQuantities, ongenerate }: Props = $props();
+  let { open = $bindable(false), hasResults, hasAdvanced, advancedRan, hasDiagnostics, hasQuantities, hasSlabDesign = false, ongenerate }: Props = $props();
 
   // ─── Remembered between sessions (localStorage) ─────────────
   // Migrate old storage key
@@ -61,7 +62,7 @@
   let companyLogo = $state<string | null>(saved.companyLogo ?? null);
   let sec = $state<Sections>({
     modelData: true, results: true, advancedAnalysis: true, storyDrift: true,
-    diagnostics: true, quantities: true, loads: true, envelope: true, statics: true, deflections: true, figures: true,
+    diagnostics: true, quantities: true, loads: true, envelope: true, statics: true, deflections: true, figures: true, slabReinforcement: true,
     ...(saved.sections ?? {}),
     // Never offered here: a code check is a design output, reported by the memoria (Documents).
   });
@@ -137,6 +138,7 @@
     { id: 'storyDrift', label: t('report.secDrift'), disabled: !hasDrift, hint: hasDrift ? undefined : t('report.noData') },
     { id: 'quantities', label: t('report.secQuantities'), disabled: !hasQuantities },
     { id: 'diagnostics', label: t('report.secDiagnostics'), disabled: !hasDiagnostics, hint: hasDiagnostics ? undefined : t('proReport.noneFound') },
+    { id: 'slabReinforcement', label: t('report.slabReinforcement'), disabled: !hasSlabDesign, hint: hasSlabDesign ? undefined : t('report.noSlabDesign') },
   ]);
   const advItems = $derived(advancedRan.length
     ? advancedRan.map((key) => ({ id: key, label: t(`pro.adv.${key}`) === `pro.adv.${key}` ? key : t(`pro.adv.${key}`) }))
@@ -186,6 +188,7 @@
         quantities: sec.quantities && hasQuantities,
         diagnostics: sec.diagnostics && hasDiagnostics,
         storyDrift: sec.storyDrift && hasDrift,
+        slabReinforcement: sec.slabReinforcement, // kept or omitted with note
       },
       resultModes: $state.snapshot(modes),
     }, $state.snapshot(figs), format);

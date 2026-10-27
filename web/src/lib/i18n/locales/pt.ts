@@ -6975,6 +6975,7 @@ const pt: Translations = {
   'report.slabLabel': 'Laje',
   'report.slabReinforcement': 'Armadura de Lajes',
   'report.slabNotDesignedHere': 'A armadura de lajes não é dimensionada neste relatório. É dimensionada com os momentos da análise no dimensionamento de lajes; este relatório imprimia uma estimativa com uma carga suposta, que foi removida.',
+  'report.noSlabDesign': 'Nenhum resultado de dimensionamento de lajes disponível. Execute o dimensionamento de lajes no painel de Detalhamento para gerar a armadura.',
   'report.slabTotalArea': 'Área total lajes: {area} m² · Volume concreto: {vol} m³',
   'report.slabs': 'Lajes',
   'report.slabsAndWalls': 'Lajes e Paredes',
