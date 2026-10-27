@@ -96,10 +96,8 @@ fn moment_on_fully_hinged_node_2d() {
 
 /// A rigid link from a node where its only member is hinged: the linked pair
 /// can rotate about the hinge freely (the truss between them does not
-/// resist a rigid rotation), so the model is a mechanism. The 2D engine's
-/// all-hinged artificial spring holds the rotation, and a load on the slave
-/// drives it to a large, meaningless value that the assembled-level
-/// certificate certifies. The end-to-end check cannot bound the model.
+/// resist a rigid rotation), so the model is a mechanism. The engine refuses
+/// the singular model instead of falsely certifying it with an artificial spring.
 #[test]
 fn rigid_link_hides_a_mechanism_2d() {
     let input = input_2d(
@@ -116,9 +114,8 @@ fn rigid_link_hides_a_mechanism_2d() {
       "constraints": [{"type":"rigidLink","masterNode":2,"slaveNode":3,"dofs":[]}]
     }"#,
     );
-    let out = certify_linear_2d_full(&input).unwrap();
-    eprintln!("{:?}\n{:?}", out.certificate, out.end_to_end);
-    assert!(!out.end_to_end.is_certified(), "{:?}", out.end_to_end);
+    let e = certify_linear_2d_full(&input).err().expect("refused");
+    assert!(e.contains("Singular") || e.contains("mechanism") || e.contains("not supported"), "{e}");
 }
 
 /// Two spans hinged at their common node 2 (its rotation held by nothing),

@@ -181,7 +181,8 @@ fn guard_end_to_end(e2e: &mut EndToEnd) {
 
 impl CertifiedResults2D {
     /// Withdraw the certificate and every bound derived from it when any of
-    /// them is not finite (outside the documented +∞ fields).
+    /// them is not finite (outside the documented +∞ fields), or when the
+    /// end-to-end check fails or detects that the model is a mechanism or unstable.
     fn guard(&mut self) {
         guard_end_to_end(&mut self.end_to_end);
         if !self.certificate.is_certified() {
@@ -192,6 +193,25 @@ impl CertifiedResults2D {
             self.certificate.downgrade(format!("non-finite bound at {}", bad.join(", ")));
             self.force_bounds.clear();
             self.shown = ShownBounds::default();
+            return;
+        }
+        match &self.end_to_end {
+            EndToEnd::Failed { reason } => {
+                self.certificate.downgrade(format!("end-to-end check failed: {reason}"));
+                self.force_bounds.clear();
+                self.shown = ShownBounds::default();
+            }
+            EndToEnd::Uncertified { reason }
+                if reason.contains("mechanism")
+                    || reason.contains("not positive definite")
+                    || reason.contains("nothing stiffens")
+                    || reason.contains("unstable structure") =>
+            {
+                self.certificate.downgrade(format!("unstable model: {reason}"));
+                self.force_bounds.clear();
+                self.shown = ShownBounds::default();
+            }
+            _ => {}
         }
     }
 }
@@ -209,6 +229,27 @@ impl CertifiedResults3D {
             self.force_bounds.clear();
             self.shell_bounds.clear();
             self.shown = ShownBounds::default();
+            return;
+        }
+        match &self.end_to_end {
+            EndToEnd::Failed { reason } => {
+                self.certificate.downgrade(format!("end-to-end check failed: {reason}"));
+                self.force_bounds.clear();
+                self.shell_bounds.clear();
+                self.shown = ShownBounds::default();
+            }
+            EndToEnd::Uncertified { reason }
+                if reason.contains("mechanism")
+                    || reason.contains("not positive definite")
+                    || reason.contains("nothing stiffens")
+                    || reason.contains("unstable structure") =>
+            {
+                self.certificate.downgrade(format!("unstable model: {reason}"));
+                self.force_bounds.clear();
+                self.shell_bounds.clear();
+                self.shown = ShownBounds::default();
+            }
+            _ => {}
         }
     }
 }

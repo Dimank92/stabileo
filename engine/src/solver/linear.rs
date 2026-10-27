@@ -4534,32 +4534,61 @@ pub(crate) fn refuse_moments_without_rotation_2d(input: &SolverInput, loads: &[S
             carried.extend([c.node_i, c.node_j]);
         }
     }
-    for c in &input.constraints {
-        match c {
-            // Only a constraint that involves the rotation (DOF 2) carries it: one
-            // tying translations alone left the slave's moment on the artificial
-            // spring, and the constrained path returned a rotation of ~1e5 rad
-            // (found by the metamorphic energy check, docs/verification/METAMORPHIC.md).
-            Constraint::RigidLink(r) => {
-                carried.insert(r.master_node);
-                if r.dofs.contains(&2) { carried.insert(r.slave_node); }
-            }
-            Constraint::Diaphragm(d) => { carried.insert(d.master_node); carried.extend(&d.slave_nodes); }
-            Constraint::LinearMPC(m) => carried.extend(m.terms.iter().filter(|t| t.dof == 2).map(|t| t.node_id)),
-            Constraint::EqualDOF(e) => {
-                if e.dofs.contains(&2) { carried.extend([e.master_node, e.slave_node]); }
-            }
-            Constraint::EccentricConnection(e) => {
-                carried.insert(e.master_node);
-                if !e.releases.get(2).copied().unwrap_or(false) { carried.insert(e.slave_node); }
-            }
-        }
-    }
     for s in crate::ordered::values(&input.supports) {
         let rigid = matches!(s.support_type.as_str(), "fixed" | "guidedX" | "guidedY" | "guidedZ");
         let spring = s.support_type == "spring" && s.kz.unwrap_or(0.0) > 0.0;
         if rigid || spring {
             carried.insert(s.node_id);
+        }
+    }
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for c in &input.constraints {
+            match c {
+                Constraint::RigidLink(r) if r.dofs.is_empty() || r.dofs.contains(&2) => {
+                    if carried.contains(&r.master_node) && carried.insert(r.slave_node) {
+                        changed = true;
+                    }
+                    if carried.contains(&r.slave_node) && carried.insert(r.master_node) {
+                        changed = true;
+                    }
+                }
+                Constraint::Diaphragm(d) => {
+                    let any = carried.contains(&d.master_node) || d.slave_nodes.iter().any(|s| carried.contains(s));
+                    if any {
+                        if carried.insert(d.master_node) { changed = true; }
+                        for &s in &d.slave_nodes {
+                            if carried.insert(s) { changed = true; }
+                        }
+                    }
+                }
+                Constraint::EqualDOF(e) if e.dofs.contains(&2) => {
+                    if carried.contains(&e.master_node) && carried.insert(e.slave_node) {
+                        changed = true;
+                    }
+                    if carried.contains(&e.slave_node) && carried.insert(e.master_node) {
+                        changed = true;
+                    }
+                }
+                Constraint::EccentricConnection(e) if !e.releases.get(2).copied().unwrap_or(false) => {
+                    if carried.contains(&e.master_node) && carried.insert(e.slave_node) {
+                        changed = true;
+                    }
+                    if carried.contains(&e.slave_node) && carried.insert(e.master_node) {
+                        changed = true;
+                    }
+                }
+                Constraint::LinearMPC(m) => {
+                    let rot_nodes: Vec<usize> = m.terms.iter().filter(|t| t.dof == 2).map(|t| t.node_id).collect();
+                    if rot_nodes.iter().any(|n| carried.contains(n)) {
+                        for n in rot_nodes {
+                            if carried.insert(n) { changed = true; }
+                        }
+                    }
+                }
+                _ => {}
+            }
         }
     }
     for m in moments {
