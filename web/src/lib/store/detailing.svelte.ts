@@ -82,6 +82,7 @@ import {
 } from './detailing-floor-inputs';
 import { collectSlabColumns, footingRunFingerprint } from './detailing-footing-inputs';
 import { collectFootingSupport, collectFootingSupportReactions } from './footing-support';
+import { designCombinationsWithheld } from './active-results';
 function createDetailingStore() {
   let selectedId = $state<string | null>(null);
   let conflictIndex = $state(0);
@@ -387,6 +388,7 @@ function createDetailingStore() {
         shells: collectShells(),
         stresses: collectStresses(),
         footings: [...modelStore.model.footings.values()],
+        combinationsWithheld: designCombinationsWithheld(),
       });
     },
 
@@ -420,8 +422,12 @@ function createDetailingStore() {
     generateFloors(
       opts: { verifierId?: string; families?: readonly ('slab' | 'wall' | 'footing')[] } = {},
     ): RunFloorDesignResult | null {
-      generating = true;
       lastError = null;
+      // The model's combinations are not there to design for: slabs and walls would read the
+      // result on screen, the loads at factor 1. Every caller, not only the panel's command.
+      const withheld = designCombinationsWithheld();
+      if (withheld) { lastError = t(withheld); return null; }
+      generating = true;
       try {
         const props = resolveConcreteProperties();
         // Footings are checked FIRST, so their entries can join the level assemblies the
