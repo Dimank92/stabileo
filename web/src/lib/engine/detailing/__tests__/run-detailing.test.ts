@@ -16,7 +16,8 @@ import type { MemberContext } from '../../design/member-context';
 import type { MemberDesignOutcome } from '../../design/outcome';
 import { teAt } from '../../../i18n/engine-text';
 
-const SRC = new URL('../../../..', import.meta.url).pathname;
+import { fileURLToPath } from 'node:url';
+const SRC = fileURLToPath(new URL('../../../..', import.meta.url));
 
 // ─── A small, real frame ─────────────────────────────────────────
 

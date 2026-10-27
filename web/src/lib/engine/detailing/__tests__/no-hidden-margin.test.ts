@@ -20,7 +20,8 @@ import { generateLayoutCandidates } from '../candidates';
 import { generateColumnCandidates } from '../column-candidates';
 import { minClearSpacingInLayer, minClearSpacingColumn } from '../../../codes/cirsoc201/spacing';
 
-const SRC = new URL('../../../..', import.meta.url).pathname;
+import { fileURLToPath } from 'node:url';
+const SRC = fileURLToPath(new URL('../../../..', import.meta.url));
 const DIRS = ['lib/engine/detailing', 'lib/codes/cirsoc201'];
 
 function walk(dir: string): string[] {

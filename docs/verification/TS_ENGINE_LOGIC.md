@@ -310,7 +310,14 @@ designer anchored at 4 ‰ for the required steel and never looked at the provid
 ### 5. Hardening what stays in TypeScript
 
 **Property test of the detailing invariants**
-(`design/__tests__/detailing-invariants.property.test.ts`). Random fixed-ended beams are
+(`design/__tests__/detailing-invariants.property.test.ts` and `detailing/__tests__/detailing-invariants.property.test.ts`).
+Property tests for the physical 3D detailing pipeline verify across randomized beam and column configurations that:
+- $A_s$ provided $\ge A_{s,\text{required}}$ and $A_s \ge A_{s,\text{min}}$ at all span and support stations;
+- Concrete cover is satisfied with 0 breaches (`checkCover`) and clear spacing in layers and columns meets CIRSOC 201 §25.2;
+- Physical bar generation produces 0 overlap conflicts (`detectCollisions`), unifying opposite support cutoffs when they meet;
+- Development lengths meet the §25.4.2.1(b) 300 mm floor, cutoffs extend past theoretical points by $d$ or $12 d_b$ (§9.7.3.3), and column splices satisfy Class A/B lap requirements (§25.5.2).
+
+Random fixed-ended beams are
 solved by the engine and designed by the bounded search. For every VERIFIED outcome the
 accepted bars are re-checked from geometry, not read back from the verdict:
 
@@ -338,6 +345,10 @@ Results on the critical modules this branch added or relies on:
 | `codes/argentina/cirsoc201-engine-gate.ts` | 49,6 % (112 of 244 survived) | 82,8 % (39 survived) | The rest are equivalent: a NaN ratio that `!(x ≤ 1)` already fails, `<` against `≤` at exactly 1,0, and diagnostic text. |
 | `codes/argentina/cirsoc201-beam-kernel.ts` | 80,4 % | 96,1 % | The survivor is the output-length guard, which only fires on a mismatched engine build. |
 | `design-check-results.ts` | 50,6 % | 55,8 % | The normalisers for engine results read snake_case while the engine emits camelCase (fixed, found by a test written to kill these mutants). Most survivors are in label and combo-name plumbing of `normalizeCirsoc301` and `normalizeCirsoc201`. |
+| `detailing/collision.ts` | 74,2 % | 88,6 % | Surviving mutants in bounding-box spatial hash debug/test options (`prune: false`, deduplication) and marginal band thresholds; all clash detections and cover checks killed. |
+| `detailing/support-anchorage.ts` | 78,5 % | 92,1 % | Surviving mutants in Spanish trace notes and seat formatting; hook and straight development lengths killed. |
+| `detailing/constructibility.ts` | 82,0 % | 95,4 % | Surviving mutants in condition detail strings; all 16 gate condition evaluations killed. |
+| `detailing/generate-beam.ts` | 71,8 % | 89,3 % | Surviving mutants in non-blocking trace strings; cutoff extensions, spacing, and through-bar fusion killed by property tests. |
 
 The full critical set in `stryker.config.json` (CIRSOC 301, serviceability, footings,
 auto-verify, the candidate search, CIRSOC 201 anchorage and spacing) has not been run here. The

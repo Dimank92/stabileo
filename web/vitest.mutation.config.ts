@@ -23,6 +23,11 @@ export default mergeConfig(rest, defineConfig({
       // tried. It checks source structure, not behaviour, so it has nothing to say about a
       // mutant; it runs in the normal unit pass.
       'src/lib/engine/design/__tests__/run-summary-reported.test.ts',
+      // Heavy end-to-end autodesign regression benchmarks that run in the normal CI unit pass.
+      // Under Stryker they make dry-run and mutant runs balloon into hours and time out.
+      'src/lib/engine/design/__tests__/autodesign-regression.test.ts',
+      'src/lib/engine/design/__tests__/settle-not-clocked.test.ts',
+      'src/lib/engine/design/__tests__/beam-line-flagship.test.ts',
     ],
     include: [
       'src/lib/engine/__tests__/differential/**/*.test.ts',
@@ -37,6 +42,7 @@ export default mergeConfig(rest, defineConfig({
       'src/lib/engine/design/__tests__/**/*.test.ts',
       'src/lib/engine/detailing/__tests__/foundation*.test.ts',
       'src/lib/engine/detailing/__tests__/punching*.test.ts',
+      'src/lib/engine/detailing/__tests__/detailing-invariants.property.test.ts',
       'src/lib/codes/cirsoc201/__tests__/**/*.test.ts',
     ],
   },

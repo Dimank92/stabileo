@@ -1329,6 +1329,7 @@ export function generateBeamBars(input: BeamGenerationInput): GeneratedBeam {
     }
   }
 
+  const topBarsPlacedI = new Map<string, { bar: BarPath; barIndex: number; plan: SupportEndPlan; actualI: number }>();
   for (const t of fromLine ? [] : tops) {
     if (t.group.count <= 0) continue;
     /**
@@ -1414,6 +1415,31 @@ export function generateBeamBars(input: BeamGenerationInput): GeneratedBeam {
     };
     const laidHere = layTop(false) ?? layTop(true)!;
     for (const { o, i } of laidHere) {
+      const slotKey = `${o.layer}:${o.across.toFixed(4)}`;
+      if (!atStart) {
+        const existingI = topBarsPlacedI.get(slotKey);
+        if (existingI && actual <= existingI.actualI + 1e-4) {
+          const plan = planFor(o.layer);
+          const from = -existingI.plan.along;
+          const to = input.L + plan.along;
+          const fused = buildStraightBarWithHooks({
+            id: existingI.bar.id,
+            layerId: existingI.bar.layerId,
+            diameterMm: t.group.diameterMm, role: 'longitudinal',
+            start: shift(add(add(input.origin, input.axis, from), input.up, zTopBar), o),
+            end: shift(add(add(input.origin, input.axis, to), input.up, zTopBar), o),
+            axis: input.axis, hookNormal: { x: -input.up.x, y: -input.up.y, z: -input.up.z },
+            startHook: existingI.plan.hook,
+            endHook: plan.hook,
+            ownerElementIds: [input.elementId], edition: input.edition,
+          });
+          bars[existingI.barIndex] = plan.anchorage || existingI.plan.anchorage
+            ? { ...fused, anchorage: { start: existingI.plan.anchorage, end: plan.anchorage } }
+            : fused;
+          trace.push(`Armadura superior en ranura (${o.across.toFixed(3)} m): las barras de ambos apoyos se superponen en el vano; se unifican como barra corrida de apoyo a apoyo.`);
+          continue;
+        }
+      }
       barLayers[`e${input.elementId}-top${t.side}-${i}`] = o.layer;
       const plan = planFor(o.layer);
       const from = atStart ? -plan.along : Math.min(input.L, actual);
@@ -1429,7 +1455,11 @@ export function generateBeamBars(input: BeamGenerationInput): GeneratedBeam {
         endHook: atStart ? undefined : plan.hook,
         ownerElementIds: [input.elementId], edition: input.edition,
       });
-      bars.push(plan.anchorage ? { ...bar, anchorage: atStart ? { start: plan.anchorage } : { end: plan.anchorage } } : bar);
+      const withAnchorage = plan.anchorage ? { ...bar, anchorage: atStart ? { start: plan.anchorage } : { end: plan.anchorage } } : bar;
+      if (atStart) {
+        topBarsPlacedI.set(slotKey, { bar: withAnchorage, barIndex: bars.length, plan, actualI: actual });
+      }
+      bars.push(withAnchorage);
     }
   }
 
