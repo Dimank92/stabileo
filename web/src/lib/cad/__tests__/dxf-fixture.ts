@@ -183,3 +183,32 @@ export function simplePlanDxf(): string {
     entities,
   });
 }
+
+/**
+ * Three floor plans of one building drawn side by side on one sheet (metres): a ground floor and
+ * a first floor, each a 2 × 1 bay frame of 5 m × 4 m bays (six 0.30 m columns and their beams),
+ * 30 m apart; and a smaller top floor (one bay) 60 m to the right and 1 m up. A 0.5 m line drawn
+ * far off on VIGAS (a detail) and a title block on its own layer complete the sheet.
+ */
+export function multiPlanDxf(): string {
+  const plan = (ox: number, oy: number, xs: number[], ys: number[]): string[] => {
+    const out: string[] = [];
+    for (const x of xs) for (const y of ys) {
+      out.push(dxfLwPolyline('PILARES', [[ox + x - 0.15, oy + y - 0.15], [ox + x + 0.15, oy + y - 0.15], [ox + x + 0.15, oy + y + 0.15], [ox + x - 0.15, oy + y + 0.15]], true));
+    }
+    for (const y of ys) for (let i = 0; i + 1 < xs.length; i++) out.push(dxfLine('VIGAS', ox + xs[i]!, oy + y, ox + xs[i + 1]!, oy + y));
+    for (const x of xs) for (let j = 0; j + 1 < ys.length; j++) out.push(dxfLine('VIGAS', ox + x, oy + ys[j]!, ox + x, oy + ys[j + 1]!));
+    return out;
+  };
+  return buildDxf({
+    insunits: 6,
+    layers: ['PILARES', 'VIGAS', 'ROTULO'],
+    entities: [
+      ...plan(0, 0, [0, 5, 10], [0, 4]),
+      ...plan(30, 0, [0, 5, 10], [0, 4]),
+      ...plan(60, 1, [0, 5], [0, 4]),
+      dxfLine('VIGAS', 45, 20, 45.5, 20),
+      dxfLwPolyline('ROTULO', [[80, -6], [86, -6], [86, -3], [80, -3]], true),
+    ].join('\n'),
+  });
+}
