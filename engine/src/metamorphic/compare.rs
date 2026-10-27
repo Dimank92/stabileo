@@ -293,7 +293,9 @@ pub fn compare_floored(actual: &Flat, expected: &Flat, scale_src: &Flat, lchar: 
     for (name, d, src, s) in fams {
         for k in 0..d.vals.len() {
             let scale = if name == "scalar" { src.scales.get(k).copied().unwrap_or(src.vals[k].abs()) } else { s };
-            let tol = rel * scale + f64::MIN_POSITIVE;
+            // Absolute floor of 1e-15 prevents spurious metamorphic violations
+            // on pure zero-baseline components where machine round-off is ~1e-20.
+            let tol = rel * scale + 1e-15;
             let ratio = d.vals[k].abs() / tol;
             if !d.vals[k].is_finite() || !(ratio <= 1.0) {
                 return Err(format!(
@@ -323,4 +325,19 @@ fn expected_val(e: &Flat, fam: &str, k: usize) -> f64 {
         _ => &e.x,
     };
     f.vals.get(k).copied().unwrap_or(f64::NAN)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn zero_scale_subatomic_noise_is_not_a_violation() {
+        let mut actual = Flat::default();
+        actual.push_t("ux@n2[0]", -1.1695618029e-20);
+        let mut expected = Flat::default();
+        expected.push_t("ux@n2[0]", 0.0);
+        let res = compare(&actual, &expected, 1.0, 2.0e-9);
+        assert!(res.is_ok(), "Expected subatomic noise 1e-20 on zero scale to pass, but got error: {:?}", res);
+    }
 }
