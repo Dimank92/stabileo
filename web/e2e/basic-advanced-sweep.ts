@@ -841,9 +841,7 @@ export function sweepExamples(names: readonly string[]): void {
  * leave the blocking PR and queue runs and run in CI's `e2e-flaky` job, with retries, until the
  * issue is closed and the entry removed.
  */
-const QUARANTINED: Readonly<Record<string, string>> = {
-  'tower-3d-2': 'https://github.com/lambdaclass/stabileo/issues/607',
-};
+const QUARANTINED: Readonly<Record<string, string>> = {};
 
 function quarantine(name: string): { tag?: string; annotation?: { type: string; description: string } } {
   const issue = QUARANTINED[name];
