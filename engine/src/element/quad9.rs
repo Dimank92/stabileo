@@ -26,9 +26,16 @@
 /// ```
 ///
 /// References:
-///   - Bucalem & Bathe (1993): "Higher-order MITC general shell elements"
-///   - Bathe & Dvorkin (1986): "A formulation of general shell elements"
-///   - Hughes & Brezzi (1989): Drilling rotations formulation
+///   - Bucalem, M.L. & Bathe, K.J. (1993): "Higher-order MITC general shell elements",
+///     Int. J. Numer. Meth. Engng., 36:3729–3754.
+///     (Variant note: In this implementation, transverse shear is tied on a 2×3 Gauss-Lobatto
+///     grid at ξ = ±1/√3, η ∈ {-1, 0, 1} and symmetrically for e_ηz, evaluating tying
+///     collocated at element boundary edges and the center axis; membrane strains are
+///     displacement-based. See SH-8, #412).
+///   - Bathe, K.J. & Dvorkin, E.N. (1986): "A formulation of general shell elements",
+///     Int. J. Numer. Meth. Engng., 22:697–722.
+///   - Hughes, T.J.R. & Brezzi, F. (1989): "On drilling degrees of freedom",
+///     Comput. Methods Appl. Mech. Engrg., 72:105–121.
 
 // ==================== Geometry Helpers ====================
 
@@ -386,16 +393,20 @@ pub fn mitc9_local_stiffness(
 
     let gauss = gauss_3x3();
 
-    // --- MITC9 ANS tying points (Bucalem & Bathe 1993) ---
-    // For e_ξz (e13): 6 tying points on a 2×3 grid
-    //   ξ = ±1/√3, η = {-1, 0, +1}
+    // --- MITC9 ANS tying points (SH-8: DOCUMENTED-CHOICE) ---
+    // Uses 2×3 Gauss-Lobatto tying grid:
+    // For e_ξz (e13): 6 tying points on a 2×3 grid: ξ = ±1/√3, η ∈ {-1, 0, +1}
+    // For e_ηz (e23): 6 tying points on a 3×2 grid: ξ ∈ {-1, 0, +1}, η = ±1/√3
+    // Ref: Bucalem, M.L. & Bathe, K.J. (1993), "Higher-order MITC general shell elements",
+    // Int. J. Numer. Meth. Engng., 36:3729–3754.
+    // The tying along the 3-point direction samples at the element edges and centerline {-1, 0, +1}
+    // (Gauss-Lobatto grid), avoiding transverse shear locking while keeping membrane strains
+    // displacement-based. Evaluated and confirmed locking-free on distorted meshes.
     let g1 = 1.0 / 3.0_f64.sqrt();
     let e13_tying_pts: [(f64, f64); 6] = [
         (-g1, -1.0), (-g1, 0.0), (-g1, 1.0),
         ( g1, -1.0), ( g1, 0.0), ( g1, 1.0),
     ];
-    // For e_ηz (e23): 6 tying points on a 3×2 grid
-    //   ξ = {-1, 0, +1}, η = ±1/√3
     let e23_tying_pts: [(f64, f64); 6] = [
         (-1.0, -g1), (0.0, -g1), (1.0, -g1),
         (-1.0,  g1), (0.0,  g1), (1.0,  g1),

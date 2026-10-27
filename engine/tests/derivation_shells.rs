@@ -660,6 +660,94 @@ fn sh7_curved_mitc9_rigid_motion_is_stress_free() {
     }
 }
 
+// ───────────────────── SH-8: MITC9 tying points & distorted mesh ─────────────────────
+
+/// Distorted MITC9 thin-shell cantilever strip benchmark (SH-8, #412).
+///
+/// Bucalem & Bathe (1993) formulate MITC9 with assumed membrane strains and transverse shear
+/// tying points placed at the 3-point Gauss-Legendre coordinates (0, ±√(3/5)) along the
+/// parametric lines. Stabileo's MITC9 formulation adopts a displacement-based membrane field
+/// and evaluates the assumed transverse shear strain on the 2×3 Gauss-Lobatto product grid:
+///   e_ξz at ξ = ±1/√3, η ∈ {-1, 0, 1}
+///   e_ηz at ξ ∈ {-1, 0, 1}, η = ±1/√3
+///
+/// This benchmark tests that the Gauss-Lobatto tying grid does NOT shear lock on a thin-shell
+/// strip with distorted interior and midside nodes in the extreme thin limit (L/t = 1000).
+fn distorted_thin_strip_tip_mitc9() -> f64 {
+    let (l, b, t, nx) = (4.0, 0.2, 0.004, 4usize);
+    let p = 1.0;
+    let mut s = empty();
+    s.materials.insert("1".into(), SolverMaterial { id: 1, e: E_MPA, nu: 0.0 });
+    let (cols, rows) = (2 * nx + 1, 3);
+    let id = |i: usize, j: usize| 1 + i * rows + j;
+    let dx = l / (cols - 1) as f64;
+    for i in 0..cols {
+        for j in 0..rows {
+            let mut x = l * i as f64 / (cols - 1) as f64;
+            let mut y = b * j as f64 / (rows - 1) as f64;
+            if i > 0 && i < cols - 1 {
+                let phase = i as f64 * 0.85 + j as f64 * 0.5;
+                x += 0.12 * dx * phase.sin();
+                y += 0.06 * b * phase.cos();
+            }
+            s.nodes.insert(id(i, j).to_string(), SolverNode3D { id: id(i, j), x, y, z: 0.0 });
+        }
+    }
+    for j in 0..rows {
+        fix(&mut s, id(0, j));
+    }
+    let mut eid = 1;
+    for e in 0..nx {
+        let (i, j) = (2 * e, 0);
+        let nodes = [
+            id(i, j), id(i + 2, j), id(i + 2, j + 2), id(i, j + 2),
+            id(i + 1, j), id(i + 2, j + 1), id(i + 1, j + 2), id(i, j + 1),
+            id(i + 1, j + 1),
+        ];
+        s.quad9s.insert(eid.to_string(), SolverQuad9Element { id: eid, nodes, material_id: 1, thickness: t });
+        eid += 1;
+    }
+    let w = vec![1.0 / 6.0, 4.0 / 6.0, 1.0 / 6.0];
+    for j in 0..rows {
+        nodal(&mut s, id(cols - 1, j), -p * w[j]);
+    }
+    let r = solve_3d(&s).unwrap();
+    let tip: f64 = (0..rows).map(|j| r.displacements.iter().find(|d| d.node_id == id(cols - 1, j)).unwrap().uz).sum();
+    let ei = E * b * t * t * t / 12.0;
+    (tip / rows as f64) / (-p * l * l * l / (3.0 * ei))
+}
+
+/// SH-8 (DOCUMENTED-CHOICE / FIXED, #412).
+///
+/// Confirms the MITC9 Gauss-Lobatto tying grid variant:
+/// 1. Thin-shell cantilever strip on distorted mesh (L/t = 1000) achieves > 95% of Euler-Bernoulli
+///    deflection, proving absence of shear locking under distortion.
+/// 2. Single distorted MITC9 element maintains exact 6 zero rigid-body modes (no spurious modes).
+#[test]
+fn sh8_mitc9_distorted_mesh_thin_shell_benchmark() {
+    let ratio = distorted_thin_strip_tip_mitc9();
+    assert!(
+        ratio > 0.95 && ratio < 1.05,
+        "Distorted MITC9 thin strip ratio tip / (PL³/3EI) = {ratio:.4} (must be in [0.95, 1.05])"
+    );
+
+    // Verify 6 rigid body modes on a distorted 9-node quad in global axes
+    let coords: [[f64; 3]; 9] = [
+        [0.0, 0.0, 0.0],
+        [1.2, 0.1, 0.0],
+        [1.1, 0.9, 0.0],
+        [-0.1, 0.8, 0.0],
+        [0.6, -0.05, 0.0],
+        [1.18, 0.48, 0.0],
+        [0.52, 0.88, 0.0],
+        [-0.08, 0.42, 0.0],
+        [0.55, 0.44, 0.0],
+    ];
+    let k = to_global(&mitc9_local_stiffness(&coords, E, 0.3, 0.01), &quad9_transform_3d(&coords), 54);
+    let res = rigid_residual(&k, &coords);
+    assert!(res < 1e-10, "Distorted MITC9 relative rigid residual {res:.3e} must be < 1e-10");
+}
+
 // ───────────────────── SH-9: solid-shell Poisson thickness locking ─────────────────────
 
 /// Solid-shell cantilever strip (nx × 2 elements, L = 4, b = 0.6, t = 0.1), fixed at x = 0,
