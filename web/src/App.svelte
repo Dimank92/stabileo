@@ -9,6 +9,9 @@
   import { viewportCanvas } from './lib/utils/viewport-canvas';
   import { onMount, untrack, tick } from 'svelte';
   import LocaleSelect from './components/LocaleSelect.svelte';
+  import AccountButton from './components/account/AccountButton.svelte';
+  import { authStore } from './lib/store/auth.svelte';
+  import { accounts } from './lib/features';
   import { hasLoadCarrying3D } from './lib/engine/solver-service';
   import Viewport from './components/Viewport.svelte';
   import Viewport3D from './components/Viewport3D.svelte';
@@ -377,7 +380,7 @@
   import { tourStore } from './lib/store/tour.svelte';
   import { startDemo, DEFAULT_DEMO } from './lib/tour/demos';
   import { whatIf } from './lib/store/whatif.svelte';
-  import { runLiveCalc, runGlobalSolve } from './lib/engine/live-calc';
+  import { runLiveCalc, runGlobalSolve, registerLiveCalcCanceller } from './lib/engine/live-calc';
   import LandingPage from './components/LandingPage.svelte';
   import BlogPage from './components/blog/BlogPage.svelte';
   import { parsePublicPath, publicHref } from './lib/i18n/public-routes';
@@ -692,6 +695,7 @@
   let dxfFileInput: HTMLInputElement;
 
   let showImportDialog = $state(false);
+  const accountsEnabled = accounts();
   let importText = $state('');
   let autosaveData = $state<DedalFile | null>(null);
   /** When the offered save was written, and whether it is the newest one that exists. */
@@ -816,6 +820,14 @@
       return;
     }
 
+    // F3 turns the snaps on or off, as in CAD programs: grid axes and the background drawings.
+    if (e.key === 'F3') {
+      e.preventDefault();
+      uiStore.snapToAxes = !uiStore.snapToAxes;
+      uiStore.toast(t(uiStore.snapToAxes ? 'osnap.on' : 'osnap.off'), 'info');
+      return;
+    }
+
     // Ctrl/Cmd+Z: Undo
     if ((e.ctrlKey || e.metaKey) && key === 'Z' && !e.shiftKey) {
       e.preventDefault();
@@ -879,6 +891,7 @@
   }
 
   onMount(() => {
+    if (accountsEnabled) void authStore.init();
     currentAppMode = pathToMode(location.pathname);
     if (currentAppMode === 'educativo') {
       uiStore.analysisMode = 'edu';
@@ -1155,6 +1168,11 @@
       liveCalcTimer = null;
     }
   }
+  // Every manual solve cancels it, from any entry point (`runGlobalSolve`).
+  $effect(() => {
+    registerLiveCalcCanceller(cancelPendingLiveCalc);
+    return () => registerLiveCalcCanceller(null);
+  });
 
   $effect(() => {
     const _v = modelStore.modelVersion;
@@ -1503,6 +1521,10 @@
           testid="lang-select"
         />
       </div>
+
+      {#if authStore.showAccountEntry}
+        <AccountButton />
+      {/if}
 
       <!--
         Settings sits with the other application-level controls — help and

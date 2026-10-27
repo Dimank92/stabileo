@@ -5,8 +5,7 @@
  */
 import { modelStore } from './model.svelte';
 import { jointDesignStore } from './joint-design.svelte';
-import { activePerCombo3D } from './active-results';
-import { resultsStore } from './results.svelte';
+import { activePerCombo3D, activeResultSet3D, designCombinationsWithheld } from './active-results';
 import { resolveConcreteProperties } from './detailing-project-inputs';
 import { detectJoints } from '../engine/connection-design';
 import { materialFamilyOf } from '../engine/steel/material-family';
@@ -28,8 +27,10 @@ function sectionOf(elementId: number): JointSection | null {
 /** The members of a joint as the typologies read them. */
 export function typologyContext(nodeId: number, elementIds: readonly number[]): TypologyContext | null {
   const n = P(nodeId);
-  if (!n) return null;
-  const forces = [...(activePerCombo3D().size ? activePerCombo3D().values() : resultsStore.results3D ? [resultsStore.results3D] : [])];
+  if (!n || designCombinationsWithheld()) return null;
+  const perCombo = activePerCombo3D();
+  const single = perCombo.size === 0 ? activeResultSet3D() : null;
+  const forces = [...(perCombo.size ? perCombo.values() : single ? [single] : [])];
   const members: JointMember[] = [];
   for (const id of elementIds) {
     const e = modelStore.elements.get(id);

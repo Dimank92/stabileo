@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { OSNAP_MODES } from '../../lib/model/osnap-modes';
   /**
    * What the next click in the model does, while PRO is drawing.
    *
@@ -73,6 +74,18 @@
     <span class="db-step" data-testid="draw-step">{step}</span>
     <span class="db-sep" aria-hidden="true"></span>
 
+    <details class="db-osnap" data-testid="osnap-menu">
+      <summary title={t('osnap.hint')}>{t('osnap.title')}{uiStore.snapToAxes ? '' : ' ·'}</summary>
+      <div class="db-osnap-list">
+        <label><input type="checkbox" bind:checked={uiStore.snapToAxes} data-testid="osnap-master" /> {t('osnap.master')}</label>
+        {#each OSNAP_MODES as m (m)}
+          <label class:off={!uiStore.snapToAxes}><input type="checkbox" checked={uiStore.osnapModes.has(m)} disabled={!uiStore.snapToAxes} onchange={() => uiStore.toggleOsnap(m)} data-testid="osnap-mode-{m}" /> {t(`osnap.${m}`)}</label>
+        {/each}
+        <p>{t('osnap.hint')}</p>
+      </div>
+    </details>
+    <span class="db-sep" aria-hidden="true"></span>
+
     <div class="db-opts">
       {#if tool === 'node'}
         <label>{t('drawBar.plane')}
@@ -120,6 +133,13 @@
 {/if}
 
 <style>
+  .db-osnap { position: relative; font-size: 0.72rem; }
+  .db-osnap summary { cursor: pointer; padding: 2px 8px; border: 1px solid var(--st-hair-strong); border-radius: var(--st-radius); list-style: none; color: var(--st-text-2); }
+  .db-osnap[open] summary { border-color: var(--st-accent); color: var(--st-text); }
+  .db-osnap-list { position: absolute; left: 0; top: calc(100% + 4px); z-index: 30; width: 240px; padding: 8px; display: flex; flex-direction: column; gap: 4px; background: var(--st-surface); border: 1px solid var(--st-hair-strong); border-radius: var(--st-radius); box-shadow: 0 6px 18px rgb(0 0 0 / 0.3); }
+  .db-osnap-list label { display: flex; gap: 6px; align-items: center; color: var(--st-text); }
+  .db-osnap-list label.off { color: var(--st-text-3); }
+  .db-osnap-list p { margin: 4px 0 0; color: var(--st-text-3); font-size: 0.66rem; line-height: 1.4; }
   .db {
     display: flex;
     align-items: center;

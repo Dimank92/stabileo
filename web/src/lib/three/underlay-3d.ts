@@ -1,7 +1,7 @@
 /**
  * The background drawings in the 3D view, each at its level: the one on the active level drawn
  * plainly, the others faint. Nothing here is pickable; a drawing is a reference to capture points
- * from (`model/underlay.ts snapToUnderlays`), not an object to select.
+ * from (`model/osnap.ts`), not an object to select.
  */
 import * as THREE from 'three';
 import { laidPoint, segmentShown, type Underlay } from '../model/underlay';

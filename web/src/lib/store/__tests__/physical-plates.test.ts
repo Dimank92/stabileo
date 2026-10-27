@@ -15,7 +15,7 @@ import * as wasmSolver from '../../engine/wasm-solver';
 import { historyStore, modelStore, uiStore } from '..';
 import {
   addPlateLoad, applyPlateMeshes, clearPlateMesh, createPlate, deletePlate, meshBeforeAnalysis, physicalPlates, planPlateMesh,
-  plateOfShell, plateShellKeys, plateStatus, preparePlatesForAnalysis,
+  plateOfShell, plateShellKeys, plateStatus, preparePlatesForAnalysis, setShellProperties,
 } from '../physical-plates';
 import { syncDefinedLoadsForAnalysis } from '../defined-loads';
 import { serializeProject, deserializeProject } from '../file';
@@ -274,5 +274,54 @@ describe('a physical plate', () => {
     expect(plateLoops(g)).toEqual(loops);
     expect(plateStatus(id)).toBe('current');
     expect(resultant(solve()).fz).toBeCloseTo(3 * 23, 6);
+  });
+
+  it('meshes a plate as a grid of squares or rectangles, current, carrying its whole load', () => {
+    const { id } = build();
+    addPlateLoad(id, 1, 3);
+    // Squares of 0.5 m round a 1 x 1 m hole: exact squares where they fit, a strip round the hole.
+    const plan = planPlateMesh(id, { size: 0.5, element: 'quad', followMembers: true, pattern: 'square' })!;
+    expect(plan.mesh, plan.refused).not.toBeNull();
+    expect(plan.grid!.gridCells).toBeGreaterThan(0);
+    expect(plan.grid!.cellA).toBeCloseTo(0.5, 9);
+    applyPlateMeshes([plan]);
+    expect(plateStatus(id)).toBe('current');
+    expect(physicalPlates()[0]!.surface.mesh.pattern).toBe('square');
+    // The plate's load (3 kN/m2 on 24 - 1 m2) reaches the supports whole.
+    expect(resultant(solve()).fz).toBeCloseTo(3 * 23, 6);
+    // Another shape is another mesh: the current one goes out of date until meshed again.
+    const rect = planPlateMesh(id, { size: 1, sizeV: 0.5, element: 'quad', followMembers: true, pattern: 'rect' })!;
+    expect(rect.signature).not.toBe(plan.signature);
+    applyPlateMeshes([rect]);
+    expect(plateStatus(id)).toBe('current');
+    expect(resultant(solve()).fz).toBeCloseTo(3 * 23, 6);
+  });
+
+  it('keeps what its panel sets tied to the rest: an element edited is the plate, a case or material removed', () => {
+    const { id } = build();
+    mesh(id, 1);
+    const shells = plateShellKeys(id);
+    // A table editing one element's thickness edits the plate and its whole mesh.
+    expect(setShellProperties([shells[0]!], { thickness: 0.22 })).toEqual([id]);
+    expect(physicalPlates()[0]!.surface.thickness).toBe(0.22);
+    for (const k of shells) {
+      const n = Number(k.slice(1));
+      expect((k[0] === 'q' ? modelStore.quads.get(n) : modelStore.plates.get(n))!.thickness).toBe(0.22);
+    }
+    expect(plateStatus(id)).toBe('current');
+    // A loose shell is still edited alone.
+    const loose = modelStore.addQuad([...modelStore.nodes.keys()].slice(0, 4) as [number, number, number, number], 1, 0.1);
+    expect(setShellProperties([`q${loose}`], { thickness: 0.3 })).toEqual([]);
+    expect(modelStore.quads.get(loose)!.thickness).toBe(0.3);
+    modelStore.removeQuad?.(loose);
+    // The material the plate is made of cannot be removed from under it.
+    expect(modelStore.removeMaterial(1)).toBe(false);
+    // Removing the case its area load writes into removes the load's definition with it.
+    addPlateLoad(id, 1, 3);
+    expect(plateLoadDefs(id)).toHaveLength(1);
+    modelStore.removeLoadCase(1);
+    expect(plateLoadDefs(id)).toHaveLength(0);
+    syncDefinedLoadsForAnalysis();
+    expect(modelStore.model.loads.filter((l) => (l.data as { caseId?: number }).caseId === 1)).toHaveLength(0);
   });
 });

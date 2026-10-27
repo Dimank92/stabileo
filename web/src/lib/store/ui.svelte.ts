@@ -1,5 +1,6 @@
 // UI state store
 
+import { DEFAULT_OSNAP, OSNAP_MODES, type OsnapMode } from '../model/osnap-modes';
 import type { NodeStylePref } from '../three/nodes-instanced';
 import { DEFAULT_WORKING_PLANE, VERTICAL_AXIS, type ViewportPresentation3D } from '../geometry/coordinate-system';
 import { isUnitSystem, type UnitSystem } from '../utils/units';
@@ -639,6 +640,15 @@ function createUIStore() {
   let nodeCreateZ = $state<number>(0);
   // Snap new points to the structural grid's axes (PRO, when the model has a grid).
   let snapToAxes = $state<boolean>(true);
+  /** The object snaps on the background drawings that are on (`model/osnap.ts`), remembered per browser. */
+  const OSNAP_KEY = 'stabileo-osnap';
+  let osnapModes = $state<Set<OsnapMode>>((() => {
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(OSNAP_KEY) : null;
+      if (raw) return new Set((JSON.parse(raw) as string[]).filter((m): m is OsnapMode => (OSNAP_MODES as readonly string[]).includes(m)));
+    } catch { /* private mode, or a value from elsewhere */ }
+    return new Set(DEFAULT_OSNAP);
+  })());
 
   // Measurement tool
   let measureMode = $state<boolean>(false);
@@ -1405,6 +1415,14 @@ function createUIStore() {
     set nodeCreateZ(v: number) { nodeCreateZ = v; },
     get snapToAxes() { return snapToAxes; },
     set snapToAxes(v: boolean) { snapToAxes = v; },
+    get osnapModes(): ReadonlySet<OsnapMode> { return osnapModes; },
+    /** Turn one object snap on or off, and remember the choice. */
+    toggleOsnap(m: OsnapMode) {
+      const next = new Set(osnapModes);
+      if (next.has(m)) next.delete(m); else next.add(m);
+      osnapModes = next;
+      try { localStorage.setItem(OSNAP_KEY, JSON.stringify([...next])); } catch { /* private mode */ }
+    },
     /** Work on a level: new points land on its plane, and the grid is drawn there. */
     setActiveLevel(z: number) { nodeCreateZ = z; workingPlane = 'XY'; },
 

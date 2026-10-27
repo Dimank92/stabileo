@@ -11,8 +11,7 @@
  *    force, stated or read from a member's largest axial force; NDS 12.3 (`timber-dowel.ts`).
  */
 import { modelStore } from './model.svelte';
-import { resultsStore } from './results.svelte';
-import { activePerCombo3D } from './active-results';
+import { activePerCombo3D, activeResultSet3D } from './active-results';
 import { envelopeAt, specialElements, statusOf } from './special-elements';
 import { gradeById } from '../data/structural-grades';
 import { extractForcesAtStation } from '../engine/station-forces';
@@ -79,7 +78,8 @@ const axialAt = (r: ReturnType<typeof activePerCombo3D> extends Map<number, infe
 
 export function hssJointChecks(): HssJointCheck[] {
   let sets = [...activePerCombo3D().values()];
-  if (!sets.length && resultsStore.results3D) sets = [resultsStore.results3D];
+  const single = sets.length === 0 ? activeResultSet3D() : null;
+  if (single) sets = [single];
   return (specialElements().hss ?? []).map((entry) => {
     const g = hssJointGeometry(entry.nodeId);
     const chordM = g ? memberOf(g.chord[0]) : null;

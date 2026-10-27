@@ -74,4 +74,45 @@ test.describe('@smoke PRO — curved geometry', () => {
     for (let i = 0; i < 4; i++) await page.getByTestId(`shell-node-${i}`).fill(String(i + 1));
     await expect(page.getByTestId('quad-curved')).toHaveCount(1);
   });
+
+  test('an arc picked whole shows one local-axis triad, a segment picked alone its own', async ({ pro: page }) => {
+    await page.getByTestId('pr-stage-model').click();
+    await page.getByTestId('pr-cmd-nodes').click();
+    await page.getByTestId('write-node').click();
+    const add = async (x: number, y: number, z: number) => {
+      await page.getByTestId('write-node-x').fill(String(x));
+      await page.getByTestId('write-node-y').fill(String(y));
+      await page.getByTestId('write-node-z').fill(String(z));
+      await page.getByTestId('write-node-card-submit').click();
+    };
+    await add(-5, 0, 0);
+    await add(0, 0, 5);
+    await add(5, 0, 0);
+    await page.getByTestId('pr-cmd-elements').click();
+    await page.getByTestId('pro-arc-toggle').click();
+    await page.getByTestId('arc-start').fill('1');
+    await page.getByTestId('arc-through').fill('2');
+    await page.getByTestId('arc-end').fill('3');
+    await page.getByTestId('arc-segments').fill('8');
+    await page.getByTestId('arc-create').click();
+    await expect.poll(() => page.evaluate(() => window.__stabileo.elementIds().length)).toBe(8);
+
+    // A point on the second segment, between its two nodes on screen.
+    const ids = await page.evaluate(() => window.__stabileo.elementIds());
+    const ends = (await page.evaluate((id) => window.__stabileo.elementEnds(id), ids[1]!))!;
+    const [a, b] = await Promise.all([ends.i, ends.j].map((n) => page.evaluate((x) => window.__stabileo.nodeScreenPos(x), n)));
+    const at = { x: (a!.x + b!.x) / 2, y: (a!.y + b!.y) / 2 };
+
+    await page.getByTestId('pr-select').click();
+    await page.getByTestId('member-pick-piece').click();
+    await page.mouse.click(at.x, at.y);
+    await expect.poll(() => page.evaluate(() => window.__stabileo.selection().length)).toBe(8);
+    await expect.poll(() => page.evaluate(() => window.__stabileo.localAxesTriads())).toBe(1);
+
+    await page.getByTestId('member-pick-segment').click();
+    await page.mouse.click(10, 300);
+    await page.mouse.click(at.x, at.y);
+    await expect.poll(() => page.evaluate(() => window.__stabileo.selection().length)).toBe(1);
+    await expect.poll(() => page.evaluate(() => window.__stabileo.localAxesTriads())).toBe(1);
+  });
 });

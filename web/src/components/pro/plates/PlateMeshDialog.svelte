@@ -22,6 +22,11 @@
   let size = $state(first?.size ?? 0.5);
   let element = $state<'quad' | 'tri'>(first?.element ?? 'quad');
   let followMembers = $state(first?.followMembers ?? true);
+  // A grid of rectangles or squares of the sides given, along the plate's first side or global X.
+  let pattern = $state<'free' | 'rect' | 'square'>(first?.pattern ?? 'free');
+  let sizeV = $state(first?.sizeV ?? first?.size ?? 0.5);
+  let orient = $state<'plate' | 'globalX'>(first?.orient ?? 'plate');
+  const gridOn = $derived(element === 'quad' && pattern !== 'free');
   let plans = $state<PlateMeshPlan[] | null>(null);
   let progress = $state<{ done: number; total: number } | null>(null);
   let result = $state<string | null>(null);
@@ -32,14 +37,14 @@
     ctrl = new AbortController();
     result = null;
     progress = { done: 0, total: ids.length };
-    const r = await planPlateMeshes(ids, { size, element, followMembers }, { signal: ctrl.signal, onProgress: (done, total) => (progress = { done, total }) });
+    const r = await planPlateMeshes(ids, { size, element, followMembers, pattern, sizeV, orient }, { signal: ctrl.signal, onProgress: (done, total) => (progress = { done, total }) });
     progress = null;
     if (r) plans = r;
   }
   function cancel() { ctrl?.abort(); progress = null; }
   onDestroy(() => ctrl?.abort());
   // A first plan as soon as the dialog opens, and again when a setting changes.
-  $effect(() => { void size; void element; void followMembers; if (size > 0) untrack(() => void preview()); });
+  $effect(() => { void size; void element; void followMembers; void pattern; void sizeV; void orient; if (size > 0) untrack(() => void preview()); });
 
   const ok = $derived((plans ?? []).filter((p) => p.mesh));
   const totals = $derived({ cells: ok.reduce((s, p) => s + p.cells, 0), local: (plans ?? []).reduce((s, p) => s + p.localLoads, 0) });
@@ -59,6 +64,11 @@
     if (!p.mesh) return '';
     const tri = p.mesh.cells.filter((c) => c.length === 3).length;
     if (p.spec.element === 'tri') return t('plates.meshKind.tri');
+    if (p.grid) {
+      const sides = { a: fmtQ(p.grid.cellA, 'length'), b: fmtQ(p.grid.cellB, 'length'), unit: unitQ('length') };
+      const cells = Math.abs(p.grid.cellA - p.grid.cellB) < 1e-9 ? tp('plates.meshKind.squares', { n: p.grid.gridCells, ...sides }) : tp('plates.meshKind.rectangles', { n: p.grid.gridCells, ...sides });
+      return p.grid.bandCells ? `${cells} ${tp('plates.meshKind.band', { n: p.grid.bandCells, tri: tri })}` : cells;
+    }
     if (p.mesh.structured) return t('plates.meshKind.structured');
     return tri ? tp('plates.meshKind.mixed', { n: tri }) : t('plates.meshKind.fromTriangles');
   };
@@ -89,8 +99,30 @@
         <button class:on={element === 'quad'} aria-pressed={element === 'quad'} onclick={() => (element = 'quad')} data-testid="plate-mesh-quad">{t('plates.elementQuad')}</button>
         <button class:on={element === 'tri'} aria-pressed={element === 'tri'} onclick={() => (element = 'tri')} data-testid="plate-mesh-tri">{t('plates.elementTri')}</button>
       </div>
-      <label>{t('plates.size')} <QuantityInput min={0.01} value={size} quantity="length" cls="pmd-num" testid="plate-mesh-size" onchange={(v) => { if (v > 0) size = v; }} /></label>
+      <label>{gridOn ? t(pattern === 'square' ? 'plates.side' : 'plates.sideA') : t('plates.size')} <QuantityInput min={0.01} value={size} quantity="length" cls="pmd-num" testid="plate-mesh-size" onchange={(v) => { if (v > 0) size = v; }} /></label>
+      {#if gridOn && pattern === 'rect'}
+        <label>{t('plates.sideB')} <QuantityInput min={0.01} value={sizeV} quantity="length" cls="pmd-num" testid="plate-mesh-size-v" onchange={(v) => { if (v > 0) sizeV = v; }} /></label>
+      {/if}
     </div>
+    {#if element === 'quad'}
+      <div class="pmd-row">
+        <span>{t('plates.pattern')}</span>
+        <div class="pmd-seg" role="group" aria-label={t('plates.pattern')}>
+          <button class:on={pattern === 'free'} aria-pressed={pattern === 'free'} onclick={() => (pattern = 'free')} data-testid="plate-mesh-free">{t('plates.patternFree')}</button>
+          <button class:on={pattern === 'rect'} aria-pressed={pattern === 'rect'} onclick={() => (pattern = 'rect')} data-testid="plate-mesh-rect">{t('plates.patternRect')}</button>
+          <button class:on={pattern === 'square'} aria-pressed={pattern === 'square'} onclick={() => (pattern = 'square')} data-testid="plate-mesh-square">{t('plates.patternSquare')}</button>
+        </div>
+        {#if gridOn}
+          <label>{t('plates.orient')}
+            <select bind:value={orient} data-testid="plate-mesh-orient">
+              <option value="plate">{t('plates.orientPlate')}</option>
+              <option value="globalX">{t('plates.orientX')}</option>
+            </select>
+          </label>
+        {/if}
+      </div>
+      {#if gridOn}<p class="pmd-hint">{t('plates.patternHint')}</p>{/if}
+    {/if}
     <label class="pmd-check" title={t('plates.followMembersHint')}>
       <input type="checkbox" bind:checked={followMembers} data-testid="plate-mesh-follow" /> {t('plates.followMembers')}
     </label>
@@ -151,6 +183,7 @@
   h3 { margin: 0; font-size: 0.9rem; color: var(--st-text); }
   .pmd-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .pmd-row label, .pmd-check { display: inline-flex; gap: 5px; align-items: center; }
+  .pmd select { padding: 2px 4px; background: var(--st-ink); color: var(--st-text); border: 1px solid var(--st-hair-strong); border-radius: var(--st-radius); font: inherit; }
   .pmd :global(input.pmd-num) { width: 64px; padding: 2px 5px; background: var(--st-ink); color: var(--st-text); border: 1px solid var(--st-hair-strong); border-radius: var(--st-radius); font-family: var(--st-font-mono, monospace); }
   .pmd-seg { display: inline-flex; border: 1px solid var(--st-hair-strong); border-radius: var(--st-radius); overflow: hidden; }
   .pmd-seg button { padding: 3px 9px; background: none; border: none; color: var(--st-text-2); font: inherit; cursor: pointer; }

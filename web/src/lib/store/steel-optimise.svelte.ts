@@ -17,7 +17,7 @@
 import { isEngineError, isEngineUnavailable, engineFailureText } from '../engine/engine-unavailable';
 import { modelStore } from './model.svelte';
 import { resultsStore } from './results.svelte';
-import { activePerCombo3D, activeCombinations } from './active-results';
+import { activePerCombo3D, activeCombinations, activeResultSet3D, designCombinationsWithheld } from './active-results';
 import { computeStationDemands, steelDemandOf, steelMemberLengths, steelSegmentDiagram } from '../engine/verification-service';
 import { memberLengths } from '../engine/steel/unbraced-length';
 import { memberEndsFor } from '../engine/steel/tension-connection';
@@ -104,8 +104,11 @@ export function membersFor(ids: readonly number[]): { members: OptimiseMember[];
   const md = { elements: modelStore.elements, nodes: modelStore.nodes, sections: modelStore.sections, materials: modelStore.materials, supports: modelStore.supports };
   let perCombo: Map<number, AnalysisResults3D> = activePerCombo3D();
   let combos = activeCombinations();
-  if (perCombo.size === 0 && resultsStore.results3D) {
-    perCombo = new Map([[0, resultsStore.results3D]]);
+  // The one solve stands in only when it is the design load: never the loads at factor 1 while
+  // combinations are defined (`designCombinationsWithheld`), never an SRSS or ABS magnitude.
+  const single = perCombo.size === 0 ? activeResultSet3D() : null;
+  if (single) {
+    perCombo = new Map([[0, single]]);
     combos = [{ id: 0, name: '', factors: [] }] as never;
   }
   const { demands, stations } = computeStationDemands(perCombo, combos, md as never);
@@ -241,6 +244,9 @@ function createSteelOptimise() {
       lastSettings = settings;
       proposedResults = resultsStore.results3D;
       if (!resultsStore.results3D) { rows = []; error = 'opt.needSolve'; return; }
+      // Combinations defined and none to read: the search would size for the loads at factor 1.
+      const withheld = designCombinationsWithheld();
+      if (withheld) { rows = []; error = withheld; return; }
       if (scope === 'group' && modelStore.model.groups.size === 0) { rows = []; error = 'opt.noGroups'; return; }
       const out: OptimiseRow[] = [];
       for (const [key, g] of groups(scope, ids)) {
@@ -343,6 +349,8 @@ function createSteelOptimise() {
     recheckWithEngine(): void {
       if (appliedEpoch !== modelStore.loadEpoch) { applied = []; appliedAt = null; return; }
       if (!resultsStore.results3D) { error = 'opt.needSolve'; return; }
+      const withheld = designCombinationsWithheld();
+      if (withheld) { error = withheld; return; }
       applied = applied.map((a) => {
         const p = byName.get(a.profileName);
         const ids = a.elementIds.filter((id) => modelStore.elements.has(id));

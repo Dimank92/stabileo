@@ -22,12 +22,13 @@ import { modelStore } from './model.svelte';
 import { uiStore } from './ui.svelte';
 import { physicalDataOf, type PhysicalData } from '../model/physical';
 import {
-  arcInterior, circleThrough, DEFAULT_PLATE_MESH, externalFeatures, meshQuality, plateGeometry, plateKindOf, plateLoops, plateMeshInput, plateProblem,
+  arcInterior, circleThrough, DEFAULT_PLATE_MESH, externalFeatures, gridOfSpec, meshQuality, plateGeometry, plateKindOf, plateLoops, plateMeshInput, plateProblem,
   plateSignature, plateSurfaceOf, type ArcSampler, type MeshQuality, type PlateMeshSpec, type PlateProblem, type PlateSurface,
 } from '../model/physical/plate';
 import { pieceOf } from '../model/curve-entity';
 import type { Vec3 } from '../model/edit/affine';
 import { generateMesh, MAX_MESH_CELLS, type MeshOutput } from '../model/edit/mesher';
+import { frameAlong, gridMesh } from '../model/edit/grid-mesh';
 import { applyMesh } from '../model/edit/mesh-apply';
 import { mergeCollinear } from '../model/edit/merge-collinear';
 import { addFloorLoadDef } from './defined-loads';
@@ -227,6 +228,26 @@ export function setPlateProperties(id: number, props: { materialId?: number; thi
   });
 }
 
+/**
+ * A shell's material or thickness, as every table and panel edits it. A shell of a physical
+ * plate's mesh is the plate's: the edit goes to the plate (its definition and its whole mesh),
+ * so a remesh does not undo it and the plate never says one thing while its elements say another.
+ * Returns the plates edited that way, for the caller to say so.
+ */
+export function setShellProperties(keys: readonly string[], patch: { materialId?: number; thickness?: number }): number[] {
+  const plates = new Set<number>();
+  modelStore.batch(() => {
+    for (const k of keys) {
+      const plate = plateOfShell(k);
+      if (plate !== null) { plates.add(plate); continue; }
+      const id = Number(k.slice(1));
+      if (k[0] === 'p') modelStore.updatePlate(id, patch); else modelStore.updateQuad(id, patch);
+    }
+    for (const id of plates) setPlateProperties(id, patch);
+  });
+  return [...plates];
+}
+
 /** Change how a plate is to be meshed. Its mesh, if any, is then out of date. */
 export function setPlateMeshSpec(ids: readonly number[], spec: Partial<PlateMeshSpec>): void {
   modelStore.batch(() => { for (const id of ids) writeSurface(id, (s) => ({ ...s, mesh: { ...s.mesh, ...spec } })); });
@@ -332,6 +353,8 @@ export interface PlateMeshPlan {
   keptNodes: number;
   /** The element asked for and what the mesher gives: quadrilaterals from triangles, outside the structured paths. */
   mixed: boolean;
+  /** A grid's mesh: its rectangles, the strip along the boundary, and the rectangles' sides as they came out. */
+  grid?: { gridCells: number; bandCells: number; cellA: number; cellB: number };
 }
 
 /** Every node something holds; `except` a plate whose own outline and mesh do not count. */
@@ -400,6 +423,18 @@ export function planPlateMesh(id: number, specOverride?: Partial<PlateMeshSpec>)
   // A plate far past the cap would be a long wait for a refusal: estimate from the area first.
   const estimate = plateAreaEstimate(f.geo, spec);
   if (estimate > MAX_MESH_CELLS * 1.5) return { ...base, mesh: null, refused: 'tooManyCells', cells: Math.round(estimate), quality: null, signature, input, mixed: false };
+  const grid = gridOfSpec(spec);
+  if (grid) {
+    const frame = grid.orient === 'globalX' ? frameAlong(f.geo.frame, [1, 0, 0]) : f.geo.frame;
+    const g = gridMesh({
+      outer: f.geo.outer, holes: f.geo.holes, frame, a: grid.a, b: grid.b, element: 'quad',
+      ...(input.sides ? { sides: input.sides } : {}), fixedPoints: input.fixedPoints ?? [], fixedSegments: input.fixedSegments ?? [],
+    });
+    if (!g) return { ...base, mesh: null, refused: 'cannotMesh', cells: 0, quality: null, signature, input, mixed: false };
+    if (g.cells.length > MAX_MESH_CELLS) return { ...base, mesh: null, refused: 'tooManyCells', cells: g.cells.length, quality: null, signature, input, mixed: false };
+    const { gridCells, bandCells, cellA, cellB, ...mesh } = g;
+    return { ...base, mesh, cells: mesh.cells.length, quality: meshQuality(mesh), signature, input, mixed: bandCells > 0, grid: { gridCells, bandCells, cellA, cellB } };
+  }
   const mesh = generateMesh(input);
   if (!mesh) return { ...base, mesh: null, refused: 'cannotMesh', cells: 0, quality: null, signature, input, mixed: false };
   if (mesh.cells.length > MAX_MESH_CELLS) return { ...base, mesh: null, refused: 'tooManyCells', cells: mesh.cells.length, quality: null, signature, input, mixed: false };
@@ -409,7 +444,8 @@ export function planPlateMesh(id: number, specOverride?: Partial<PlateMeshSpec>)
 function plateAreaEstimate(geo: NonNullable<ReturnType<typeof plateGeometry>>, spec: PlateMeshSpec): number {
   const proj = (l: typeof geo.outer) => { let s = 0; const f = geo.frame; for (let i = 0; i < l.length; i++) { const a = l[i]!, b = l[(i + 1) % l.length]!; const ua = (a[0] - f.o[0]) * f.u[0] + (a[1] - f.o[1]) * f.u[1] + (a[2] - f.o[2]) * f.u[2], va = (a[0] - f.o[0]) * f.v[0] + (a[1] - f.o[1]) * f.v[1] + (a[2] - f.o[2]) * f.v[2]; const ub = (b[0] - f.o[0]) * f.u[0] + (b[1] - f.o[1]) * f.u[1] + (b[2] - f.o[2]) * f.u[2], vb = (b[0] - f.o[0]) * f.v[0] + (b[1] - f.o[1]) * f.v[1] + (b[2] - f.o[2]) * f.v[2]; s += ua * vb - ub * va; } return Math.abs(s / 2); };
   const area = proj(geo.outer) - geo.holes.reduce((s, h) => s + proj(h), 0);
-  return area / (spec.size * spec.size);
+  const grid = gridOfSpec(spec);
+  return area / (grid ? grid.a * grid.b : spec.size * spec.size);
 }
 
 /**
