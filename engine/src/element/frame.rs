@@ -342,6 +342,7 @@ pub(crate) fn condense_warping_block(
 /// 3D frame local stiffness matrix with warping DOF (14×14).
 /// DOFs: [u1, v1, w1, θx1, θy1, θz1, φ'1, u2, v2, w2, θx2, θy2, θz2, φ'2]
 /// cw: warping constant (m⁶), phi' = rate of twist (warping DOF)
+#[allow(clippy::too_many_arguments)]
 pub fn frame_local_stiffness_3d_warping(
     e: f64, a: f64, iy: f64, iz: f64, j: f64, cw: f64, l: f64, g: f64,
     hinge: Hinge3D,
@@ -353,6 +354,7 @@ pub fn frame_local_stiffness_3d_warping(
 }
 
 /// 3D frame local stiffness matrix with warping DOF and per-member warping releases (14×14).
+#[allow(clippy::too_many_arguments)]
 pub fn frame_local_stiffness_3d_warping_with_releases(
     e: f64, a: f64, iy: f64, iz: f64, j: f64, cw: f64, l: f64, g: f64,
     hinge: Hinge3D,
