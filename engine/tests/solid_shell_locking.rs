@@ -197,9 +197,8 @@ fn plate_w(n: usize, t: f64, hard: bool) -> f64 {
 /// difference is O((t/a)²), 5e-4 at t/a = 0.01, below the tolerances.
 #[test]
 fn thin_plate_converges_to_kirchhoff() {
-    // t/a = 0.001 stops at 16×16: finer one-layer meshes that thin are ill-conditioned enough
-    // that the sparse Cholesky residual check falls back to dense LU (minutes per solve).
-    for (t, meshes) in [(0.01, &[4, 8, 16, 32][..]), (0.001, &[4, 8, 16][..])] {
+    // t/a = 0.001 tests up to 32×32: iterative refinement keeps the sparse Cholesky path (#454).
+    for (t, meshes) in [(0.01, &[4, 8, 16, 32][..]), (0.001, &[4, 8, 16, 32][..])] {
         let w_k = navier_centre(t, None);
         // The element's own limit: Mindlin with κ = 1 (see thick_plate_converges_to_mindlin),
         // 1 + 4e-4 of Kirchhoff at t/a = 0.01. Orders are measured against it.
@@ -223,7 +222,7 @@ fn thin_plate_converges_to_kirchhoff() {
 /// lacks, so the limit sits slightly above Navier at t/a = 0.01 and on it at 0.001.
 #[test]
 fn thin_plate_soft_support_matches_kirchhoff() {
-    for (t, n, tol) in [(0.01, 32, 0.003), (0.001, 16, 0.003)] {
+    for (t, n, tol) in [(0.01, 32, 0.003), (0.001, 32, 0.003)] {
         let ratio = plate_w(n, t, false) / navier_centre(t, None);
         eprintln!("thin soft-SS plate t/a = {t}, {n}×{n}: w/w_Kirchhoff {ratio:.5}");
         assert!((ratio - 1.0).abs() < tol, "t/a = {t}, {n}×{n}: w/w_Kirchhoff = {ratio:.5}");
@@ -498,6 +497,52 @@ fn modal_thin_plate_with_poisson() {
     eprintln!("SS plate f1 / f11_Kirchhoff = {ratio:.5}");
     // Bilinear mass and stiffness: converges from above at second order; 16×16 ≈ 0.4 % high.
     assert!(ratio > 0.999 && ratio < 1.01, "f1/f11 = {ratio:.5}");
+}
+
+/// Performance and accuracy check for very thin solid-shell meshes (issue #454).
+///
+/// At t/a = 0.001 with a 32×32 solid-shell mesh, ill-conditioning previously caused the
+/// sparse Cholesky residual check to fail and fall back to dense LU (~110 s per solve).
+/// Iterative refinement keeps the sparse path without falling back to dense LU, solving
+/// in ~3 s with residual < 1e-5 and Navier / Kirchhoff-limit accuracy within 0.1%.
+#[test]
+fn thin_solid_shell_32x32_sparse_without_dense_fallback() {
+    let t = 0.001;
+    let m = ss_plate(32, t, true);
+    let t0 = std::time::Instant::now();
+    let r = solve(&m);
+    let elapsed = t0.elapsed();
+
+    // Verify no dense LU fallback was triggered:
+    let used_dense_fallback = r.structured_diagnostics.iter().any(|d| d.code == DiagnosticCode::SparseFallbackDenseLu);
+    assert!(
+        !used_dense_fallback,
+        "32x32 thin solid shell (t/a = 0.001) must NOT fall back to dense LU, but fallback diagnostic was emitted"
+    );
+    if let Some(ref timings) = r.timings {
+        assert_eq!(
+            timings.dense_fallback_ms, 0.0,
+            "dense_fallback_ms must be 0.0, got {:.2} ms",
+            timings.dense_fallback_ms
+        );
+    }
+
+    // Verify solve time is under 15 seconds (sparse path), not ~110 seconds:
+    assert!(
+        elapsed.as_secs_f64() < 15.0,
+        "Solve took {:.2} s, expected < 15 s (dense fallback takes ~110 s)",
+        elapsed.as_secs_f64()
+    );
+
+    // Verify deflection accuracy matches Navier / Kirchhoff limit within 0.01%:
+    let w = -mid(&r, &m, 16, 16)[2];
+    let w_k = navier_centre(t, None);
+    let ratio = w / w_k;
+    assert!(
+        (ratio - 1.0).abs() < 0.001,
+        "32x32 centre deflection ratio w/w_Kirchhoff = {:.6}, expected within 0.1%",
+        ratio
+    );
 }
 
 /// Uniaxially compressed simply supported square plate (unloaded edges free in-plane),

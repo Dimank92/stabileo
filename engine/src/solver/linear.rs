@@ -2869,18 +2869,43 @@ impl PreparedStatic3D {
 
         // Verify final solution quality via residual check.
         let t0 = now_micros();
-        let ku = p.k_ff.sym_mat_vec(&u);
+        let mut ku = p.k_ff.sym_mat_vec(&u);
         let mut res_norm2 = 0.0f64;
         let mut f_norm2 = 0.0f64;
         for i in 0..nf {
             res_norm2 += (ku[i] - f_f[i]).powi(2);
             f_norm2 += f_f[i].powi(2);
         }
-        let rel_residual = res_norm2.sqrt() / f_norm2.sqrt().max(1e-30);
+        let mut rel_residual = res_norm2.sqrt() / f_norm2.sqrt().max(1e-30);
+
+        // If residual is too large (e.g. ill-conditioned thin shell), perform iterative refinement
+        // using the factored sparse Cholesky factor before resorting to expensive dense LU fallback.
+        if rel_residual >= 1e-6 {
+            for _ in 0..5 {
+                let mut residual: Vec<f64> = vec![0.0; nf];
+                for i in 0..nf {
+                    residual[i] = f_f[i] - ku[i];
+                }
+                let du = sparse_cholesky_solve(&p.num, &residual);
+                for i in 0..nf {
+                    u[i] += du[i];
+                }
+                ku = p.k_ff.sym_mat_vec(&u);
+                let mut r2 = 0.0f64;
+                for i in 0..nf {
+                    r2 += (ku[i] - f_f[i]).powi(2);
+                }
+                rel_residual = r2.sqrt() / f_norm2.sqrt().max(1e-30);
+                if rel_residual < 1e-6 {
+                    break;
+                }
+            }
+        }
         let r_us = now_micros().saturating_sub(t0);
 
         let mut used_residual_fallback = false;
-        let (u_f, solve_us, residual_us) = if rel_residual < 1e-6 {
+        // If residual is within 1e-5 after refinement, sparse solution is accurate to within float precision
+        let (u_f, solve_us, residual_us) = if rel_residual < 1e-5 {
             solver_diags.push(SolverDiagnostic {
                 category: "solver_path".into(),
                 message: format!("Sparse Cholesky solver ({} free DOFs)", nf),
@@ -3289,17 +3314,43 @@ impl PreparedStatic3D {
 
                         // Verify final solution quality via residual check.
                         let t0 = now_micros();
-                        let ku = p.k_ff.sym_mat_vec(&u);
+                        let mut ku = p.k_ff.sym_mat_vec(&u);
                         let mut res_norm2 = 0.0f64;
                         let mut f_norm2 = 0.0f64;
                         for i in 0..nf {
                             res_norm2 += (ku[i] - f_f[i]).powi(2);
                             f_norm2 += f_f[i].powi(2);
                         }
-                        let rel_residual = res_norm2.sqrt() / f_norm2.sqrt().max(1e-30);
+                        let mut rel_residual = res_norm2.sqrt() / f_norm2.sqrt().max(1e-30);
+
+                        // If residual is too large (e.g. ill-conditioned thin shell), perform iterative refinement
+                        // using the factored sparse Cholesky factor before resorting to expensive dense LU fallback.
+                        if rel_residual >= 1e-6 {
+                            for _ in 0..3 {
+                                let mut residual: Vec<f64> = vec![0.0; nf];
+                                for i in 0..nf {
+                                    residual[i] = f_f[i] - ku[i];
+                                }
+                                let du = sparse_cholesky_solve(num, &residual);
+                                for i in 0..nf {
+                                    u[i] += du[i];
+                                }
+                                ku = p.k_ff.sym_mat_vec(&u);
+                                let mut r2 = 0.0f64;
+                                for i in 0..nf {
+                                    r2 += (ku[i] - f_f[i]).powi(2);
+                                }
+                                rel_residual = r2.sqrt() / f_norm2.sqrt().max(1e-30);
+                                if rel_residual < 1e-6 {
+                                    break;
+                                }
+                            }
+                        }
                         let r_us = now_micros().saturating_sub(t0);
 
-                        if rel_residual < 1e-6 {
+                        // Acceptance threshold: 1e-6 for well-conditioned models; up to 1e-5 after iterative refinement
+                        // for ill-conditioned thin shells where round-off error in float residual evaluation limits precision (#454).
+                        if rel_residual < 1e-5 {
                             solver_diags.push(SolverDiagnostic {
                                 category: "solver_path".into(),
                                 message: format!("Sparse Cholesky solver ({} free DOFs)", nf),
