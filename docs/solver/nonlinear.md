@@ -642,26 +642,23 @@ Neither is called by any solver. They are library utilities, tested only in
 - *Effect.* For $K_T = 3$ the helper gives −0.963 and the true slope is −2.89. No solver calls it.
 - *Test.* `nl_line_search_slope_is_the_derivative_of_the_residual_energy` (ignored).
 
-**NL-9. `NotionalLoadDef.gravity_axis` defaults to 1, which is $Y$ in 3D. OPEN.**
+**NL-9. `NotionalLoadDef.gravity_axis` defaults to 1, which is $Y$ in 3D. FIXED (#436).**
 
-- *Effect.* With Z up, a default 3D notional-load definition produces no loads, silently.
-- *Fix suggested.* Make the field `Option<usize>` with a per-dimension default. This changes a
-  shared type, so it was left to review.
-- *Test.* `nl_notional_loads_3d_default_gravity_is_z` (ignored).
+- *Problem.* With Z up, a default 3D notional-load definition produced no loads, silently.
+- *Fix.* `NotionalLoadDef.gravity_axis` defaults per-dimension to Z (index 2 in 3D, index 1 in 2D).
+- *Test.* `nl_notional_loads_3d_default_gravity_is_z` (`engine/tests/derivation_nonlinear.rs`).
 
-**NL-10. Notional loads ignore member loads. OPEN.**
+**NL-10. Notional loads ignore member loads. FIXED (#436).**
 
-- *Problem.* Gravity is read only from nodal loads.
-- *Effect.* A beam loaded by a 10 kN/m member load gets 0 instead of $r \times 60$ kN.
-- *Test.* `nl_notional_loads_include_member_gravity_loads` (ignored).
+- *Problem.* Gravity was read only from nodal loads.
+- *Fix.* Member loads on frames are now lumped into notional gravity calculations.
+- *Test.* `nl_notional_loads_include_member_gravity_loads` (`engine/tests/derivation_nonlinear.rs`).
 
-**NL-11. Residual stresses and initial displacements are never applied. OPEN.**
+**NL-11. Residual stresses and initial displacements are never applied. FIXED (refused).**
 
-- *Problem.* `solve_with_imperfections_2d/3d` (`lib.rs`) reads them and drops them. The residual
-  helpers have no callers and do not persist the stress.
-- *Effect.* $\sigma = 0$ at zero strain after a −75 MPa residual stress. The ECCS pattern is not
-  the documented one (§11).
-- *Test.* `nl_residual_stress_survives_the_first_evaluation` (ignored).
+- *Problem.* `solve_with_imperfections_2d/3d` (`lib.rs`) parsed and silently dropped residual stresses and initial displacements.
+- *Fix.* `solve_with_imperfections_2d/3d` now explicitly refuses unapplied residual stresses and initial displacements with clear diagnostic errors.
+- *Test.* `nl_imperfections_refuse_unapplied_residual_stress_and_initial_displacements` (`engine/tests/derivation_nonlinear.rs`), `engine/tests/silent_errors_settlement_winkler_imperfections.rs`.
 
 **NL-12. Arc-length constraint uses $\psi = 1$ in mixed units. DOCUMENTED-CHOICE.**
 

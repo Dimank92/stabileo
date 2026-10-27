@@ -632,10 +632,8 @@ fn nl_line_search_slope_is_the_derivative_of_the_residual_energy() {
 }
 
 /// Notional loads in 3D: with the defaults (Z up, ADR 0001) a column carrying
-/// 100 kN of gravity gets ratio·100 kN laterally. The default gravity axis is
-/// 1, which is Z in 2D but Y in 3D, so the 3D default reads gravity from F_y.
+/// 100 kN of gravity gets ratio·100 kN laterally. NL-9 (FIXED).
 #[test]
-#[ignore = "open question NL-9: NotionalLoadDef.gravity_axis defaults to 1 = Y in 3D, so default 3D notional loads are empty"]
 fn nl_notional_loads_3d_default_gravity_is_z() {
     use dedaliano_engine::solver::imperfections::notional_loads_3d;
     let input = make_3d_input(vec![(1, 0.0, 0.0, 0.0), (2, 0.0, 0.0, 3.0)], vec![(1, E, 0.3)],
@@ -648,9 +646,8 @@ fn nl_notional_loads_3d_default_gravity_is_z() {
 }
 
 /// Notional loads are a fraction of the gravity load the structure carries:
-/// a beam whose gravity is a member load gets none.
+/// member (distributed/point) gravity loads on frames are lumped into notional gravity. NL-10 (FIXED).
 #[test]
-#[ignore = "open question NL-10: notional loads read only nodal loads; member (distributed/point) gravity loads are ignored"]
 fn nl_notional_loads_include_member_gravity_loads() {
     use dedaliano_engine::solver::imperfections::notional_loads_2d;
     let input = make_input(vec![(1, 0.0, 3.0), (2, 6.0, 3.0)], vec![(1, E, 0.3)], vec![(1, 0.01, 1e-4)],
@@ -659,6 +656,39 @@ fn nl_notional_loads_include_member_gravity_loads() {
     let def: NotionalLoadDef = serde_json::from_str(r#"{"ratio": 0.005}"#).unwrap();
     let fx: f64 = notional_loads_2d(&input, &def).iter().map(|l| match l { SolverLoad::Nodal(n) => n.fx, _ => 0.0 }).sum();
     close(fx, 0.005 * 60.0, 1e-9, "notional load of 60 kN of gravity");
+}
+
+/// NL-11 (FIXED): solve_with_imperfections_2d and 3d refuse unapplied residual
+/// stresses and initial displacements with informative diagnostic errors rather
+/// than running a linear solve that silently ignores them.
+#[test]
+fn nl_imperfections_refuse_unapplied_residual_stress_and_initial_displacements() {
+    use dedaliano_engine::solver::imperfections::{solve_with_imperfections_2d, solve_with_imperfections_3d};
+    let input2 = make_input(
+        vec![(1, 0.0, 0.0), (2, 0.0, 3.0)],
+        vec![(1, E, 0.3)],
+        vec![(1, 0.01, 1e-4)],
+        vec![(1, "frame", 1, 2, 1, 1, false, false)],
+        vec![(1, 1, "pinned"), (2, 2, "rollerX")],
+        vec![SolverLoad::Nodal(SolverNodalLoad { node_id: 2, fx: 0.0, fz: -100.0, my: 0.0 })],
+    );
+    let mut imp: ImperfectionInput = serde_json::from_str("{}").unwrap();
+    imp.residual_stresses.insert("1".into(), ResidualStressPattern::Uniform { stress: -75.0 });
+    let err2 = solve_with_imperfections_2d(input2, &imp).unwrap_err();
+    assert!(err2.contains("residual stresses are not applied"), "err: {err2}");
+
+    let input3 = make_3d_input(
+        vec![(1, 0.0, 0.0, 0.0), (2, 0.0, 0.0, 3.0)],
+        vec![(1, E, 0.3)],
+        vec![(1, 0.01, 1e-5, 1e-5, 2e-5)],
+        vec![(1, "frame", 1, 2, 1, 1)],
+        vec![(1, vec![true; 6])],
+        vec![SolverLoad3D::Nodal(SolverNodalLoad3D { node_id: 2, fx: 0.0, fy: 0.0, fz: -100.0, mx: 0.0, my: 0.0, mz: 0.0, bw: None })],
+    );
+    let mut imp3: ImperfectionInput = serde_json::from_str("{}").unwrap();
+    imp3.initial_displacements.insert("2".into(), vec![0.01, 0.0, 0.0]);
+    let err3 = solve_with_imperfections_3d(input3, &imp3).unwrap_err();
+    assert!(err3.contains("initial displacements are not applied"), "err: {err3}");
 }
 
 /// A residual stress set into a fiber state has to survive the first strain
