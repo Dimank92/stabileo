@@ -1,16 +1,7 @@
 <script lang="ts">
   import { askAboutOverlapsInModel } from '../lib/model/edit/connection-questions';
   import { viewVisibility } from '../lib/store/view-state.svelte';
-  // CAD → RC draft wizard (PR [9]).
-  //
-  // 4 steps: (1) upload/units → (2) layer roles → (3) assumptions →
-  // (4) draft preview + Apply/Back/Cancel.
-  //
-  // The model store is NOT touched until the user clicks Apply. Apply is one
-  // transactional pushState + restore(draft.snapshot); Cancel at any step
-  // simply closes. The generated model carries a 'cad-draft-unreviewed'
-  // provenance tag with the full assumption list (including the v1
-  // one-plan-replicated-to-all-floors assumption).
+  // The model store is not touched until Apply, which is one undo step.
   import { modelStore, uiStore, resultsStore } from '../lib/store';
   import { fragmentFromSnapshot } from '../lib/model/edit/fragment-code';
   import { placementStore } from '../lib/store/placement.svelte';
@@ -23,7 +14,8 @@
     drawCadPreview, drawSemanticPreview, planBBox, ROLE_COLORS,
     fitView, zoomAround, panView, screenToWorld, type PreviewView,
   } from '../lib/cad/preview';
-  import { alignPlans, detectPlanWindows, shiftDoc, type PlanAlignment } from '../lib/cad/floor-regions';
+  import { alignPlans, assignFloors, detectPlanWindows, floorRuns, formatFloors, parseFloors, shiftDoc, type PlanAlignment } from '../lib/cad/floor-regions';
+  import CadStoriesPanel from './cad/CadStoriesPanel.svelte';
   import { drawDraftPreview } from '../lib/cad/draft-preview';
   import { diagnoseDraft, type DraftDiagnostics } from '../lib/cad/diagnostics';
   import { buildDraft, validateFloorRanges, type InferenceOptions, type FloorPlanSpec } from '../lib/cad/draft-build';
@@ -75,7 +67,7 @@
   // ── Assumptions form state ─────────────────────────────────
   let nFloors = $state(1);
   let storyHeight = $state(3);
-  let storyHeightsCsv = $state('');
+  let heights = $state<number[]>([3]);
   let concreteGrade = $state<ConcreteGrade>('H-30');
   let colB = $state(0.3);
   let colH = $state(0.3);
@@ -111,7 +103,7 @@
   let infPruneFloating = $state(false);
   // Per-floor plan regions (crop windows of the same file → floor ranges).
   // `ref` is in the drawing's raw units, not metres; null means aligned automatically.
-  let floorRegions = $state<Array<PlanWindow & { fromFloor: number; toFloor: number; label: string; ref?: { x: number; y: number } | null }>>([]);
+  let floorRegions = $state<Array<PlanWindow & { floors: number[]; label: string; ref?: { x: number; y: number } | null }>>([]);
   let pickingRef = $state<number | null>(null);
   let detectedPlans = $state<number | null>(null);
   // Set once the user has acknowledged an uncovered-floor gap so the next build
@@ -282,15 +274,30 @@
     const used = new Set(floorRegions.map((r) => r.label));
     let k = 0, label: string;
     do { label = tp('cad.floorRegionLabel', { id: k < 26 ? String.fromCharCode(65 + k) : `#${k + 1}` }); k++; } while (used.has(label));
-    const nextFloor = floorRegions.length ? Math.max(...floorRegions.map((r) => r.toFloor)) + 1 : 1;
-    floorRegions = [...floorRegions, { ...sanitizeWin(cropWin), fromFloor: nextFloor, toFloor: nextFloor, label, ref: null }];
-    fitFloors();
+    const nextFloor = Math.max(0, ...floorRegions.flatMap((r) => r.floors)) + 1;
+    if (nextFloor > nFloors) nFloors = nextFloor;
+    floorRegions = [...floorRegions, { ...sanitizeWin(cropWin), floors: [nextFloor], label, ref: null }];
   }
 
-  function fitFloors(): void {
-    const top = Math.max(0, ...floorRegions.map((r) => (Number.isFinite(r.toFloor) ? r.toFloor : 0)));
-    if (top > nFloors) nFloors = top;
+  function setPlanFloors(i: number, text: string): boolean {
+    const floors = parseFloors(text, nFloors);
+    if (!floors) return false;
+    const next = assignFloors(floorRegions.map((r) => r.floors), i, floors);
+    floorRegions.forEach((r, j) => { r.floors = next[j]!; });
+    return true;
   }
+
+  function assignFloor(floor: number, plan: number): void {
+    const without = floorRegions.map((r) => r.floors.filter((k) => k !== floor));
+    if (plan >= 0) without[plan] = [...without[plan]!, floor].sort((a, b) => a - b);
+    floorRegions.forEach((r, j) => { r.floors = without[j]!; });
+  }
+
+  $effect(() => {
+    const n = Math.max(1, Math.floor(nFloors || 1));
+    if (heights.length !== n) heights = Array.from({ length: n }, (_, i) => heights[i] ?? storyHeight);
+    for (const r of floorRegions) if (r.floors.some((k) => k > n)) r.floors = r.floors.filter((k) => k <= n);
+  });
 
   function detectPlans(): void {
     if (!doc) return;
@@ -298,7 +305,7 @@
     detectedPlans = wins.length;
     if (wins.length < 2) return;
     floorRegions = wins.map((w, i) => ({
-      ...w, fromFloor: i + 1, toFloor: i + 1, ref: null,
+      ...w, floors: [i + 1], ref: null,
       label: tp('cad.floorRegionLabel', { id: i < 26 ? String.fromCharCode(65 + i) : `#${i + 1}` }),
     }));
     nFloors = wins.length;
@@ -315,7 +322,8 @@
 
   const regionAlign = $derived.by((): PlanAlignment[] => {
     if (regionPlans.length !== floorRegions.length || !floorRegions.length) return [];
-    const order = floorRegions.map((_, i) => i).sort((a, b) => floorRegions[a]!.fromFloor - floorRegions[b]!.fromFloor || a - b);
+    const lowest = (i: number) => Math.min(Infinity, ...floorRegions[i]!.floors);
+    const order = floorRegions.map((_, i) => i).sort((a, b) => lowest(a) - lowest(b) || a - b);
     const k = unitScale;
     const fixed = order.map((i) => { const r = floorRegions[i]!.ref; return r && Number.isFinite(r.x) && Number.isFinite(r.y) ? { x: r.x * k, y: r.y * k } : null; });
     const al = alignPlans(order.map((i) => regionPlans[i]!), fixed);
@@ -369,7 +377,7 @@
     if (!canvas || !doc || !(step === 1 || step === 2)) return;
     void mappings; // redraw on role change
     void [cropWin.x0, cropWin.x1, cropWin.y0, cropWin.y1, cropEnabled, cadView, hoveredLayer, effectiveMode];
-    void floorRegions.map((r) => [r.x0, r.x1, r.y0, r.y1, r.label, r.fromFloor, r.toFloor, r.ref?.x, r.ref?.y]); void regionAlign;
+    void floorRegions.map((r) => [r.x0, r.x1, r.y0, r.y1, r.label, r.floors.join(','), r.ref?.x, r.ref?.y]); void regionAlign;
     const W = canvas.width, H = canvas.height;
     if (effectiveMode === 'draft') {
       if (livePreviewDraft) drawDraftPreview(canvas, livePreviewDraft.snapshot, { highlightFailures: true });
@@ -406,7 +414,7 @@
       ctx.strokeRect(X(Math.min(w.x0, w.x1)), Y(Math.max(w.y0, w.y1)), Math.abs(w.x1 - w.x0) * view.scale, Math.abs(w.y1 - w.y0) * view.scale);
       ctx.setLineDash([]);
       ctx.fillStyle = warn; ctx.font = '11px sans-serif';
-      ctx.fillText(`${r.label} · ${r.fromFloor === r.toFloor ? r.fromFloor : `${r.fromFloor}–${r.toFloor}`}`, X(Math.min(w.x0, w.x1)) + 3, Y(Math.max(w.y0, w.y1)) - 4);
+      ctx.fillText(`${r.label} · ${r.floors.length ? formatFloors(r.floors) : '—'}`, X(Math.min(w.x0, w.x1)) + 3, Y(Math.max(w.y0, w.y1)) - 4);
       const ref = regionRef(i), px = X(ref.x), py = Y(ref.y);
       ctx.strokeStyle = accent; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(px - 7, py); ctx.lineTo(px + 7, py); ctx.moveTo(px, py - 7); ctx.lineTo(px, py + 7); ctx.stroke();
@@ -426,11 +434,10 @@
     livePreviewBusy = true;
     const handle = setTimeout(() => {
       try {
-        const d = buildDraft({
-          plan: p, assumptions: assumptions(),
-          source: { fileName, importedAtIso: PREVIEW_ISO },
-          inference: anyInference ? inferenceOpts : undefined,
-        });
+        const common = { assumptions: assumptions(), source: { fileName, importedAtIso: PREVIEW_ISO }, inference: anyInference ? inferenceOpts : undefined };
+        const d = floorRegions.some((r) => r.floors.length)
+          ? buildDraft({ ...common, floorPlans: floorPlanSpecs(), allowFloorGaps: true })
+          : buildDraft({ ...common, plan: p });
         livePreviewDraft = d;
         livePreviewDiag = diagnoseDraft(d);
         livePreviewError = null;
@@ -524,7 +531,7 @@
   // Any edit to the floor ranges (add/remove/renumber) invalidates a prior
   // gap acknowledgement, so the user must re-confirm a newly-introduced gap.
   $effect(() => {
-    void floorRegions.map((r) => `${r.fromFloor}-${r.toFloor}`).join(',');
+    void floorRegions.map((r) => r.floors.join(',')).join('|');
     void nFloors;
     allowFloorGaps = false;
   });
@@ -538,12 +545,7 @@
   }
 
   function assumptions(): RcDraftAssumptions {
-    const heights = storyHeightsCsv.trim()
-      ? storyHeightsCsv.split(',').map((s) => parseFloat(s.trim())).filter((v) => v > 0)
-      : [];
-    const storyHeights = heights.length === nFloors
-      ? heights
-      : Array.from({ length: nFloors }, () => storyHeight);
+    const storyHeights = Array.from({ length: nFloors }, (_, i) => heights[i] ?? storyHeight);
     return {
       nFloors, storyHeights, concreteGrade,
       columnSection: { b: colB, h: colH },
@@ -584,12 +586,12 @@
     if (levelsPrefilled || !plan?.levelHeights?.length) return;
     nFloors = plan.levelHeights.length;
     storyHeight = plan.levelHeights[plan.levelHeights.length - 1];
-    storyHeightsCsv = plan.levelHeights.join(', ');
+    heights = [...plan.levelHeights];
     levelsPrefilled = true;
   }
 
   const assumptionsValid = $derived(
-    nFloors >= 1 && storyHeight > 0 && colB > 0 && colH > 0 && beamB > 0 && beamH > 0 &&
+    nFloors >= 1 && storyHeight > 0 && heights.every((h) => h > 0) && colB > 0 && colH > 0 && beamB > 0 && beamH > 0 &&
     slabThickness > 0 && wallThickness > 0 && deadLoad >= 0 && liveLoad >= 0 &&
     snapTolerance > 0 &&
     // The slab mesh setting in use, and only that one (draft.ts, meshSettingsValid).
@@ -599,6 +601,27 @@
   const classifiedCount = $derived(
     mappings.filter((m) => m.role !== 'ignore' && m.role !== 'text' && m.role !== 'grid').length,
   );
+
+  /** One spec per run of consecutive floors of each plan, each plan moved so its reference lands on the origin. */
+  function floorPlanSpecs(): FloorPlanSpec[] {
+    const d = doc!;
+    return floorRegions.flatMap((r, i) => {
+      if (!r.floors.length) return [];
+      const ref = regionRef(i);
+      const plan = extractArchPlan(shiftDoc(cropDoc(d, sanitizeWin(r)), -ref.x, -ref.y), mappings, unit);
+      return floorRuns(r.floors).map(([fromFloor, toFloor]) => ({ plan, fromFloor, toFloor, label: r.label }));
+    });
+  }
+
+  function recordPlanReferences(result: RcDraftResult): void {
+    const lines = floorRegions.map((r, i) => {
+      const ref = regionRef(i);
+      return tp('cad.assume.planRef', { label: r.label, x: +ref.x.toFixed(3), y: +ref.y.toFixed(3), unit, how: alignText(i) });
+    });
+    const snap = result.snapshot.provenance?.assumptions;
+    result.provenance.assumptions.push(...lines);
+    if (snap && snap !== result.provenance.assumptions) snap.push(...lines);
+  }
 
   function goPreview(): void {
     if (!plan) return;
@@ -618,12 +641,7 @@
     const inference = anyInference ? inferenceOpts : undefined;
     try {
       if (floorRegions.length > 0 && doc) {
-        // Per-floor plans: each region is a crop window of the same file,
-        // read through the same layer mapping (PR [14] Layer 3).
-        const floorPlans: FloorPlanSpec[] = floorRegions.map((r, i) => ({
-          plan: extractArchPlan((() => { const ref = regionRef(i); return shiftDoc(cropDoc(doc!, sanitizeWin(r)), -ref.x, -ref.y); })(), mappings, unit),
-          fromFloor: r.fromFloor, toFloor: r.toFloor, label: r.label,
-        }));
+        const floorPlans = floorPlanSpecs();
         // Validate ranges up front so overlaps/out-of-range are a clear, blocking
         // error and an uncovered-floor gap prompts an explicit confirmation
         // before we silently build fewer floors than intended.
@@ -639,6 +657,7 @@
           return; // stay on step 3, model untouched
         }
         result = buildDraft({ floorPlans, assumptions: assumptions(), source, inference, allowFloorGaps });
+        recordPlanReferences(result);
       } else {
         result = buildDraft({ plan, assumptions: assumptions(), source, inference });
       }
@@ -825,11 +844,11 @@
                       <div class="plan-row" data-testid="cad-plan-row">
                         <div class="region-row">
                           <input type="text" class="region-label" bind:value={r.label} title={t('cad.floorPlanLabel')} />
-                          <span class="region-range">
+                          <label class="region-range">
                             {t('cad.floors')}
-                            <input type="number" min="1" step="1" bind:value={r.fromFloor} onchange={fitFloors} data-testid="cad-plan-from" />–
-                            <input type="number" min="1" step="1" bind:value={r.toFloor} onchange={fitFloors} data-testid="cad-plan-to" />
-                          </span>
+                            <input type="text" class="floors-in" value={formatFloors(r.floors)} placeholder="2-9" title={t('cad.plans.floorsHint')} data-testid="cad-plan-floors"
+                              onchange={(e) => { const el = e.currentTarget as HTMLInputElement; if (!setPlanFloors(i, el.value)) el.value = formatFloors(r.floors); }} />
+                          </label>
                           <button class="btn mini" title={t('cad.plans.remove')} onclick={() => { floorRegions = floorRegions.filter((_, j) => j !== i); if (pickingRef === i) pickingRef = null; }}>✕</button>
                         </div>
                         <div class="region-row">
@@ -1016,20 +1035,10 @@
                 {/if}
               </div>
             {/if}
-            <div class="banner">{t('cad.replicatedBanner')}</div>
+            <CadStoriesPanel bind:nFloors bind:heights bind:storyHeight
+              plans={floorRegions.map((r) => ({ label: r.label, floors: r.floors }))}
+              detected={detectedPlans} onassign={assignFloor} ondetect={detectPlans} />
             <div class="form-grid">
-              <details class="panel" open>
-                <summary>{t('cad.geometry')}</summary>
-                <label>{t('cad.nFloors')}
-                  <input type="number" min="1" max="50" step="1" bind:value={nFloors} />
-                </label>
-                <label>{t('cad.storyHeight')}
-                  <input type="number" min="0.1" step="0.1" bind:value={storyHeight} />
-                </label>
-                <label>{t('cad.storyHeightsCsv')}
-                  <input type="text" placeholder="3, 3, 2.8" bind:value={storyHeightsCsv} />
-                </label>
-              </details>
               <details class="panel" open>
                 <summary>{t('cad.materialSections')}</summary>
                 <label>{t('cad.concreteGrade')}
@@ -1188,14 +1197,6 @@
                   {t('cad.inferPruneFloating')}
                 </label>
               </details>
-              {#if floorRegions.length}
-                <div class="panel plans-summary" data-testid="cad-plans-summary">
-                  <div class="hint">{tp('cad.plans.summary', { n: floorRegions.length })}</div>
-                  {#each floorRegions as r, i}
-                    <div class="region-win">{r.label} · {t('cad.floors')} {r.fromFloor}–{r.toFloor} · {alignText(i)}</div>
-                  {/each}
-                </div>
-              {/if}
             </div>
           {:else if step === 4 && draft}
             <div class="banner">{t('cad.draftBanner')}</div>
@@ -1515,7 +1516,7 @@
   .ref-label { color: var(--st-text-3); font-size: 0.68rem; }
   .plan-row input.ref-in { width: 64px; }
   .btn.mini.active { border-color: var(--st-accent); color: var(--st-text); }
-  .plans-summary { border: 1px solid var(--st-hair-strong); border-radius: var(--st-radius-lg); padding: 0.4rem 0.7rem 0.5rem; }
+  .region-row input.floors-in { width: 72px; }
   .preview-row { display: flex; gap: 0.8rem; margin-bottom: 0.7rem; align-items: stretch; }
   .preview-pane canvas { border: 1px solid var(--st-hair-strong); border-radius: var(--st-radius); background: var(--st-bg); }
   .diag-pane { flex: 1; border-radius: var(--st-radius-lg); padding: 0.5rem 0.7rem; font-size: 0.76rem; overflow-y: auto; max-height: 340px; }
