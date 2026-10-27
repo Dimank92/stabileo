@@ -30,6 +30,7 @@ on that branch: a test that now passes means the finding is fixed.
 | [#418](https://github.com/lambdaclass/stabileo/issues/418) | SP-15 curved-beam segment axes depend on plan orientation | #523 (advisory SA-2026-016) | `curved_beam_arch_is_invariant_under_plan_rotation` passes and is un-ignored; containment removed |
 | [#429](https://github.com/lambdaclass/stabileo/issues/429) | NL-6 3D material-nonlinear yield surface unconservative vs 2D | `fix/nl6-yield-surface` (advisory SA-2026-020) | `nl_material_2d_and_3d_use_the_same_yield_surface` and three new 3D tests pass; the I-section strong-axis N–M term stays open for 2D and 3D (docs/solver/nonlinear.md NL-6) |
 | [#407](https://github.com/lambdaclass/stabileo/issues/407) | FR-4 frame/truss thermal: fixed α = 12e-6 and depth √(12I/A) | branch `fix/frame-thermal` (SA-2026-019) | `engine/tests/frame_thermal_inputs.rs` (material α and real depth; defaults warn) |
+| [#453](https://github.com/lambdaclass/stabileo/issues/453) | solid-shell buckling converges ≈ first order, from below | branch `fix/issue-453-solid-shell-buckling-convergence` | `solid_shell_buckling_convergence_order` passes; mesh guidance and convergence rate documented |
 
 ## A: wrong results a user would rely on (fix, contain, advisory)
 
@@ -56,7 +57,7 @@ on that branch: a test that now passes means the finding is fixed.
 | [#426](https://github.com/lambdaclass/stabileo/issues/426) | NL-3 3D co-rotational adds rotation vectors | error for large non-coaxial rotations; promote to A if reachable within the documented range | none; to add |
 | [#408](https://github.com/lambdaclass/stabileo/issues/408) | FR-5 warping DOF shared by all members at a node | a modelling assumption to state in the UI and offer a release for | n/a |
 | [#338](https://github.com/lambdaclass/stabileo/issues/338) | modal drops modes on a mechanism | PR [#331](https://github.com/lambdaclass/stabileo/pull/331) (mechanism detection) | — |
-| [#453](https://github.com/lambdaclass/stabileo/issues/453) | solid-shell buckling converges ≈ first order, from below | an accuracy note with mesh guidance; ties to discretization estimates (#356) | — |
+| [#453](https://github.com/lambdaclass/stabileo/issues/453) | solid-shell buckling converges ≈ first order, from below | an accuracy note with mesh guidance; ties to discretization estimates (#356) | **FIXED**: `solid_shell_buckling_convergence_order` passes; accuracy note and mesh guidance added to `docs/solver/shells.md` |
 
 ## C: documentation, naming, dead code
 

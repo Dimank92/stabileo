@@ -280,6 +280,10 @@ Pressure on the top face (inward positive), self-weight $\rho g/1000$. Recovery:
 moments zero (this element has no rotation DOFs; through-thickness integration is not done),
 von Mises at the eight Gauss points.
 
+### Buckling convergence and mesh guidance
+
+Solid-shell plate buckling converges monotonically from below at approximately first order ($\approx O(h)$, verified in `solid_shell_locking.rs::solid_shell_buckling_convergence_order`). Because convergence is strictly from below, eigenvalue buckling load factor estimates $\lambda_{\mathrm{cr}}$ are conservative for engineering design (they underpredict rather than overpredict capacity). For $< 2.5\%$ discretization error on thin-plate stability benchmarks, a mesh density of $32\times 32$ or finer is recommended, or `MITC9` quadrilateral elements for pure flat-plate stability.
+
 ## 7. Interaction with releases, offsets and constraints
 
 Shells have no releases. Constraints (rigid links, diaphragms, eccentric connections) act on the

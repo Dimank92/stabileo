@@ -514,6 +514,30 @@ fn buckling_thin_plate_with_poisson() {
     assert!(r[0] < r[1] && r[1] < r[2], "not monotone: {r:?}");
     assert!(r[2] > 0.97 && r[2] < 1.0, "32×32: λ/N_cr = {:.4}", r[2]);
 }
+
+/// Convergence order check for solid-shell buckling (issue #453).
+/// Quantifies the observed first-order convergence from below towards closed-form N_cr = 4*pi^2*D/a^2.
+#[test]
+fn solid_shell_buckling_convergence_order() {
+    let r: Vec<f64> = [8, 16, 32].iter().map(|&n| buckle(n, false)).collect();
+    // Verify strict monotonicity from below (conservative side):
+    assert!(r[0] < r[1] && r[1] < r[2], "Buckling load factors must increase monotonically: {r:?}");
+    assert!(r[2] < 1.0, "Buckling load factor must converge from below for safety (conservative): {:.4}", r[2]);
+    assert!(r[2] > 0.97, "32x32 mesh must achieve within 3% of analytical N_cr: {:.4}", r[2]);
+
+    // Measure observed order of convergence between successive mesh refinements (h_ratio = 2):
+    // e(h) = 1.0 - r
+    let e0 = 1.0 - r[0]; // ~0.061
+    let e1 = 1.0 - r[1]; // ~0.039
+    let e2 = 1.0 - r[2]; // ~0.023
+    let order_8_16 = (e0 / e1).log2();
+    let order_16_32 = (e1 / e2).log2();
+    let overall_order = (e0 / e2).log2() / 2.0;
+
+    assert!(order_8_16 > 0.5 && order_8_16 < 1.5, "Observed order between 8 and 16 out of bounds: {:.2}", order_8_16);
+    assert!(order_16_32 > 0.5 && order_16_32 < 1.5, "Observed order between 16 and 32 out of bounds: {:.2}", order_16_32);
+    assert!(overall_order > 0.6 && overall_order < 1.2, "Overall convergence order should be approx first-order (~0.7-1.0): {:.2}", overall_order);
+}
 /// λ/N_cr on an n × n mesh; `hard` ties the edge-tangential displacement of the two faces
 /// (hard support) instead of leaving it free (soft).
 fn buckle(n: usize, hard: bool) -> f64 {
