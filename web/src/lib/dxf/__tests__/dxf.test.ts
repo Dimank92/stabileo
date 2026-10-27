@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { parseDxf } from '../parser';
 import { mapDxfToModel, parseSectionText, parseMaterialText } from '../mapper';
 import type { DxfParseResult } from '../types';
+import { modelStore, uiStore } from '../../store';
 
 // ─── Minimal DXF strings for testing ───────────────────────────
 
@@ -359,5 +360,128 @@ describe('parseMaterialText', () => {
 
   it('should return null for unknown text', () => {
     expect(parseMaterialText('xyz')).toBeNull();
+  });
+});
+
+
+describe('3D DXF import and lines (Issue #476)', () => {
+  function dxfLine3D(layer: string, x1: number, y1: number, z1: number, x2: number, y2: number, z2: number): string {
+    return [
+      '0', 'LINE',
+      '8', layer,
+      '10', x1.toString(),
+      '20', y1.toString(),
+      '30', z1.toString(),
+      '11', x2.toString(),
+      '21', y2.toString(),
+      '31', z2.toString(),
+    ].join('\n');
+  }
+
+  function dxfPolyline3D(layer: string, vertices: Array<[number, number, number]>): string {
+    const parts = [
+      '0', 'POLYLINE',
+      '8', layer,
+      '70', '8', // 8 = 3D polyline
+    ];
+    for (const [x, y, z] of vertices) {
+      parts.push(
+        '0', 'VERTEX',
+        '8', layer,
+        '10', x.toString(),
+        '20', y.toString(),
+        '30', z.toString(),
+        '70', '32', // 32 = 3D polyline vertex
+      );
+    }
+    parts.push('0', 'SEQEND');
+    return parts.join('\n');
+  }
+
+  it('preserves z coordinates on parsed LINE entities', () => {
+    const dxf = minimalDxf(dxfLine3D('BARRAS', 0, 0, 0, 0, 0, 4));
+    const result = parseDxf(dxf);
+    expect(result.lines).toHaveLength(1);
+    expect(result.lines[0].start).toEqual({ x: 0, y: 0 });
+    expect(result.lines[0].end).toEqual({ x: 0, y: 0, z: 4 });
+  });
+
+  it('preserves z coordinates on parsed 3D POLYLINE entities', () => {
+    const dxf = minimalDxf(dxfPolyline3D('BARRAS', [[0, 0, 0], [0, 0, 3], [4, 0, 3]]));
+    const result = parseDxf(dxf);
+    expect(result.lines).toHaveLength(2);
+    expect(result.lines[0].start).toEqual({ x: 0, y: 0 });
+    expect(result.lines[0].end).toEqual({ x: 0, y: 0, z: 3 });
+    expect(result.lines[1].start).toEqual({ x: 0, y: 0, z: 3 });
+    expect(result.lines[1].end).toEqual({ x: 4, y: 0, z: 3 });
+  });
+
+  it('maps 3D lines to 3D MappedNodes without collapsing vertical lines', () => {
+    const dxf = minimalDxf(
+      dxfLine3D('BARRAS', 0, 0, 0, 0, 0, 3) + '\n' +
+      dxfLine3D('BARRAS', 0, 0, 3, 4, 0, 3) + '\n' +
+      dxfLine3D('BARRAS', 4, 0, 3, 4, 0, 0)
+    );
+    const parsed = parseDxf(dxf);
+    const mapped = mapDxfToModel(parsed, { unit: 'm', snapTolerance: 0.01 });
+
+    expect(mapped.warnings).toHaveLength(0);
+    expect(mapped.nodes).toHaveLength(4);
+    expect(mapped.elements).toHaveLength(3);
+
+    // Verify 3D positions are preserved
+    expect(mapped.nodes[0]).toMatchObject({ x: 0, y: 0 });
+    expect(mapped.nodes[0].z).toBeUndefined();
+    expect(mapped.nodes[1]).toMatchObject({ x: 0, y: 0, z: 3 });
+    expect(mapped.nodes[2]).toMatchObject({ x: 4, y: 0, z: 3 });
+    expect(mapped.nodes[3]).toMatchObject({ x: 4, y: 0 });
+    expect(mapped.nodes[3].z).toBeUndefined();
+  });
+
+  it('does not falsely split members crossing in 2D projection at different heights', () => {
+    // Line 1 at z = 0, along X: from (0, 2, 0) to (4, 2, 0)
+    // Line 2 at z = 3, along Y: from (2, 0, 3) to (2, 4, 3)
+    // They cross at (2, 2) in XY projection, but dz = 3 in 3D.
+    const dxf = minimalDxf(
+      dxfLine3D('BARRAS', 0, 2, 0, 4, 2, 0) + '\n' +
+      dxfLine3D('BARRAS', 2, 0, 3, 2, 4, 3)
+    );
+    const parsed = parseDxf(dxf);
+    const mapped = mapDxfToModel(parsed, { unit: 'm', snapTolerance: 0.01 });
+
+    expect(mapped.elements).toHaveLength(2);
+    expect(mapped.nodes).toHaveLength(4);
+  });
+
+  it('imports 3D DXF into modelStore with 3D nodes and sets 3D presentation', () => {
+    modelStore.clear();
+    uiStore.analysisMode = '2d';
+
+    const dxf = minimalDxf(
+      dxfLine3D('BARRAS', 0, 0, 0, 0, 0, 3) + '\n' +
+      dxfLine3D('BARRAS', 0, 0, 3, 4, 0, 3)
+    );
+    const parsed = parseDxf(dxf);
+    const mapped = mapDxfToModel(parsed, { unit: 'm', snapTolerance: 0.01 });
+
+    const idMap = new Map<number, number>();
+    const is3d = mapped.nodes.some(n => n.z !== undefined && Math.abs(n.z) > 1e-9);
+    for (const n of mapped.nodes) {
+      const realId = modelStore.addNode(n.x, n.y, n.z);
+      idMap.set(n.id, realId);
+    }
+    if (is3d) {
+      if (uiStore.analysisMode === '2d') {
+        uiStore.analysisMode = '3d';
+      }
+      uiStore.useNative3DPresentation();
+    }
+
+    expect(uiStore.analysisMode).toBe('3d');
+    expect(uiStore.viewportPresentation3D).toBe('native3d');
+    expect(modelStore.nodes.size).toBe(3);
+    const topNode = [...modelStore.nodes.values()].find(n => n.z === 3);
+    expect(topNode).toBeDefined();
+    expect(topNode?.z).toBe(3);
   });
 });

@@ -12,7 +12,7 @@ export function unitScale(unit: DxfUnit): number {
 
 // ─── Parsed intermediate representation ────────────────────────
 
-export interface DxfPoint { x: number; y: number; }
+export interface DxfPoint { x: number; y: number; z?: number; }
 
 export interface DxfParsedLine {
   layer: string;
@@ -58,6 +58,7 @@ export interface MappedNode {
   id: number;
   x: number;
   y: number;
+  z?: number;
 }
 
 export interface MappedElement {

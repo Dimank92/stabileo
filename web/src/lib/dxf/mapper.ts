@@ -42,16 +42,22 @@ export function mapDxfToModel(
   // ── Node pool with snap merging ──
 
   const nodes: MappedNode[] = [];
-  function findOrAddNode(rawX: number, rawY: number): number {
+  function findOrAddNode(rawX: number, rawY: number, rawZ?: number): number {
     const x = rawX * scale;
     const y = rawY * scale;
+    const z = rawZ !== undefined ? rawZ * scale : 0;
     for (const n of nodes) {
       const dx = n.x - x;
       const dy = n.y - y;
-      if (dx * dx + dy * dy < tol * tol) return n.id;
+      const dz = (n.z ?? 0) - z;
+      if (dx * dx + dy * dy + dz * dz < tol * tol) return n.id;
     }
     const id = nodes.length;
-    nodes.push({ id, x, y });
+    const node: MappedNode = { id, x, y };
+    if (rawZ !== undefined && Math.abs(z) > 1e-9) {
+      node.z = z;
+    }
+    nodes.push(node);
     return id;
   }
 
@@ -63,8 +69,8 @@ export function mapDxfToModel(
     for (const line of parsed.lines) {
       const isElement = ELEMENT_LAYERS.has(line.layer) || TRUSS_LAYERS.has(line.layer);
       if (!isElement) continue;
-      const ni = findOrAddNode(line.start.x, line.start.y);
-      const nj = findOrAddNode(line.end.x, line.end.y);
+      const ni = findOrAddNode(line.start.x, line.start.y, line.start.z);
+      const nj = findOrAddNode(line.end.x, line.end.y, line.end.z);
       if (ni === nj) { warnings.push(t('dxf.warnZeroLengthLine')); continue; }
       const type = TRUSS_LAYERS.has(line.layer) ? 'truss' as const : 'frame' as const;
       elements.push({ nodeI: ni, nodeJ: nj, type });
@@ -75,8 +81,8 @@ export function mapDxfToModel(
       warnings.push(t('dxf.warnNoElementLayers'));
     }
     for (const line of parsed.lines) {
-      const ni = findOrAddNode(line.start.x, line.start.y);
-      const nj = findOrAddNode(line.end.x, line.end.y);
+      const ni = findOrAddNode(line.start.x, line.start.y, line.start.z);
+      const nj = findOrAddNode(line.end.x, line.end.y, line.end.z);
       if (ni === nj) continue;
       elements.push({ nodeI: ni, nodeJ: nj, type: 'frame' });
     }
@@ -287,16 +293,16 @@ function splitAtTouchingNodes(elements: MappedElement[], nodes: MappedNode[], to
   for (let i = 0; i < elements.length; i++) {
     const e = elements[i];
     const a = nodes[e.nodeI], b = nodes[e.nodeJ];
-    const dx = b.x - a.x, dy = b.y - a.y;
-    const L2 = dx * dx + dy * dy;
+    const dx = b.x - a.x, dy = b.y - a.y, dz = (b.z ?? 0) - (a.z ?? 0);
+    const L2 = dx * dx + dy * dy + dz * dz;
     if (L2 < 1e-12) continue;
     const L = Math.sqrt(L2);
     const on: Array<{ id: number; t: number }> = [];
     for (const n of nodes) {
       if (n.id === e.nodeI || n.id === e.nodeJ) continue;
-      const t = ((n.x - a.x) * dx + (n.y - a.y) * dy) / L2;
+      const t = ((n.x - a.x) * dx + (n.y - a.y) * dy + ((n.z ?? 0) - (a.z ?? 0)) * dz) / L2;
       if (t * L <= tol || (1 - t) * L <= tol) continue;
-      if (pointToSegmentDist(n.x, n.y, a.x, a.y, b.x, b.y) < tol) on.push({ id: n.id, t });
+      if (pointToSegmentDist(n.x, n.y, n.z ?? 0, a.x, a.y, a.z ?? 0, b.x, b.y, b.z ?? 0) < tol) on.push({ id: n.id, t });
     }
     if (on.length === 0) continue;
     on.sort((p, q) => p.t - q.t);
@@ -322,12 +328,14 @@ function parseSupportType(text: string): MappedSupport['type'] {
 function findNearestNode(pos: DxfPoint, nodes: MappedNode[], scale: number, tolerance: number): number {
   const px = pos.x * scale;
   const py = pos.y * scale;
+  const pz = (pos.z ?? 0) * scale;
   let bestDist = tolerance * 10; // wider search for labels
   let bestId = -1;
   for (const n of nodes) {
     const dx = n.x - px;
     const dy = n.y - py;
-    const d = Math.sqrt(dx * dx + dy * dy);
+    const dz = (n.z ?? 0) - pz;
+    const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
     if (d < bestDist) { bestDist = d; bestId = n.id; }
   }
   return bestId;
@@ -341,13 +349,14 @@ function findNearestElement(
 ): number {
   const px = pos.x * scale;
   const py = pos.y * scale;
+  const pz = (pos.z ?? 0) * scale;
   let bestDist = Infinity;
   let bestIdx = -1;
 
   for (let i = 0; i < elements.length; i++) {
     const ni = nodes[elements[i].nodeI];
     const nj = nodes[elements[i].nodeJ];
-    const d = pointToSegmentDist(px, py, ni.x, ni.y, nj.x, nj.y);
+    const d = pointToSegmentDist(px, py, pz, ni.x, ni.y, ni.z ?? 0, nj.x, nj.y, nj.z ?? 0);
     if (d < bestDist) { bestDist = d; bestIdx = i; }
   }
 
@@ -362,6 +371,7 @@ function findNearestElementWithProjection(
 ): { elemIdx: number; a: number } | null {
   const px = pos.x * scale;
   const py = pos.y * scale;
+  const pz = (pos.z ?? 0) * scale;
   let bestDist = Infinity;
   let bestIdx = -1;
   let bestA = 0;
@@ -371,13 +381,15 @@ function findNearestElementWithProjection(
     const nj = nodes[elements[i].nodeJ];
     const dx = nj.x - ni.x;
     const dy = nj.y - ni.y;
-    const L2 = dx * dx + dy * dy;
+    const dz = (nj.z ?? 0) - (ni.z ?? 0);
+    const L2 = dx * dx + dy * dy + dz * dz;
     if (L2 < 1e-12) continue;
-    let t = ((px - ni.x) * dx + (py - ni.y) * dy) / L2;
+    let t = ((px - ni.x) * dx + (py - ni.y) * dy + (pz - (ni.z ?? 0)) * dz) / L2;
     t = Math.max(0, Math.min(1, t));
     const cx = ni.x + t * dx;
     const cy = ni.y + t * dy;
-    const d = Math.sqrt((px - cx) * (px - cx) + (py - cy) * (py - cy));
+    const cz = (ni.z ?? 0) + t * dz;
+    const d = Math.sqrt((px - cx) * (px - cx) + (py - cy) * (py - cy) + (pz - cz) * (pz - cz));
     if (d < bestDist) {
       bestDist = d;
       bestIdx = i;
@@ -397,14 +409,15 @@ function findHingeEnd(
 ): MappedHinge | null {
   const px = pos.x * scale;
   const py = pos.y * scale;
+  const pz = (pos.z ?? 0) * scale;
   let bestDist = tolerance * 5;
   let bestHinge: MappedHinge | null = null;
 
   for (let i = 0; i < elements.length; i++) {
     const ni = nodes[elements[i].nodeI];
     const nj = nodes[elements[i].nodeJ];
-    const diI = Math.sqrt((px - ni.x) ** 2 + (py - ni.y) ** 2);
-    const diJ = Math.sqrt((px - nj.x) ** 2 + (py - nj.y) ** 2);
+    const diI = Math.sqrt((px - ni.x) ** 2 + (py - ni.y) ** 2 + (pz - (ni.z ?? 0)) ** 2);
+    const diJ = Math.sqrt((px - nj.x) ** 2 + (py - nj.y) ** 2 + (pz - (nj.z ?? 0)) ** 2);
     if (diI < bestDist) { bestDist = diI; bestHinge = { elementIndex: i, end: 'start' }; }
     if (diJ < bestDist) { bestDist = diJ; bestHinge = { elementIndex: i, end: 'end' }; }
   }
@@ -413,17 +426,19 @@ function findHingeEnd(
 }
 
 function pointToSegmentDist(
-  px: number, py: number,
-  ax: number, ay: number,
-  bx: number, by: number,
+  px: number, py: number, pz: number,
+  ax: number, ay: number, az: number,
+  bx: number, by: number, bz: number,
 ): number {
   const dx = bx - ax;
   const dy = by - ay;
-  const L2 = dx * dx + dy * dy;
-  if (L2 < 1e-12) return Math.sqrt((px - ax) ** 2 + (py - ay) ** 2);
-  let t = ((px - ax) * dx + (py - ay) * dy) / L2;
+  const dz = bz - az;
+  const L2 = dx * dx + dy * dy + dz * dz;
+  if (L2 < 1e-12) return Math.sqrt((px - ax) ** 2 + (py - ay) ** 2 + (pz - az) ** 2);
+  let t = ((px - ax) * dx + (py - ay) * dy + (pz - az) * dz) / L2;
   t = Math.max(0, Math.min(1, t));
   const cx = ax + t * dx;
   const cy = ay + t * dy;
-  return Math.sqrt((px - cx) ** 2 + (py - cy) ** 2);
+  const cz = az + t * dz;
+  return Math.sqrt((px - cx) ** 2 + (py - cy) ** 2 + (pz - cz) ** 2);
 }

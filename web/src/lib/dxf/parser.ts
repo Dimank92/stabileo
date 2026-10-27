@@ -41,8 +41,16 @@ export function parseDxf(text: string): DxfParseResult {
         if (e.vertices && e.vertices.length >= 2) {
           result.lines.push({
             layer,
-            start: { x: e.vertices[0].x, y: e.vertices[0].y },
-            end: { x: e.vertices[1].x, y: e.vertices[1].y },
+            start: {
+              x: e.vertices[0].x,
+              y: e.vertices[0].y,
+              ...(e.vertices[0].z !== undefined && Math.abs(e.vertices[0].z) > 1e-9 ? { z: e.vertices[0].z } : {}),
+            },
+            end: {
+              x: e.vertices[1].x,
+              y: e.vertices[1].y,
+              ...(e.vertices[1].z !== undefined && Math.abs(e.vertices[1].z) > 1e-9 ? { z: e.vertices[1].z } : {}),
+            },
           });
         }
         break;
@@ -54,8 +62,16 @@ export function parseDxf(text: string): DxfParseResult {
           for (let i = 0; i < e.vertices.length - 1; i++) {
             result.lines.push({
               layer,
-              start: { x: e.vertices[i].x, y: e.vertices[i].y },
-              end: { x: e.vertices[i + 1].x, y: e.vertices[i + 1].y },
+              start: {
+                x: e.vertices[i].x,
+                y: e.vertices[i].y,
+                ...(e.vertices[i].z !== undefined && Math.abs(e.vertices[i].z) > 1e-9 ? { z: e.vertices[i].z } : {}),
+              },
+              end: {
+                x: e.vertices[i + 1].x,
+                y: e.vertices[i + 1].y,
+                ...(e.vertices[i + 1].z !== undefined && Math.abs(e.vertices[i + 1].z) > 1e-9 ? { z: e.vertices[i + 1].z } : {}),
+              },
             });
           }
           // Close if shape flag is set
@@ -64,8 +80,40 @@ export function parseDxf(text: string): DxfParseResult {
             const first = e.vertices[0];
             result.lines.push({
               layer,
-              start: { x: last.x, y: last.y },
-              end: { x: first.x, y: first.y },
+              start: {
+                x: last.x,
+                y: last.y,
+                ...(last.z !== undefined && Math.abs(last.z) > 1e-9 ? { z: last.z } : {}),
+              },
+              end: {
+                x: first.x,
+                y: first.y,
+                ...(first.z !== undefined && Math.abs(first.z) > 1e-9 ? { z: first.z } : {}),
+              },
+            });
+          }
+        }
+        break;
+      }
+      case '3DFACE': {
+        const e = entity as any;
+        if (e.vertices && e.vertices.length >= 3) {
+          const v = e.vertices;
+          for (let i = 0; i < v.length; i++) {
+            const next = (i + 1) % v.length;
+            if (v[i].x === v[next].x && v[i].y === v[next].y && (v[i].z ?? 0) === (v[next].z ?? 0)) continue;
+            result.lines.push({
+              layer,
+              start: {
+                x: v[i].x,
+                y: v[i].y,
+                ...(v[i].z !== undefined && Math.abs(v[i].z) > 1e-9 ? { z: v[i].z } : {}),
+              },
+              end: {
+                x: v[next].x,
+                y: v[next].y,
+                ...(v[next].z !== undefined && Math.abs(v[next].z) > 1e-9 ? { z: v[next].z } : {}),
+              },
             });
           }
         }
@@ -75,7 +123,11 @@ export function parseDxf(text: string): DxfParseResult {
         const e = entity as IPointEntity;
         result.points.push({
           layer,
-          position: { x: e.position.x, y: e.position.y },
+          position: {
+            x: e.position.x,
+            y: e.position.y,
+            ...(e.position.z !== undefined && Math.abs(e.position.z) > 1e-9 ? { z: e.position.z } : {}),
+          },
         });
         break;
       }
@@ -83,7 +135,11 @@ export function parseDxf(text: string): DxfParseResult {
         const e = entity as IInsertEntity;
         result.inserts.push({
           layer,
-          position: { x: e.position.x, y: e.position.y },
+          position: {
+            x: e.position.x,
+            y: e.position.y,
+            ...(e.position.z !== undefined && Math.abs(e.position.z) > 1e-9 ? { z: e.position.z } : {}),
+          },
           blockName: e.name ?? '',
         });
         break;
@@ -94,7 +150,11 @@ export function parseDxf(text: string): DxfParseResult {
         if (pos) {
           result.texts.push({
             layer,
-            position: { x: pos.x, y: pos.y },
+            position: {
+              x: pos.x,
+              y: pos.y,
+              ...(pos.z !== undefined && Math.abs(pos.z) > 1e-9 ? { z: pos.z } : {}),
+            },
             value: e.text ?? '',
           });
         }
@@ -105,7 +165,11 @@ export function parseDxf(text: string): DxfParseResult {
         if (e.position) {
           result.texts.push({
             layer,
-            position: { x: e.position.x, y: e.position.y },
+            position: {
+              x: e.position.x,
+              y: e.position.y,
+              ...(e.position.z !== undefined && Math.abs(e.position.z) > 1e-9 ? { z: e.position.z } : {}),
+            },
             value: e.text ?? '',
           });
         }
@@ -115,7 +179,11 @@ export function parseDxf(text: string): DxfParseResult {
         const e = entity as ICircleEntity;
         result.circles.push({
           layer,
-          center: { x: e.center.x, y: e.center.y },
+          center: {
+            x: e.center.x,
+            y: e.center.y,
+            ...(e.center.z !== undefined && Math.abs(e.center.z) > 1e-9 ? { z: e.center.z } : {}),
+          },
           radius: e.radius,
         });
         break;

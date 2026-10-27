@@ -77,9 +77,16 @@
 
     // Map temp IDs to real node IDs
     const idMap = new Map<number, number>();
+    const is3d = m.nodes.some(n => n.z !== undefined && Math.abs(n.z) > 1e-9);
     for (const n of m.nodes) {
-      const realId = modelStore.addNode(n.x, n.y);
+      const realId = modelStore.addNode(n.x, n.y, n.z);
       idMap.set(n.id, realId);
+    }
+    if (is3d) {
+      if (uiStore.analysisMode === '2d') {
+        uiStore.analysisMode = '3d';
+      }
+      uiStore.useNative3DPresentation();
     }
 
     // Material
