@@ -264,7 +264,7 @@ export async function runGlobalSolve(options: { directBase?: boolean } = {}): Pr
     // once for the whole solve and before its inputs are taken, or the solve stops and says which.
     const p = preparePlatesForAnalysis();
     if (!p.ok) {
-      const error = tp(p.reason === 'needsMesh' ? 'plates.analysisNeedsMesh' : 'plates.analysisMeshRefused', { names: p.plates.join(', ') });
+      const error = tp(p.reason === 'needsMesh' ? 'plates.analysisNeedsMesh' : p.reason === 'localLoads' ? 'plates.analysisLocalLoads' : 'plates.analysisMeshRefused', { names: p.plates.join(', ') });
       uiStore.toast(error, 'error');
       return { ok: false, error };
     }

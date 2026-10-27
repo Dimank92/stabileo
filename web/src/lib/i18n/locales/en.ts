@@ -14036,5 +14036,7 @@ const en: Record<string, string> = {
   "plates.meshKind.band": "and {n} in the transition ({tri} triangles)",
   "plates.editedWhole": "Applied to the whole plate: {names}. An element of its mesh is edited with the plate.",
   "proRibbon.diagnosticsDesc": "The model's and the analysis's problems, by severity: what keeps it from solving, warnings and notes, plates with no mesh or an out-of-date one included. Each item names the nodes, members or plates involved.",
+  "plates.analysisLocalLoads": "These plates have an out-of-date mesh with loads put on its elements: {names}. A new mesh cannot carry them; mesh them from their panel, which lists those loads, or load the whole plate instead.",
+  "plates.scopeNowElement": "A click on a plate now picks a mesh element. To go back to the whole plate: Selection → «Whole plate», or «Select plate» in the element's panel.",
 };
 export default en;
