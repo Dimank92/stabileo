@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { parseCadDxf } from '../parse';
 import { extractArchPlan, suggestLayerMappings } from '../classify';
 import { cropDoc } from '../infer';
-import { alignPlans, detectPlanWindows, shiftDoc } from '../floor-regions';
+import { alignPlans, assignFloors, detectPlanWindows, floorRuns, formatFloors, parseFloors, planOfFloor, shiftDoc } from '../floor-regions';
 import { multiPlanDxf } from './dxf-fixture';
 
 const doc = parseCadDxf(multiPlanDxf(), 'plantas.dxf');
@@ -56,5 +56,23 @@ describe('floor plans drawn side by side', () => {
     expect(moved.bbox!.minX).toBeCloseTo(doc.bbox!.minX - 30, 9);
     const p = extractArchPlan(cropDoc(moved, { x0: -1, x1: 11, y0: -1, y1: 5 }), mappings, 'm');
     expect(p.columns).toHaveLength(6);
+  });
+});
+
+describe('floors given to plans', () => {
+  it('reads and writes lists of floors', () => {
+    expect(parseFloors('2-4', 9)).toEqual([2, 3, 4]);
+    expect(parseFloors('1, 3–4; 9-7', 8)).toEqual([1, 3, 4, 7, 8]);
+    expect(parseFloors('', 5)).toEqual([]);
+    expect(parseFloors('2 a 4', 5)).toBeNull();
+    expect(formatFloors([4, 1, 2, 3, 7])).toBe('1–4, 7');
+    expect(floorRuns([1, 2, 5])).toEqual([[1, 2], [5, 5]]);
+  });
+
+  it('never gives a floor two plans, and names the floors left without one', () => {
+    let plans = [[1], [2, 3, 4], [5]];
+    plans = assignFloors(plans, 0, [1, 2]);
+    expect(plans).toEqual([[1, 2], [3, 4], [5]]);
+    expect(planOfFloor(plans, 6)).toEqual([0, 0, 1, 1, 2, -1]);
   });
 });

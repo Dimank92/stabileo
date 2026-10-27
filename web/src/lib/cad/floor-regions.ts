@@ -126,3 +126,44 @@ export function alignPlans(plans: readonly ArchPlan[], fixed: ReadonlyArray<CadP
   });
   return out;
 }
+
+/** "2-9", "1, 3–4": floors within 1..n, sorted and unique; null when the text is not a list of floors. */
+export function parseFloors(text: string, n: number): number[] | null {
+  const out = new Set<number>();
+  const parts = text.split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+  if (!parts.length) return [];
+  for (const part of parts) {
+    const m = /^(\d+)\s*(?:[-–]\s*(\d+))?$/.exec(part);
+    if (!m) return null;
+    const a = Number(m[1]), b = m[2] ? Number(m[2]) : a;
+    for (let k = Math.min(a, b); k <= Math.max(a, b); k++) if (k >= 1 && k <= n) out.add(k);
+  }
+  return [...out].sort((a, b) => a - b);
+}
+
+export function floorRuns(floors: readonly number[]): Array<[number, number]> {
+  const runs: Array<[number, number]> = [];
+  for (const k of [...floors].sort((a, b) => a - b)) {
+    const last = runs[runs.length - 1];
+    if (last && k === last[1] + 1) last[1] = k;
+    else if (!last || k > last[1]) runs.push([k, k]);
+  }
+  return runs;
+}
+
+export function formatFloors(floors: readonly number[]): string {
+  return floorRuns(floors).map(([a, b]) => (a === b ? String(a) : `${a}–${b}`)).join(', ');
+}
+
+/** Plan `r` takes `floors`; every other plan gives them up, so a floor never has two plans. */
+export function assignFloors(plans: ReadonlyArray<readonly number[]>, r: number, floors: readonly number[]): number[][] {
+  const taken = new Set(floors);
+  return plans.map((f, i) => (i === r ? [...taken].sort((a, b) => a - b) : f.filter((k) => !taken.has(k))));
+}
+
+/** The plan of each floor 1..n (index into `plans`), or -1 for a floor no plan covers. */
+export function planOfFloor(plans: ReadonlyArray<readonly number[]>, n: number): number[] {
+  const out = new Array<number>(n).fill(-1);
+  plans.forEach((f, i) => { for (const k of f) if (k >= 1 && k <= n && out[k - 1] === -1) out[k - 1] = i; });
+  return out;
+}
