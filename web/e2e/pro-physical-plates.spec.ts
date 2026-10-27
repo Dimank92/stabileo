@@ -172,3 +172,15 @@ test('@smoke a plate of five nodes is picked by a click in the default mode and 
   await page.getByTestId('plate-mesh-apply').click();
   await expect.poll(async () => (await plates(page))[0]!.status).toBe('current');
 });
+
+test('@smoke Diagnostics opens from the Analyse row and lists a plate with no mesh', async ({ pro: page }) => {
+  await page.getByTestId('draw-plate').click();
+  for (const n of [5, 6, 8, 7, 5]) await click(page, n);
+  await expect.poll(() => plates(page)).toHaveLength(1);
+  await page.getByTestId('draw-stop').click();
+
+  await page.getByTestId('pr-stage-analyse').click();
+  await page.getByTestId('pr-cmd-diagnostics').click();
+  await expect(page.getByTestId('pr-cmd-diagnostics')).toHaveClass(/\bactive\b/);
+  await expect(page.locator('.diag-item').filter({ hasText: /no mesh|sin malla|sem malha/ })).toHaveCount(1);
+});

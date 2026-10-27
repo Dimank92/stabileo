@@ -14035,5 +14035,6 @@ const en: Record<string, string> = {
   "plates.meshKind.squares": "{n} squares of {a} {unit}",
   "plates.meshKind.band": "and {n} in the transition ({tri} triangles)",
   "plates.editedWhole": "Applied to the whole plate: {names}. An element of its mesh is edited with the plate.",
+  "proRibbon.diagnosticsDesc": "The model's and the analysis's problems, by severity: what keeps it from solving, warnings and notes, plates with no mesh or an out-of-date one included. Each item names the nodes, members or plates involved.",
 };
 export default en;
