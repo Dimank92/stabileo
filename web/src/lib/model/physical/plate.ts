@@ -58,6 +58,12 @@ export interface PlateSurface {
   materialId: number;
   thickness: number;
   mesh: PlateMeshSpec;
+  /**
+   * Curved sides: indices, in the group's nodes, of nodes the outline or a hole passes through on
+   * an arc. Node k marked joins its neighbours in the loop by the arc through the three of them,
+   * so the plate keeps its curved side whatever its mesh does with it (`arcSampler`).
+   */
+  arcMids?: number[];
   /** Set when the current mesh was made: what it was made from, and what it is. */
   meshed?: { signature: string; cells: number; quality: MeshQuality };
 }
@@ -133,16 +139,75 @@ const offPlane = (f: PlateFrame, p: Vec3) => Math.abs(dot(sub(p, f.o), f.n));
 
 export interface PlateGeometry { outer: Vec3[]; holes: Vec3[][]; frame: PlateFrame }
 
-/** A plate's outline and holes as points, with its plane; null when a node is gone or it has no area. */
-export function plateGeometry(m: PlateModel, g: GroupLike): PlateGeometry | null {
+/**
+ * The points strictly between a and b on a curved side through `mid`, in order. The default draws
+ * the arc in steps of 5°; the mesh asks for its own (`store/physical-plates.ts`).
+ */
+export type ArcSampler = (a: { id: number; p: Vec3 }, mid: { id: number; p: Vec3 }, b: { id: number; p: Vec3 }) => Vec3[];
+
+/** The circle through three points: centre, normal and the angle a→b the way through mid. Null in line. */
+export function circleThrough(a: Vec3, m: Vec3, b: Vec3): { c: Vec3; n: Vec3; r: number; sweep: number } | null {
+  const u = sub(m, a), v = sub(b, a), n = cross(u, v);
+  const n2 = dot(n, n);
+  if (n2 < 1e-18) return null;
+  const k1 = dot(u, u), k2 = dot(v, v);
+  const t1 = cross(v, n), t2 = cross(n, u);
+  const c: Vec3 = [a[0] + (k1 * t1[0] + k2 * t2[0]) / (2 * n2), a[1] + (k1 * t1[1] + k2 * t2[1]) / (2 * n2), a[2] + (k1 * t1[2] + k2 * t2[2]) / (2 * n2)];
+  const nn = unit(n);
+  const ang = (p: Vec3, q: Vec3) => { const x = sub(p, c), y = sub(q, c); const t = Math.atan2(dot(cross(x, y), nn), dot(x, y)); return t < 0 ? t + 2 * Math.PI : t; };
+  return { c, n: nn, r: norm(sub(a, c)), sweep: ang(a, m) + ang(m, b) };
+}
+
+/** `count` − 1 points strictly inside the arc a→b through m, evenly spaced along it. */
+export function arcInterior(a: Vec3, m: Vec3, b: Vec3, count: number): Vec3[] {
+  const ci = circleThrough(a, m, b);
+  if (!ci) return [];
+  const r0 = sub(a, ci.c);
+  const out: Vec3[] = [];
+  for (let k = 1; k < count; k++) {
+    const t = (ci.sweep * k) / count, ct = Math.cos(t), st = Math.sin(t);
+    const kx = cross(ci.n, r0), kd = dot(ci.n, r0);
+    out.push([0, 1, 2].map((i) => ci.c[i]! + r0[i]! * ct + kx[i]! * st + ci.n[i]! * kd * (1 - ct)) as Vec3);
+  }
+  return out;
+}
+
+const fineSampler: ArcSampler = (a, mid, b) => {
+  const ci = circleThrough(a.p, mid.p, b.p);
+  return ci ? arcInterior(a.p, mid.p, b.p, Math.max(2, Math.ceil(ci.sweep / ((5 * Math.PI) / 180)))) : [];
+};
+
+/**
+ * A plate's outline and holes as points, with its plane; null when a node is gone or it has no
+ * area. A curved side is drawn by `sampler` (5° steps unless asked otherwise).
+ */
+export function plateGeometry(m: PlateModel, g: GroupLike, sampler: ArcSampler = fineSampler): PlateGeometry | null {
+  const s = plateSurfaceOf(g);
   const { outer, holes } = plateLoops(g);
-  const pts = (ids: number[]) => { const out: Vec3[] = []; for (const id of ids) { const n = m.nodes.get(id); if (!n) return null; out.push(v3(n)); } return out; };
-  const o = pts(outer);
+  const mids = new Set(s?.arcMids ?? []);
+  let base = 0;
+  const loop = (ids: number[]): Vec3[] | null => {
+    const at = base; base += ids.length;
+    const out: Vec3[] = [];
+    for (let k = 0; k < ids.length; k++) {
+      const n = m.nodes.get(ids[k]!);
+      if (!n) return null;
+      if (!mids.has(at + k)) { out.push(v3(n)); continue; }
+      // A curved side: its neighbours in the loop and the arc between them through this node.
+      const ia = ids[(k + ids.length - 1) % ids.length]!, ib = ids[(k + 1) % ids.length]!;
+      const na = m.nodes.get(ia), nb = m.nodes.get(ib);
+      if (!na || !nb) return null;
+      const pts = sampler({ id: ia, p: v3(na) }, { id: ids[k]!, p: v3(n) }, { id: ib, p: v3(nb) });
+      out.push(...(pts.length ? pts : [v3(n)]));
+    }
+    return out;
+  };
+  const o = loop(outer);
   if (!o) return null;
   const frame = frameOfLoop(o);
   if (!frame) return null;
   const hs: Vec3[][] = [];
-  for (const h of holes) { const p = pts(h); if (!p) return null; hs.push(p); }
+  for (const h of holes) { const p = loop(h); if (!p) return null; hs.push(p); }
   return { outer: o, holes: hs, frame };
 }
 
@@ -179,28 +244,34 @@ export type PlateProblem = 'needNodes' | 'repeatedNode' | 'noArea' | 'notPlanar'
  * Why these loops make no plate, or null when they make one: at least three distinct nodes, one
  * plane, an outline that does not cross itself, holes inside it and apart from each other.
  */
-export function plateProblem(m: PlateModel, outer: readonly number[], holes: readonly (readonly number[])[] = []): PlateProblem | null {
+export function plateProblem(m: PlateModel, outer: readonly number[], holes: readonly (readonly number[])[] = [], arcMids: readonly number[] = []): PlateProblem | null {
   if (outer.length < 3) return 'needNodes';
   const ids = [outer, ...holes].flat();
   if (new Set(ids).size !== ids.length) return 'repeatedNode';
-  const pts = (l: readonly number[]) => l.map((id) => m.nodes.get(id)).map((n) => (n ? v3(n) : null));
-  const o = pts(outer);
-  if (o.some((p) => !p)) return 'needNodes';
-  const frame = frameOfLoop(o as Vec3[]);
-  // No net area: in a line, or a figure eight whose two halves cancel.
-  if (!frame) return collinear(o as Vec3[]) ? 'noArea' : 'selfIntersecting';
-  const hs = holes.map(pts);
-  if (hs.some((h) => h.length < 3 || h.some((p) => !p))) return 'needNodes';
-  if ([o, ...hs].flat().some((p) => offPlane(frame, p!) > PLANE_TOL)) return 'notPlanar';
-  const o2 = (o as Vec3[]).map((p) => to2(frame, p));
-  if (Math.abs(area2(o2)) < 1e-9 || selfCrossing(o2)) return Math.abs(area2(o2)) < 1e-9 ? 'noArea' : 'selfIntersecting';
-  const h2 = (hs as Vec3[][]).map((h) => h.map((p) => to2(frame, p)));
+  if (ids.some((id) => !m.nodes.has(id)) || holes.some((h) => h.length < 3)) return 'needNodes';
+  // An arc needs a neighbour on each side that is not itself an arc's point.
+  const mids = new Set(arcMids);
+  let at = 0;
+  for (const l of [outer, ...holes]) {
+    for (let k = 0; k < l.length; k++) if (mids.has(at + k) && (mids.has(at + ((k + 1) % l.length)) || mids.has(at + ((k + l.length - 1) % l.length)))) return 'selfIntersecting';
+    at += l.length;
+  }
+  const temp = { id: 0, members: { nodes: ids }, data: { surface: { loops: [outer.length, ...holes.map((h) => h.length)], arcMids: [...arcMids] } as unknown as PlateSurface } };
+  const raw = ids.map((id) => v3(m.nodes.get(id)!));
+  const geo = plateGeometry(m, temp);
+  if (!geo) return collinear(raw.slice(0, outer.length)) ? 'noArea' : 'selfIntersecting';
+  const frame = geo.frame;
+  if ([...raw, ...geo.outer, ...geo.holes.flat()].some((p) => offPlane(frame, p) > PLANE_TOL)) return 'notPlanar';
+  const o2 = geo.outer.map((p) => to2(frame, p));
+  if (Math.abs(area2(o2)) < 1e-9) return 'noArea';
+  if (selfCrossing(o2)) return 'selfIntersecting';
+  const h2 = geo.holes.map((h) => h.map((p) => to2(frame, p)));
   for (const h of h2) {
     if (Math.abs(area2(h)) < 1e-9 || selfCrossing(h)) return 'selfIntersecting';
     if (!h.every((q) => inPoly(q, o2))) return 'holeOutside';
   }
-  for (let i = 0; i < h2.length; i++) for (let j = i + 1; j < h2.length; j++) {
-    if (h2[i]!.some((q) => inPoly(q, h2[j]!)) || h2[j]!.some((q) => inPoly(q, h2[i]!))) return 'holesOverlap';
+  for (let a = 0; a < h2.length; a++) for (let b = a + 1; b < h2.length; b++) {
+    if (h2[a]!.some((q) => inPoly(q, h2[b]!)) || h2[b]!.some((q) => inPoly(q, h2[a]!))) return 'holesOverlap';
   }
   return null;
 }

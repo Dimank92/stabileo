@@ -22,9 +22,11 @@ import { modelStore } from './model.svelte';
 import { uiStore } from './ui.svelte';
 import { physicalDataOf, type PhysicalData } from '../model/physical';
 import {
-  DEFAULT_PLATE_MESH, externalFeatures, gridOfSpec, meshQuality, plateGeometry, plateKindOf, plateLoops, plateMeshInput, plateProblem,
-  plateSignature, plateSurfaceOf, type MeshQuality, type PlateMeshSpec, type PlateProblem, type PlateSurface,
+  arcInterior, circleThrough, DEFAULT_PLATE_MESH, externalFeatures, gridOfSpec, meshQuality, plateGeometry, plateKindOf, plateLoops, plateMeshInput, plateProblem,
+  plateSignature, plateSurfaceOf, type ArcSampler, type MeshQuality, type PlateMeshSpec, type PlateProblem, type PlateSurface,
 } from '../model/physical/plate';
+import { pieceOf } from '../model/curve-entity';
+import type { Vec3 } from '../model/edit/affine';
 import { generateMesh, MAX_MESH_CELLS, type MeshOutput } from '../model/edit/mesher';
 import { frameAlong, gridMesh } from '../model/edit/grid-mesh';
 import { applyMesh } from '../model/edit/mesh-apply';
@@ -77,13 +79,51 @@ uiStore.setPlateShellResolver(plateShellKeys);
 const plateModel = () => ({ nodes: modelStore.nodes, elements: modelStore.elements });
 
 /**
+ * A curved member running from node a to node b, as its nodes in order from a, or null. What a
+ * plate's curved side between the same nodes follows, so the two share their nodes.
+ */
+export function arcEdgeBetween(a: number, b: number): { arcId: number; nodes: number[] } | null {
+  const seen = new Set<number>();
+  for (const e of modelStore.elements.values()) {
+    if (!e.arc || seen.has(e.arc.id)) continue;
+    seen.add(e.arc.id);
+    const p = pieceOf(modelStore.model as never, e.id);
+    if (!p || p.kind !== 'arc') continue;
+    if (!((p.start === a && p.end === b) || (p.start === b && p.end === a))) continue;
+    const nodes = [p.start];
+    for (const seg of p.segments) { const x = modelStore.elements.get(seg.elementId)!; nodes.push(seg.reversed ? x.nodeI : x.nodeJ); }
+    return { arcId: e.arc.id, nodes: p.start === a ? nodes : nodes.reverse() };
+  }
+  return null;
+}
+
+/**
+ * How a mesh draws a curved side: through the nodes of the curved member on it, when one runs
+ * between its ends along the same circle, so plate and member share them; otherwise in pieces of
+ * the element size.
+ */
+function meshSampler(size: number): ArcSampler {
+  return (a, mid, b) => {
+    const ci = circleThrough(a.p, mid.p, b.p);
+    if (!ci) return [];
+    const edge = arcEdgeBetween(a.id, b.id);
+    if (edge) {
+      const pts = edge.nodes.slice(1, -1).map((id) => { const n = modelStore.nodes.get(id)!; return [n.x, n.y, n.z ?? 0] as Vec3; });
+      const onCircle = pts.every((q) => Math.abs(Math.hypot(q[0] - ci.c[0], q[1] - ci.c[1], q[2] - ci.c[2]) - ci.r) < 1e-3);
+      if (pts.length && onCircle) return pts;
+    }
+    return arcInterior(a.p, mid.p, b.p, Math.max(2, Math.ceil((ci.r * ci.sweep) / size)));
+  };
+}
+
+/**
  * What a plate's mesh has to meet. Members are read whole through the nodes every plate's mesh
  * created, so meshing one plate never puts its neighbours out of date; the nodes of the other
  * shells on its outline are points the mesh passes through, so neighbouring meshes meet node to
  * node.
  */
-function featuresOf(e: PlateEntry) {
-  const geo = plateGeometry(plateModel(), e.group);
+function featuresOf(e: PlateEntry, spec: PlateMeshSpec = e.surface.mesh) {
+  const geo = plateGeometry(plateModel(), e.group, meshSampler(spec.size));
   if (!geo) return null;
   const loops = plateLoops(e.group);
   const mine = new Set(loops.owned);
@@ -126,14 +166,38 @@ export function platesNeedingMesh(): number[] {
 
 // ─── Making a plate ──────────────────────────────────────────────
 
-export interface NewPlate { outline: number[]; holes?: number[][]; materialId: number; thickness: number; name?: string; mesh?: PlateMeshSpec }
+export interface NewPlate {
+  outline: number[]; holes?: number[][]; materialId: number; thickness: number; name?: string; mesh?: PlateMeshSpec;
+  /** Indices of `outline` that are points of curved sides (`PlateSurface.arcMids`). */
+  arcMids?: number[];
+  /** A side between two nodes a curved member joins follows the member (default true). */
+  followArcs?: boolean;
+}
+
+/** An outline with the sides a curved member joins made curved, through the member's middle node. */
+function withMemberArcs(outline: number[], arcMids: number[]): { outline: number[]; arcMids: number[] } {
+  const out: number[] = [];
+  const mids: number[] = [];
+  const given = new Set(arcMids);
+  for (let k = 0; k < outline.length; k++) {
+    if (given.has(k)) mids.push(out.length);
+    out.push(outline[k]!);
+    const a = outline[k]!, b = outline[(k + 1) % outline.length]!;
+    if (given.has(k) || given.has((k + 1) % outline.length)) continue;
+    const edge = arcEdgeBetween(a, b);
+    if (edge && edge.nodes.length >= 3) { mids.push(out.length); out.push(edge.nodes[Math.floor(edge.nodes.length / 2)]!); }
+  }
+  return { outline: out, arcMids: mids };
+}
 
 /** A plate from an outline of nodes; one undo step. The problem when the nodes make none. */
 export function createPlate(p: NewPlate): { id: number } | { problem: PlateProblem } {
   const holes = p.holes ?? [];
-  const problem = plateProblem(plateModel(), p.outline, holes);
+  const arcs = p.followArcs === false ? { outline: p.outline, arcMids: p.arcMids ?? [] } : withMemberArcs(p.outline, p.arcMids ?? []);
+  const problem = plateProblem(plateModel(), arcs.outline, holes, arcs.arcMids);
   if (problem) return { problem };
-  const surface: PlateSurface = { loops: [p.outline.length, ...holes.map((h) => h.length)], materialId: p.materialId, thickness: p.thickness, mesh: { ...(p.mesh ?? DEFAULT_PLATE_MESH) } };
+  p = { ...p, outline: arcs.outline };
+  const surface: PlateSurface = { loops: [p.outline.length, ...holes.map((h) => h.length)], materialId: p.materialId, thickness: p.thickness, mesh: { ...(p.mesh ?? DEFAULT_PLATE_MESH) }, ...(arcs.arcMids.length ? { arcMids: arcs.arcMids } : {}) };
   const temp = { id: 0, members: { nodes: [...p.outline, ...holes.flat()] }, data: { surface } };
   const geo = plateGeometry(plateModel(), temp)!;
   const physical: PhysicalData & { surface: PlateSurface } = { kind: plateKindOf(geo), provenance: 'declared', surface };
@@ -196,13 +260,63 @@ export function setPlateHoles(id: number, holes: number[][]): PlateProblem | nul
   const e = plateEntry(id);
   if (!e) return 'needNodes';
   const loops = plateLoops(e.group);
-  const problem = plateProblem(plateModel(), loops.outer, holes);
+  // The outline's curved sides stay; a hole is straight-sided when replaced this way.
+  const outerArcs = (e.surface.arcMids ?? []).filter((k) => k < loops.outer.length);
+  const problem = plateProblem(plateModel(), loops.outer, holes, outerArcs);
   if (problem) return problem;
   modelStore.batch(() => {
     modelStore.setGroupMembers(id, { ...e.group.members, nodes: [...loops.outer, ...holes.flat(), ...loops.owned] });
-    writeSurface(id, (s) => ({ ...s, loops: [loops.outer.length, ...holes.map((h) => h.length)] }));
+    writeSurface(id, (s) => ({ ...s, loops: [loops.outer.length, ...holes.map((h) => h.length)], ...(outerArcs.length ? { arcMids: outerArcs } : { arcMids: undefined }) }));
   });
   return null;
+}
+
+/**
+ * Make an outline side curved through a node, or straight again (`mid` null). `side` k is the
+ * side from the k-th corner of the outline (curved sides' points not counted) to the next.
+ */
+export function setPlateSideArc(id: number, side: number, mid: number | null): PlateProblem | null {
+  const e = plateEntry(id);
+  if (!e) return 'needNodes';
+  const loops = plateLoops(e.group);
+  const mids = new Set((e.surface.arcMids ?? []).filter((k) => k < loops.outer.length));
+  // Corners: the outline's nodes that are not arc points; the side from corner `side`.
+  const corners = loops.outer.map((_, k) => k).filter((k) => !mids.has(k));
+  const at = corners[side];
+  if (at === undefined) return 'needNodes';
+  const next = (at + 1) % loops.outer.length;
+  const outer = [...loops.outer];
+  let arcList = [...mids];
+  let corner = at;
+  if (mids.has(next)) {
+    outer.splice(next, 1);
+    arcList = arcList.filter((k) => k !== next).map((k) => (k > next ? k - 1 : k));
+    if (next < corner) corner--;
+  }
+  if (mid !== null) { const pos = corner + 1; outer.splice(pos, 0, mid); arcList = arcList.map((k) => (k >= pos ? k + 1 : k)); arcList.push(pos); }
+  const problem = plateProblem(plateModel(), outer, loops.holes, arcList);
+  if (problem) return problem;
+  modelStore.batch(() => {
+    modelStore.setGroupMembers(id, { ...e.group.members, nodes: [...outer, ...loops.holes.flat(), ...loops.owned] });
+    writeSurface(id, (s) => ({ ...s, loops: [outer.length, ...loops.holes.map((h) => h.length)], ...(arcList.length ? { arcMids: arcList.sort((x, y) => x - y) } : { arcMids: undefined }) }));
+  });
+  return null;
+}
+
+/** The outline's sides: each one's corners, and the node it passes through when curved. */
+export function plateSides(id: number): Array<{ from: number; to: number; mid: number | null }> {
+  const e = plateEntry(id);
+  if (!e) return [];
+  const { outer } = plateLoops(e.group);
+  const mids = new Set(e.surface.arcMids ?? []);
+  const out: Array<{ from: number; to: number; mid: number | null }> = [];
+  for (let k = 0; k < outer.length; k++) {
+    if (mids.has(k)) continue;
+    const n1 = (k + 1) % outer.length;
+    if (mids.has(n1)) out.push({ from: outer[k]!, to: outer[(n1 + 1) % outer.length]!, mid: outer[n1]! });
+    else out.push({ from: outer[k]!, to: outer[n1]!, mid: null });
+  }
+  return out;
 }
 
 /** An area load on the whole plate, kept as a definition so that it follows every mesh. */
@@ -304,7 +418,7 @@ export function planPlateMesh(id: number, specOverride?: Partial<PlateMeshSpec>)
   if (!e) return null;
   const spec = { ...e.surface.mesh, ...(specOverride ?? {}) };
   const base = { id, name: e.name, spec, localLoads: localLoadsOn(e), keptNodes: keptMeshNodes(e) };
-  const f = featuresOf(e);
+  const f = featuresOf(e, spec);
   if (!f) return { ...base, mesh: null, refused: 'invalid', cells: 0, quality: null, signature: '', input: null, mixed: false };
   const input = plateMeshInput(f.geo, spec, f.features);
   const signature = plateSignature(f.geo, spec, f.features);

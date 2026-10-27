@@ -37,7 +37,7 @@ import {
 import type { SolverInput, FullEnvelope, AnalysisResults } from '../engine/types';
 import type { SolverInput3D, AnalysisResults3D, FullEnvelope3D, Constraint3D, ConnectorElement } from '../engine/types-3d';
 /** Groups that are load definitions, written into model loads by case (`store/defined-loads.ts`). */
-const DEFINED_LOAD_KINDS = new Set<string>(['floorLoad']);
+const DEFINED_LOAD_KINDS = new Set<string>(['floorLoad', 'curveLoad']);
 
 export type { ConnectorElement };
 import type { ModelSnapshot, SnapshotKind } from './history.svelte';

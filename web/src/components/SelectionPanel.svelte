@@ -339,6 +339,14 @@
       </button>
     {/each}
   </div>
+  {#if !basic && uiStore.selectsKind('elements')}
+    <!-- What a click on a curved member, or a member a plate's mesh cut, picks. -->
+    <div class="sel-scope" role="group" aria-label={t('pieces.pickScope')} data-testid="member-pick-scope">
+      <span class="sel-scope-label">{t('pieces.pickScope')}</span>
+      <button class:on={uiStore.memberPickScope === 'piece'} aria-pressed={uiStore.memberPickScope === 'piece'} onclick={() => (uiStore.memberPickScope = 'piece')} data-testid="member-pick-piece">{t('pieces.pickPiece')}</button>
+      <button class:on={uiStore.memberPickScope === 'segment'} aria-pressed={uiStore.memberPickScope === 'segment'} onclick={() => (uiStore.memberPickScope = 'segment')} data-testid="member-pick-segment">{t('pieces.pickSegment')}</button>
+    </div>
+  {/if}
   {#if !basic && uiStore.selectsKind('shells')}
     <!-- What a click on a plate's mesh picks; said here so that hiding the mesh never changes it unseen. -->
     <div class="sel-scope" role="group" aria-label={t('plates.pickScope')} data-testid="shell-pick-scope">

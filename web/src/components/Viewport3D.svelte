@@ -62,6 +62,7 @@
   import { fatLineResolution } from '../lib/three/create-element-mesh';
   import { resolveHitUserData, shellSelectionKey } from '../lib/viewport3d/picking';
   import { plateOfShell, platesInMarquee } from '../lib/store/physical-plates';
+  import { selectPiece } from '../lib/store/curved-members';
   import { currentLoadDrawView, isLoadDrawn } from '../lib/viewport3d/load-drawn';
   import { evaluateDiagramAt, formatDiagramValue3D, type Diagram3DKind } from '../lib/engine/diagrams-3d';
   import { certificateStore, formatBound } from '../lib/store/certificate.svelte';
@@ -3370,7 +3371,7 @@
       let hit = false;
       if (pick?.kind === 'node') { uiStore.selectNode(pick.id, addToSel); hit = true; }
       else if (pick?.kind === 'element') {
-        uiStore.selectElement(pick.id, addToSel);
+        selectPiece(pick.id, addToSel);
         if (dsmStepsStore.isOpen) dsmStepsStore.selectElement(pick.id);
         hit = true;
       } else if (pick?.kind === 'load') { uiStore.selectLoad(pick.id, addToSel); hit = true; }
@@ -3425,7 +3426,8 @@
      */
     const pick = pickUnderPointer(e, { nodes: false, elements: true });
     if (pick) {
-      uiStore.selectElement(pick.id, addToSel);
+      // In PRO, the whole piece the member belongs to unless one segment is asked for.
+      selectPiece(pick.id, addToSel);
       // Sync with DSM Matrix Explorer if wizard is open
       if (dsmStepsStore.isOpen) dsmStepsStore.selectElement(pick.id);
       return;
