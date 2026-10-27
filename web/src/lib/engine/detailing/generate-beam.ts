@@ -1329,7 +1329,7 @@ export function generateBeamBars(input: BeamGenerationInput): GeneratedBeam {
     }
   }
 
-  const topBarsPlacedI = new Map<string, { bar: BarPath; barIndex: number; plan: SupportEndPlan; actualI: number }>();
+  const topBarsPlacedI = new Map<string, { bar: BarPath; barIndex: number; plan: EndPlan; actualI: number }>();
   for (const t of fromLine ? [] : tops) {
     if (t.group.count <= 0) continue;
     /**
@@ -1433,8 +1433,12 @@ export function generateBeamBars(input: BeamGenerationInput): GeneratedBeam {
             endHook: plan.hook,
             ownerElementIds: [input.elementId], edition: input.edition,
           });
-          bars[existingI.barIndex] = plan.anchorage || existingI.plan.anchorage
-            ? { ...fused, anchorage: { start: existingI.plan.anchorage, end: plan.anchorage } }
+          const fusedAnchorage = {
+            ...(existingI.plan.anchorage ? { start: existingI.plan.anchorage } : {}),
+            ...(plan.anchorage ? { end: plan.anchorage } : {}),
+          };
+          bars[existingI.barIndex] = Object.keys(fusedAnchorage).length
+            ? { ...fused, anchorage: fusedAnchorage }
             : fused;
           trace.push(`Armadura superior en ranura (${o.across.toFixed(3)} m): las barras de ambos apoyos se superponen en el vano; se unifican como barra corrida de apoyo a apoyo.`);
           continue;

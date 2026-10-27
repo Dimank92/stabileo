@@ -17,7 +17,6 @@ import {
 import {
   generateColumnStack,
   type ColumnStackInput,
-  type ColumnLift,
 } from '../generate-column';
 import {
   detectCollisions,
@@ -126,7 +125,6 @@ describe('detailing property invariants', () => {
                 diameterMm: dia,
                 fc: fcM,
                 fy,
-                maxAggregateSizeMm: maxAgg,
                 favourableSpacing: true,
                 edition,
               });
@@ -203,7 +201,7 @@ describe('detailing property invariants', () => {
               maxAggregateSizeMm: maxAgg,
               memberKindOf: () => 'beam',
               layerOf: (barId) => generated.barLayers[barId] ?? 0,
-              isLapPair: () => false,
+              isLapPair: () => undefined,
             }, s, ta, tb);
             const collisionResult = detectCollisions(generated.bars, { classifyFor: classifyForBeam });
             const overlaps = collisionResult.conflicts.filter((c) => c.severity === 'overlap');
@@ -266,7 +264,7 @@ describe('detailing property invariants', () => {
               diameterMm: barDia,
               fc: fcM,
               fy,
-              maxAggregateSizeMm: maxAgg,
+              favourableSpacing: true,
               edition,
             }).ldM;
             const lapClassA = Math.max(ld, MIN_LAP_MM / 1000);
@@ -299,7 +297,7 @@ describe('detailing property invariants', () => {
                   diameterMm: d,
                   fc: fcM,
                   fy,
-                  maxAggregateSizeMm: maxAgg,
+                  favourableSpacing: true,
                   edition,
                 }).ldM,
                 MIN_LAP_MM / 1000,
@@ -321,7 +319,7 @@ describe('detailing property invariants', () => {
                 maxAggregateSizeMm: maxAgg,
                 memberKindOf: () => 'column',
                 layerOf: () => 0,
-                isLapPair: () => false,
+                isLapPair: () => undefined,
               }, s, ta, tb);
               const colCollision = detectCollisions(stack.bars, { classifyFor: classifyForColumn });
               const overlaps = colCollision.conflicts.filter((c) => c.severity === 'overlap');
