@@ -13568,5 +13568,17 @@ const pt: Translations = {
   "plates.meshKind.squares": "{n} quadrados de {a} {unit}",
   "plates.meshKind.band": "e {n} de transição ({tri} triângulos)",
   "plates.editedWhole": "Aplicado à placa inteira: {names}. Um elemento da sua malha é editado com a placa.",
+  "osnap.endpoint": "Extremidade",
+  "osnap.midpoint": "Ponto médio",
+  "osnap.center": "Centro",
+  "osnap.quadrant": "Quadrante",
+  "osnap.intersection": "Interseção",
+  "osnap.perpendicular": "Perpendicular",
+  "osnap.nearest": "Próximo",
+  "osnap.on": "Captura ativada (F3)",
+  "osnap.off": "Captura desativada (F3)",
+  "osnap.title": "Captura",
+  "osnap.master": "Captura ativa (F3)",
+  "osnap.hint": "Sobre os desenhos de fundo do nível. Perpendicular é medida a partir do último ponto: o primeiro nó da barra ou o nó escolhido. Próximo só atua se não houver outro ponto ao alcance. Com barras, um clique num ponto capturado sem nó cria um.",
 };
 export default pt;

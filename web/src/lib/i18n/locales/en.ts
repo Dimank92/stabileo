@@ -13928,5 +13928,17 @@ const en: Record<string, string> = {
   "plates.meshKind.squares": "{n} squares of {a} {unit}",
   "plates.meshKind.band": "and {n} in the transition ({tri} triangles)",
   "plates.editedWhole": "Applied to the whole plate: {names}. An element of its mesh is edited with the plate.",
+  "osnap.endpoint": "Endpoint",
+  "osnap.midpoint": "Midpoint",
+  "osnap.center": "Center",
+  "osnap.quadrant": "Quadrant",
+  "osnap.intersection": "Intersection",
+  "osnap.perpendicular": "Perpendicular",
+  "osnap.nearest": "Nearest",
+  "osnap.on": "Snaps on (F3)",
+  "osnap.off": "Snaps off (F3)",
+  "osnap.title": "Snaps",
+  "osnap.master": "Snaps on (F3)",
+  "osnap.hint": "On the level's background drawings. Perpendicular is taken from the last point: the member's first node or the node selected. Nearest only acts when no other point is within reach. Drawing members, a click on a snap point with no node there makes one.",
 };
 export default en;

@@ -4,7 +4,7 @@
  * so the plan is there when the project is opened again.
  *
  * A drawing is kept as plain segments in metres, in its own coordinates, with a shift and a turn
- * that lay it on the model; the points a click can capture are its segments' ends.
+ * that lay it on the model; what a click can capture on it is `osnap.ts`'s.
  */
 import type { CadDocument, CadEntity, CadPt, CadUnit } from '../cad/types';
 import { CAD_UNIT_SCALE } from '../cad/types';
@@ -164,49 +164,5 @@ export function underlayExtent(segments: number[]): { minX: number; minY: number
   return { minX, minY, maxX, maxY };
 }
 
-// ─── Capturing a point ────────────────────────────────────────
+// Capturing a point on a drawing: `model/osnap.ts`, with the snaps the person chose.
 
-interface PointIndex { cell: number; cells: Map<string, Array<[number, number]>> }
-const indexCache = new WeakMap<Underlay, PointIndex>();
-
-/** The drawing's segment ends, laid, hashed into cells of a size fit to the drawing. */
-function indexOf(u: Underlay): PointIndex {
-  const hit = indexCache.get(u);
-  if (hit) return hit;
-  const ext = underlayExtent(u.segments);
-  const span = ext ? Math.max(ext.maxX - ext.minX, ext.maxY - ext.minY, 1) : 1;
-  const cell = span / 256;
-  const cells = new Map<string, Array<[number, number]>>();
-  const put = (p: [number, number]) => { const key = `${Math.floor(p[0] / cell)},${Math.floor(p[1] / cell)}`; (cells.get(key) ?? cells.set(key, []).get(key)!).push(p); };
-  // Each segment's two ends and its middle, on the layers that snap.
-  for (let s = 0; s * 4 + 3 < u.segments.length; s++) {
-    if (!segmentSnaps(u, s)) continue;
-    const x1 = u.segments[s * 4]!, y1 = u.segments[s * 4 + 1]!, x2 = u.segments[s * 4 + 2]!, y2 = u.segments[s * 4 + 3]!;
-    put(laidPoint(u, x1, y1)); put(laidPoint(u, x2, y2)); put(laidPoint(u, (x1 + x2) / 2, (y1 + y2) / 2));
-  }
-  const idx = { cell, cells };
-  indexCache.set(u, idx);
-  return idx;
-}
-
-/**
- * The end or middle of a visible drawing's segment nearest to (x, y) within `tol`, on the drawings
- * laid at elevation `z` (any elevation when `z` is null). Hidden layers and layers taken out of
- * the snaps are not captured, so a point never comes from something the view does not show.
- */
-export function snapToUnderlays(list: readonly Underlay[], x: number, y: number, tol: number, z: number | null): { x: number; y: number } | null {
-  let best: { x: number; y: number; d: number } | null = null;
-  for (const u of list) {
-    if (!u.visible || (z !== null && Math.abs(u.z - z) > 1e-6)) continue;
-    const { cell, cells } = indexOf(u);
-    const r = Math.ceil(tol / cell);
-    const cx = Math.floor(x / cell), cy = Math.floor(y / cell);
-    for (let i = cx - r; i <= cx + r; i++) for (let j = cy - r; j <= cy + r; j++) {
-      for (const p of cells.get(`${i},${j}`) ?? []) {
-        const d = Math.hypot(p[0] - x, p[1] - y);
-        if (d <= tol && (!best || d < best.d)) best = { x: p[0], y: p[1], d };
-      }
-    }
-  }
-  return best ? { x: best.x, y: best.y } : null;
-}

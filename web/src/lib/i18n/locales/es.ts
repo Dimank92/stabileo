@@ -13917,5 +13917,17 @@ const es: Record<string, string> = {
   "plates.meshKind.squares": "{n} cuadrados de {a} {unit}",
   "plates.meshKind.band": "y {n} de transición ({tri} triángulos)",
   "plates.editedWhole": "Se aplicó a toda la placa: {names}. Un elemento de su malla se edita con la placa.",
+  "osnap.endpoint": "Extremo",
+  "osnap.midpoint": "Punto medio",
+  "osnap.center": "Centro",
+  "osnap.quadrant": "Cuadrante",
+  "osnap.intersection": "Intersección",
+  "osnap.perpendicular": "Perpendicular",
+  "osnap.nearest": "Cercano",
+  "osnap.on": "Captura activada (F3)",
+  "osnap.off": "Captura desactivada (F3)",
+  "osnap.title": "Captura",
+  "osnap.master": "Captura activa (F3)",
+  "osnap.hint": "Sobre las plantillas de fondo del nivel. Perpendicular se mide desde el último punto: el primer nodo de la barra o el nodo elegido. Cercano sólo actúa si no hay otro punto a mano. Con barras, un clic en un punto capturado sin nodo lo crea.",
 };
 export default es;

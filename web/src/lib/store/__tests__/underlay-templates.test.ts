@@ -15,12 +15,15 @@ import { historyStore, modelStore, uiStore } from '..';
 import { parseCadDxf } from '../../cad/parse';
 import { buildDxf, dxfArc, dxfCircle, dxfLine, dxfText } from '../../cad/__tests__/dxf-fixture';
 import { drawingRegions } from '../../model/underlay-regions';
-import { snapToUnderlays } from '../../model/underlay';
+import { osnapUnderlays } from '../../model/osnap';
 import { planConversion } from '../../model/underlay-convert';
 import { addUnderlays, alignByPoints, editUnderlay, underlayFromDrawing } from '../underlays';
 import { applyConversion } from '../underlay-convert';
 import { serializeProject, deserializeProject } from '../file';
 import { arcs } from '../curved-members';
+
+/** The snaps a template offered before they could be chosen: segment ends and middles. */
+const ENDS = new Set(['endpoint', 'midpoint'] as const);
 
 function plan(x0: number, extra: string[] = []): string[] {
   const L = (a: number, b: number, c: number, d: number) => dxfLine('VIGAS', x0 + a, b, x0 + c, d);
@@ -62,20 +65,20 @@ describe('templates from a DXF with two plans', () => {
     addUnderlays([ua, ub]);
     // The column at A's lower-left (radius 15 cm) is at -0.15 in the drawing; laid by its region's
     // corner both plans' frames land at (0.15, 0.15)… on their own levels only.
-    expect(snapToUnderlays(modelStore.underlays, 0.15, 0.15, 0.05, 3)).toEqual({ x: expect.closeTo(0.15, 9), y: expect.closeTo(0.15, 9) });
-    expect(snapToUnderlays(modelStore.underlays, 6.15, 5.15, 0.05, 6)).toEqual({ x: expect.closeTo(6.15, 9), y: expect.closeTo(5.15, 9) });
+    expect(osnapUnderlays(modelStore.underlays, 0.15, 0.15, 0.05, 3, ENDS)).toMatchObject({ x: expect.closeTo(0.15, 9), y: expect.closeTo(0.15, 9) });
+    expect(osnapUnderlays(modelStore.underlays, 6.15, 5.15, 0.05, 6, ENDS)).toMatchObject({ x: expect.closeTo(6.15, 9), y: expect.closeTo(5.15, 9) });
     expect(ua.shapes!.filter((s) => s.k === 'l')).toHaveLength(4);
     expect(ub.leftOut).toBeUndefined();
     expect(ub.shapes!.filter((x) => x.k === 't').map((x) => (x as { text: string }).text)).toEqual(['ESTAR']);
 
     // A hidden layer, or one out of the snaps, is not captured.
     editUnderlay(ua.id, { hiddenLayers: ['VIGAS'] });
-    expect(snapToUnderlays(modelStore.underlays, 3.15, 0.15, 0.05, 3)).toBeNull();
+    expect(osnapUnderlays(modelStore.underlays, 3.15, 0.15, 0.05, 3, ENDS)).toBeNull();
     editUnderlay(ua.id, { hiddenLayers: [], noSnapLayers: ['VIGAS'] });
-    expect(snapToUnderlays(modelStore.underlays, 3.15, 0.15, 0.05, 3)).toBeNull();
+    expect(osnapUnderlays(modelStore.underlays, 3.15, 0.15, 0.05, 3, ENDS)).toBeNull();
     editUnderlay(ua.id, { noSnapLayers: [] });
     // The middle of a member line is a snap point too.
-    expect(snapToUnderlays(modelStore.underlays, 3.15, 0.15, 0.05, 3)).not.toBeNull();
+    expect(osnapUnderlays(modelStore.underlays, 3.15, 0.15, 0.05, 3, ENDS)).not.toBeNull();
 
     // A locked template does not move.
     editUnderlay(ua.id, { locked: true });
