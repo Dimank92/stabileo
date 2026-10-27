@@ -1350,7 +1350,7 @@ export function syncLocalAxes(ctx: SceneSyncContext): void {
   const shellMode = uiStore.shellAxesMode3D;
   const shellShowAll = shellMode === 'always';
   const selShells = uiStore.selectedShells;
-  const drawShells = shellMode !== 'never' && (shellShowAll || selShells.size > 0);
+  const drawShells = shellMode !== 'never' && (shellShowAll || selShells.size > 0 || uiStore.selectedPlates.size > 0);
   const shellLabel = selShells.size > 0 && selShells.size <= LABEL_CAP;
   if (drawShells) {
     const addShellTriad = (key: string, nodeIds: number[]) => {
@@ -1365,12 +1365,38 @@ export function syncLocalAxes(ctx: SceneSyncContext): void {
       const origin = new THREE.Vector3(cx / verts.length, cy / verts.length, cz / verts.length);
       group.add(createLocalAxesTriad(origin, axes, { withLabels: isSel && shellLabel }));
     };
-    for (const [id, plate] of visiblePlates()) addShellTriad(`p${id}`, [...plate.nodes]);
-    for (const [id, quad] of visibleQuads()) addShellTriad(`q${id}`, [...quad.nodes]);
+    /*
+     * A physical plate selected whole shows ONE triad: the plate's own axes (u along its outline's
+     * first side, n its normal, v = n × u, as its results are read), at its centroid. Its mesh's
+     * elements, all selected with it, would otherwise each draw theirs. 'Always' still draws every
+     * element's: that setting asks for them.
+     */
+    const wholePlates = shellShowAll ? [] : physicalPlates().filter((pl) => uiStore.selectedPlates.has(pl.id));
+    const ownedByWhole = new Set<string>();
+    for (const pl of wholePlates) {
+      for (const q of pl.group.members.quads ?? []) ownedByWhole.add(`q${q}`);
+      for (const q of pl.group.members.plates ?? []) ownedByWhole.add(`p${q}`);
+      const geo = plateGeometry(modelStore, pl.group);
+      if (!geo) continue;
+      const f = geo.frame;
+      const pts = geo.outer;
+      let per = 0, cx = 0, cy = 0, cz = 0;
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i]!, b = pts[(i + 1) % pts.length]!;
+        per += Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+        cx += a[0]; cy += a[1]; cz += a[2];
+      }
+      const origin = new THREE.Vector3(cx / pts.length, cy / pts.length, cz / pts.length);
+      group.add(createLocalAxesTriad(origin, { ex: f.u, ey: f.v, ez: f.n, L: per / pts.length } as never, { withLabels: wholePlates.length <= LABEL_CAP }));
+    }
+    for (const [id, plate] of visiblePlates()) if (!ownedByWhole.has(`p${id}`)) addShellTriad(`p${id}`, [...plate.nodes]);
+    for (const [id, quad] of visibleQuads()) if (!ownedByWhole.has(`q${id}`)) addShellTriad(`q${id}`, [...quad.nodes]);
   }
 
   ctx.localAxesGroup = group;
   ctx.localAxesParent.add(group);
+  // How many triads are drawn, for the e2e hooks (as `__loadFootprints` is for the load arrows).
+  (window as unknown as { __localAxesTriads?: number }).__localAxesTriads = group.children.length;
 }
 
 /** Shell local frame: ex along node0→node1 edge, ez the face normal, ey = ez×ex.

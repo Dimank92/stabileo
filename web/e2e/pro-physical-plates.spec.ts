@@ -74,6 +74,8 @@ test('@smoke a plate drawn on an outline has no mesh, meshes from its panel, and
   await page.mouse.click(q.x, q.y);
   await expect.poll(async () => (await sel(page)).plates).toEqual([p!.id]);
   expect((await sel(page)).shells).toHaveLength(n1);
+  // Selected whole, the plate shows one local-axis triad, its own, not one per element.
+  await expect.poll(() => page.evaluate(() => window.__stabileo.localAxesTriads())).toBe(1);
 
   await page.getByTestId('pr-cmd-shells').click();
   await page.getByTestId('plates-show-mesh').check();
@@ -81,6 +83,8 @@ test('@smoke a plate drawn on an outline has no mesh, meshes from its panel, and
   await expect.poll(async () => (await sel(page)).scope).toBe('element');
   await page.mouse.click(q.x, q.y);
   await expect.poll(async () => (await sel(page)).shells.length).toBe(1);
+  // One element picked: its own triad.
+  await expect.poll(() => page.evaluate(() => window.__stabileo.localAxesTriads())).toBe(1);
   expect((await sel(page)).plates).toEqual([]);
   // And back to the plate it belongs to.
   await page.getByTestId('shell-select-owner').click();
