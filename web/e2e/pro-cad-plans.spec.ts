@@ -72,3 +72,28 @@ test('@smoke a single plan says it is repeated on every floor, and the plans can
   await expect(stories.getByTestId('cad-story-plan')).toHaveCount(3);
   await expect(stories.getByTestId('cad-stories-mode')).toContainText('3');
 });
+
+test('@smoke the wizard leaves the model alone until Apply, and Apply is one undo step', async ({ pro: page }) => {
+  const census = () => page.evaluate(() => window.__stabileo.modelCensus());
+  const empty = await census();
+  await openWizard(page);
+  await page.getByTestId('cad-plans').locator('summary').click();
+  await page.getByTestId('cad-detect-plans').click();
+  await page.getByTestId('cad-next').click();
+  await page.getByTestId('cad-next').click();
+  await page.getByTestId('cad-generate').click();
+  // Cancel at the draft: nothing came in.
+  await page.getByRole('button', { name: /^(Cancel|Cancelar)$/ }).click();
+  expect(await census()).toEqual(empty);
+
+  await openWizard(page);
+  await page.getByTestId('cad-plans').locator('summary').click();
+  await page.getByTestId('cad-detect-plans').click();
+  await page.getByTestId('cad-next').click();
+  await page.getByTestId('cad-next').click();
+  await page.getByTestId('cad-generate').click();
+  await page.getByTestId('cad-apply').click();
+  expect((await census()).nodes).toBeGreaterThan(0);
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect.poll(census).toEqual(empty);
+});
