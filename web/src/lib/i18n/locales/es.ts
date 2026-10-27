@@ -14114,5 +14114,6 @@ const es: Record<string, string> = {
   "cad.stories.gaps": "Pisos sin planta: {floors}. Asignales una; si no, se omiten al generar y se pide confirmación.",
   "cad.plans.floorsHint": "Pisos de esta planta, por ejemplo 2-9 o 1, 3-4. Cada piso tiene una sola planta: asignarlo acá se lo saca a la otra.",
   "cad.assume.planRef": "{label}: el punto ({x}; {y}) {unit} del dibujo va al origen del modelo. {how}.",
+  "proRibbon.diagnosticsDesc": "Los problemas del modelo y del cálculo, por gravedad: lo que impide calcular, las advertencias y los avisos, incluidas las placas sin malla o con la malla desactualizada. Cada punto nombra los nodos, barras o placas afectados.",
 };
 export default es;

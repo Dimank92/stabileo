@@ -14125,5 +14125,6 @@ const en: Record<string, string> = {
   "cad.stories.gaps": "Floors with no plan: {floors}. Give them one; otherwise they are left out when generating, after a confirmation.",
   "cad.plans.floorsHint": "Floors of this plan, for example 2-9 or 1, 3-4. Each floor has one plan: giving it here takes it from the other.",
   "cad.assume.planRef": "{label}: the drawing point ({x}; {y}) {unit} goes to the model's origin. {how}.",
+  "proRibbon.diagnosticsDesc": "The model's and the analysis's problems, by severity: what keeps it from solving, warnings and notes, plates with no mesh or an out-of-date one included. Each item names the nodes, members or plates involved.",
 };
 export default en;

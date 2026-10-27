@@ -13765,5 +13765,6 @@ const pt: Translations = {
   "cad.stories.gaps": "Pavimentos sem planta: {floors}. Atribua uma; caso contrário, são omitidos ao gerar, após uma confirmação.",
   "cad.plans.floorsHint": "Pavimentos desta planta, por exemplo 2-9 ou 1, 3-4. Cada pavimento tem uma única planta: atribuí-lo aqui o tira da outra.",
   "cad.assume.planRef": "{label}: o ponto ({x}; {y}) {unit} do desenho vai para a origem do modelo. {how}.",
+  "proRibbon.diagnosticsDesc": "Os problemas do modelo e do cálculo, por gravidade: o que impede o cálculo, os alertas e os avisos, incluídas as placas sem malha ou com a malha desatualizada. Cada item indica os nós, barras ou placas envolvidos.",
 };
 export default pt;
