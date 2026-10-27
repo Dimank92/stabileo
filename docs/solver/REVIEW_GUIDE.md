@@ -73,7 +73,7 @@ whether it is acceptable as documented, needs a warning or refusal, or must be f
 | [special-elements.md](special-elements.md) | SP-1 to SP-7, SP-9 | SP-10, 11, 12, 14, 15, 17, 18 | SP-8, 13, 16 |
 | [assembly-constraints.md](assembly-constraints.md) | AC-1, 2, 4, 6, 11, 14 | AC-3, 5, 7, 10, 12, 13, 15, 16 | AC-8, 9 |
 | [mass-geometric-dynamics.md](mass-geometric-dynamics.md) | MD-11 (doc) | MD-5, 6, 7, 8, 10, 12 | MD-1 to 4, 9, 13 |
-| [nonlinear.md](nonlinear.md) | NL-1, NL-7 | NL-3, 4, 5, 6, 8, 9, 10, 11, 13, 17 | NL-2, 12, 14, 15, 16 |
+| [nonlinear.md](nonlinear.md) | NL-1, NL-3, NL-6, NL-7 | NL-4, 5, 8, 9, 10, 11, 13, 17 | NL-2, 12, 14, 15, 16 |
 
 ### Open items to look at first
 

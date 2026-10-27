@@ -1800,40 +1800,26 @@ fn assemble_frame_corotational_3d(
         }
     }
 
-    // Rigid-body rotation vector of the chord frame (exact, see `rotation_vector`).
-    let [beta_x, beta_y, beta_z] = rotation_vector(&r_rigid);
+// Chord frame rigid-body rotation (NL-3)
 
     // Project global rotations to corotated frame and subtract rigid body rotation
     let theta_i_global = [u_elem[3], u_elem[4], u_elem[5]];
     let theta_j_global = [u_elem[9], u_elem[10], u_elem[11]];
 
-    // R_n^T * θ_global: project to corotated frame
-    // Using r_n[axis][component]: (R_n^T * v)[m] = sum_k r_n[m][k] * v[k]
-    let project = |v: &[f64; 3]| -> [f64; 3] {
-        [
-            ex_n[0] * v[0] + ex_n[1] * v[1] + ex_n[2] * v[2],
-            ey_n[0] * v[0] + ey_n[1] * v[1] + ey_n[2] * v[2],
-            ez_n[0] * v[0] + ez_n[1] * v[1] + ez_n[2] * v[2],
-        ]
-    };
 
-    let theta_i_local = project(&theta_i_global);
-    let theta_j_local = project(&theta_j_global);
-    // β is the axial vector of R_n·R_0ᵀ, a rotation in GLOBAL axes: it has to
-    // be taken to the corotated frame before it is subtracted from the
-    // (projected) nodal rotations. Subtracted as it was, it was right only
-    // where the member's local axes happen to coincide with the global ones
-    // (a member along +X); a column (local y = −Y) converged to itself folded
-    // in half, u_z = −2L, and reported convergence.
-    let [beta_x, beta_y, beta_z] = project(&[beta_x, beta_y, beta_z]);
 
-    // Natural deformations (rigid body removed)
+    // Multiplicative relative rotation update (NL-3, Battini-Pacoste / Crisfield):
+    // eliminates O(θ·θ̄) vector subtraction error for large non-coaxial 3D rotations.
+
+    // Natural deformations (rigid body removed): multiplicative relative rotation update (NL-3)
     let d_axial = elong;
+    let theta_i_nat = relative_deformational_rotation(theta_i_global, &ex_0, &ey_0, &ez_0, &ex_n, &ey_n, &ez_n);
+    let theta_j_nat = relative_deformational_rotation(theta_j_global, &ex_0, &ey_0, &ez_0, &ex_n, &ey_n, &ez_n);
     let d_nat = [
         0.0, 0.0, 0.0,                                                          // u_i, v_i, w_i
-        theta_i_local[0] - beta_x, theta_i_local[1] - beta_y, theta_i_local[2] - beta_z, // θx_i, θy_i, θz_i
+        theta_i_nat[0], theta_i_nat[1], theta_i_nat[2],                         // θx_i, θy_i, θz_i
         d_axial, 0.0, 0.0,                                                      // u_j, v_j, w_j
-        theta_j_local[0] - beta_x, theta_j_local[1] - beta_y, theta_j_local[2] - beta_z, // θx_j, θy_j, θz_j
+        theta_j_nat[0], theta_j_nat[1], theta_j_nat[2],                         // θx_j, θy_j, θz_j
     ];
 
     // Local stiffness (using original length)
@@ -2007,6 +1993,56 @@ fn rotation_vector(r: &[[f64; 3]; 3]) -> [f64; 3] {
     }
     let f = angle / sin;
     [skew[0] * f, skew[1] * f, skew[2] * f]
+}
+
+/// Forward map from rotation vector to 3x3 rotation matrix (Rodrigues formula).
+pub(crate) fn rot_matrix_3d(theta: [f64; 3]) -> [[f64; 3]; 3] {
+    let angle = (theta[0] * theta[0] + theta[1] * theta[1] + theta[2] * theta[2]).sqrt();
+    if angle < 1e-12 {
+        return [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+    }
+    let k = [theta[0] / angle, theta[1] / angle, theta[2] / angle];
+    let (s, c) = (angle.sin(), angle.cos());
+    let skew = [[0.0, -k[2], k[1]], [k[2], 0.0, -k[0]], [-k[1], k[0], 0.0]];
+    let mut r = [[0.0; 3]; 3];
+    for i in 0..3 {
+        for j in 0..3 {
+            r[i][j] = (if i == j { c } else { 0.0 }) + s * skew[i][j] + (1.0 - c) * k[i] * k[j];
+        }
+    }
+    r
+}
+
+/// Compute exact relative deformational rotation vector of a node with respect to the
+/// corotated chord frame (NL-3, Battini-Pacoste / Crisfield).
+///
+/// Eliminates the O(θ·θ̄) vector-subtraction error of additive total rotation vectors
+/// for large non-coaxial 3D rotations, while preserving exact vanishing under rigid-body
+/// motions and reducing to R_n^T θ - β to first order for small rotations.
+pub(crate) fn relative_deformational_rotation(
+    theta_global: [f64; 3],
+    ex_0: &[f64; 3], ey_0: &[f64; 3], ez_0: &[f64; 3],
+    ex_n: &[f64; 3], ey_n: &[f64; 3], ez_n: &[f64; 3],
+) -> [f64; 3] {
+    let r_node = rot_matrix_3d(theta_global);
+    let e_0 = [ex_0, ey_0, ez_0];
+    let e_n = [ex_n, ey_n, ez_n];
+
+    let mut r_def = [[0.0; 3]; 3];
+    for m in 0..3 {
+        for k in 0..3 {
+            let mut dot = 0.0;
+            for i in 0..3 {
+                let mut tk_i = 0.0;
+                for j in 0..3 {
+                    tk_i += r_node[i][j] * e_0[k][j];
+                }
+                dot += e_n[m][i] * tk_i;
+            }
+            r_def[m][k] = dot;
+        }
+    }
+    rotation_vector(&r_def)
 }
 
 /// Add spring and connector stiffness and internal forces (3D); `scatter`
@@ -2352,29 +2388,22 @@ fn elastic_corotational_forces_3d(
                 }
             }
         }
-        let [beta_x, beta_y, beta_z] = rotation_vector(&r_rigid);
+// Chord frame rigid-body rotation (NL-3)
 
-        let project = |v: &[f64; 3]| -> [f64; 3] {
-            [
-                ex_n[0] * v[0] + ex_n[1] * v[1] + ex_n[2] * v[2],
-                ey_n[0] * v[0] + ey_n[1] * v[1] + ey_n[2] * v[2],
-                ez_n[0] * v[0] + ez_n[1] * v[1] + ez_n[2] * v[2],
-            ]
-        };
+
 
         let theta_i = [u_elem_12[3], u_elem_12[4], u_elem_12[5]];
         let theta_j = [u_elem_12[9], u_elem_12[10], u_elem_12[11]];
-        let ti = project(&theta_i);
-        let tj = project(&theta_j);
-        // β to the corotated frame, as in `assemble_frame_corotational_3d`.
-        let [beta_x, beta_y, beta_z] = project(&[beta_x, beta_y, beta_z]);
+// Multiplicative relative rotation update (NL-3)
 
         let d_axial = elong;
+        let ti_nat = relative_deformational_rotation(theta_i, &ex_0, &ey_0, &ez_0, &ex_n, &ey_n, &ez_n);
+        let tj_nat = relative_deformational_rotation(theta_j, &ex_0, &ey_0, &ez_0, &ex_n, &ey_n, &ez_n);
         let d_nat = [
             0.0, 0.0, 0.0,
-            ti[0] - beta_x, ti[1] - beta_y, ti[2] - beta_z,
+            ti_nat[0], ti_nat[1], ti_nat[2],
             d_axial, 0.0, 0.0,
-            tj[0] - beta_x, tj[1] - beta_y, tj[2] - beta_z,
+            tj_nat[0], tj_nat[1], tj_nat[2],
         ];
 
         let l_calc = l0;

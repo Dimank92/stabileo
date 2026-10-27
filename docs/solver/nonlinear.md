@@ -238,13 +238,16 @@ nodal "moment" on these DOFs is a spatial moment only to first order in the rota
 4. **Natural deformations.**
 
 $$
-d_n = [0,0,0,\ R_n^{\mathsf T}\theta_i - \beta_\ell,\ \bar u,0,0,\ R_n^{\mathsf T}\theta_j - \beta_\ell],\qquad \bar u = l - L_0 .
+d_n = [0,0,0,\ \theta_{\text{def},i},\ \bar u,0,0,\ \theta_{\text{def},j}],\qquad \bar u = l - L_0 .
 $$
 
-The deformational rotations are formed by **vector subtraction** of rotation vectors, not by
-$\log(R_n^{\mathsf T}R(\theta_i)R_0)$. This is exact for a rigid motion: then
-$\theta_i = \theta_j = \beta$ and $R_n = R(\beta)R_0$. It is also exact for coaxial rotations.
-Otherwise the error is $O(\lvert\theta\rvert\,\lvert\bar\theta\rvert)$ (NL-3).
+The deformational rotations are extracted via exact multiplicative orientation composition
+(`relative_deformational_rotation`): the current nodal orientation triad is
+$E_\text{node} = R(\theta_\text{node}) R_0$, the relative rotation in the co-rotated frame is
+$R_\text{def} = R_n^{\mathsf T} E_\text{node}$, and the natural deformation vector is
+$\theta_\text{def} = \log(R_\text{def})^\vee$ via the exact logarithmic map (`rotation_vector`).
+This eliminates the $O(\lvert\theta\rvert\,\lvert\bar\theta\rvert)$ error of additive vector
+subtraction for large non-coaxial 3D rotations (NL-3, Crisfield vol. 2 §16, Battini–Pacoste 2002).
 
 ### 4.3 Forces and tangent
 
@@ -494,7 +497,7 @@ Neither is called by any solver. They are library utilities, tested only in
 |---|---|---|
 | P-Delta | moderate sway, $P < P_\text{cr}$, small rotations (one cubic per member: mesh long columns) | large rotations, post-buckling |
 | Co-rotational 2D | arbitrary rigid rotation, small strain; Euler–Bernoulli or Timoshenko local element | dead (non-follower) loads only; member-load reporting under large rotation (NL-14) |
-| Co-rotational 3D | rigid rotations of any size; planar or moderately 3D deformation | large non-coaxial rotations with large deformation (NL-3); warping; follower moments |
+| Co-rotational 3D | rigid rotations of any size; large 3D deformations and non-coaxial rotations (NL-3) | warping; follower moments |
 | Arc-length | limit points of 2D co-rotational models | snap-back with the units-mixed constraint when $\lVert F\rVert$ dominates (NL-12) |
 | Material nonlinear | bracketing a collapse load (existing validation tests) | displacements, member forces or anything past first yield (NL-4, NL-5) |
 | Plastic event-to-event | first-order collapse load (lower bound), bending-dominated frames | N–M interaction; 3D associated flow |
@@ -573,17 +576,20 @@ Neither is called by any solver. They are library utilities, tested only in
   slower than quadratic and the tangent cannot be used for stability (sign of $\det K_T$).
 - *Test.* None: the 3D element assembly is not public.
 
-**NL-3. 3D rotations are additive total rotation vectors. OPEN.**
+**NL-3. 3D rotations are additive total rotation vectors. FIXED (#426).**
 
-- *Problem.* The deformational rotations are $R_n^{\mathsf T}\theta - \beta_\ell$ (vector
-  subtraction, §4.1–4.2).
-- *What is exact.* Rigid motions and coaxial rotations; frame invariance holds
-  (`nl_corot3d_solution_is_frame_invariant`).
-- *What is not.* For large non-coaxial rotations, applied nodal moments are not spatial moments
-  and the deformational rotations carry an $O(\theta\bar\theta)$ error.
-- *Question for the reviewer.* Should the element move to a multiplicative update (Battini–Pacoste
-  or Crisfield vol. 2), or should its validity be limited and gated?
-- *Test.* None against a 3D reference such as Bathe–Bolourchi.
+- *Problem.* The deformational rotations were previously computed by additive vector subtraction
+  $R_n^{\mathsf T}\theta - \beta_\ell$ (§4.1–4.2).
+- *Effect.* For large non-coaxial rotations, vector subtraction produces an
+  $O(\lvert\theta\rvert\,\lvert\bar\theta\rvert)$ error in deformational rotations, distorting transverse
+  displacements and equilibrium under multi-axis rotations.
+- *Fix.* Multiplicative relative rotation extraction (`relative_deformational_rotation` using Rodrigues map
+  and logarithmic extraction): spatial nodal triad $E_{\text{node}} = R(\theta_{\text{node}}) R_0$,
+  relative rotation in corotated frame $R_{\text{def}} = R_n^{\mathsf T} E_{\text{node}}$, and natural
+  rotation vector $\theta_{\text{def}} = \operatorname{rotation\_vector}(R_{\text{def}})$.
+- *Tests.* `nl_corot3d_bathe_bolourchi_45_degree_bend` (matches published Bathe & Bolourchi 1979 45-degree
+  circular bend benchmark displacements within 0.5%) and `nl_corot3d_large_non_coaxial_moments` (tip
+  rotation > 0.3 rad, reaction moments balance applied moments, zero spurious shears).
 
 **NL-4. Material-nonlinear member forces are the elastic $K_\text{el}u$. OPEN.**
 

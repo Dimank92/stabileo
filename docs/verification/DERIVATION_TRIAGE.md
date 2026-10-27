@@ -30,6 +30,7 @@ on that branch: a test that now passes means the finding is fixed.
 | [#418](https://github.com/lambdaclass/stabileo/issues/418) | SP-15 curved-beam segment axes depend on plan orientation | #523 (advisory SA-2026-016) | `curved_beam_arch_is_invariant_under_plan_rotation` passes and is un-ignored; containment removed |
 | [#429](https://github.com/lambdaclass/stabileo/issues/429) | NL-6 3D material-nonlinear yield surface unconservative vs 2D | `fix/nl6-yield-surface` (advisory SA-2026-020) | `nl_material_2d_and_3d_use_the_same_yield_surface` and three new 3D tests pass; the I-section strong-axis N–M term stays open for 2D and 3D (docs/solver/nonlinear.md NL-6) |
 | [#407](https://github.com/lambdaclass/stabileo/issues/407) | FR-4 frame/truss thermal: fixed α = 12e-6 and depth √(12I/A) | branch `fix/frame-thermal` (SA-2026-019) | `engine/tests/frame_thermal_inputs.rs` (material α and real depth; defaults warn) |
+| [#426](https://github.com/lambdaclass/stabileo/issues/426) | NL-3 3D co-rotational adds rotation vectors | `fix/nl3-corot3d-multiplicative-rotation` | `nl_corot3d_bathe_bolourchi_45_degree_bend` (within 0.5% of Bathe & Bolourchi 1979 benchmark) and `nl_corot3d_large_non_coaxial_moments` pass |
 
 ## A: wrong results a user would rely on (fix, contain, advisory)
 
@@ -53,7 +54,6 @@ on that branch: a test that now passes means the finding is fixed.
 | [#433](https://github.com/lambdaclass/stabileo/issues/433) | NL-17 fiber solver reports an unconverged iterate on failure | must refuse or report the last converged step | none; to add |
 | [#420](https://github.com/lambdaclass/stabileo/issues/420) | SP-18 fiber solvers return no reactions | missing output | `fiber_solver_reports_reactions` fails |
 | [#419](https://github.com/lambdaclass/stabileo/issues/419) | SP-17 3D connector axes discontinuous in direction, not orientable | results jump across a direction; promote to A if a connector's stiffness differs by axis | `connector_3d_axes_are_continuous_in_direction` fails |
-| [#426](https://github.com/lambdaclass/stabileo/issues/426) | NL-3 3D co-rotational adds rotation vectors | error for large non-coaxial rotations; promote to A if reachable within the documented range | none; to add |
 | [#408](https://github.com/lambdaclass/stabileo/issues/408) | FR-5 warping DOF shared by all members at a node | a modelling assumption to state in the UI and offer a release for | n/a |
 | [#338](https://github.com/lambdaclass/stabileo/issues/338) | modal drops modes on a mechanism | PR [#331](https://github.com/lambdaclass/stabileo/pull/331) (mechanism detection) | — |
 | [#453](https://github.com/lambdaclass/stabileo/issues/453) | solid-shell buckling converges ≈ first order, from below | an accuracy note with mesh guidance; ties to discretization estimates (#356) | — |

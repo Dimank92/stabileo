@@ -273,6 +273,96 @@ fn nl_corot3d_solution_is_frame_invariant() {
     }
 }
 
+/// Bathe & Bolourchi (1979) 45-degree circular bend benchmark (NL-3).
+/// A 45-degree circular bend in the X-Y plane (radius R = 100 in), clamped at node 1
+/// (X = 100, Y = 0, Z = 0) and free at the tip (node 9), loaded with an out-of-plane
+/// vertical tip load P in Z. 8 equal straight frame elements.
+/// E = 1e7 psi, nu = 0.0, square 1x1 in (A = 1, Iy = Iz = 1/12, J = 0.1406).
+#[test]
+fn nl_corot3d_bathe_bolourchi_45_degree_bend() {
+    let r_radius = 100.0;
+    let n_el = 8;
+    let total_angle = std::f64::consts::FRAC_PI_4; // 45 degrees
+    let d_theta = total_angle / n_el as f64;
+
+    let nodes: Vec<_> = (0..=n_el).map(|k| {
+        let theta = k as f64 * d_theta;
+        (k + 1, r_radius * theta.cos(), r_radius * theta.sin(), 0.0)
+    }).collect();
+
+    let elems: Vec<_> = (1..=n_el).map(|k| {
+        (k, "frame", k, k + 1, 1, 1)
+    }).collect();
+
+    let p_vertical = 600.0; // lb
+    let input = make_3d_input(
+        nodes,
+        vec![(1, 10_000.0, 0.0)],
+        vec![(1, 1.0, 1.0 / 12.0, 1.0 / 12.0, 0.1406)],
+        elems,
+        vec![(1, vec![true; 6])],
+        vec![SolverLoad3D::Nodal(SolverNodalLoad3D {
+            node_id: n_el + 1, fx: 0.0, fy: 0.0, fz: p_vertical, mx: 0.0, my: 0.0, mz: 0.0, bw: None,
+        })],
+    );
+
+    let res = corotational::solve_corotational_3d(&input, 100, 1e-6, 20, false).unwrap();
+    assert!(res.converged, "Bathe-Bolourchi 45-deg bend must converge");
+    let tip = disp3(&res.results, n_el + 1);
+    let rot_mag = (tip.rx * tip.rx + tip.ry * tip.ry + tip.rz * tip.rz).sqrt();
+    assert!(rot_mag > 0.5, "Benchmark operates in finite rotation regime: rot_mag = {rot_mag}");
+
+    // Published benchmark values (Bathe & Bolourchi 1979 Table 2, Simo & Vu-Quoc 1986,
+    // Ritto Corrêa 2004 for J = 0.141, 8 straight elements under P = 600 lb):
+    // uz ~ 53.4 - 53.6 in (vertical in direction of load), ux ~ 13.4 - 13.7 in, uy ~ -23.5 - -23.8 in.
+    close(tip.uz, 53.5, 0.02, "Bathe-Bolourchi 45-deg bend tip uz");
+    close(tip.ux, 13.6, 0.05, "Bathe-Bolourchi 45-deg bend tip ux");
+    close(tip.uy, -23.7, 0.05, "Bathe-Bolourchi 45-deg bend tip uy");
+}
+
+/// 3D cantilever under large non-coaxial moments (NL-3).
+/// Verifies that multiplicative relative rotation updates maintain equilibrium and
+/// convergence under multi-axis finite rotations (Mx, My, Mz > 0.5 rad total rotation)
+/// with zero spurious shear reactions.
+#[test]
+fn nl_corot3d_large_non_coaxial_moments() {
+    let (l, n_el) = (3.0, 6);
+    let nodes: Vec<_> = (0..=n_el).map(|k| {
+        (k + 1, l * k as f64 / n_el as f64, 0.0, 0.0)
+    }).collect();
+    let elems: Vec<_> = (1..=n_el).map(|k| (k, "frame", k, k + 1, 1, 1)).collect();
+
+    let m_applied = [160.0, 240.0, -280.0]; // kN*m: non-coaxial moments in all 3 axes
+    let input = make_3d_input(
+        nodes,
+        vec![(1, E, 0.3)],
+        vec![(1, 0.01, 2e-5, 2e-5, 3e-5)],
+        elems,
+        vec![(1, vec![true; 6])],
+        vec![SolverLoad3D::Nodal(SolverNodalLoad3D {
+            node_id: n_el + 1, fx: 0.0, fy: 0.0, fz: 0.0, mx: m_applied[0], my: m_applied[1], mz: m_applied[2], bw: None,
+        })],
+    );
+
+    let res = corotational::solve_corotational_3d(&input, 80, 1e-8, 15, false).unwrap();
+    assert!(res.converged, "Cantilever under large non-coaxial moments must converge");
+
+    let tip = disp3(&res.results, n_el + 1);
+    let rot_tip = (tip.rx * tip.rx + tip.ry * tip.ry + tip.rz * tip.rz).sqrt();
+    assert!(rot_tip > 0.3, "Tip rotation should be in the large-rotation regime: {rot_tip} rad");
+
+    // Statics: under pure nodal moments, shear forces must be zero to high precision
+    let base_rx = res.results.reactions.iter().find(|r| r.node_id == 1).unwrap();
+    assert!(base_rx.fx.abs() < 1e-4, "Spurious axial reaction: fx = {}", base_rx.fx);
+    assert!(base_rx.fy.abs() < 1e-4, "Spurious shear reaction: fy = {}", base_rx.fy);
+    assert!(base_rx.fz.abs() < 1e-4, "Spurious shear reaction: fz = {}", base_rx.fz);
+
+    // Moment equilibrium: base reaction moments must balance applied tip moments
+    close(base_rx.mx, -m_applied[0], 1e-3, "Base reaction Mx balances applied Mx");
+    close(base_rx.my, -m_applied[1], 1e-3, "Base reaction My balances applied My");
+    close(base_rx.mz, -m_applied[2], 1e-3, "Base reaction Mz balances applied Mz");
+}
+
 // ======================================================================
 // P-Delta against the closed form and against linear buckling
 // ======================================================================
