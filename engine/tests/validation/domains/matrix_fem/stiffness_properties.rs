@@ -127,6 +127,7 @@ fn validation_rigid_body_3d_frame_6_zero_eigenvalues() {
     elems.insert("1".to_string(), SolverElement3D {
         id: 1, elem_type: "frame".to_string(), node_i: 1, node_j: 2,
         material_id: 1, section_id: 1, release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
         local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
     });
 

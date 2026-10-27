@@ -651,6 +651,7 @@ fn assembled_free_model_rigid_modes_and_kernel() {
         id, elem_type: ty.into(), node_i: i, node_j: j, material_id: 1, section_id: 1,
         release_my_start: false, release_my_end: rel, release_mz_start: false, release_mz_end: false,
         release_t_start: false, release_t_end: false,
+        release_warp_start: false, release_warp_end: false,
         local_yx: if id == 2 { Some(0.3) } else { None }, local_yy: if id == 2 { Some(1.0) } else { None },
         local_yz: if id == 2 { Some(0.2) } else { None }, roll_angle: None,
     };

@@ -173,6 +173,7 @@ impl B3 {
                         release_mz_end: e.rel.mz_e,
                         release_t_start: false,
                         release_t_end: false,
+                        release_warp_start: false, release_warp_end: false,
                         local_yx: e.ref_y.map(|v| v[0]),
                         local_yy: e.ref_y.map(|v| v[1]),
                         local_yz: e.ref_y.map(|v| v[2]),

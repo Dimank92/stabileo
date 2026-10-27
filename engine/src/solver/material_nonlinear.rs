@@ -1421,10 +1421,12 @@ fn assemble_tangent_stiffness_3d_scatter(
 
             if has_cw && dof_num.dofs_per_node >= 7 {
                 let t = frame_transform_3d_warping(&ex, &ey, &ez);
-                let k_local = frame_local_stiffness_3d_warping(
+                let k_local = frame_local_stiffness_3d_warping_with_releases(
                     e, sec.a, iy_eff, iz_eff, sec.j, sec.cw.unwrap(), l, g,
                     Hinge3D::from_elem(elem),
                     phi_y, phi_z,
+                    elem.release_warp_start,
+                    elem.release_warp_end,
                 );
                 let k_glob = transform_stiffness(&k_local, &t, 14);
                 let ndof = elem_dofs.len();
@@ -1563,10 +1565,12 @@ fn compute_global_internal_forces_3d(
             let (f_local, ndof_elem) = if has_cw && dof_num.dofs_per_node >= 7 {
                 let t = frame_transform_3d_warping(&ex, &ey, &ez);
                 let u_local = transform_displacement(&u_global, &t, 14);
-                let k_local = frame_local_stiffness_3d_warping(
+                let k_local = frame_local_stiffness_3d_warping_with_releases(
                     e, sec.a, iy_eff, iz_eff, sec.j, sec.cw.unwrap(), l, g,
                     Hinge3D::from_elem(elem),
                     phi_y, phi_z,
+                    elem.release_warp_start,
+                    elem.release_warp_end,
                 );
                 let mut fl = vec![0.0; 14];
                 for i in 0..14 {

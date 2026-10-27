@@ -32,6 +32,7 @@ fn frame(id: usize, node_i: usize, node_j: usize, section_id: usize, pin_i: bool
         id, elem_type: "frame".into(), node_i, node_j, material_id: 1, section_id,
         release_my_start: pin_i, release_mz_start: pin_i, release_my_end: pin_j, release_mz_end: pin_j,
         release_t_start: false, release_t_end: false,
+        release_warp_start: false, release_warp_end: false,
         local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
     }
 }

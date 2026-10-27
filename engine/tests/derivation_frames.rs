@@ -127,3 +127,89 @@ fn left_handed_axes_are_refused() {
     let err = mk(Some(true)).unwrap_err();
     assert!(err.contains("leftHand"), "{err}");
 }
+
+/// FR-5 (FIXED, #408).
+///
+/// Warping DOF release per member-end (`release_warp_start`, `release_warp_end`):
+/// When two collinear warping members meet at a shared node, by default warping is continuous.
+/// When member 1 has `release_warp_end: true` and member 2 has `release_warp_start: true`,
+/// warping continuity is broken at the shared joint (bimoment transmission = 0).
+///
+/// With member 1 fixed with warping restrained (`rw = Some(true)`) at root x = 0 and loaded
+/// with tip torque T at the shared joint x = L, member 1's bimoment matches an independent
+/// cantilever with free warping at its tip. Member 2 remains completely unstrained (zero bimoment,
+/// zero torque).
+#[test]
+fn fr5_collinear_warping_members_with_release_match_independent_cantilever() {
+    let (e, nu, a, iy, iz, j, cw): (f64, f64, f64, f64, f64, f64, f64) =
+        (200_000.0, 0.3, 7.61e-3, 18.4e-6, 128.0e-6, 0.5e-6, 300.0e-9);
+    let torque = 1.0;
+
+    // Two collinear members:
+    // Member 1: Node 1 (0,0,0) to Node 2 (3,0,0), with release_warp_end = true
+    // Member 2: Node 2 (3,0,0) to Node 3 (6,0,0), with release_warp_start = true
+    let mut inp = make_3d_input(
+        vec![(1, 0.0, 0.0, 0.0), (2, 3.0, 0.0, 0.0), (3, 6.0, 0.0, 0.0)],
+        vec![(1, e, nu)],
+        vec![(1, a, iy, iz, j)],
+        vec![
+            (1, "frame", 1, 2, 1, 1),
+            (2, "frame", 2, 3, 1, 1),
+        ],
+        vec![(1, vec![true; 6])], // fixed at node 1
+        vec![SolverLoad3D::Nodal(SolverNodalLoad3D {
+            node_id: 2, fx: 0.0, fy: 0.0, fz: 0.0, mx: torque, my: 0.0, mz: 0.0, bw: None,
+        })],
+    );
+    for s in inp.sections.values_mut() { s.cw = Some(cw); }
+    for s in inp.supports.values_mut() { s.rw = Some(true); }
+
+    // With warping release at the shared joint (Node 2)
+    inp.elements.get_mut("1").unwrap().release_warp_end = true;
+    inp.elements.get_mut("2").unwrap().release_warp_start = true;
+
+    let r = solve_3d(&inp).unwrap();
+    let ef1 = r.element_forces.iter().find(|e| e.element_id == 1).unwrap();
+    let ef2 = r.element_forces.iter().find(|e| e.element_id == 2).unwrap();
+
+    let b0 = ef1.bimoment_start.unwrap();
+    let b_joint1 = ef1.bimoment_end.unwrap();
+    let b_joint2 = ef2.bimoment_start.unwrap();
+    let b_end2 = ef2.bimoment_end.unwrap();
+
+    // Member 1 bimoments at joint and member 2 bimoments must be zero
+    assert!(b_joint1.abs() < 1e-9, "Member 1 bimoment at released end must be zero: {b_joint1}");
+    assert!(b_joint2.abs() < 1e-9, "Member 2 bimoment at released start must be zero: {b_joint2}");
+    assert!(b_end2.abs() < 1e-9, "Member 2 tip bimoment must be zero: {b_end2}");
+    assert!(ef2.mx_start.abs() < 1e-9 && ef2.mx_end.abs() < 1e-9, "Member 2 carries no torque");
+
+    // Also verify against single independent cantilever with same discretization
+    let mut single_inp = make_3d_input(
+        vec![(1, 0.0, 0.0, 0.0), (2, 3.0, 0.0, 0.0)],
+        vec![(1, e, nu)],
+        vec![(1, a, iy, iz, j)],
+        vec![(1, "frame", 1, 2, 1, 1)],
+        vec![(1, vec![true; 6])],
+        vec![SolverLoad3D::Nodal(SolverNodalLoad3D {
+            node_id: 2, fx: 0.0, fy: 0.0, fz: 0.0, mx: torque, my: 0.0, mz: 0.0, bw: None,
+        })],
+    );
+    for s in single_inp.sections.values_mut() { s.cw = Some(cw); }
+    for s in single_inp.supports.values_mut() { s.rw = Some(true); }
+    let single_r = solve_3d(&single_inp).unwrap();
+    let single_ef = single_r.element_forces.iter().find(|e| e.element_id == 1).unwrap();
+    let single_b0 = single_ef.bimoment_start.unwrap();
+
+    assert!(
+        (b0 - single_b0).abs() < 1e-9,
+        "Member 1 root bimoment {b0} must exactly match independent cantilever {single_b0}"
+    );
+
+    let rx_joint = r.displacements.iter().find(|d| d.node_id == 2).unwrap().rx;
+    let single_rx = single_r.displacements.iter().find(|d| d.node_id == 2).unwrap().rx;
+    assert!(
+        (rx_joint - single_rx).abs() < 1e-9,
+        "Twist at joint {rx_joint} must match single cantilever {single_rx}"
+    );
+}
+

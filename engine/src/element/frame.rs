@@ -297,6 +297,48 @@ pub(crate) fn torsion_warping_block(gj: f64, ecw: f64, l: f64, l2: f64, l3: f64)
     ]
 }
 
+/// Static condensation of warping releases in the 4×4 torsion-warping block (FR-5).
+/// DOFs: [θx1, φ'1, θx2, φ'2] (indices 0, 1, 2, 3).
+pub(crate) fn condense_warping_block(
+    tw: &[f64; 16],
+    gj: f64,
+    l: f64,
+    release_warp_start: bool,
+    release_warp_end: bool,
+) -> [f64; 16] {
+    if !release_warp_start && !release_warp_end {
+        return *tw;
+    }
+    if release_warp_start && release_warp_end {
+        // Both ends free to warp: warping DOFs condense out entirely,
+        // leaving pure St. Venant torsion on (θx1, θx2).
+        let st_venant = gj / l;
+        return [
+             st_venant, 0.0, -st_venant, 0.0,
+             0.0,       0.0,  0.0,       0.0,
+            -st_venant, 0.0,  st_venant, 0.0,
+             0.0,       0.0,  0.0,       0.0,
+        ];
+    }
+
+    let mut out = [0.0; 16];
+    let rel_idx = if release_warp_start { 1 } else { 3 };
+    let c = tw[rel_idx * 4 + rel_idx];
+    if c.abs() < 1e-30 {
+        return *tw;
+    }
+
+    for i in 0..4 {
+        for j in 0..4 {
+            if i == rel_idx || j == rel_idx {
+                continue;
+            }
+            out[i * 4 + j] = tw[i * 4 + j] - tw[i * 4 + rel_idx] * tw[rel_idx * 4 + j] / c;
+        }
+    }
+    out
+}
+
 /// 3D frame local stiffness matrix with warping DOF (14×14).
 /// DOFs: [u1, v1, w1, θx1, θy1, θz1, φ'1, u2, v2, w2, θx2, θy2, θz2, φ'2]
 /// cw: warping constant (m⁶), phi' = rate of twist (warping DOF)
@@ -304,6 +346,19 @@ pub fn frame_local_stiffness_3d_warping(
     e: f64, a: f64, iy: f64, iz: f64, j: f64, cw: f64, l: f64, g: f64,
     hinge: Hinge3D,
     phi_y: f64, phi_z: f64,
+) -> Vec<f64> {
+    frame_local_stiffness_3d_warping_with_releases(
+        e, a, iy, iz, j, cw, l, g, hinge, phi_y, phi_z, false, false,
+    )
+}
+
+/// 3D frame local stiffness matrix with warping DOF and per-member warping releases (14×14).
+pub fn frame_local_stiffness_3d_warping_with_releases(
+    e: f64, a: f64, iy: f64, iz: f64, j: f64, cw: f64, l: f64, g: f64,
+    hinge: Hinge3D,
+    phi_y: f64, phi_z: f64,
+    release_warp_start: bool,
+    release_warp_end: bool,
 ) -> Vec<f64> {
     let n = 14;
     let mut k = vec![0.0; n * n];
@@ -343,6 +398,7 @@ pub fn frame_local_stiffness_3d_warping(
     // silently overwrite the release applied by frame_local_stiffness_3d.
     if !hinge.release_t_start && !hinge.release_t_end {
         let tw = torsion_warping_block(gj, ecw, l, l2, l3);
+        let tw = condense_warping_block(&tw, gj, l, release_warp_start, release_warp_end);
 
         for i in 0..4 {
             for jj in 0..4 {

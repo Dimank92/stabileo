@@ -24,7 +24,10 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::element::{frame_local_stiffness_2d, frame_local_stiffness_3d, frame_local_stiffness_3d_warping, Hinge3D};
+use crate::element::{
+    frame_local_stiffness_2d, frame_local_stiffness_3d,
+    frame_local_stiffness_3d_warping_with_releases, Hinge3D,
+};
 use crate::solver::dof::DofNumbering;
 use crate::types::*;
 
@@ -182,8 +185,9 @@ pub(crate) fn local_stiffness_3d(input: &SolverInput3D) -> Vec<LocalK> {
             };
             if let (Some(cw), true) = (sec.cw.filter(|&cw| cw > 0.0), warping_model) {
                 // 14 DOFs [u1 v1 w1 θx1 θy1 θz1 φ'1 u2 … φ'2], as compute_internal_forces_3d.
-                let k = frame_local_stiffness_3d_warping(
+                let k = frame_local_stiffness_3d_warping_with_releases(
                     e, sec.a, sec.iy, sec.iz, sec.j, cw, l, g, Hinge3D::from_elem(elem), phi_y, phi_z,
+                    elem.release_warp_start, elem.release_warp_end,
                 );
                 return LocalK { element_id: elem.id, length: l, n: 14, k, truss: false };
             }
@@ -425,6 +429,7 @@ mod tests {
                 id: i, elem_type: "frame".into(), node_i: i, node_j: i + 1, material_id: 1, section_id: 1,
                 release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false,
                 release_t_start: false, release_t_end: false,
+                release_warp_start: false, release_warp_end: false,
                 local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
             });
         }

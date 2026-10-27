@@ -98,6 +98,7 @@ fn make_3d_beam_on_foundation(
             id: i, elem_type: "frame".to_string(),
             node_i: i, node_j: i + 1, material_id: 0, section_id: 0,
             release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
             local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
         });
     }

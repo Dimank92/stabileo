@@ -54,7 +54,7 @@ on that branch: a test that now passes means the finding is fixed.
 | [#420](https://github.com/lambdaclass/stabileo/issues/420) | SP-18 fiber solvers return no reactions | missing output | `fiber_solver_reports_reactions` fails |
 | [#419](https://github.com/lambdaclass/stabileo/issues/419) | SP-17 3D connector axes discontinuous in direction, not orientable | results jump across a direction; promote to A if a connector's stiffness differs by axis | `connector_3d_axes_are_continuous_in_direction` fails |
 | [#426](https://github.com/lambdaclass/stabileo/issues/426) | NL-3 3D co-rotational adds rotation vectors | error for large non-coaxial rotations; promote to A if reachable within the documented range | none; to add |
-| [#408](https://github.com/lambdaclass/stabileo/issues/408) | FR-5 warping DOF shared by all members at a node | a modelling assumption to state in the UI and offer a release for | n/a |
+| [#408](https://github.com/lambdaclass/stabileo/issues/408) | FR-5 warping DOF shared by all members at a node | FIXED: member-end releases (`release_warp_start/end`) with static condensation | `fr5_collinear_warping_members_with_release_match_independent_cantilever` |
 | [#338](https://github.com/lambdaclass/stabileo/issues/338) | modal drops modes on a mechanism | PR [#331](https://github.com/lambdaclass/stabileo/pull/331) (mechanism detection) | — |
 | [#453](https://github.com/lambdaclass/stabileo/issues/453) | solid-shell buckling converges ≈ first order, from below | an accuracy note with mesh guidance; ties to discretization estimates (#356) | — |
 

@@ -498,7 +498,8 @@ pub fn refine_uniform(input: &SolverInput3D, mode: GeometryMode) -> Result<Refin
         let (l1, l2) = (norm3(&sub(&pm, &pi)), norm3(&sub(&pj, &pm)));
         let (id1, id2) = (b.elem_id(), b.elem_id());
         out.elements.insert(id1.to_string(), SolverElement3D {
-            id: id1, node_j: m, release_my_end: false, release_mz_end: false, release_t_end: false, ..f.clone()
+            id: id1, node_j: m, release_my_end: false, release_mz_end: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false, ..f.clone()
         });
         out.elements.insert(id2.to_string(), SolverElement3D {
             id: id2, node_i: m, release_my_start: false, release_mz_start: false, release_t_start: false, ..f.clone()

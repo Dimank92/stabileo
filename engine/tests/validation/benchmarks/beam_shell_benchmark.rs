@@ -103,6 +103,7 @@ fn benchmark_beam_shell_stiffened_plate() {
                     node_i: node_grid[i][j_mid], node_j: node_grid[i+1][j_mid],
                     material_id: 1, section_id: 1,
                     release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
                     local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
                 });
                 eid += 1;
@@ -251,6 +252,7 @@ fn benchmark_beam_shell_column_to_slab() {
         node_i: col_base, node_j: col_top,
         material_id: 1, section_id: 1,
         release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
         local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
     });
 
@@ -356,6 +358,7 @@ fn benchmark_beam_shell_cantilever_parity() {
             node_i: i + 1, node_j: i + 2,
             material_id: 1, section_id: 1,
             release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
             local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
         });
     }
@@ -513,6 +516,7 @@ fn benchmark_beam_shell_equilibrium() {
             node_i: slab_grid[i][0], node_j: slab_grid[i+1][0],
             material_id: 1, section_id: 1,
             release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
             local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
         });
         eid += 1;

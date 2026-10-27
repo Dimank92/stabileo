@@ -947,10 +947,12 @@ pub fn assemble_stiffness_3d(input: &SolverInput3D, dof_num: &DofNumbering) -> S
 
             if has_cw && dof_num.dofs_per_node >= 7 {
                 // Warping element: 14×14 stiffness
-                let k_local = frame_local_stiffness_3d_warping(
+                let k_local = frame_local_stiffness_3d_warping_with_releases(
                     e, sec.a, sec.iy, sec.iz, sec.j, sec.cw.unwrap(), l, g,
                     Hinge3D::from_elem(elem),
                     phi_y, phi_z,
+                    elem.release_warp_start,
+                    elem.release_warp_end,
                 );
                 let t = frame_transform_3d_warping(&ex, &ey, &ez);
                 let k_glob = transform_stiffness(&k_local, &t, 14);
@@ -2458,10 +2460,12 @@ pub fn assemble_stiffness_sparse_3d(input: &SolverInput3D, dof_num: &DofNumberin
             };
 
             if has_cw && dof_num.dofs_per_node >= 7 {
-                let k_local = frame_local_stiffness_3d_warping(
+                let k_local = frame_local_stiffness_3d_warping_with_releases(
                     e, sec.a, sec.iy, sec.iz, sec.j, sec.cw.unwrap(), l, g,
                     Hinge3D::from_elem(elem),
                     phi_y, phi_z,
+                    elem.release_warp_start,
+                    elem.release_warp_end,
                 );
                 let t = frame_transform_3d_warping(&ex, &ey, &ez);
                 let k_glob = transform_stiffness(&k_local, &t, 14);

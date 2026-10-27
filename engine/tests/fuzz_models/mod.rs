@@ -342,6 +342,7 @@ pub fn random_3d_model(seed: u64) -> SolverInput3D {
                 release_mz_end: rng.gen_bool(0.1),
                 release_t_start: false,
                 release_t_end: false,
+                release_warp_start: false, release_warp_end: false,
                 local_yx: None,
                 local_yy: None,
                 local_yz: None,
@@ -375,6 +376,7 @@ pub fn random_3d_model(seed: u64) -> SolverInput3D {
                 release_mz_end: false,
                 release_t_start: false,
                 release_t_end: false,
+                release_warp_start: false, release_warp_end: false,
                 local_yx: None,
                 local_yy: None,
                 local_yz: None,
@@ -849,6 +851,7 @@ pub fn random_3d_model_rich(seed: u64) -> (SolverInput3D, HashMap<String, f64>) 
             release_mz_end: frame && rng.gen_bool(0.1),
             release_t_start: frame && rng.gen_bool(0.05),
             release_t_end: false,
+            release_warp_start: false, release_warp_end: false,
             local_yx: lyx, local_yy: lyy, local_yz: lyz,
             roll_angle: if frame && rng.gen_bool(0.3) { Some(rng.gen_range(-180.0..180.0)) } else { None },
         });

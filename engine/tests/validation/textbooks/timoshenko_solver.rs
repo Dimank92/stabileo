@@ -438,6 +438,7 @@ fn validation_timoshenko_3d_deep_beam() {
             node_i: i + 1, node_j: i + 2,
             material_id: 1, section_id: 1,
             release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
             local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
         });
     }

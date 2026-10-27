@@ -244,6 +244,7 @@ fn build_3d(m: &Model) -> Option<SolverInput3D> {
                 release_mz_end: e.rel_j,
                 release_t_start: false,
                 release_t_end: false,
+                release_warp_start: false, release_warp_end: false,
                 local_yx: None,
                 local_yy: None,
                 local_yz: None,

@@ -37,6 +37,7 @@ fn make_ss_beam_3d() -> SolverInput3D {
         node_i: 1, node_j: 2,
         material_id: 1, section_id: 1,
         release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
         local_yx: None, local_yy: None, local_yz: None,
         roll_angle: None,
     });
@@ -211,6 +212,7 @@ fn moving_loads_3d_multispan() {
         node_i: 1, node_j: 2,
         material_id: 1, section_id: 1,
         release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
         local_yx: None, local_yy: None, local_yz: None,
         roll_angle: None,
     });
@@ -219,6 +221,7 @@ fn moving_loads_3d_multispan() {
         node_i: 2, node_j: 3,
         material_id: 1, section_id: 1,
         release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
         local_yx: None, local_yy: None, local_yz: None,
         roll_angle: None,
     });

@@ -682,7 +682,8 @@ fn refinement_keeps_loads_supports_and_members() {
         m.input.elements.insert(eid.to_string(), SolverElement3D {
             id: eid, elem_type: "frame".into(), node_i: a, node_j: b, material_id: 1, section_id: 1,
             release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false,
-            release_t_start: false, release_t_end: false, local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
+            release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false, local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
         });
         m.input.loads.push(SolverLoad3D::Distributed(SolverDistributedLoad3D {
             element_id: eid, q_xi: 0.0, q_xj: 0.0, q_yi: 0.0, q_yj: 0.0, q_zi: -2.0, q_zj: -2.0, a: None, b: None,
@@ -727,7 +728,8 @@ fn frames_only_estimate_says_exact() {
     input.elements.insert("1".into(), SolverElement3D {
         id: 1, elem_type: "frame".into(), node_i: 1, node_j: 2, material_id: 1, section_id: 1,
         release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false,
-        release_t_start: false, release_t_end: false, local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
+        release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false, local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
     });
     input.supports.insert("1".into(), support(1, [true; 6]));
     input.loads.push(nodal(2, [0.0, 0.0, -10.0]));
@@ -850,7 +852,8 @@ fn cantilever_with_section(cw: Option<f64>) -> SolverInput3D {
     input.elements.insert("1".into(), SolverElement3D {
         id: 1, elem_type: "frame".into(), node_i: 1, node_j: 2, material_id: 1, section_id: 1,
         release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false,
-        release_t_start: false, release_t_end: false, local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
+        release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false, local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
     });
     let mut s = support(1, [true; 6]);
     s.rw = Some(true);
@@ -999,7 +1002,8 @@ fn beam(id: usize, i: usize, j: usize) -> SolverElement3D {
     SolverElement3D {
         id, elem_type: "frame".into(), node_i: i, node_j: j, material_id: 1, section_id: 1,
         release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false,
-        release_t_start: false, release_t_end: false, local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
+        release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false, local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
     }
 }
 

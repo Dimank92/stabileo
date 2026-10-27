@@ -84,6 +84,7 @@ fn validation_inclined_roller_45_degrees() {
             node_i: i + 1, node_j: i + 2,
             material_id: 1, section_id: 1,
             release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
             local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
         });
     }
@@ -159,6 +160,7 @@ fn validation_inclined_roller_normal_y_is_standard_roller() {
             node_i: i + 1, node_j: i + 2,
             material_id: 1, section_id: 1,
             release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
             local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
         });
     }
@@ -251,6 +253,7 @@ fn validation_inclined_support_global_equilibrium() {
             node_i: i + 1, node_j: i + 2,
             material_id: 1, section_id: 1,
             release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
             local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
         });
     }
@@ -336,6 +339,7 @@ fn validation_inclined_support_displacement_direction() {
             node_i: i + 1, node_j: i + 2,
             material_id: 1, section_id: 1,
             release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
             local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
         });
     }
@@ -409,6 +413,7 @@ fn validation_inclined_support_equilibrium_summary_correct() {
             node_i: i + 1, node_j: i + 2,
             material_id: 1, section_id: 1,
             release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
             local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
         });
     }
@@ -494,6 +499,7 @@ fn validation_inclined_support_prescribed_global_settlement() {
         release_my_start: false, release_my_end: false,
         release_mz_start: false, release_mz_end: false,
         release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
         local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
     });
 

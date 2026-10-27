@@ -277,12 +277,15 @@ Members whose section has `cw > 0` in a model with warping DOFs use the 14-DOF e
   $k=\sqrt{GJ/EC_w}$. So this element converges with mesh refinement (as $h^4$ in tip twist)
   rather than being exact per member. Use several elements per member when $kL \gtrsim 1$.
 - **Releases:** a torsion release at either end zeroes the whole 4×4 block, warping included.
-  There is no "warping release" flag. Warping restraint at a node is a support condition (`rw`,
-  or a spring `kw`).
-- **Warping DOF continuity:** $\theta_x'$ is shared between members meeting at a node. This is
-  right for collinear members of the same section. At a joint between non-collinear members or
-  different sections, real warping transmission depends on the joint detail. Sharing the DOF
-  assumes full continuity: see [FR-5](#discrepancies-and-open-questions-for-review).
+  Per-member warping releases (`release_warp_start` and `release_warp_end` in `SolverElement3D`)
+  allow releasing the warping DOF $\theta_x'$ (rate of twist $\phi'$) independently at either member end,
+  condensing the warping DOF out via `condense_warping_block` while retaining torsion. Warping restraint
+  at a node is a support condition (`rw`, or a spring `kw`).
+- **Warping DOF continuity:** by default, $\theta_x'$ is shared between members meeting at a node.
+  This is correct for collinear members of the same section. At a joint between non-collinear members or
+  different sections, real warping transmission depends on the joint detail; per-member warping releases
+  permit breaking warping continuity where connection detailing does not transmit bimoments.
+  See [FR-5](#discrepancies-and-open-questions-for-review).
 - **Mixed models:** a member with no `cw` in a 7-DOF model uses the 12×12 kernel scattered
   through `DOF_MAP_12_TO_14`. Its warping DOFs get no stiffness from that member.
 
@@ -493,7 +496,7 @@ physical one. Shell thermal loads, by contrast, take an optional `alpha`. See
 | FR-2 | **Declared sign convention contradicted the values.** The beam-station output (`postprocess/beam_stations.rs`, consumed by reports and AI) declared 2D "moment positive = sagging" and 3D "moment_z positive = sagging in x-y plane". The values are hogging-positive in 2D and tension-on-$+y$ in 3D (§7.1). The torsion string ("right-hand rule about local x") did not say which face. The strings now state the actual convention. Values are unchanged. | FIXED (metadata) | `derivation_frames.rs::beam_station_sign_convention_matches_values`, `moment_and_shear_signs_2d_and_3d`, `torsion_sign_is_negative_face_resultant` |
 | FR-3 | **Shear-area naming differs between 2D and 3D.** The 3D `as_y` goes with `iy` (shear along local z), but the 2D `as_y` goes with `iz` (shear along local y). The pairing is consistent between stiffness, loads and recovery, and the web follows it. But the old field comment ("shear area for Y-bending") invited the common reading "area for a force along y", which would swap the shear areas of an I-section, a ~2× error in shear flexibility. The field docs in `types/input.rs` now spell out the pairing. Should the JSON names change (e.g. `asForIy`)? | OPEN (naming; docs fixed) | n/a (convention; covered by `symbolic_elements.rs` φ pairing) |
 | FR-4 | **Thermal $\alpha$ and depth are constants in the engine.** Frames and trusses use $\alpha = 12\times10^{-6}$ and $h=\sqrt{12I/A}$. The web rescales the temperatures to compensate (§7.4), but a direct JSON/API user loading a concrete ($\alpha\approx10^{-5}$) or aluminium ($2.3\times10^{-5}$) member, or an I-section gradient, gets wrong thermal forces without any warning. Shells accept an optional `alpha`. Should frames take `alpha` and `depthY/Z` the same way? | OPEN | n/a (behaviour documented, §7.4) |
-| FR-5 | **Warping DOF continuity at joints.** $\theta_x'$ is one nodal DOF shared by every warping member at a node, which assumes full warping transmission. That is correct for collinear continuous members. At a column–beam joint or a change of section, the real transmission depends on the detail (stiffeners, end plates). There is no per-member warping release. | OPEN (modelling assumption) | n/a |
+| FR-5 | **Warping DOF continuity at joints.** $\theta_x'$ is one nodal DOF shared by every warping member at a node, which assumes full warping transmission. That is correct for collinear continuous members. At a column–beam joint or a change of section, the real transmission depends on the detail (stiffeners, end plates). Per-member warping releases (`release_warp_start`, `release_warp_end`) allow breaking continuity via static condensation. | FIXED (#408) | `derivation_frames.rs::fr5_collinear_warping_members_with_release_match_independent_cantilever` |
 | FR-6 | **The bimoment recovery was never checked.** Before this work no test compared the recovered element bimoment with a closed form. It now converges to Vlasov's $(T/k)\tanh kL$ (4 elements: 1e-3; 16 elements: 1e-5), and the support reaction balances it. | VERIFIED (gap closed) | `derivation_frames.rs::warping_bimoment_matches_vlasov` |
 | FR-7 | **2D rotation is about $-Y$.** The 2D θ and the 2D nodal `my` are right-hand about $-Y$ in the global XZ embedding, while the 3D $\theta_Y$/`my` are about $+Y$. This is consistent inside 2D, and the engine's 2D and 3D paths agree when the mapping negates it (`derivation_assembly_constraints.rs::plane_2d_matches_3d_xz_embedding`). But the web's flat-2D-to-3D embedding passes nodal moments and prescribed rotations through **without** negating them ([AC-15](assembly-constraints.md)), so from the code, a flat model solved through the 3D path responds to a nodal moment in the opposite sense. | DOCUMENTED-CHOICE (engine); web: OPEN, AC-15 | `plane_2d_matches_3d_xz_embedding` |
 | FR-8 | **Documented formulation choices** (from [SYMBOLIC.md](../verification/SYMBOLIC.md)): $K_g$ ignores shear flexibility and the torsional $P\,I_p/A$ term; released rotations in $K_g$ follow the Euler–Bernoulli map; consistent mass has no rotary inertia. Their quantitative impact is in [mass-geometric-dynamics.md](mass-geometric-dynamics.md). | DOCUMENTED-CHOICE | `symbolic_elements.rs` |

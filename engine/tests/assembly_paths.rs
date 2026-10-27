@@ -502,6 +502,7 @@ fn embed(input: &SolverInput, rot_sign: f64) -> SolverInput3D {
                 release_my_start: e.hinge_start, release_my_end: e.hinge_end,
                 release_mz_start: e.hinge_start, release_mz_end: e.hinge_end,
                 release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
                 local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
             })
         })
@@ -1201,6 +1202,7 @@ fn model_3d_from(
                     id, elem_type: t.into(), node_i: i, node_j: j, material_id: 1, section_id: sec,
                     release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false,
                     release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
                     local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
                 })
             })

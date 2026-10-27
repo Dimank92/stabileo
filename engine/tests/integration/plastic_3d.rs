@@ -36,6 +36,7 @@ fn make_plastic_cantilever_3d() -> PlasticInput3D {
         node_i: 1, node_j: 2,
         material_id: 1, section_id: 1,
         release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
         local_yx: None, local_yy: None, local_yz: None,
         roll_angle: None,
     });
@@ -127,6 +128,7 @@ fn plastic_3d_fixed_beam_two_hinges() {
         node_i: 1, node_j: 2,
         material_id: 1, section_id: 1,
         release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
         local_yx: None, local_yy: None, local_yz: None,
         roll_angle: None,
     });
@@ -135,6 +137,7 @@ fn plastic_3d_fixed_beam_two_hinges() {
         node_i: 2, node_j: 3,
         material_id: 1, section_id: 1,
         release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
         local_yx: None, local_yy: None, local_yz: None,
         roll_angle: None,
     });
@@ -280,6 +283,7 @@ fn plastic_3d_portal_frame_mechanism() {
         node_i: 1, node_j: 2,
         material_id: 1, section_id: 1,
         release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
         local_yx: None, local_yy: None, local_yz: None,
         roll_angle: None,
     });
@@ -289,6 +293,7 @@ fn plastic_3d_portal_frame_mechanism() {
         node_i: 2, node_j: 3,
         material_id: 1, section_id: 1,
         release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
         local_yx: None, local_yy: None, local_yz: None,
         roll_angle: None,
     });
@@ -298,6 +303,7 @@ fn plastic_3d_portal_frame_mechanism() {
         node_i: 3, node_j: 4,
         material_id: 1, section_id: 1,
         release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
         local_yx: None, local_yy: None, local_yz: None,
         roll_angle: None,
     });

@@ -5480,9 +5480,10 @@ pub fn compute_internal_forces_3d_with_loads(
             let u_global: Vec<f64> = elem_dofs.iter().map(|&d| u[d]).collect();
             let t = element::frame_transform_3d_warping(&ex, &ey, &ez);
             let u_local = transform_displacement(&u_global, &t, 14);
-            let k_local = element::frame_local_stiffness_3d_warping(
+            let k_local = element::frame_local_stiffness_3d_warping_with_releases(
                 e, sec.a, sec.iy, sec.iz, sec.j, sec.cw.unwrap(), l, g,
                 element::Hinge3D::from_elem(elem), phi_y, phi_z,
+                elem.release_warp_start, elem.release_warp_end,
             );
             let mut fl = vec![0.0; 14];
             for i in 0..14 {
@@ -5784,6 +5785,8 @@ pub fn expand_curved_beams_3d(input: &SolverInput3D) -> SolverInput3D {
                 release_mz_end: he,
                 release_t_start: false,
                 release_t_end: false,
+                release_warp_start: false,
+                release_warp_end: false,
                 local_yx: ly.map(|v| v[0]),
                 local_yy: ly.map(|v| v[1]),
                 local_yz: ly.map(|v| v[2]),

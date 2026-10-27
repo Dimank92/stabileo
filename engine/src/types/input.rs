@@ -364,6 +364,12 @@ pub struct SolverElement3D {
     /// Release torsion about local x axis at end.
     #[serde(default)]
     pub release_t_end: bool,
+    /// Release warping DOF (rate of twist phi') at start (Node I).
+    #[serde(default)]
+    pub release_warp_start: bool,
+    /// Release warping DOF (rate of twist phi') at end (Node J).
+    #[serde(default)]
+    pub release_warp_end: bool,
     #[serde(default)]
     pub local_yx: Option<f64>,
     #[serde(default)]

@@ -153,6 +153,7 @@ fn constrained_frame_only_model_has_no_shell_stresses() {
         id: 1, elem_type: "frame".into(), node_i: 1, node_j: 2, material_id: 1, section_id: 1,
         release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false,
         release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
         local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
     });
     let mk_fixed = |node_id: usize| SolverSupport3D {

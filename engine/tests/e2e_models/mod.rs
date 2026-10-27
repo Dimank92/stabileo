@@ -229,6 +229,7 @@ pub fn stable_3d(seed: u64) -> SolverInput3D {
             material_id: rng.gen_range(1..=2), section_id: rng.gen_range(1..=3),
             release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false,
             release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
             local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
         };
         if t == "frame" {

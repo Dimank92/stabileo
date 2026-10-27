@@ -357,6 +357,7 @@ fn frame_elem_3d(id: usize, ni: usize, nj: usize) -> SolverElement3D {
         release_my_start: false, release_my_end: false,
         release_mz_start: false, release_mz_end: false,
         release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
         local_yx: None, local_yy: None, local_yz: None,
         roll_angle: None,
     }

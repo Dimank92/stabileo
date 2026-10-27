@@ -258,6 +258,7 @@ fn make_building_frame_3d(stories: usize, bays_x: usize, bays_y: usize) -> Solve
                 release_my_start: false, release_my_end: false,
                 release_mz_start: false, release_mz_end: false,
                 release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
                 local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
             },
         );

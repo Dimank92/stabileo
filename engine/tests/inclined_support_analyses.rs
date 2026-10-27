@@ -394,6 +394,7 @@ fn model_3d(normal: [f64; 3], q: Option<&Mat3>, sub: usize, loads: &[(usize, [f6
             id: next_elem, elem_type: t.to_string(), node_i: ni, node_j: nj, material_id: 1, section_id: sec,
             release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false,
             release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
             local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
         });
         next_elem += 1;

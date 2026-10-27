@@ -39,6 +39,7 @@ fn make_staged_3d_base() -> StagedInput3D {
         node_i: 1, node_j: 2,
         material_id: 1, section_id: 1,
         release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
         local_yx: None, local_yy: None, local_yz: None,
         roll_angle: None,
     });
@@ -47,6 +48,7 @@ fn make_staged_3d_base() -> StagedInput3D {
         node_i: 2, node_j: 3,
         material_id: 1, section_id: 1,
         release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
         local_yx: None, local_yy: None, local_yz: None,
         roll_angle: None,
     });
@@ -344,6 +346,7 @@ fn staged_3d_multistory_erection() {
         node_i: 1, node_j: 2,
         material_id: 1, section_id: 1,
         release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
         local_yx: None, local_yy: None, local_yz: None,
         roll_angle: None,
     });
@@ -352,6 +355,7 @@ fn staged_3d_multistory_erection() {
         node_i: 2, node_j: 3,
         material_id: 1, section_id: 1,
         release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
         local_yx: None, local_yy: None, local_yz: None,
         roll_angle: None,
     });
@@ -360,6 +364,7 @@ fn staged_3d_multistory_erection() {
         node_i: 3, node_j: 4,
         material_id: 1, section_id: 1,
         release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
         local_yx: None, local_yy: None, local_yz: None,
         roll_angle: None,
     });
@@ -491,6 +496,7 @@ fn portal_with_slab() -> StagedInput3D {
         release_my_start: false, release_my_end: false,
         release_mz_start: false, release_mz_end: false,
         release_t_start: false, release_t_end: false,
+ release_warp_start: false, release_warp_end: false,
         local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
     };
     let mut elements = HashMap::new();

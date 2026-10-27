@@ -121,6 +121,7 @@ fn building(s: &Spec) -> Building {
                 release_mz_end: false,
                 release_t_start: false,
                 release_t_end: false,
+                release_warp_start: false, release_warp_end: false,
                 local_yx: None,
                 local_yy: None,
                 local_yz: None,

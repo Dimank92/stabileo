@@ -1102,10 +1102,12 @@ pub fn assemble_stiffness_sparse_3d_parallel(input: &SolverInput3D, dof_num: &Do
                     };
 
                     if has_cw && dof_num.dofs_per_node >= 7 {
-                        let k_local = element::frame_local_stiffness_3d_warping(
+                        let k_local = element::frame_local_stiffness_3d_warping_with_releases(
                             e, sec.a, sec.iy, sec.iz, sec.j, sec.cw.unwrap(), l, g,
                             Hinge3D::from_elem(elem),
                             phi_y, phi_z,
+                            elem.release_warp_start,
+                            elem.release_warp_end,
                         );
                         let t = element::frame_transform_3d_warping(&ex, &ey, &ez);
                         let k_glob = transform_stiffness(&k_local, &t, 14);
@@ -2285,6 +2287,7 @@ mod tests {
                 release_my_start: false, release_my_end: false,
                 release_mz_start: false, release_mz_end: false,
                 release_t_start: false, release_t_end: false,
+                release_warp_start: false, release_warp_end: false,
                 local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
             });
             eid += 1;
