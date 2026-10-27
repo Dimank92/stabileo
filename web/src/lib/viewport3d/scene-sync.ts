@@ -629,12 +629,12 @@ function syncShellsNow(ctx: SceneSyncContext): void {
       const d = [p[0] - f.o[0], p[1] - f.o[1], p[2] - f.o[2]];
       return [d[0]! * f.u[0] + d[1]! * f.u[1] + d[2]! * f.u[2], d[0]! * f.v[0] + d[1]! * f.v[1] + d[2]! * f.v[2]];
     };
-    const signature = `${renderMode}|${pl.surface.materialId}|` + [outer, ...holes].map((l) => l.map((n) => `${n!.x}:${n!.y}:${n!.z}`).join(';')).join('|');
+    const signature = `${renderMode}|${pl.surface.materialId}|${pl.surface.thickness}|` + [outer, ...holes].map((l) => l.map((n) => `${n!.x}:${n!.y}:${n!.z}`).join(';')).join('|');
     const existing = ctx.shellGroups.get(key);
     if (existing && existing.userData.shellSig === signature) { seen.add(key); continue; }
     if (existing) { ctx.shellsParent.remove(existing); disposeObject(existing); }
     const group = createPhysicalPlateMesh(outer as Array<{ x: number; y: number; z: number }>, holes as Array<Array<{ x: number; y: number; z: number }>>,
-      { outer: geo.outer.map(uv), holes: geo.holes.map((h) => h.map(uv)) }, pl.id, { renderMode, faceColor: shellColorForMaterial(pl.surface.materialId) });
+      { outer: geo.outer.map(uv), holes: geo.holes.map((h) => h.map(uv)) }, pl.id, { renderMode, faceColor: shellColorForMaterial(pl.surface.materialId), thickness: pl.surface.thickness });
     group.userData.shellSig = signature;
     ctx.shellsParent.add(group);
     ctx.shellGroups.set(key, group);

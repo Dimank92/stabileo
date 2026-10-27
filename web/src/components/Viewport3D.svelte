@@ -3323,22 +3323,27 @@
     // select mode, only that entity class is pickable. This also keeps
     // selectedElements type-consistent — frame elements and plates/quads have
     // overlapping numeric ids, disambiguated only by selectMode. ──
-    if (sm === 'shells') {
-      const shellHits = raycaster.intersectObjects(shellsParent.children, true);
-      for (const hit of shellHits) {
+    /**
+     * The plate or shell under the pointer, selected as the shell scope says: a physical plate with no
+     * mesh is only ever the plate; an element of a plate's mesh is the plate when picking plates whole.
+     */
+    const pickShell = (): boolean => {
+      for (const hit of raycaster.intersectObjects(shellsParent.children, true)) {
         const ud = resolveHitUserData(hit);
-        // A physical plate with no mesh is only ever the plate.
-        if (ud?.type === 'physicalPlate') { uiStore.selectPlates([ud.id], addToSel); return; }
+        if (ud?.type === 'physicalPlate') { uiStore.selectPlates([ud.id], addToSel); return true; }
         const key = shellSelectionKey(ud);
         if (key) {
-          // Picking plates whole, a click on an element of a plate's mesh is the plate.
           const plate = uiStore.shellPickScope === 'plate' ? plateOfShell(key) : null;
           if (plate !== null) uiStore.selectPlates([plate], addToSel);
           else uiStore.selectShell(key, addToSel);
-          return;
+          return true;
         }
       }
-      if (!addToSel) uiStore.clearSelection();
+      return false;
+    };
+
+    if (sm === 'shells') {
+      if (!pickShell() && !addToSel) uiStore.clearSelection();
       return;
     }
 
@@ -3379,6 +3384,8 @@
           }
         }
       }
+      // Plates and shells last: a node, member, load or support on them is what the click meant.
+      if (!hit && uiStore.selectsKind('shells')) pickShell();
       return;
     }
 
@@ -3422,6 +3429,17 @@
       // Sync with DSM Matrix Explorer if wizard is open
       if (dsmStepsStore.isOpen) dsmStepsStore.selectElement(pick.id);
       return;
+    }
+    /*
+     * No member under the pointer, and a plate is: a plate is an object of PRO's model, and a click
+     * on it with nothing else there takes it, in the plates' mode (as opening the Plates panel
+     * does). A member under the pointer still wins. Basic draws no physical plates.
+     */
+    if (uiStore.appMode === 'pro' && !addToSel && sm === 'elements') {
+      const before = uiStore.selectMode;
+      uiStore.selectMode = 'shells';
+      if (pickShell()) return;
+      uiStore.selectMode = before;
     }
 
     // Clicked on empty space → clear selection
