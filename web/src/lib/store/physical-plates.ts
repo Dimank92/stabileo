@@ -201,7 +201,9 @@ export function createPlate(p: NewPlate): { id: number } | { problem: PlateProbl
   const temp = { id: 0, members: { nodes: [...p.outline, ...holes.flat()] }, data: { surface } };
   const geo = plateGeometry(plateModel(), temp)!;
   const physical: PhysicalData & { surface: PlateSurface } = { kind: plateKindOf(geo), provenance: 'declared', surface };
-  const n = physicalPlates().length + 1;
+  const taken = new Set(physicalPlates().map((e) => e.name));
+  let n = physicalPlates().length + 1;
+  while (taken.has(`P${n}`)) n++;
   const id = modelStore.addGroup(p.name ?? `P${n}`, 'physicalMember', temp.members, { data: physical as unknown as Record<string, unknown> });
   return { id };
 }
@@ -531,7 +533,8 @@ export function deletePlate(id: number): void {
 export type PlatePreparation =
   | { ok: true; meshed: number; cells: number }
   | { ok: false; reason: 'needsMesh'; plates: string[] }
-  | { ok: false; reason: 'refused'; plates: string[] };
+  | { ok: false; reason: 'refused'; plates: string[] }
+  | { ok: false; reason: 'localLoads'; plates: string[] };
 
 /**
  * Mesh what an analysis needs and nothing else: the plates with no mesh or an out-of-date one,
@@ -544,6 +547,10 @@ export function preparePlatesForAnalysis(): PlatePreparation {
   const names = (ids: number[]) => ids.map((id) => plateEntry(id)?.name ?? `#${id}`);
   if (!meshBeforeAnalysis.value) return { ok: false, reason: 'needsMesh', plates: names(need) };
   const plans = need.map((id) => planPlateMesh(id)).filter((p): p is PlateMeshPlan => !!p);
+  // Loads put by hand on the old mesh's elements cannot follow a new mesh: the plate is meshed
+  // from its panel, whose plan lists them, never here where they would vanish unseen.
+  const loaded = plans.filter((p) => p.localLoads > 0);
+  if (loaded.length) return { ok: false, reason: 'localLoads', plates: names(loaded.map((p) => p.id)) };
   const r = applyPlateMeshes(plans);
   if (r.refused.length) return { ok: false, reason: 'refused', plates: names(r.refused.map((x) => x.id)) };
   return { ok: true, meshed: r.plates, cells: r.cells };

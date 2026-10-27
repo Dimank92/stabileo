@@ -14209,5 +14209,7 @@ const en: Record<string, string> = {
   "cad.plans.floorsHint": "Floors of this plan, for example 2-9 or 1, 3-4. Each floor has one plan: giving it here takes it from the other.",
   "cad.assume.planRef": "{label}: the drawing point ({x}; {y}) {unit} goes to the model's origin. {how}.",
   "proRibbon.diagnosticsDesc": "The model's and the analysis's problems, by severity: what keeps it from solving, warnings and notes, plates with no mesh or an out-of-date one included. Each item names the nodes, members or plates involved.",
+  "plates.analysisLocalLoads": "These plates have an out-of-date mesh with loads put on its elements: {names}. A new mesh cannot carry them; mesh them from their panel, which lists those loads, or load the whole plate instead.",
+  "plates.scopeNowElement": "A click on a plate now picks a mesh element. To go back to the whole plate: Selection → «Whole plate», or «Select plate» in the element's panel.",
 };
 export default en;

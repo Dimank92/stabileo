@@ -13849,5 +13849,7 @@ const pt: Translations = {
   "cad.plans.floorsHint": "Pavimentos desta planta, por exemplo 2-9 ou 1, 3-4. Cada pavimento tem uma única planta: atribuí-lo aqui o tira da outra.",
   "cad.assume.planRef": "{label}: o ponto ({x}; {y}) {unit} do desenho vai para a origem do modelo. {how}.",
   "proRibbon.diagnosticsDesc": "Os problemas do modelo e do cálculo, por gravidade: o que impede o cálculo, os alertas e os avisos, incluídas as placas sem malha ou com a malha desatualizada. Cada item indica os nós, barras ou placas envolvidos.",
+  "plates.analysisLocalLoads": "Estas placas têm a malha desatualizada e cargas colocadas em elementos dessa malha: {names}. Uma malha nova não pode levá-las; malhe-as pelo painel, que lista essas cargas, ou carregue a placa inteira.",
+  "plates.scopeNowElement": "Um clique em uma placa agora escolhe um elemento de malha. Para voltar à placa inteira: Seleção → «Placa inteira», ou «Selecionar a placa» no painel do elemento.",
 };
 export default pt;
