@@ -25,7 +25,7 @@
       "a": 0.02386,
       "iy": 0.001072,
       "iz": 0.0001262,
-      "j": 0.000004917,
+      "j": 4.917e-06,
       "b": 0.3,
       "h": 0.5,
       "shape": "I",
@@ -37,8 +37,8 @@
       "name": "IPE 400",
       "a": 0.00845,
       "iy": 0.0002313,
-      "iz": 0.00001318,
-      "j": 5.1e-7,
+      "iz": 1.318e-05,
+      "j": 5.1e-07,
       "h": 0.4,
       "b": 0.18,
       "shape": "I",
@@ -49,9 +49,9 @@
       "id": 3,
       "name": "Stay Cable",
       "a": 0.005,
-      "iy": 0.000002,
-      "iz": 0.000002,
-      "j": 0.000004,
+      "iy": 2e-06,
+      "iz": 2e-06,
+      "j": 4e-06,
       "h": 0.08,
       "b": 0.08
     }
@@ -1213,7 +1213,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     },
     {
       "id": 81,
@@ -1223,7 +1225,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     },
     {
       "id": 84,
@@ -1233,7 +1237,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     },
     {
       "id": 85,
@@ -1243,7 +1249,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     },
     {
       "id": 86,
@@ -1273,7 +1281,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     },
     {
       "id": 89,
@@ -1283,7 +1293,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     },
     {
       "id": 92,
@@ -1293,7 +1305,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     },
     {
       "id": 93,
@@ -1303,7 +1317,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     },
     {
       "id": 94,
@@ -1333,7 +1349,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     },
     {
       "id": 97,
@@ -1343,7 +1361,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     },
     {
       "id": 100,
@@ -1353,7 +1373,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     },
     {
       "id": 101,
@@ -1363,7 +1385,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     },
     {
       "id": 102,
@@ -1393,7 +1417,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     },
     {
       "id": 105,
@@ -1403,7 +1429,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     },
     {
       "id": 108,
@@ -1413,7 +1441,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     },
     {
       "id": 109,
@@ -1423,7 +1453,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     },
     {
       "id": 110,
@@ -1453,7 +1485,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     },
     {
       "id": 113,
@@ -1463,7 +1497,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     },
     {
       "id": 114,
@@ -1493,7 +1529,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     },
     {
       "id": 117,
@@ -1503,7 +1541,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     },
     {
       "id": 118,
@@ -1533,7 +1573,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     },
     {
       "id": 121,
@@ -1543,7 +1585,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     },
     {
       "id": 122,
@@ -1573,7 +1617,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     },
     {
       "id": 125,
@@ -1583,7 +1629,9 @@
       "materialId": 2,
       "sectionId": 3,
       "hingeStart": false,
-      "hingeEnd": false
+      "hingeEnd": false,
+      "behaviour": "cable",
+      "cablePretension": 200
     }
   ],
   "supports": [

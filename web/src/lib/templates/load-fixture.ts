@@ -43,6 +43,8 @@ export interface JSONModel {
     rollAngle?: number;
     /** A member of variable section: the section at end J, by the same ids as `sectionId`. */
     variableSection?: { sectionJ: number; segments?: number };
+    behaviour?: 'tensionOnly' | 'compressionOnly' | 'inactive' | 'cable';
+    cablePretension?: number;
   }>;
   supports: Array<{ id: number; nodeId: number; type: string; [k: string]: unknown }>;
   loads: Array<{ type: string; data: Record<string, unknown> }>;
@@ -169,10 +171,17 @@ export function loadFixture(json: JSONModel, api: FixtureLoader): void {
     if (matId !== 1) api.updateElementMaterial(newId, matId);
     if (secId !== 1) api.updateElementSection(newId, secId);
 
-    // Analytical member offset (PR [7]) and profile roll — both set directly on the
-    // created element, because `FixtureLoader` exposes no setter for either.
-    if (e.offset || e.rollAngle !== undefined || e.variableSection || e.name) {
-      type Carried = { offset?: unknown; rollAngle?: number; variableSection?: { sectionJ: number; segments?: number }; name?: string };
+    // Analytical member offset (PR [7]), profile roll, and nonlinear behaviour/pretension —
+    // set directly on the created element, because `FixtureLoader` exposes no setter for them.
+    if (e.offset || e.rollAngle !== undefined || e.variableSection || e.name || e.behaviour || e.cablePretension !== undefined) {
+      type Carried = {
+        offset?: unknown;
+        rollAngle?: number;
+        variableSection?: { sectionJ: number; segments?: number };
+        name?: string;
+        behaviour?: string;
+        cablePretension?: number;
+      };
       const created = (api.model as unknown as { elements?: Map<number, Carried> }).elements?.get?.(newId)
         ?? (api as unknown as { elements?: Map<number, Carried> }).elements?.get?.(newId);
       if (created) {
@@ -180,6 +189,8 @@ export function loadFixture(json: JSONModel, api: FixtureLoader): void {
         if (e.rollAngle !== undefined) created.rollAngle = e.rollAngle;
         if (e.variableSection) created.variableSection = { ...e.variableSection, sectionJ: secMap.get(e.variableSection.sectionJ) ?? e.variableSection.sectionJ };
         if (e.name) created.name = e.name;
+        if (e.behaviour) created.behaviour = e.behaviour;
+        if (e.cablePretension !== undefined) created.cablePretension = e.cablePretension;
       }
     }
 

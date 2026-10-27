@@ -37,13 +37,19 @@ describe.each(PRO_EXAMPLES.filter((e) => e.source === 'fixture').map((e) => [e.i
 
     // A combination's name adds up what it holds: none names a load type the model has no case of.
     const types = new Set(modelStore.model.loadCases.map((c) => c.type));
-    if (id === 'offshore-platform') {
-      for (const c of modelStore.combinations) for (const m of c.name.matchAll(/\d(?:\.\d+)?\s*([A-Z][a-z]?)\b/g)) expect(types, `${c.name}`).toContain(m[1]);
-    }
-
     const dead = modelStore.model.loadCases.find((c) => c.type === 'D')!;
     const d = r.perCase.get(dead.id)!;
     const [hx, hy, v] = resultant(d);
+
+    if (id === 'offshore-platform') {
+      for (const c of modelStore.combinations) for (const m of c.name.matchAll(/\d(?:\.\d+)?\s*([A-Z][a-z]?)\b/g)) expect(types, `${c.name}`).toContain(m[1]);
+      // Deck under the flare no longer sags excessively relative to jacket corner legs (#372)
+      const dispMap = new Map(d.displacements.map((disp) => [disp.nodeId, disp]));
+      const flareDeckUz = dispMap.get(199)!.uz;
+      const legUz = dispMap.get(177)!.uz;
+      expect(Math.abs(flareDeckUz - legUz), 'offshore-platform relative flare deck sag').toBeLessThan(0.05);
+    }
+
     if (id === 'la-bombonera') {
       // Dead load down, and nothing sideways under it: it was written for a Y-up model. Its wind
       // is a wind: sideways, and nothing down (it once added 14.6 MN of downward load).
@@ -53,6 +59,10 @@ describe.each(PRO_EXAMPLES.filter((e) => e.source === 'fixture').map((e) => [e.i
       const [wx, wy, wv] = resultant(r.perCase.get(w.id)!);
       expect(Math.hypot(wx, wy)).toBeGreaterThan(1000);
       expect(Math.abs(wv)).toBeLessThan(1e-6 * Math.hypot(wx, wy));
+      // Realistic stadium live load per CIRSOC 101 (> 5,000 kN on grandstands, not the old token 569 kN; #372)
+      const live = modelStore.model.loadCases.find((c) => c.type === 'L')!;
+      const [, , liveV] = resultant(r.perCase.get(live.id)!);
+      expect(liveV, 'la-bombonera live load resultant').toBeGreaterThan(5000);
     }
     if (id === 'xl-diagrid-tower') {
       expect(Math.hypot(hx, hy)).toBeLessThan(1e-6 * v);
@@ -63,8 +73,13 @@ describe.each(PRO_EXAMPLES.filter((e) => e.source === 'fixture').map((e) => [e.i
       const crane = modelStore.model.loadCases.find((c) => c.name === 'Crane')!;
       expect(resultant(r.perCase.get(crane.id)!)[2]).toBeCloseTo(2 * 60 + 2 * 25, 6);
     }
-    if (id === 'suspension-bridge' || id === 'cable-stayed-bridge') {
+    if (id === 'suspension-bridge') {
       expect([...modelStore.elements.values()].some((e) => e.behaviour === 'tensionOnly')).toBe(true);
+    }
+    if (id === 'cable-stayed-bridge') {
+      // Stays work as cables with pretension, eliminating large dead-load deflection (#372)
+      const stays = [...modelStore.elements.values()].filter((e) => e.behaviour === 'cable' && (e.cablePretension ?? 0) > 0);
+      expect(stays.length, 'cable-stayed-bridge pretensioned stays').toBeGreaterThan(0);
     }
   }, 600_000);
 });

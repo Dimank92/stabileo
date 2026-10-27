@@ -192,7 +192,7 @@ export const PRO_EXAMPLES: readonly ProExample[] = [
   // ── Towers ──
   entry({ id: 'pro-guyed-tower', source: 'code', group: 'towers', tags: ['pro.tagCables', 'pro.tagTensionOnly'], stats: { nodes: 90, members: 261 }, selfWeight: 'all', combinations: 'regulation' }),
   // The platform's "E" is wave and current, not an earthquake: it keeps its own combinations.
-  entry({ id: 'offshore-platform', source: 'fixture', group: 'towers', tags: ['pro.tagSteel', 'pro.tagOffshore'], stats: { nodes: 203, members: 780 }, selfWeight: 'all', combinations: 'own' }),
+  entry({ id: 'offshore-platform', source: 'fixture', group: 'towers', tags: ['pro.tagSteel', 'pro.tagOffshore'], stats: { nodes: 203, members: 784 }, selfWeight: 'all', combinations: 'own' }),
   entry({ id: 'xl-diagrid-tower', source: 'fixture', group: 'towers', tags: ['pro.tagScale', 'pro.tagDrift'], stats: { nodes: 1090, members: 3414 }, selfWeight: 'all', combinations: 'regulation' }),
 
   // ── Bridges and long spans ──

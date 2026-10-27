@@ -77,6 +77,10 @@ export const PRO_EXAMPLE_FIXES: Readonly<Record<string, Fix>> = {
    */
   'suspension-bridge': () => tensionOnly(membersWhere((s, m) => /cable/i.test(m) && !/main/i.test(s))),
 
-  /* The stays, drawn as trusses, work in tension only. */
-  'cable-stayed-bridge': () => tensionOnly(membersWhere((s) => /stay/i.test(s))),
+  /* The stays work as cables with pretension, eliminating large dead-load deflection (#372). */
+  'cable-stayed-bridge': () => {
+    for (const id of membersWhere((s) => /stay/i.test(s))) {
+      modelStore.updateElement(id, { behaviour: 'cable', cablePretension: 200 } as never);
+    }
+  },
 };

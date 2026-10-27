@@ -21,7 +21,7 @@
   "sections": [
     {
       "id": 1,
-      "name": "Leg — CHS 1200×40",
+      "name": "Leg \u2014 CHS 1200\u00d740",
       "a": 0.1458,
       "iy": 0.02436,
       "iz": 0.02436,
@@ -33,7 +33,7 @@
     },
     {
       "id": 2,
-      "name": "Intermediate Leg — CHS 900×30",
+      "name": "Intermediate Leg \u2014 CHS 900\u00d730",
       "a": 0.08199,
       "iy": 0.007614,
       "iz": 0.007614,
@@ -45,7 +45,7 @@
     },
     {
       "id": 3,
-      "name": "Horizontal — CHS 800×25",
+      "name": "Horizontal \u2014 CHS 800\u00d725",
       "a": 0.06086,
       "iy": 0.004536,
       "iz": 0.004536,
@@ -57,7 +57,7 @@
     },
     {
       "id": 4,
-      "name": "Brace — CHS 600×20",
+      "name": "Brace \u2014 CHS 600\u00d720",
       "a": 0.03644,
       "iy": 0.001525,
       "iz": 0.001525,
@@ -69,7 +69,7 @@
     },
     {
       "id": 5,
-      "name": "Conductor — CHS 500×15",
+      "name": "Conductor \u2014 CHS 500\u00d715",
       "a": 0.02286,
       "iy": 0.000658,
       "iz": 0.000658,
@@ -81,7 +81,7 @@
     },
     {
       "id": 6,
-      "name": "Deck Beam — RHS 500×300×16",
+      "name": "Deck Beam \u2014 RHS 500\u00d7300\u00d716",
       "a": 0.02368,
       "iy": 0.000962,
       "iz": 0.000445,
@@ -93,10 +93,10 @@
     },
     {
       "id": 7,
-      "name": "Secondary — CHS 300×10",
+      "name": "Secondary \u2014 CHS 300\u00d710",
       "a": 0.00911,
-      "iy": 0.0000934,
-      "iz": 0.0000934,
+      "iy": 9.34e-05,
+      "iz": 9.34e-05,
       "j": 0.0001868,
       "shape": "CHS",
       "b": 0.3,
@@ -105,7 +105,7 @@
     },
     {
       "id": 8,
-      "name": "Boom/Crane — CHS 400×12",
+      "name": "Boom/Crane \u2014 CHS 400\u00d712",
       "a": 0.01463,
       "iy": 0.000271,
       "iz": 0.000271,
@@ -9134,6 +9134,46 @@
       "nodeJ": 199,
       "materialId": 1,
       "sectionId": 6,
+      "hingeStart": false,
+      "hingeEnd": false
+    },
+    {
+      "id": 800,
+      "type": "frame",
+      "nodeI": 161,
+      "nodeJ": 185,
+      "materialId": 1,
+      "sectionId": 1,
+      "hingeStart": false,
+      "hingeEnd": false
+    },
+    {
+      "id": 801,
+      "type": "frame",
+      "nodeI": 162,
+      "nodeJ": 188,
+      "materialId": 1,
+      "sectionId": 1,
+      "hingeStart": false,
+      "hingeEnd": false
+    },
+    {
+      "id": 802,
+      "type": "frame",
+      "nodeI": 163,
+      "nodeJ": 191,
+      "materialId": 1,
+      "sectionId": 1,
+      "hingeStart": false,
+      "hingeEnd": false
+    },
+    {
+      "id": 803,
+      "type": "frame",
+      "nodeI": 164,
+      "nodeJ": 194,
+      "materialId": 1,
+      "sectionId": 1,
       "hingeStart": false,
       "hingeEnd": false
     }
