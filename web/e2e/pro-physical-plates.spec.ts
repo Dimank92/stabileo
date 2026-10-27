@@ -160,4 +160,15 @@ test('@smoke a plate of five nodes is picked by a click in the default mode and 
   await page.getByTestId('multi-kind').check();
   await clickInside();
   await expect.poll(async () => (await sel(page)).plates).toEqual([p!.id]);
+
+  // Meshed as a grid of 0.5 m squares: exact squares inside, a transition strip along the outline.
+  await page.getByTestId('pr-cmd-shells').click();
+  await page.getByTestId('plate-mesh-open').click();
+  await page.getByTestId('plate-mesh-square').click();
+  await page.getByTestId('plate-mesh-size').fill('0.5');
+  await page.getByTestId('plate-mesh-size').press('Tab');
+  await expect(page.getByTestId('plate-mesh-plan')).toContainText(/squares of 0.5|cuadrados de 0,5/);
+  if (process.env.SHOT) await page.getByTestId('plate-mesh-dialog').screenshot({ path: process.env.SHOT });
+  await page.getByTestId('plate-mesh-apply').click();
+  await expect.poll(async () => (await plates(page))[0]!.status).toBe('current');
 });
