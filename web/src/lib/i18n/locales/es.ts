@@ -14115,5 +14115,7 @@ const es: Record<string, string> = {
   "cad.plans.floorsHint": "Pisos de esta planta, por ejemplo 2-9 o 1, 3-4. Cada piso tiene una sola planta: asignarlo acá se lo saca a la otra.",
   "cad.assume.planRef": "{label}: el punto ({x}; {y}) {unit} del dibujo va al origen del modelo. {how}.",
   "proRibbon.diagnosticsDesc": "Los problemas del modelo y del cálculo, por gravedad: lo que impide calcular, las advertencias y los avisos, incluidas las placas sin malla o con la malla desactualizada. Cada punto nombra los nodos, barras o placas afectados.",
+  "plates.analysisLocalLoads": "Estas placas tienen la malla desactualizada y cargas puestas sobre elementos de esa malla: {names}. Una malla nueva no las puede llevar; mallalas desde su panel, que lista esas cargas, o cargalas sobre la placa entera.",
+  "plates.scopeNowElement": "Un clic sobre una placa ahora elige un elemento de malla. Para volver a la placa completa: Selección → «Placa completa», o «Seleccionar la placa» en el panel del elemento.",
 };
 export default es;

@@ -62,6 +62,7 @@
   const fmt = (q: PlateQuantity, v: number) => (q.startsWith('m') ? fmtQ(v, 'force') : fmtQ(v, QTY[q].q));
   function show(at: string) {
     if (at.startsWith('N')) { uiStore.selectNode(Number(at.slice(1))); return; }
+    if (uiStore.shellPickScope !== 'element') uiStore.toast(t('plates.scopeNowElement'), 'info');
     uiStore.shellPickScope = 'element';
     uiStore.selectMode = 'shells';
     uiStore.selectShell(at, false);
