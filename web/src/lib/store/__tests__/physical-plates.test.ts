@@ -275,4 +275,25 @@ describe('a physical plate', () => {
     expect(plateStatus(id)).toBe('current');
     expect(resultant(solve()).fz).toBeCloseTo(3 * 23, 6);
   });
+
+  it('meshes a plate as a grid of squares or rectangles, current, carrying its whole load', () => {
+    const { id } = build();
+    addPlateLoad(id, 1, 3);
+    // Squares of 0.5 m round a 1 x 1 m hole: exact squares where they fit, a strip round the hole.
+    const plan = planPlateMesh(id, { size: 0.5, element: 'quad', followMembers: true, pattern: 'square' })!;
+    expect(plan.mesh, plan.refused).not.toBeNull();
+    expect(plan.grid!.gridCells).toBeGreaterThan(0);
+    expect(plan.grid!.cellA).toBeCloseTo(0.5, 9);
+    applyPlateMeshes([plan]);
+    expect(plateStatus(id)).toBe('current');
+    expect(physicalPlates()[0]!.surface.mesh.pattern).toBe('square');
+    // The plate's load (3 kN/m2 on 24 - 1 m2) reaches the supports whole.
+    expect(resultant(solve()).fz).toBeCloseTo(3 * 23, 6);
+    // Another shape is another mesh: the current one goes out of date until meshed again.
+    const rect = planPlateMesh(id, { size: 1, sizeV: 0.5, element: 'quad', followMembers: true, pattern: 'rect' })!;
+    expect(rect.signature).not.toBe(plan.signature);
+    applyPlateMeshes([rect]);
+    expect(plateStatus(id)).toBe('current');
+    expect(resultant(solve()).fz).toBeCloseTo(3 * 23, 6);
+  });
 });
