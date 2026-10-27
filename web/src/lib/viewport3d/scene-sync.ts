@@ -38,6 +38,7 @@ import { variableSectionPlan } from '../section/variable';
 import { DEFAULT_VARIABLE_SEGMENTS } from '../engine/variable-members';
 import { hasShellOffset, resolveShellOffsetGlobal } from '../engine/shell-offsets';
 import { physicalPlates } from '../store/physical-plates';
+import { piece } from '../store/curved-members';
 import { plateGeometry, plateLoops } from '../model/physical/plate';
 import type { SolverNode3D } from '../engine/types-3d';
 import {
@@ -1308,9 +1309,30 @@ export function syncLocalAxes(ctx: SceneSyncContext): void {
   const group = new THREE.Group();
   group.name = 'localAxesContainer';
 
+  /*
+   * A piece selected whole (an arc, or a member a mesh cut) shows ONE triad, on its middle segment,
+   * instead of one per segment: picking pieces, its segments are all selected with it. A segment
+   * picked alone, or the 'always' setting, still shows each.
+   */
+  const pieceHidden = new Set<number>();
+  if (!memberShowAll && selected.size > 1 && selected.size <= 5000 && uiStore.analysisMode === 'pro' && uiStore.memberPickScope === 'piece') {
+    const seen = new Set<number>();
+    for (const id of selected) {
+      if (seen.has(id)) continue;
+      const pc = piece(id);
+      if (!pc || pc.segments.length <= 1) { seen.add(id); continue; }
+      const ids = pc.segments.map((sg) => sg.elementId);
+      for (const e of ids) seen.add(e);
+      if (!ids.every((e) => selected.has(e))) continue;
+      const keep = ids[Math.floor(ids.length / 2)]!;
+      for (const e of ids) if (e !== keep) pieceHidden.add(e);
+    }
+  }
+
   if (drawMembers) for (const [id, elem] of visibleElements()) {
     const isSelected = selected.has(id);
     if (!memberShowAll && !isSelected) continue;
+    if (pieceHidden.has(id)) continue;
 
     const nI = modelStore.nodes.get(elem.nodeI);
     const nJ = modelStore.nodes.get(elem.nodeJ);
