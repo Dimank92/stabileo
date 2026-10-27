@@ -110,12 +110,9 @@
   let infSnapColumns = $state(true);
   let infPruneFloating = $state(false);
   // Per-floor plan regions (crop windows of the same file → floor ranges).
-  // `ref` (raw units) is the point of the plan that goes to the model's origin, when chosen by
-  // hand; null → found by laying the plan on the one below (`alignPlans`).
+  // `ref` is in the drawing's raw units, not metres; null means aligned automatically.
   let floorRegions = $state<Array<PlanWindow & { fromFloor: number; toFloor: number; label: string; ref?: { x: number; y: number } | null }>>([]);
-  // The row whose reference point the next click on the preview sets.
   let pickingRef = $state<number | null>(null);
-  // After "Detect plans": how many were found (0 → the drawing is one plan).
   let detectedPlans = $state<number | null>(null);
   // Set once the user has acknowledged an uncovered-floor gap so the next build
   // proceeds (gaps become warnings instead of a blocking error).
@@ -290,13 +287,11 @@
     fitFloors();
   }
 
-  /** The building is at least as tall as its highest plan range. */
   function fitFloors(): void {
     const top = Math.max(0, ...floorRegions.map((r) => (Number.isFinite(r.toFloor) ? r.toFloor : 0)));
     if (top > nFloors) nFloors = top;
   }
 
-  /** The separate plans of the drawing, one floor each, lowest first. */
   function detectPlans(): void {
     if (!doc) return;
     const wins = detectPlanWindows(doc, unit, mappings);
@@ -312,14 +307,12 @@
 
   const unitScale = $derived(CAD_UNIT_SCALE[unit]);
 
-  /** Each region's plan, read with the current layer roles (for laying them and for the picks). */
   const regionPlans = $derived.by(() => {
     const d = doc;
     if (!d || !floorRegions.length) return [];
     return floorRegions.map((r) => extractArchPlan(cropDoc(d, sanitizeWin(r)), mappings, unit));
   });
 
-  /** Each region's reference point (metres, drawing coordinates) and how it was found. */
   const regionAlign = $derived.by((): PlanAlignment[] => {
     if (regionPlans.length !== floorRegions.length || !floorRegions.length) return [];
     const order = floorRegions.map((_, i) => i).sort((a, b) => floorRegions[a]!.fromFloor - floorRegions[b]!.fromFloor || a - b);
@@ -331,7 +324,6 @@
     return out;
   });
 
-  /** A region's reference point in the drawing's raw units. */
   function regionRef(i: number): { x: number; y: number } {
     const a = regionAlign[i];
     return a ? { x: a.ref.x / unitScale, y: a.ref.y / unitScale } : { x: floorRegions[i]!.x0, y: floorRegions[i]!.y0 };
@@ -346,8 +338,6 @@
     return t('cad.plans.alignManual');
   }
 
-  /** The reference point taken from a click: the region's nearest column or member end within
-   *  12 px, else the point clicked. */
   function pickRef(i: number, sx: number, sy: number): void {
     const view = ensureView();
     const w = screenToWorld(view, sx, sy);
@@ -402,7 +392,6 @@
     if (step === 1 && view && floorRegions.length) drawRegions(canvas, view);
   });
 
-  /** The plans over the drawing: each window with its name and its reference point. */
   function drawRegions(c: HTMLCanvasElement, view: PreviewView): void {
     const ctx = c.getContext('2d');
     if (!ctx) return;
@@ -631,8 +620,6 @@
       if (floorRegions.length > 0 && doc) {
         // Per-floor plans: each region is a crop window of the same file,
         // read through the same layer mapping (PR [14] Layer 3).
-        // Each moved so its reference point lands on the origin: the plans lie on each other
-        // wherever on the sheet they were drawn.
         const floorPlans: FloorPlanSpec[] = floorRegions.map((r, i) => ({
           plan: extractArchPlan((() => { const ref = regionRef(i); return shiftDoc(cropDoc(doc!, sanitizeWin(r)), -ref.x, -ref.y); })(), mappings, unit),
           fromFloor: r.fromFloor, toFloor: r.toFloor, label: r.label,

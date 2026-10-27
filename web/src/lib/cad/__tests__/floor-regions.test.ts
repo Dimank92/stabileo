@@ -1,7 +1,3 @@
-/**
- * Several floor plans in one drawing (`floor-regions.ts`): found in reading order, and laid on
- * each other by their columns, wherever on the sheet each was drawn.
- */
 import { describe, it, expect } from 'vitest';
 import { parseCadDxf } from '../parse';
 import { extractArchPlan, suggestLayerMappings } from '../classify';

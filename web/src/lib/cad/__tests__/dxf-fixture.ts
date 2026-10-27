@@ -184,12 +184,6 @@ export function simplePlanDxf(): string {
   });
 }
 
-/**
- * Three floor plans of one building drawn side by side on one sheet (metres): a ground floor and
- * a first floor, each a 2 × 1 bay frame of 5 m × 4 m bays (six 0.30 m columns and their beams),
- * 30 m apart; and a smaller top floor (one bay) 60 m to the right and 1 m up. A 0.5 m line drawn
- * far off on VIGAS (a detail) and a title block on its own layer complete the sheet.
- */
 export function multiPlanDxf(): string {
   const plan = (ox: number, oy: number, xs: number[], ys: number[]): string[] => {
     const out: string[] = [];
