@@ -13635,5 +13635,6 @@ const pt: Translations = {
   "plates.meshKind.squares": "{n} quadrados de {a} {unit}",
   "plates.meshKind.band": "e {n} de transição ({tri} triângulos)",
   "plates.editedWhole": "Aplicado à placa inteira: {names}. Um elemento da sua malha é editado com a placa.",
+  "proRibbon.diagnosticsDesc": "Os problemas do modelo e do cálculo, por gravidade: o que impede o cálculo, os alertas e os avisos, incluídas as placas sem malha ou com a malha desatualizada. Cada item indica os nós, barras ou placas envolvidos.",
 };
 export default pt;

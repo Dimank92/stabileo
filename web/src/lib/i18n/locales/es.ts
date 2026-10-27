@@ -13984,5 +13984,6 @@ const es: Record<string, string> = {
   "plates.meshKind.squares": "{n} cuadrados de {a} {unit}",
   "plates.meshKind.band": "y {n} de transición ({tri} triángulos)",
   "plates.editedWhole": "Se aplicó a toda la placa: {names}. Un elemento de su malla se edita con la placa.",
+  "proRibbon.diagnosticsDesc": "Los problemas del modelo y del cálculo, por gravedad: lo que impide calcular, las advertencias y los avisos, incluidas las placas sin malla o con la malla desactualizada. Cada punto nombra los nodos, barras o placas afectados.",
 };
 export default es;
