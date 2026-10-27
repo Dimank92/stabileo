@@ -7,6 +7,7 @@
   import { modelStore } from '../../../lib/store';
   import { t, tp } from '../../../lib/i18n';
   import { applyZoneLoadPlan, zoneLoadPlan } from '../../../lib/store/use-zones';
+  import { fmtQ, unitQ } from '../../../lib/store/display-units.svelte';
 
   let { onclose }: { onclose: () => void } = $props();
   const plan = $derived.by(() => { void modelStore.modelVersion; void modelStore.model.groups; return zoneLoadPlan(); });
@@ -27,10 +28,11 @@
     <h3>{t('useZones.planTitle')}</h3>
     {#if plan}
       <p class="zp-hint">{t('useZones.planHint')}</p>
-      {#if plan.add.length}<h4>{tp('useZones.planAdd', { n: plan.add.length })}</h4><ul>{#each plan.add as a (`${a.zoneId}|${a.role}`)}<li>{a.zone} · {t(`useZones.role.${a.role}`)}: {a.q} kN/m² · {caseName(a.caseId)} · {dist(a.distribution)}</li>{/each}</ul>{/if}
-      {#if plan.change.length}<h4>{tp('useZones.planChange', { n: plan.change.length })}</h4><ul>{#each plan.change as c (`${c.zoneId}|${c.role}`)}<li>{c.zone} · {t(`useZones.role.${c.role}`)}: {c.from.q} → {c.q} kN/m²{c.from.distribution !== c.distribution ? ` · ${dist(c.distribution)}` : ''}</li>{/each}</ul>{/if}
+      {#if plan.add.length}<h4>{tp('useZones.planAdd', { n: plan.add.length })}</h4><ul>{#each plan.add as a (`${a.zoneId}|${a.role}`)}<li>{a.zone} · {t(`useZones.role.${a.role}`)}: {fmtQ(a.q, 'areaLoad')} {unitQ('areaLoad')} · {caseName(a.caseId)} · {dist(a.distribution)}</li>{/each}</ul>{/if}
+      {#if plan.change.length}<h4>{tp('useZones.planChange', { n: plan.change.length })}</h4><ul>{#each plan.change as c (`${c.zoneId}|${c.role}`)}<li>{c.zone} · {t(`useZones.role.${c.role}`)}: {fmtQ(c.from.q, 'areaLoad')} → {fmtQ(c.q, 'areaLoad')} {unitQ('areaLoad')}{c.from.distribution !== c.distribution ? ` · ${dist(c.distribution)}` : ''}</li>{/each}</ul>{/if}
       {#if plan.remove.length}<h4>{tp('useZones.planRemove', { n: plan.remove.length })}</h4><ul>{#each plan.remove as r (r.defId)}<li>{r.zone}</li>{/each}</ul>{/if}
       {#if plan.unresolved.length}<h4 class="warn">{tp('useZones.planUnresolved', { n: plan.unresolved.length })}</h4><ul>{#each plan.unresolved as u (u.zoneId)}<li>{u.zone}: {t(`useZones.status.${u.status}`)}</li>{/each}</ul>{/if}
+      {#if plan.finishNoCase.length}<h4 class="warn" data-testid="use-zones-plan-no-dead">{tp('useZones.planFinishNoCase', { n: plan.finishNoCase.length })}</h4><ul>{#each plan.finishNoCase as f (f.zoneId)}<li>{f.zone}</li>{/each}</ul>{/if}
       {#if !plan.add.length && !plan.change.length && !plan.remove.length}<p data-testid="use-zones-plan-empty">{t('useZones.planNothing')}</p>{/if}
     {:else}
       <p>{t('useZones.noLiveCase')}</p>

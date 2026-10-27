@@ -8,7 +8,7 @@ import { meshBeforeAnalysis } from './mesh-policy.svelte';
 import type { SolverDiagnostic } from '../engine/types';
 import { modelStore } from './model.svelte';
 import { useZones, zoneLoadPlan } from './use-zones';
-import { zoneHasShells, zoneOverlap, zoneStatus, zoneUnsupported, zoneUseOf } from '../model/use-zones';
+import { zoneHasShells, zoneOverUnmeshedPlate, zoneOverlap, zoneStatus, zoneUnsupported, zoneUseOf } from '../model/use-zones';
 import type { DefinitionModel } from '../model/loads/floor-definitions';
 
 export function plateDiagnostics(t: (key: string) => string): SolverDiagnostic[] {
@@ -42,7 +42,7 @@ export function zoneDiagnostics(t: (key: string) => string): SolverDiagnostic[] 
     if (s === 'pending') out.push({ ...base(z.id, z.name), severity: 'warning', code: 'ZONE_PENDING', message: t('useZones.diag.pending') });
     if (s === 'unsupported') out.push({ ...base(z.id, z.name), severity: 'warning', code: 'ZONE_NO_VALUE', message: t('useZones.diag.unsupported') });
     const off = zoneUnsupported(m, z.id);
-    if (off > 1e-3 && zoneHasShells(m, z.id)) out.push({ ...base(z.id, z.name), severity: 'warning', code: 'ZONE_OFF_SLAB', message: t('useZones.diag.offSlab'), details: { zone: z.name, area: Math.round(off * 100) / 100 } });
+    if (off > 1e-3 && zoneHasShells(m, z.id) && !zoneOverUnmeshedPlate(m, z.id)) out.push({ ...base(z.id, z.name), severity: 'warning', code: 'ZONE_OFF_SLAB', message: t('useZones.diag.offSlab'), details: { zone: z.name, area: Math.round(off * 100) / 100 } });
   }
   for (let i = 0; i < zones.length; i++) for (let j = i + 1; j < zones.length; j++) {
     if (Math.abs(zones[i]!.z - zones[j]!.z) > 1e-6) continue;
@@ -50,6 +50,7 @@ export function zoneDiagnostics(t: (key: string) => string): SolverDiagnostic[] 
     if (a > 1e-3) out.push({ source: 'model', objects: [{ kind: 'zone', id: zones[i]!.id }, { kind: 'zone', id: zones[j]!.id }], severity: 'warning', code: 'ZONE_OVERLAP', message: t('useZones.diag.overlap'), details: { zone: `${zones[i]!.name} / ${zones[j]!.name}`, area: Math.round(a * 100) / 100 } });
   }
   const plan = zoneLoadPlan();
+  if (plan?.finishNoCase.length) out.push({ source: 'model', objects: plan.finishNoCase.map((f) => ({ kind: 'zone' as const, id: f.zoneId })), severity: 'warning', code: 'ZONE_FINISH_NO_CASE', message: t('useZones.diag.finishNoCase'), details: { zone: plan.finishNoCase.map((f) => f.zone).join(', ') } });
   if (plan && plan.add.length + plan.change.length + plan.remove.length > 0) {
     out.push({ source: 'model', objects: [...new Set([...plan.add, ...plan.change].map((x) => x.zoneId))].map((id) => ({ kind: 'zone' as const, id })), severity: 'warning', code: 'ZONE_LOADS_STALE', message: t('useZones.diag.stale'), details: { add: plan.add.length, change: plan.change.length, remove: plan.remove.length } });
   }

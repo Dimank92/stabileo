@@ -14,7 +14,7 @@
 import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
 import * as wasmSolver from '../../engine/wasm-solver';
 import { historyStore, modelStore, uiStore } from '..';
-import { applyPlateMeshes, createPlate, physicalPlates, planPlateMesh } from '../physical-plates';
+import { applyPlateMeshes, createPlate, physicalPlates, planPlateMesh, preparePlatesForAnalysis } from '../physical-plates';
 import { applyZoneLoadPlan, confirmZoneUse, copyZonesToLevels, createUseZone, deleteUseZones, setZoneUse, suggestUse, useZones, zoneLoadPlan } from '../use-zones';
 import { syncDefinedLoadsForAnalysis } from '../defined-loads';
 import { serializeProject, deserializeProject } from '../file';
@@ -200,6 +200,33 @@ describe('use zones over two floors', () => {
     plan = zoneLoadPlan()!;
     expect(plan.remove).toHaveLength(1);
     expect(plan.add.length + plan.change.length).toBe(0);
+  });
+
+  it('says when finishes cannot be applied for want of a dead-load case', async () => {
+    const { addFinishPackage } = await import('../use-zones');
+    modelStore.clear(); historyStore.clear(); uiStore.analysisMode = 'pro';
+    floor(3);
+    meshAll(0.5);
+    for (const c of modelStore.model.loadCases.filter((c) => c.type === 'D')) modelStore.removeLoadCase(c.id);
+    const z1 = zone([[0, 2.5], [3, 2.5], [3, 5], [0, 5]], 3, 'Estar');
+    const pkg = addFinishPackage('Piso', { layers: [{ name: 'piso', q: 1 }] });
+    setZoneUse([z1], { occupancy: 'vivienda', provenance: 'confirmed', finish: String(pkg) });
+    const plan = zoneLoadPlan()!;
+    expect(plan.add.map((a) => a.role)).toEqual(['live']);
+    expect(plan.finishNoCase).toEqual([{ zoneId: z1, zone: 'Estar' }]);
+  });
+
+  it('puts a zone drawn before its plate is meshed onto the slab, not onto the members', () => {
+    modelStore.clear(); historyStore.clear(); uiStore.analysisMode = 'pro';
+    floor(3);
+    const z1 = zone([[0, 0], [6, 0], [6, 5], [0, 5]], 3, 'Oficina');
+    setZoneUse([z1], { occupancy: 'oficina', provenance: 'confirmed' });
+    const plan = zoneLoadPlan()!;
+    expect(plan.add.map((i) => i.distribution)).toEqual(['slab']);
+    applyZoneLoadPlan(plan);
+    expect(preparePlatesForAnalysis().ok).toBe(true);
+    expect(zoneTotals().get(z1)).toBeCloseTo(2.5 * 29, 6);
+    expect(zoneLoadPlan()!.change).toHaveLength(0);
   });
 
   it('solves with the zones loading the floor, and the reactions add up to their loads', () => {

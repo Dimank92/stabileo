@@ -29,6 +29,7 @@ import { findOccupancy, type OccupancyEntry } from '../codes/cirsoc101/live-load
 import { zoneArea, zoneOutline, type DefinitionModel, type FloorLoadDef, type ZoneData } from './loads/floor-definitions';
 import { shellLoadForces } from '../engine/shell-load-integration';
 import type { ModelGroup } from '../store/model.svelte';
+import { plateLoops, plateSurfaceOf } from './physical/plate';
 
 export interface ZoneUse {
   /** The room's name, as drawn or typed. */
@@ -100,6 +101,8 @@ export interface ZonePlan {
   remove: Array<{ defId: number; zoneId: number | null; zone: string }>;
   /** Zones whose use leaves the load undecided: unassigned, pending, a row with no value. */
   unresolved: Array<{ zoneId: number; zone: string; status: ZoneStatus }>;
+  /** Zones given finishes while the model has no dead-load case to put them in. */
+  finishNoCase: Array<{ zoneId: number; zone: string }>;
 }
 
 /** Whether a zone has shells under it in its plane: the load goes onto the slab, else to the members. */
@@ -123,6 +126,25 @@ export function zoneHasShells(m: DefinitionModel, zoneId: number): boolean {
   };
   for (const q of m.quads.values()) if (reach('quad', q.nodes)) return true;
   for (const p of m.plates.values()) if (reach('plate', p.nodes)) return true;
+  return zoneOverUnmeshedPlate(m, zoneId);
+}
+
+/** A physical plate with no mesh yet under the zone, in its plane: the slab its load goes onto once meshed. */
+export function zoneOverUnmeshedPlate(m: DefinitionModel, zoneId: number): boolean {
+  const z = zoneOutline(m, zoneId);
+  if (!z) return false;
+  const zl = z.outer[0]![2];
+  const zoneTris = triangles(z.outer.map((p) => [p[0], p[1]] as [number, number]));
+  for (const g of m.groups.values()) {
+    if (g.kind !== 'physicalMember' || !plateSurfaceOf(g)) continue;
+    if ((g.members.quads?.length ?? 0) + (g.members.plates?.length ?? 0) > 0) continue;
+    const pts = plateLoops(g).outer.map((id) => m.nodes.get(id));
+    if (pts.length < 3 || pts.some((p) => !p || Math.abs((p.z ?? 0) - zl) > 1e-3)) continue;
+    const plateTris = triangles(pts.map((p) => [p!.x, p!.y] as [number, number]));
+    let shared = 0;
+    for (const a of zoneTris) for (const b of plateTris) shared += Math.abs(area(clip(a, b)));
+    if (shared > 1e-6) return true;
+  }
   return false;
 }
 
@@ -132,7 +154,7 @@ export function zoneHasShells(m: DefinitionModel, zoneId: number): boolean {
  * definitions of the others are left alone); absent, every zone.
  */
 export function planZoneLoads(m: DefinitionModel, liveCaseId: number, zoneIds?: readonly number[], deadCaseId: number | null = null): ZonePlan {
-  const plan: ZonePlan = { add: [], change: [], remove: [], unresolved: [] };
+  const plan: ZonePlan = { add: [], change: [], remove: [], unresolved: [], finishNoCase: [] };
   const zones = [...m.groups.values()].filter((g) => g.kind === 'loadZone' && (!zoneIds || zoneIds.includes(g.id)));
   const defs = [...m.groups.values()].filter((g) => g.kind === 'floorLoad' && (g.data as { fromZone?: number } | undefined)?.fromZone !== undefined);
   const key = (z: number, r: ZoneLoadRole) => `${z}|${r}`;
@@ -169,7 +191,10 @@ export function planZoneLoads(m: DefinitionModel, liveCaseId: number, zoneIds?: 
     const pkg = use?.finish !== undefined ? packages.get(Number(use.finish)) : undefined;
     const total = finishTotal(pkg);
     if (pkg && total > 0 && deadCaseId !== null) want(z, 'finish', Math.round(total * 1e6) / 1e6, deadCaseId);
-    else drop(z, 'finish');
+    else {
+      if (pkg && total > 0) plan.finishNoCase.push({ zoneId: z.id, zone: z.name });
+      drop(z, 'finish');
+    }
   }
   return plan;
 }

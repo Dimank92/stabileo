@@ -14211,5 +14211,7 @@ const en: Record<string, string> = {
   "proRibbon.diagnosticsDesc": "The model's and the analysis's problems, by severity: what keeps it from solving, warnings and notes, plates with no mesh or an out-of-date one included. Each item names the nodes, members or plates involved.",
   "plates.analysisLocalLoads": "These plates have an out-of-date mesh with loads put on its elements: {names}. A new mesh cannot carry them; mesh them from their panel, which lists those loads, or load the whole plate instead.",
   "plates.scopeNowElement": "A click on a plate now picks a mesh element. To go back to the whole plate: Selection → «Whole plate», or «Select plate» in the element's panel.",
+  "useZones.planFinishNoCase": "{n} zone(s) with finishes that are not applied: the model has no dead-load case (D). Add one and generate again.",
+  "useZones.diag.finishNoCase": "Zone with finishes not applied: there is no dead-load case (D)",
 };
 export default en;
