@@ -201,7 +201,7 @@
             <div class="dxf-layers">
               {#each parseResult.layers as layer}
                 <span class="dxf-layer" class:known={KNOWN_LAYERS.has(layer.toUpperCase())}>
-                  {KNOWN_LAYERS.has(layer.toUpperCase()) ? '&#10003;' : '&#8226;'} {layer}
+                  {KNOWN_LAYERS.has(layer.toUpperCase()) ? '✓' : '•'} {layer}
                 </span>
               {/each}
               {#if parseResult.layers.length === 0}
@@ -328,8 +328,8 @@
   .dxf-filename {
     padding: 0.5rem 1.25rem;
     font-size: 0.8rem;
-    color: var(--st-value);
-    font-family: monospace;
+    color: var(--st-text-2);
+    font-family: var(--st-mono);
   }
 
   .dxf-body {
@@ -393,7 +393,7 @@
   }
 
   .dxf-layer.known {
-    color: var(--st-value);
+    color: var(--st-text);
     background: var(--st-selected-bg);
   }
 

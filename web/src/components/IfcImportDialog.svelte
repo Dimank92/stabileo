@@ -293,7 +293,15 @@
   .ifc-classes { width: 100%; border-collapse: collapse; font-size: 0.78rem; margin: 4px 0; }
   .ifc-classes th { text-align: left; font-weight: 500; opacity: 0.75; padding: 2px 4px; }
   .ifc-classes td { padding: 2px 4px; }
-  .ifc-classes .mono { font-family: monospace; }
+  .ifc-classes .mono { font-family: var(--st-mono); color: var(--st-text); }
+  .ifc-classes select {
+    background: var(--st-surface-3);
+    border: 1px solid var(--st-hair-strong);
+    border-radius: var(--st-radius);
+    color: var(--st-text);
+    padding: 2px 6px;
+    font-size: 0.75rem;
+  }
   .ifc-hint { font-size: 0.75rem; opacity: 0.75; margin: 2px 0; }
   .ifc-overlay {
     position: fixed;
@@ -312,9 +320,9 @@
 
   .ifc-dialog {
     position: relative;
-    background: var(--st-ink);
+    background: var(--st-surface);
     border: 1px solid var(--st-hair-strong);
-    border-radius: 12px;
+    border-radius: var(--st-radius-lg);
     width: min(500px, 90vw);
     max-height: 80vh;
     display: flex;
@@ -332,7 +340,9 @@
 
   .ifc-header h2 {
     margin: 0;
-    font-size: 1.1rem;
+    font-size: 1rem;
+    font-family: var(--st-display);
+    font-weight: 600;
     color: var(--st-text);
   }
 
@@ -357,8 +367,8 @@
   .ifc-filename {
     padding: 8px 20px;
     font-size: 0.75rem;
-    color: var(--st-value);
-    font-family: monospace;
+    color: var(--st-text-2);
+    font-family: var(--st-mono);
   }
 
   .ifc-body {
@@ -444,7 +454,7 @@
   .ifc-preview h3 {
     margin: 0 0 8px;
     font-size: 0.85rem;
-    color: var(--st-value);
+    color: var(--st-text);
   }
 
   .ifc-stats {
@@ -470,7 +480,7 @@
     padding: 2px 6px;
     margin: 2px;
     background: var(--st-hair-strong);
-    border-radius: 3px;
+    border-radius: var(--st-radius);
     font-size: 0.7rem;
     color: var(--st-text);
   }
@@ -478,7 +488,7 @@
   .ifc-warnings {
     margin-top: 12px;
     padding: 8px;
-    background: var(--st-danger-bg);
+    background: var(--st-warn-bg);
     border-radius: var(--st-radius);
   }
 
@@ -517,10 +527,10 @@
 
   .ifc-btn-import {
     padding: 6px 16px;
-    background: var(--st-value);
+    background: var(--st-accent);
     border: none;
     border-radius: var(--st-radius);
-    color: var(--st-ink);
+    color: var(--st-text-on-accent);
     cursor: pointer;
     font-size: 0.8rem;
     font-weight: 600;
