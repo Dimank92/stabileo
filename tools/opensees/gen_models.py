@@ -133,9 +133,11 @@ def _rich_2d(seed):
             if rng.random() < 0.4:
                 s["angle"] = rng.uniform(-1.2, 1.2)
         elif rng.random() < 0.3:
-            s["dx"] = rng.uniform(-0.01, 0.01)
-            s["dz"] = rng.uniform(-0.01, 0.01)
-            s["dry"] = rng.uniform(-0.002, 0.002)
+            fl = {"fixed": (1, 1, 1), "pinned": (1, 1, 0), "rollerX": (0, 1, 0),
+                  "rollerZ": (1, 0, 0), "guidedX": (0, 1, 1), "guidedZ": (1, 0, 1)}.get(typ, (1, 1, 1))
+            for key, r_, lim in (("dx", fl[0], 0.01), ("dz", fl[1], 0.01), ("dry", fl[2], 0.002)):
+                if r_:
+                    s[key] = rng.uniform(-lim, lim)
         sups[str(k)] = s
     loads = []
     lengths = {e["id"]: math.dist(pts[e["nodeI"] - 1], pts[e["nodeJ"] - 1]) for e in elems.values()}
@@ -145,7 +147,10 @@ def _rich_2d(seed):
             loads.append({"type": "nodal", "data": {"nodeId": rng.randint(1, n), "fx": rng.uniform(-50, 50),
                                                     "fz": rng.uniform(-50, 50), "my": rng.uniform(-30, 30)}})
             continue
-        e = rng.choice(list(elems.values()))
+        frame_elems = [el for el in elems.values() if el.get("type") == "frame"]
+        if not frame_elems:
+            continue
+        e = rng.choice(frame_elems)
         L = lengths[e["id"]]
         if kind < 0.65:
             d = {"elementId": e["id"], "qI": rng.uniform(-20, 20), "qJ": rng.uniform(-20, 20)}
@@ -218,10 +223,11 @@ def _rich_3d(seed):
                 if rng.random() < 0.4:
                     s[key] = rng.uniform(1e3, 1e6)
         if rng.random() < 0.3:
-            for key in ("dx", "dy", "dz"):
-                s[key] = rng.uniform(-0.01, 0.01)
-            for key in ("drx", "dry", "drz"):
-                s[key] = rng.uniform(-0.002, 0.002)
+            dofs = (("dx", "rx", "kx", 0.01), ("dy", "ry", "ky", 0.01), ("dz", "rz", "kz", 0.01),
+                    ("drx", "rrx", "krx", 0.002), ("dry", "rry", "kry", 0.002), ("drz", "rrz", "krz", 0.002))
+            for key, r_flag, k_spring, lim in dofs:
+                if s.get(r_flag) and k_spring not in s:
+                    s[key] = rng.uniform(-lim, lim)
         sups[str(k)] = s
     loads = []
     lengths = {e["id"]: math.dist(pts[e["nodeI"] - 1], pts[e["nodeJ"] - 1]) for e in elems.values()}
@@ -232,7 +238,10 @@ def _rich_3d(seed):
                           **{k: rng.uniform(-50, 50) for k in ("fx", "fy", "fz")},
                           **{k: rng.uniform(-30, 30) for k in ("mx", "my", "mz")}}})
             continue
-        e = rng.choice(list(elems.values()))
+        frame_elems = [el for el in elems.values() if el.get("type") == "frame"]
+        if not frame_elems:
+            continue
+        e = rng.choice(frame_elems)
         L = lengths[e["id"]]
         if kind < 0.65:
             d = {"elementId": e["id"], **{k: rng.uniform(-20, 20) for k in ("qYI", "qYJ", "qZI", "qZJ")}}
