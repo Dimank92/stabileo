@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use phasefield_shauer_2025::examples::{bar_reference, NotchedPlate};
+use phasefield_shauer_2025::examples::{bar_reference, three_point_bending_reference, NotchedPlate};
 use phasefield_shauer_2025::mesh::Mesh;
 use phasefield_shauer_2025::solver::{Solver, StepResult};
 use serde::{Deserialize, Serialize};
@@ -83,8 +83,9 @@ fn run(solver: &mut Solver, keep: &[usize]) -> (Vec<StepResult>, HashMap<usize, 
     (steps, fields, centers)
 }
 
-/// For each node, the node at the mirror position (x, -y); on the notch the two copies swap.
-fn mirror_map(m: &Mesh) -> Vec<usize> {
+/// For each node, the node at the mirror position ((x, -y) or (-x, y)); on the notch the two
+/// copies swap.
+fn mirror_map(m: &Mesh, about_x_axis: bool) -> Vec<usize> {
     let key = |x: f64, y: f64| ((x * 1e9).round() as i64, (y * 1e9).round() as i64);
     let mut at: HashMap<(i64, i64), Vec<usize>> = HashMap::new();
     for (i, p) in m.nodes.iter().enumerate() {
@@ -93,7 +94,7 @@ fn mirror_map(m: &Mesh) -> Vec<usize> {
     (0..m.nodes.len())
         .map(|i| {
             let [x, y] = m.nodes[i];
-            let c = &at[&key(x, -y)];
+            let c = if about_x_axis { &at[&key(x, -y)] } else { &at[&key(-x, y)] };
             if c.len() == 2 { if c[0] == i { c[1] } else { c[0] } } else { c[0] }
         })
         .collect()
@@ -151,7 +152,7 @@ fn example2(c: &mut Checks) {
     let mesh_ref: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(dir().join("reference-results/ex2_mesh.json")).unwrap()).unwrap();
     let (n, e) = mesh_fingerprint(&problem.mesh);
     c.equal("ex2: mesh identical to the reference (node and element fingerprints)", n == mesh_ref["nodes_fnv1a64"] && e == mesh_ref["elements_fnv1a64"]);
-    let mirror = mirror_map(&problem.mesh);
+    let mirror = mirror_map(&problem.mesh, true);
     let tol = plate.controls.tolerance;
 
     let mut solver = Solver::new(problem).unwrap();
@@ -195,11 +196,42 @@ fn example2(c: &mut Checks) {
     }
 }
 
+fn example3(c: &mut Checks) {
+    let problem = three_point_bending_reference();
+    let mesh_ref: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(dir().join("reference-results/ex3_mesh.json")).unwrap()).unwrap();
+    let (n, e) = mesh_fingerprint(&problem.mesh);
+    c.equal("ex3: mesh identical to the reference (node and element fingerprints)", n == mesh_ref["nodes_fnv1a64"] && e == mesh_ref["elements_fnv1a64"]);
+    let mirror = mirror_map(&problem.mesh, false);
+    let tol = problem.controls.tolerance;
+    let mut solver = Solver::new(problem).unwrap();
+    let (steps, fields, _) = run(&mut solver, &[56, 98]);
+    let reference = read_csv("ex3_steps.csv");
+    c.equal("ex3: same number of load steps", steps.len() == reference.len());
+    c.equal(
+        "ex3: same number of staggered iterations at every step",
+        steps.iter().zip(&reference).all(|(s, r)| r["staggered_iterations"] == s.iterations.to_string()),
+    );
+    let peak_ref = reference.iter().enumerate().max_by(|a, b| f(a.1, "reaction").total_cmp(&f(b.1, "reaction"))).unwrap();
+    let peak = steps.iter().max_by(|a, b| a.reaction.total_cmp(&b.reaction)).unwrap();
+    c.equal("ex3: peak force at the same load step", peak.step == peak_ref.0);
+    let worst = steps.iter().zip(&reference).filter(|(s, _)| s.step <= peak_ref.0).map(|(s, r)| rel(f(r, "reaction"), s.reaction)).fold(0.0, f64::max);
+    c.at_most("ex3: force at every step up to the peak", "relative difference", worst, 1e-9);
+    let worst = steps.iter().zip(&reference).map(|(s, r)| (f(r, "reaction") - s.reaction).abs()).fold(0.0, f64::max);
+    c.at_most("ex3: force at every step, including fracture (bounded by the staggered tolerance)", "absolute difference, kN", worst, tol);
+    let d_ref = column("ex3_damage_step056.csv", 0);
+    c.at_most("ex3: nodal damage at the peak step 56", "max absolute difference", max_abs(&d_ref, &fields[&56].0), 1e-8);
+    let d_ref = column("ex3_damage_step098.csv", 0);
+    let d = &fields[&98].0;
+    let mirrored: Vec<f64> = (0..d_ref.len()).map(|i| d_ref[mirror[i]]).collect();
+    c.at_most("ex3: nodal damage at the last step 98, reference or its mirror image", "max absolute difference", max_abs(&d_ref, d).min(max_abs(&mirrored, d)), 1e-8);
+}
+
 #[test]
 fn validation_against_reference_code() {
     let mut c = Checks::default();
     example1(&mut c);
     example2(&mut c);
+    example3(&mut c);
     let json = serde_json::to_string_pretty(&serde_json::json!({
         "reference": "reference-results/ (phasefield-jr-py, see MANIFEST.json)",
         "produced_by": "cargo test --release --test reference",
