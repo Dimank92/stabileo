@@ -596,3 +596,85 @@ fn plastic_3d_frame3d_2_is_a_lower_bound_of_its_certificate() {
     assert!(r.warnings.iter().any(|w| w.contains("no consistent set of active hinges") && w.contains("lower bound")), "{:?}", r.warnings);
     assert!(!r.warnings.iter().any(|w| w.contains("exceeds the yield surface")), "{:?}", r.warnings);
 }
+
+
+/// Issue #758: 2D plastic collapse factor changes with renumbering,
+/// member direction, and units (up to 4.6x).
+#[test]
+fn test_issue_758_plastic_2d_invariance() {
+    let cases = crate::corpus::cases_2d(crate::corpus::Tier::Nightly, 20754);
+    let a_plastic: Vec<_> = crate::ana2::rows()
+        .into_iter()
+        .filter(|a| a.name == "plastic collapse")
+        .collect();
+
+    let target_names = [
+        "feature_matrix/2d-constraint--rigid-link--offset-beam-with",
+        "fuzz_rich_2d/20840",
+        "fuzz_rich_2d/20832",
+        "fuzz_rich_2d/20772",
+        "fuzz_rich_2d/20843",
+    ];
+
+    let tally = crate::tally::Tally::default();
+    let ctx = crate::checks2::Ctx { tally: &tally, rng_seed: 20754 };
+
+    for name in &target_names {
+        if let Some(c) = cases.iter().find(|c| c.name == *name) {
+            crate::checks2::check_case(&ctx, c, &a_plastic, crate::INV_2D);
+        }
+    }
+
+    println!("{}", tally.report());
+    let failures = tally.failures();
+    assert!(failures.is_empty(), "Metamorphic failures in plastic 2D:\n{}", failures.join("\n"));
+}
+
+
+#[test]
+fn test_debug_20843_relabel_steps() {
+    let cases = crate::corpus::cases_2d(crate::corpus::Tier::Nightly, 20754);
+    let c = cases.iter().find(|c| c.name == "fuzz_rich_2d/20843").expect("case not found");
+    let to_input = |solver_input: &dedaliano_engine::types::SolverInput| {
+        let sections = solver_input
+            .sections
+            .values()
+            .map(|x| {
+                let (b, h) = crate::ana2::rect(x.a, x.iz);
+                let mat = solver_input.elements.values().find(|e| e.section_id == x.id).map_or(1, |e| e.section_id);
+                (x.id.to_string(), dedaliano_engine::types::PlasticSectionData { a: x.a, iz: x.iz, material_id: mat, b: Some(b), h: Some(h) })
+            })
+            .collect();
+        let materials = solver_input.materials.values().map(|x| (x.id.to_string(), dedaliano_engine::types::PlasticMaterialData { fy: Some(c.p.fy) })).collect();
+        dedaliano_engine::types::PlasticInput { solver: solver_input.clone(), sections, materials, max_hinges: None, mp_overrides: None }
+    };
+    let r_base = dedaliano_engine::solver::plastic::solve_plastic_2d(&to_input(&c.s)).unwrap();
+    println!("=== BASE 20843: factor={}, is_mech={} ===", r_base.collapse_factor, r_base.is_mechanism);
+    for (i, st) in r_base.steps.iter().enumerate() {
+        println!("  step {}: factor={:.6}, hinges={:?}", i, st.load_factor, st.hinges_formed.iter().map(|h| (h.element_id, &h.end, h.position)).collect::<Vec<_>>());
+    }
+    let mut rng = dedaliano_engine::metamorphic::Rng::new(20754 ^ crate::checks2::hash(&c.name) ^ crate::checks2::hash("plastic collapse"));
+    let _ = rng.range(0.1, 6.2);
+    let _ = rng.range(-50.0, 50.0);
+    let _ = rng.range(-50.0, 50.0);
+    let _ = rng.below(3);
+    let _ = rng.range(-50.0, 50.0);
+    let _ = rng.range(-50.0, 50.0);
+    let _ = rng.range(0.0, 3.1);
+    let _ = rng.range(-50.0, 50.0);
+    let _ = rng.range(-50.0, 50.0);
+    let _ = rng.range(-50.0, 50.0);
+    let _ = rng.range(-5.0, 5.0);
+    let seed = rng.next_u64();
+    let rl = dedaliano_engine::metamorphic::relabel::Relabel::random_2d(&c.s, seed);
+    let c_rel = c.relabel(&rl, seed);
+    let r_rel = dedaliano_engine::solver::plastic::solve_plastic_2d(&to_input(&c_rel.s)).unwrap();
+    println!("=== RELABEL 20843: factor={}, is_mech={} ===", r_rel.collapse_factor, r_rel.is_mechanism);
+    for (i, st) in r_rel.steps.iter().enumerate() {
+        let mapped: Vec<_> = st.hinges_formed.iter().map(|h| {
+            let orig_elem = rl.element.iter().find(|(_, &new)| new == h.element_id).map(|(&old, _)| old).unwrap_or(0);
+            (orig_elem, &h.end, h.position)
+        }).collect();
+        println!("  step {}: factor={:.6}, orig_hinges={:?}", i, st.load_factor, mapped);
+    }
+}

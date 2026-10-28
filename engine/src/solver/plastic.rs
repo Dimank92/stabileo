@@ -115,6 +115,9 @@ fn increment_to_mp(mp: f64, m_acc: f64, m_unit: f64) -> f64 {
 const STATIONS: usize = 48;
 /// Two sections closer than this (fraction of the member length) are one.
 const SNAP: f64 = 1e-6;
+/// Span sections closer than this (fraction of the member length) to a node
+/// of the member are that node (see the event search).
+const HINGE_GAP: f64 = 1e-3;
 /// Relative load-factor resolution of an event (see the tie in the event loop).
 const TIE: f64 = 1e-6;
 
@@ -519,7 +522,7 @@ fn span_candidates(
     let mut ts: Vec<(f64, bool)> = bounds.iter().map(|&t| (t, true)).collect();
     if loaded {
         ts.extend((1..STATIONS).map(|i| (i as f64 / STATIONS as f64, false)));
-        ts.extend(breakpoints.iter().map(|&t| (t, false)));
+        ts.extend(breakpoints.iter().map(|&t| (t, true)));
     }
     ts.sort_by(|a, b| a.0.total_cmp(&b.0));
     let mut pts: Vec<(f64, bool)> = Vec::with_capacity(ts.len());
@@ -543,7 +546,8 @@ fn span_candidates(
         }
     }
     for i in 1..pts.len().saturating_sub(1) {
-        if pts[i].1 || !vals[i].is_finite() || vals[i] > vals[i - 1] || vals[i] > vals[i + 1] {
+        let rel_tol = 1e-6 * vals[i].abs().max(1.0);
+        if pts[i].1 || !vals[i].is_finite() || vals[i] >= vals[i - 1] - rel_tol || vals[i] >= vals[i + 1] - rel_tol {
             continue;
         }
         let (tg, dg) = golden_min(&dfun, pts[i - 1].0, pts[i + 1].0);
@@ -686,9 +690,15 @@ pub fn solve_plastic_2d(input: &PlasticInput) -> Result<PlasticResult, String> {
     let mut last_event: Vec<usize> = Vec::new();
 
     for step in 0..max_hinges {
-        // ---- a consistent set of active hinges, and its unit-load solution
+                // ---- a consistent set of active hinges, and its unit-load solution
         let mut visited: std::collections::HashSet<Vec<bool>> = std::collections::HashSet::new();
         let mut tie_closed: Vec<usize> = Vec::new();
+        let entry: Vec<(bool, usize)> = hinges.iter().map(|h| (h.active, h.record)).collect();
+        let entry_records = all_hinges.clone();
+        if step == 7 {
+            let kin = super::kinematic::analyze_kinematics_2d(&current_input);
+            println!("[STEP 7 START] kin.solvable={}, modes={}, unconstrained={:?}", kin.is_solvable, kin.mechanism_modes, kin.unconstrained_dofs);
+        }
         let results = loop {
             let fresh = visited.insert(hinges.iter().map(|h| h.active).collect());
             // A mechanism ends the analysis — unless one of its hinges would
@@ -730,8 +740,8 @@ pub fn solve_plastic_2d(input: &PlasticInput) -> Result<PlasticResult, String> {
                 // With hinge h closed, the unit moment at h is P·φ/θ_h(φ)
                 // (φ the mechanism): the opposite sign to the moment h carries
                 // means h rotates backwards in the mechanism, i.e. it unloads.
-                let mut closed = false;
-                for hi in (0..hinges.len()).rev() {
+                let mut backwards: Option<(usize, f64)> = None;
+                for hi in 0..hinges.len() {
                     if !hinges[hi].active {
                         continue;
                     }
@@ -741,15 +751,21 @@ pub fn solve_plastic_2d(input: &PlasticInput) -> Result<PlasticResult, String> {
                         if let Ok(r) = super::linear::solve_2d(&current_input) {
                             let by_id: HashMap<usize, &ElementForces> = r.element_forces.iter().map(|ef| (ef.element_id, ef)).collect();
                             let mu = members[mi].diagram(members[mi].unit_vals(&by_id), 1.0, &current_input).at(t);
-                            if mu * sign < -unit_moment_scale(&r) * 1e-9 {
-                                hinges[hi].active = false;
-                                all_hinges[hinges[hi].record].unloaded_at = Some(cumulative_factor);
-                                closed = true;
-                                break;
+                            let scale = unit_moment_scale(&r);
+                            let rate = (mu * sign) / scale.max(f64::MIN_POSITIVE);
+                            if rate < -1e-9 && backwards.is_none_or(|(_, x)| rate < x) {
+                                backwards = Some((hi, rate));
                             }
                         }
                     }
                     set_hinge(&mut current_input, &members[mi], t, true);
+                }
+                let closed = backwards.is_some();
+                if let Some((hi, rate)) = backwards {
+                    println!("[UNLOAD MECHANISM] step={}, factor={:.6}, elem={}, t={}, rate={:e}", step, cumulative_factor, members[hinges[hi].member].id, hinges[hi].t, rate);
+                    set_hinge(&mut current_input, &members[hinges[hi].member], hinges[hi].t, false);
+                    hinges[hi].active = false;
+                    all_hinges[hinges[hi].record].unloaded_at = Some(cumulative_factor);
                 }
                 if !closed {
                     // a true collapse: the tied hinges set aside turn too
@@ -769,9 +785,21 @@ pub fn solve_plastic_2d(input: &PlasticInput) -> Result<PlasticResult, String> {
                 Err(_) => break None,
             };
             if !fresh {
-                // cycled through the same states: no consistent choice found
+                // cycled through the same states: stop at the last consistent state
+                for (h, &(active, record)) in hinges.iter_mut().zip(&entry) {
+                    if h.active != active {
+                        set_hinge(&mut current_input, &members[h.member], h.t, active);
+                    }
+                    h.active = active;
+                    h.record = record;
+                }
+                all_hinges = entry_records;
                 reversal_unresolved = true;
-                break Some(r);
+                if let Ok(r_entry) = super::linear::solve_2d(&current_input) {
+                    break Some(r_entry);
+                } else {
+                    break Some(r);
+                }
             }
             let by_id: HashMap<usize, &ElementForces> = r.element_forces.iter().map(|ef| (ef.element_id, ef)).collect();
             // active hinges whose rotation would reverse
@@ -801,9 +829,10 @@ pub fn solve_plastic_2d(input: &PlasticInput) -> Result<PlasticResult, String> {
                     continue;
                 }
             }
-            // closed hinges still at Mp that would be loaded past it
+            // closed hinges still at Mp that would be loaded past it: the one
+            // loaded outward the most reopens (by rate, not by hinge index)
             let tol_m = unit_moment_scale(&r) * 1e-9;
-            let mut reopened = false;
+            let mut outward: Option<(usize, f64)> = None;
             for hi in 0..hinges.len() {
                 if hinges[hi].active {
                     continue;
@@ -812,25 +841,27 @@ pub fn solve_plastic_2d(input: &PlasticInput) -> Result<PlasticResult, String> {
                 let t = hinges[hi].t;
                 let m_acc = m.diagram(m.acc, cumulative_factor, &current_input).at(t);
                 let mu = m.diagram(m.unit_vals(&by_id), 1.0, &current_input).at(t);
-                if m_acc.abs() >= m.mp * (1.0 - 1e-9) && mu * hinges[hi].sign > tol_m {
-                    hinges[hi].active = true;
-                    set_hinge(&mut current_input, m, t, true);
-                    let rec = &mut all_hinges[hinges[hi].record];
-                    if rec.unloaded_at == Some(cumulative_factor) {
-                        rec.unloaded_at = None;
-                    } else {
-                        let mut again = rec.clone();
-                        again.unloaded_at = None;
-                        again.load_factor = cumulative_factor;
-                        again.step = step;
-                        all_hinges.push(again);
-                        hinges[hi].record = all_hinges.len() - 1;
-                    }
-                    reopened = true;
-                    break;
+                let rate = mu * hinges[hi].sign;
+                if m_acc.abs() >= m.mp * (1.0 - 1e-9) && rate > tol_m && outward.is_none_or(|(_, x)| rate > x) {
+                    outward = Some((hi, rate));
                 }
             }
-            if reopened {
+            if let Some((hi, _)) = outward {
+                let m = &members[hinges[hi].member];
+                let t = hinges[hi].t;
+                hinges[hi].active = true;
+                set_hinge(&mut current_input, m, t, true);
+                let rec = &mut all_hinges[hinges[hi].record];
+                if rec.unloaded_at == Some(cumulative_factor) {
+                    rec.unloaded_at = None;
+                } else {
+                    let mut again = rec.clone();
+                    again.unloaded_at = None;
+                    again.load_factor = cumulative_factor;
+                    again.step = step;
+                    all_hinges.push(again);
+                    hinges[hi].record = all_hinges.len() - 1;
+                }
                 continue;
             }
             break Some(r);
@@ -870,7 +901,16 @@ pub fn solve_plastic_2d(input: &PlasticInput) -> Result<PlasticResult, String> {
             let unit = m.diagram(unit_vals[mi], 1.0, &current_input);
             let (out, sup) = member_candidates(m, &current_input, &acc, &unit, tol_m, tol_d);
             suppressed = suppressed.min(sup);
-            cands.extend(out.into_iter().map(|(t, d)| (mi, t, d)));
+            let bounds = m.bounds();
+            for (t, d) in out {
+                let at_load = m.breakpoints.iter().any(|&x| (x - t).abs() < SNAP);
+                let near = bounds.iter().any(|&b| b != t && (b - t).abs() < HINGE_GAP && ((b > 0.0 && b < 1.0) || m.hinged(&current_input, b)));
+                if near && !at_load {
+                    suppressed = suppressed.min(d);
+                    continue;
+                }
+                cands.push((mi, t, d));
+            }
         }
         let min_delta = cands.iter().fold(f64::INFINITY, |a, c| a.min(c.2));
         if !min_delta.is_finite() || min_delta <= 0.0 {
@@ -895,16 +935,45 @@ pub fn solve_plastic_2d(input: &PlasticInput) -> Result<PlasticResult, String> {
         // metamorphic rotation check: the rotated portal gave the right
         // answer). The tie matches SNAP; the factor moves by at most that.
         let tie = TIE * (cumulative_factor + min_delta);
-        let mut chosen: Vec<(usize, f64)> = Vec::new();
-        for &(mi, t, d) in &cands {
-            if d - min_delta <= tie && !chosen.iter().any(|&(mj, tj)| mj == mi && (tj - t).abs() < SNAP) {
-                chosen.push((mi, t));
+        let mut chosen: Vec<(usize, f64, f64)> = Vec::new();
+        let mut sorted_cands = cands.clone();
+        let rel_tie = (1e-8 * (cumulative_factor + min_delta)).max(1e-11);
+        sorted_cands.sort_by(|a, b| {
+            let diff = a.2 - b.2;
+            if diff.abs() > rel_tie {
+                a.2.total_cmp(&b.2)
+            } else {
+                let ma = &members[a.0];
+                let mb = &members[b.0];
+                let (xa, za) = (ma.x0 + a.1 * ma.dx, ma.z0 + a.1 * ma.dz);
+                let (xb, zb) = (mb.x0 + b.1 * mb.dx, mb.z0 + b.1 * mb.dz);
+                let tol_coord = 1e-7 * ma.l.max(mb.l).max(1.0);
+                let dx = xa - xb;
+                let dz = za - zb;
+                (!ma.loaded)
+                    .cmp(&(!mb.loaded))
+                    .reverse()
+                    .then_with(|| mb.l.total_cmp(&ma.l))
+                    .then_with(|| ma.mp.total_cmp(&mb.mp))
+                    .then_with(|| if dx.abs() > tol_coord { xa.total_cmp(&xb) } else { std::cmp::Ordering::Equal })
+                    .then_with(|| if dz.abs() > tol_coord { za.total_cmp(&zb) } else { std::cmp::Ordering::Equal })
+                    .then_with(|| a.1.total_cmp(&b.1))
+                    .then_with(|| a.0.cmp(&b.0))
+            }
+        });
+        for (mi, t, d) in sorted_cands {
+            if d - min_delta <= tie {
+                let at_load = members[mi].breakpoints.iter().any(|&x| (x - t).abs() < SNAP);
+                let gap = if at_load { SNAP } else { HINGE_GAP };
+                if !chosen.iter().any(|&(mj, tj, _)| mj == mi && ((tj - t).abs() < gap || ((tj > 0.0 && tj < 1.0) && (t > 0.0 && t < 1.0)))) {
+                    chosen.push((mi, t, d));
+                }
             }
         }
         // A node whose every frame end turns freely gains nothing from one
         // more hinge: the last one is the same physical hinge.
         let mut per_node: HashMap<usize, usize> = HashMap::new();
-        chosen.retain(|&(mi, t)| {
+        chosen.retain(|&(mi, t, _)| {
             let m = &members[mi];
             let Some(n) = m.slot(t).and_then(|_| m.node_at(&current_input, t)) else { return true };
             if rot_restrained.contains(&n) || node_has_couple(&current_input, n) {
@@ -932,8 +1001,7 @@ pub fn solve_plastic_2d(input: &PlasticInput) -> Result<PlasticResult, String> {
 
         let mut step_hinges = Vec::new();
         last_event.clear();
-        chosen.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)));
-        for (mi, t) in chosen {
+        for (mi, t, _) in chosen {
             let sign = {
                 let m = &members[mi];
                 let s = m.diagram(m.acc, cumulative_factor, &current_input).at(t);
