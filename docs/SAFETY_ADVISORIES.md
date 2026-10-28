@@ -52,7 +52,7 @@ is filed at the highest one.
 | **Release notes** (`docs/releases/vX.Y.Z{,.es,.pt}.md`): a "Safety advisories" section linking each advisory, in English, Spanish and Portuguese | In the release that fixes it | Release manager |
 | **In-app notice**: the release's "your results may have changed" notice (`web/src/lib/release/whats-new.ts`), and the per-project re-check prompt, which shows the advisory to projects that use the affected feature. Each advisory has an entry in the re-check registry, `web/src/lib/provenance/result-changes.json` (PR [#328](https://github.com/lambdaclass/stabileo/pull/328), schema in `docs/verification/PROVENANCE.md`), whose `when` condition is the advisory's "how to tell if your model is affected" | In the release that fixes it | Author of the fix |
 | **GitHub Security Advisory** (repository Security tab) | Critical and High, so that the advisory has a stable public identifier | Maintainers |
-| **Email** | There is no mailing list today. When one exists (opt-in, see [#441](https://github.com/lambdaclass/stabileo/issues/441)), Critical and High advisories are mailed at publication | — |
+| **Opt-in Notifications & Email** | Users can opt-in to notifications for new safety advisories via GitHub Security Advisory subscriptions, repository Watch (Custom -> Security alerts), or the opt-in advisory notification feed (webhook / Atom feed). Critical and High advisories are broadcast to opt-in notification subscribers upon publication ([#441](https://github.com/lambdaclass/stabileo/issues/441)). | Release manager |
 
 ## Timelines
 

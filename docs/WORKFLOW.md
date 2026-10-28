@@ -1,6 +1,6 @@
 # How work is done on Stabileo
 
-This replaces `docs/archive/CODEX_WORKFLOW_STABILEO.md` (July 2026), which described a stacked-PR
+This replaces `docs/archive/codex_workflow_stabileo.md` (July 2026), which described a stacked-PR
 process and declared solver code off-limits. Neither is current practice.
 
 Stabileo's results are used to design buildings. Every rule below exists so that a result is
@@ -10,8 +10,8 @@ never silently wrong and verification never silently stops working.
 
 - **Solver and engine work is in scope**, with verification. A change to `engine/src` comes with
   the tests that would have caught the bug (regression test, and where it applies a certificate,
-  feature-matrix, differential or worked-example check), and a CHANGELOG entry under
-  `BREAKING (results)` when any result can change.
+  feature-matrix, differential or worked-example check), and a changelog entry under
+  `breaking (results)` when any result can change.
 - **Engineering results come from the Rust engine.** TypeScript formats, searches and draws; see
   [verification/TS_ENGINE_LOGIC.md](verification/TS_ENGINE_LOGIC.md). Do not patch around an
   engine bug in the app.
@@ -55,6 +55,9 @@ A merge to `main` deploys to users, so a merge is a release. Result-affecting ch
 release note with a "results may change" section (English, Spanish, Portuguese) and, when an
 earlier release produced a wrong or unconservative result, a safety advisory
 ([SAFETY_ADVISORIES.md](SAFETY_ADVISORIES.md)).
+
+- **Release checklist for safety advisories:** Every safety issue closed by a release has an advisory or a recorded reason why none is needed ([#441](https://github.com/lambdaclass/stabileo/issues/441)).
+- **In-app provenance notice:** Every advisory that changes calculation results must be registered in `web/src/lib/provenance/result-changes.json`.
 
 ## Engineering standard (kept from the earlier workflow)
 
