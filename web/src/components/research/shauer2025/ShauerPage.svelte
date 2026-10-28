@@ -15,7 +15,7 @@
   import ExperimentShell from '../shell/ExperimentShell.svelte';
   import ExperimentLink from '../shell/ExperimentLink.svelte';
   import { Playback, SOURCE_LABEL, type Source } from '../shell/playback.svelte';
-  import { decodeReplay } from '../shell/replay';
+  import { fetchReplay } from '../shell/replay';
 
   const STABILEO = '#3987e5';
   const REFERENCE = '#d95926';
@@ -86,10 +86,8 @@
   let pane: HTMLElement | undefined = $state();
 
   onMount(() => {
-    fetch(`${BASE}replay.bin.gz`)
-      .then((r) => (r.ok && r.body ? new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer() : Promise.reject(new Error(`replay: HTTP ${r.status}`))))
-      .then((buf) => {
-        const d = decodeReplay<Step>(buf);
+    fetchReplay<Step>(`${BASE}replay.srpl`)
+      .then((d) => {
         replay = { nodes: d.nodes, elements: d.elements, frames: d.frames };
         playback.setCount(d.frames.length);
         // A link can open the page at a step, with or without the mesh (?step=57&mesh=0).
@@ -108,7 +106,10 @@
           narrow: window.innerWidth < 640,
         });
       })
-      .catch((err) => (replayError = String(err)));
+      .catch((err) => {
+        console.warn('research: the precomputed replay could not be loaded', err);
+        replayError = 'unavailable';
+      });
     const io = new IntersectionObserver(([en]) => playback.setVisible(en.isIntersecting), { threshold: 0.15 });
     if (pane) io.observe(pane);
     return () => io.disconnect();
@@ -380,7 +381,7 @@
           </m.default>
         {/await}
       {:else}
-        <div class="rs-placeholder">{replayError ? `The replay is not part of this build (${replayError}). Press Recompute live.` : 'Loading the replay…'}</div>
+        <div class="rs-placeholder">{replayError ? 'The precomputed replay couldn’t be loaded. Press Recompute live to compute it in your browser.' : 'Loading the replay…'}</div>
       {/if}
 
       {#if frames.length}
@@ -430,7 +431,7 @@
         </div>
         <p class="rs-status" aria-live="polite">
           {#if sim.available === false}
-            <span class="warnt">The simulation bundle is not part of this build ({sim.unavailableReason}).</span>
+            <span class="warnt">The in-browser solver couldn’t be loaded in this build; the replay above is still our solver’s run.</span>
           {:else if run?.status === 'running'}
             Solving step {frames.length + 1} of {expectedSteps}…
           {:else if run?.status === 'done'}

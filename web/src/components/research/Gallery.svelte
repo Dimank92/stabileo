@@ -71,7 +71,7 @@
       <h2 class="rs-g-h2">{s.comingNext}</h2>
       <ul class="rs-g-next">
         {#each COMING_NEXT as c (c.name)}
-          <li><FieldIcon field={c.field} size={36} /><div><strong>{c.name}</strong> <span class="rs-g-tag">{s.inProgress}</span><br /><span class="rs-g-by">{c.note}</span></div></li>
+          <li><FieldIcon field={c.field} size={36} /><div><span class="rs-g-tag">{s.inProgress}</span><br /><strong>{c.name}</strong><br /><span class="rs-g-by">{c.note}</span></div></li>
         {/each}
       </ul>
     {/if}
@@ -171,6 +171,13 @@
     background: #0f1e2b;
     aspect-ratio: 16 / 10;
   }
+  @media (min-width: 52rem) {
+    .rs-g-runcard :global(.rs-g-thumb) {
+      aspect-ratio: auto;
+      height: 100%;
+      min-height: 16rem;
+    }
+  }
   .rs-g-runcard img {
     width: 100%;
     height: 100%;
@@ -256,6 +263,8 @@
     color: var(--fg);
   }
   .rs-g-tag {
+    white-space: nowrap;
+    display: inline-block;
     font: 11px var(--lp-mono);
     color: #d9a441;
     border: 1px solid #d9a441;
