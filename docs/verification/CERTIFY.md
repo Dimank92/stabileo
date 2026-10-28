@@ -390,6 +390,13 @@ Exit status 0 if every bundle is accepted, 1 if one is rejected, 2 on a parse er
 The JSON reader (`verify/Certify/BundleParse.lean`) is trusted: it only turns `[m, e]`
 into the dyadic `m · 2^e` and CSC into column lists.
 
+**Second independent checker (Rust, `cargo run --bin certcheck-exact <bundle.json>...`).**
+Beside the verified Lean checker, an independent exact-rational certificate checker (`engine/src/certify/checker_exact.rs`,
+compiled as the `certcheck-exact` binary) re-verifies every bundle using exact dyadic and `num_rational::BigRational` arithmetic.
+It implements independent parsers and checks linear-static, plastic-collapse, and load-combination bundles.
+Both checkers run side-by-side in CI on the full bundle corpus via `verify/scripts/check-bundles.sh`; any disagreement between the
+two independently written checkers immediately fails the verification gate.
+
 Timings (Apple Silicon, one core, `check` only; the machine was shared):
 
 | model | n | nnz(K) | nnz(L) | `certcheck` |

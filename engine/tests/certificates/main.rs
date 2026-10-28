@@ -16,6 +16,8 @@ mod e2e_models;
 #[path = "../properties_common/mod.rs"]
 mod properties_common;
 
+#[path = "../certcheck_exact.rs"]
+mod certcheck_exact;
 #[path = "../certify.rs"]
 mod certify;
 #[path = "../certify_bundle.rs"]

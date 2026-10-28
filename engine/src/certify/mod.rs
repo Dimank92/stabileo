@@ -2,6 +2,7 @@
 
 pub mod buckling;
 pub mod bundle;
+pub mod checker_exact;
 pub mod combination_bundle;
 pub mod combinations;
 pub mod constrained;

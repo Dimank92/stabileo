@@ -110,6 +110,10 @@ path = "tests/elements/main.rs"
 name = "robustness"
 path = "tests/robustness/main.rs"
 
+[[bin]]
+name = "certcheck-exact"
+path = "src/bin/certcheck_exact.rs"
+
 [[bench]]
 name = "solver_bench"
 harness = false
