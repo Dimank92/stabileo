@@ -114,7 +114,7 @@
     },
     {
       "metric": "absolute difference, kN",
-      "name": "ex2: force at every step, including fracture (bounded by the staggered tolerance)",
+      "name": "ex2: force at every step, including fracture (comparison tolerance)",
       "observed": 2.194403730101718e-7,
       "passed": true,
       "tolerance": 0.00001
@@ -184,7 +184,7 @@
     },
     {
       "metric": "absolute difference, kN",
-      "name": "ex3: force at every step, including fracture (bounded by the staggered tolerance)",
+      "name": "ex3: force at every step, including fracture (comparison tolerance)",
       "observed": 1.033201445777704e-6,
       "passed": true,
       "tolerance": 0.0001

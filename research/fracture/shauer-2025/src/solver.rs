@@ -304,6 +304,15 @@ impl Solver {
             self.u = self.elastic.solve(&rhs)?;
             self.solve_damage()?;
         }
+        if !converged {
+            // The last solve changed u and d: report the residual of those returned fields.
+            self.assemble_elastic()?;
+            let mut rhs = vec![0.0; self.u.len()];
+            let fixed = self.fixed();
+            apply_dirichlet(&mut self.elastic.matrix, &mut rhs, &fixed);
+            let ku = self.elastic.matrix.sym_mat_vec(&self.u);
+            residual = norm(&ku.iter().zip(&rhs).map(|(a, b)| a - b).collect::<Vec<_>>());
+        }
         self.failed = !converged;
         if converged && self.problem.controls.irreversibility == Irreversibility::History {
             for e in 0..self.coords.len() {
@@ -346,6 +355,26 @@ impl Solver {
 mod tests {
     use super::*;
     use crate::examples::bar_reference;
+
+    #[test]
+    fn failed_step_residual_describes_returned_fields() {
+        for max_iterations in [1, 2] {
+            let mut problem = bar_reference();
+            problem.controls.max_iterations = max_iterations;
+            problem.controls.tolerance = 1e-30;
+            let mut solver = Solver::new(problem).unwrap();
+            let step = solver.advance().unwrap().unwrap();
+            assert!(!step.converged);
+            assert!(step.residual.is_finite());
+            solver.assemble_elastic().unwrap();
+            let fixed = solver.fixed();
+            let mut rhs = vec![0.0; solver.u.len()];
+            apply_dirichlet(&mut solver.elastic.matrix, &mut rhs, &fixed);
+            let ku = solver.elastic.matrix.sym_mat_vec(&solver.u);
+            let expected = norm(&ku.iter().zip(&rhs).map(|(a, b)| a - b).collect::<Vec<_>>());
+            assert_eq!(step.residual, expected);
+        }
+    }
 
     #[test]
     fn failed_step_does_not_commit_history_or_advance_on_unloading() {
