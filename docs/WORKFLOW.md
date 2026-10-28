@@ -1,6 +1,6 @@
 # How work is done on Stabileo
 
-This replaces `docs/archive/CODEX_WORKFLOW_STABILEO.md` (July 2026), which described a stacked-PR
+This replaces `docs/archive/codex_workflow_stabileo.md` (July 2026), which described a stacked-PR
 process and declared solver code off-limits. Neither is current practice.
 
 Stabileo's results are used to design buildings. Every rule below exists so that a result is
@@ -10,8 +10,8 @@ never silently wrong and verification never silently stops working.
 
 - **Solver and engine work is in scope**, with verification. A change to `engine/src` comes with
   the tests that would have caught the bug (regression test, and where it applies a certificate,
-  feature-matrix, differential or worked-example check), and a CHANGELOG entry under
-  `BREAKING (results)` when any result can change.
+  feature-matrix, differential or worked-example check), and a changelog entry under
+  `breaking (results)` when any result can change.
 - **Engineering results come from the Rust engine.** TypeScript formats, searches and draws; see
   [verification/TS_ENGINE_LOGIC.md](verification/TS_ENGINE_LOGIC.md). Do not patch around an
   engine bug in the app.
@@ -30,6 +30,11 @@ never silently wrong and verification never silently stops working.
   Each PR is then merged on its own, in that order.
 - **Review before merge.** Every PR gets an independent review (Codex review, plus a human
   reviewer for solver, certificate and design-check changes) before it leaves draft and merges.
+- **Review checklist item (negative case):** Every new design check, verification test,
+  certificate check, CI gate or alert ships with a negative case: an input or mutation that
+  must make it fail (wrong value, missing feature, injected NaN, mutated kernel, red job), run
+  in CI. A check that cannot fail protects nothing ([#451](https://github.com/lambdaclass/stabileo/issues/451)).
+  The PR template line `negative case: <test name>` must be filled in with the exact test verifying it.
 - **Required checks** must be green (engine, web, e2e, Kani, Lean, symbolic; see
   [#355](https://github.com/lambdaclass/stabileo/issues/355)). A red nightly verification job
   opens an issue labelled `verification-failure` and is triaged like a bug.
@@ -40,7 +45,9 @@ never silently wrong and verification never silently stops working.
 ## Issues and labels
 
 - `safety`: a released or about-to-be-released result can be wrong or unconservative. These are
-  counted on the [verification dashboard](verification/DASHBOARD.md).
+  counted on the [verification dashboard](verification/DASHBOARD.md). Every `safety` defect that
+  reached `main` gets a blameless postmortem in `docs/postmortems/YYYY-MM-DD-<slug>.md` within
+  10 working days of the fix ([postmortems/README.md](postmortems/README.md), [#449](https://github.com/lambdaclass/stabileo/issues/449)).
 - `safety-advisory`: the public advisory for a `safety` issue that reached a release; see
   [SAFETY_ADVISORIES.md](SAFETY_ADVISORIES.md).
 - `roadmap:multiplier`, `roadmap:verification`, `roadmap:coverage`, `roadmap:solver-proofs`,
@@ -54,7 +61,8 @@ never silently wrong and verification never silently stops working.
 A merge to `main` deploys to users, so a merge is a release. Result-affecting changes need a
 release note with a "results may change" section (English, Spanish, Portuguese) and, when an
 earlier release produced a wrong or unconservative result, a safety advisory
-([SAFETY_ADVISORIES.md](SAFETY_ADVISORIES.md)).
+([SAFETY_ADVISORIES.md](SAFETY_ADVISORIES.md)). Every `safety` defect closed by a release
+requires a postmortem within 10 working days ([#449](https://github.com/lambdaclass/stabileo/issues/449)).
 
 ## Engineering standard (kept from the earlier workflow)
 
