@@ -26,7 +26,7 @@
 
   let width = $state(600);
   let hoverX = $state<number | null>(null);
-  const M = { l: 64, r: 16, t: 12, b: 40 };
+  const M = { l: 84, r: 16, t: 12, b: 40 };
 
   /** Ticks that cover [lo, hi]: the first at or below lo, the last at or above hi. */
   function niceTicks(lo: number, hi: number, n = 5): number[] {
@@ -126,11 +126,12 @@
       {/each}
     </div>
   {/if}
-  {#if series.length > 1}
+  {#if series.length > 1 || marker !== null}
     <ul class="legend">
       {#each series as s (s.name)}
         <li><span class="sw" class:dashed={s.dashed} style:border-color={s.color} style:background={s.dashed ? 'transparent' : s.color}></span>{s.name}</li>
       {/each}
+      {#if marker !== null}<li><span class="sw dotted"></span>step shown in the field view</li>{/if}
     </ul>
   {/if}
 </div>
@@ -188,7 +189,7 @@
     gap: 1rem;
     list-style: none;
     padding: 0;
-    margin: 0.4rem 0 0 64px;
+    margin: 0.4rem 0 0 84px;
     font-size: 13px;
     color: var(--fg-2);
   }
@@ -205,6 +206,9 @@
     width: 8px;
     border: 0;
     border-radius: 50%;
+  }
+  .sw.dotted {
+    border-top: 2px dotted var(--fg-2);
   }
   .sw.dashed {
     border-top-style: dashed;

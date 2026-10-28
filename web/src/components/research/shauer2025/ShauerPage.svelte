@@ -99,7 +99,7 @@
   let field = $state<'damage' | 'syy'>('damage');
   let view = $state<'plate' | 'band' | 'tip'>('plate');
   let deform = $state(20);
-  let showMesh = $state(false);
+  let showMesh = $state(typeof window === 'undefined' || window.innerWidth >= 640);
   let hideBroken = $state(true);
 
   function start() {

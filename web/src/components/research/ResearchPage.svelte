@@ -52,3 +52,9 @@
   {/if}
   <LandingFooter />
 </div>
+
+<style>
+  .research :global(.nav) {
+    background: var(--lp-ink);
+  }
+</style>

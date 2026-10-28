@@ -5,11 +5,14 @@
   let { steps, reference = null, height = 160 }: { steps: Step[]; reference?: number[] | null; height?: number } = $props();
   let width = $state(600);
   let hover = $state<number | null>(null);
-  const M = { l: 64, r: 16, t: 10, b: 34 };
+  const M = { l: 84, r: 16, t: 10, b: 40 };
   const TICKS = [1, 10, 100, 1000];
   const n = $derived(Math.max(steps.length, reference?.length ?? 0, 1));
   const bw = $derived((width - M.l - M.r) / n);
-  const sy = (v: number) => M.t + (1 - Math.log10(Math.max(1, v)) / 3) * (height - M.t - M.b);
+  const LOG_MIN = Math.log10(0.5);
+  /** The axis starts below 1 so a one-iteration step is still a visible bar. */
+  const sy = (v: number) => M.t + (1 - (Math.log10(Math.max(0.5, v)) - LOG_MIN) / (3 - LOG_MIN)) * (height - M.t - M.b);
+  const xTicks = $derived(Array.from({ length: Math.floor((n - 1) / 10) + 1 }, (_, k) => k * 10));
 </script>
 
 <div class="chart" bind:clientWidth={width}>
@@ -19,13 +22,16 @@
       <text x={M.l - 8} y={sy(t)} class="tick" text-anchor="end" dominant-baseline="middle">{t}</text>
     {/each}
     <text transform="translate(14 {(M.t + height - M.b) / 2}) rotate(-90)" class="label" text-anchor="middle">iterations</text>
-    <text x={(M.l + width - M.r) / 2} y={height - 6} class="label" text-anchor="middle">load step</text>
+    {#each xTicks as t (t)}
+      <text x={M.l + (t + 0.5) * bw} y={height - M.b + 14} class="tick" text-anchor="middle">{t}</text>
+    {/each}
+    <text x={(M.l + width - M.r) / 2} y={height - 4} class="label" text-anchor="middle">load step</text>
     {#each steps as s, i (i)}
       <rect
         x={M.l + i * bw + Math.min(1, bw * 0.15)}
         width={Math.max(1, bw - Math.min(2, bw * 0.3))}
         y={sy(s.iterations)}
-        height={Math.max(0, sy(1) - sy(s.iterations)) || 1}
+        height={Math.max(1, sy(0.5) - sy(s.iterations))}
         rx="1"
         class="bar"
         role="presentation"

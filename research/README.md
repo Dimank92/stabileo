@@ -7,6 +7,8 @@ This directory is **research, not engineering design**. Nothing here is used by 
 application or its solver, and no result here is a design result. A benchmark agreement is not a
 certification.
 
+The plan every page and contribution follows is [DESIGN.md](DESIGN.md).
+
 ## Layout
 
 | Path | What |

@@ -4,6 +4,9 @@ You do not need to know the rest of Stabileo to contribute here. A contribution 
 under `research/<area>/<id>/` plus one entry in `papers.yaml`, opened as a pull request. Once the
 repository's external-contribution policy (issue #726) exists, it applies here as well.
 
+Read [DESIGN.md](DESIGN.md) first: what a research page offers, how statuses are earned, and how
+papers are chosen.
+
 ## What a contribution must contain
 
 Copy `templates/paper/` to `research/<area>/<id>/` and fill it in.
