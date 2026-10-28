@@ -13493,7 +13493,6 @@ const pt: Translations = {
   "provenance.reproduce.modelDiffers": "O projeto aberto não é o modelo do qual o relatório foi feito.",
   "provenance.reproduce.buildDiffers": "O relatório foi feito com outra compilação ({fields}); uma diferença nos resultados pode ser uma mudança registrada e não um defeito.",
   "provenance.reproduce.solveFailed": "O modelo não foi resolvido: {error}",
-  "provenance.reproduce.menu": "Reproduzir pela procedência…",
   "drawBar.outline": "Placa",
   "drawBar.outlineHint": "Uma placa física sobre um contorno de nós, malhada depois.",
   "drawBar.elementHint": "Um único elemento de cálculo de três ou quatro nós, sem placa física.",
@@ -13853,5 +13852,6 @@ const pt: Translations = {
   "plates.scopeNowElement": "Um clique em uma placa agora escolhe um elemento de malha. Para voltar à placa inteira: Seleção → «Placa inteira», ou «Selecionar a placa» no painel do elemento.",
   "useZones.planFinishNoCase": "{n} zona(s) com acabamentos que não são aplicados: o modelo não tem um caso de carga permanente (D). Crie um e gere de novo.",
   "useZones.diag.finishNoCase": "Zona com acabamentos não aplicados: falta um caso de carga permanente (D)",
+  "provenance.reproduce.link": "Verificar um relatório exportado…",
 };
 export default pt;

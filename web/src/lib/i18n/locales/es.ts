@@ -13842,7 +13842,6 @@ const es: Record<string, string> = {
   "provenance.reproduce.modelDiffers": "El proyecto abierto no es el modelo del que se hizo el informe.",
   "provenance.reproduce.buildDiffers": "El informe se hizo con otra compilación ({fields}); una diferencia en los resultados puede ser un cambio registrado y no un defecto.",
   "provenance.reproduce.solveFailed": "El modelo no se resolvió: {error}",
-  "provenance.reproduce.menu": "Reproducir desde la procedencia…",
   "drawBar.outline": "Placa",
   "drawBar.outlineHint": "Una placa física sobre un contorno de nodos, que se malla después.",
   "drawBar.elementHint": "Un solo elemento de cálculo de tres o cuatro nodos, sin placa física.",
@@ -14202,5 +14201,6 @@ const es: Record<string, string> = {
   "plates.scopeNowElement": "Un clic sobre una placa ahora elige un elemento de malla. Para volver a la placa completa: Selección → «Placa completa», o «Seleccionar la placa» en el panel del elemento.",
   "useZones.planFinishNoCase": "{n} zona(s) con terminaciones que no se aplican: el modelo no tiene un caso de carga muerta (D). Creá uno y volvé a generar.",
   "useZones.diag.finishNoCase": "Zona con terminaciones sin aplicar: falta un caso de carga muerta (D)",
+  "provenance.reproduce.link": "Verificar un reporte exportado…",
 };
 export default es;

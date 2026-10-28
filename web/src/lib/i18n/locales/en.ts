@@ -13853,7 +13853,6 @@ const en: Record<string, string> = {
   "provenance.reproduce.modelDiffers": "The open project is not the model the report was made from.",
   "provenance.reproduce.buildDiffers": "The report was made with a different build ({fields}); a difference in results may be a registered change rather than a defect.",
   "provenance.reproduce.solveFailed": "The model did not solve: {error}",
-  "provenance.reproduce.menu": "Reproduce from provenance…",
   "drawBar.outline": "Plate",
   "drawBar.outlineHint": "A physical plate on an outline of nodes, meshed later.",
   "drawBar.elementHint": "One analysis element of three or four nodes, with no physical plate.",
@@ -14213,5 +14212,6 @@ const en: Record<string, string> = {
   "plates.scopeNowElement": "A click on a plate now picks a mesh element. To go back to the whole plate: Selection → «Whole plate», or «Select plate» in the element's panel.",
   "useZones.planFinishNoCase": "{n} zone(s) with finishes that are not applied: the model has no dead-load case (D). Add one and generate again.",
   "useZones.diag.finishNoCase": "Zone with finishes not applied: there is no dead-load case (D)",
+  "provenance.reproduce.link": "Check an exported report…",
 };
 export default en;

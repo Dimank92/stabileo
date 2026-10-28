@@ -314,10 +314,6 @@
         <button class="pp-btn" onclick={() => fileInput?.click()}
                 data-testid="pp-open">{t('project.open')}</button>
       </HelpTip>
-      <HelpTip text={t('provenance.reproduce.intro')}>
-        <button class="pp-btn" onclick={() => window.dispatchEvent(new Event('stabileo-reproduce'))}
-                data-testid="pp-reproduce">{t('provenance.reproduce.menu')}</button>
-      </HelpTip>
       <HelpTip text={linkTooLong ? tp('project.linkTooLong', { n: proLink?.length ?? 0 }) : t('project.copyLinkTooltip')}>
         <button
           class="pp-btn"
@@ -446,6 +442,8 @@
           >{t('proExport.reportBtn')}</button>
         </HelpTip>
       </div>
+      <button class="pp-link" title={t('provenance.reproduce.intro')} onclick={() => window.dispatchEvent(new Event('stabileo-reproduce'))}
+              data-testid="pp-reproduce">{t('provenance.reproduce.link')}</button>
     </div>
     <div class="pp-group">
       <span class="pp-group-label">{t('proExport.groupDrawings')}</span>
@@ -706,6 +704,22 @@
     color: var(--st-text-2);
     margin-right: 0.3rem;
   }
+
+  .pp-link {
+    display: block;
+    align-self: flex-start;
+    margin: 0.3rem auto 0 0;
+    text-align: left;
+    padding: 0;
+    background: none;
+    border: none;
+    font: inherit;
+    font-size: 0.68rem;
+    color: var(--st-text-3);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .pp-link:hover { color: var(--st-text-2); }
 
   .pp-note {
     margin: 0.45rem 0 0.5rem;
