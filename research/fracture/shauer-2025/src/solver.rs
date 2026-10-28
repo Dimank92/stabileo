@@ -255,6 +255,17 @@ impl Solver {
         Ok((elastic, fracture))
     }
 
+    /// Degraded stress and damage at the centre of element `e`.
+    pub fn center_stress(&self, e: usize) -> Result<([f64; 3], f64), String> {
+        let (n, dn) = fe::shape(0.0, 0.0);
+        let (g, _) = fe::gradients(&self.coords[e], &dn, self.problem.aligned)?;
+        let de = self.element_d(e);
+        let d: f64 = (0..4).map(|a| n[a] * de[a]).sum();
+        let s = fe::stress(&self.problem.material, &fe::strain(&g, &self.element_u(e)));
+        let k = fe::degradation(d);
+        Ok(([k * s[0], k * s[1], k * s[2]], d))
+    }
+
     pub fn finished(&self) -> bool {
         self.pseudotime + self.problem.controls.dt > self.problem.controls.total_time
     }
