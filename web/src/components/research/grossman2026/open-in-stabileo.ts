@@ -9,8 +9,10 @@
  * E·A/ℓ is 1000 k kN/m and its axial force in kN is 1000 times the page's. Held rows become
  * pinned supports, the top row with the imposed vertical displacement. Prestress is not exported.
  */
-import { deflateSync } from 'fflate';
 import type { StripResult } from './springs';
+// Only the current results version, read as a separate module (the query keeps it from becoming
+// a chunk shared with the application, which must not grow by a byte).
+import { currentResultsVersion } from '../../../lib/provenance/result-changes.json?research-page';
 
 export function stripCompact(strip: StripResult, label: string, stamp?: unknown) {
   const n = strip.nodes.map((p, i) => [i + 1, p[0], p[1]]);
@@ -54,15 +56,21 @@ export function stripCompact(strip: StripResult, label: string, stamp?: unknown)
   };
 }
 
+/** Raw DEFLATE, as fflate's deflateSync in the app (the browser's own compressor, no shared code). */
+async function deflateRaw(bytes: Uint8Array): Promise<Uint8Array> {
+  const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
 function base64url(bytes: Uint8Array): string {
   let bin = '';
   for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-export function stripShareHash(strip: StripResult, label: string, stamp?: unknown): string {
+export async function stripShareHash(strip: StripResult, label: string, stamp?: unknown): Promise<string> {
   const bytes = new TextEncoder().encode(JSON.stringify(stripCompact(strip, label, stamp)));
-  return `#data=2.${base64url(deflateSync(bytes, { level: 9 }))}`;
+  return `#data=2.${base64url(await deflateRaw(bytes))}`;
 }
 
 export type StripLabel = { family: string; eta: number; keep: number; seed: number; strain: number };
@@ -74,10 +82,11 @@ function label(p: StripLabel): string {
 
 /** The share payload "2.<...>" of the strip, carrying the app's stamp for a fresh, unsolved project. */
 async function payload(strip: StripResult, p: StripLabel): Promise<string> {
-  // A new project that this build has not solved yet (the app's own stamp for a fresh project),
-  // so the editor does not treat it as results from an unknown older version.
-  const { freshStamp } = await import('../../../lib/provenance/solve-stamp');
-  return stripShareHash(strip, label(p), freshStamp()).slice('#data='.length);
+  // A project that carries no results, stamped with this build's results version (what the app's
+  // freshStamp() gives a new project), so the editor does not present it as results solved by an
+  // unknown older version. The editor solves it itself on opening.
+  const stamp = { resultsVersion: currentResultsVersion, resultsSchemaVersion: 1, analyses: [] };
+  return (await stripShareHash(strip, label(p), stamp)).slice('#data='.length);
 }
 
 /** The app in embed mode (ribbon and viewport, no header or footer) with the strip loaded. */
