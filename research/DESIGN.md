@@ -165,6 +165,11 @@ academic partners.
 
 ## 12. The platform: GitHub for computational mechanics, safely
 
+> **Not now.** For now Stabileo runs the experiments and the comparisons itself: we choose the
+> papers, implement them, validate them and publish them, and no outside code runs anywhere. This
+> section is the later direction, written down so today's choices don't block it; nothing in it is
+> built until the curated experiments and the benchmarks (§11.1) have proven the format.
+
 **Build on GitHub, not instead of it.** Researchers keep their code on GitHub. A repo adds one
 small file, `stabileo.yaml` (model, solver, parameters, reference outputs, article — the
 structure `research/` already uses, published as an open format), and connects to Stabileo.
