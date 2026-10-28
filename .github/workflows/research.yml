@@ -19,6 +19,7 @@ on:
       - 'web/src/lib/geometry/coordinate-system.ts'
       - 'web/package*.json'
       - 'web/vite*.ts'
+      - 'web/scripts/check-research-route-size.mjs'
       - 'Cargo.lock'
       - 'Cargo.toml'
       - 'flake.*'
@@ -39,6 +40,7 @@ on:
       - 'web/src/lib/geometry/coordinate-system.ts'
       - 'web/package*.json'
       - 'web/vite*.ts'
+      - 'web/scripts/check-research-route-size.mjs'
       - 'Cargo.lock'
       - 'Cargo.toml'
       - 'flake.*'
@@ -63,10 +65,28 @@ jobs:
         with:
           persist-credentials: false
       - run: research/tools/check_isolation.sh
+      - run: python3 -I research/tools/test_check_isolation.py
       - name: Research pages draw models only through the shared Stabileo viewer
         run: research/tools/check_viewer.sh
       - name: The viewer rule rejects a page with its own canvas
         run: research/tools/test_check_viewer.sh
+
+  route-size:
+    name: Landing and app route byte budgets
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - run: npm ci
+        working-directory: web
+      - run: node --test research/fracture/shauer-2025/wasm/check.test.mjs
+      - run: node scripts/check-research-route-size.mjs
+        working-directory: web
 
   catalog:
     name: Research catalog (Crossref, licenses)
