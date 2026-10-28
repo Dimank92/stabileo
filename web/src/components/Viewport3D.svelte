@@ -13,6 +13,7 @@
   import { onMount, onDestroy, untrack } from 'svelte';
   import { t, tp } from '../lib/i18n';
   import * as THREE from 'three';
+  import { createViewerScene, createViewerPerspectiveCamera, createViewerOrthographicCamera, createViewerRenderer, createViewerControls, applyDefaultNavigation, addViewerLights } from '../lib/viewport3d/scene-setup';
   import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
   import { modelStore, uiStore, resultsStore, historyStore, dsmStepsStore, verificationStore } from '../lib/store';
   import { setGeometryDrag } from '../lib/store/physical-frame';
@@ -595,8 +596,7 @@
 
   onMount(() => {
     // Scene
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(COLORS.background);
+    scene = createViewerScene();
 
     // Parent groups
     nodesParent = new THREE.Group();
@@ -641,34 +641,19 @@
      * both follow the distance to what is looked at (`nearPlaneFor`,
      * `farPlaneFor`).
      */
-    perspCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
-    setCameraUp(perspCamera);
-    perspCamera.position.set(12, 8, 12);
-    perspCamera.lookAt(0, 0, 0);
+    perspCamera = createViewerPerspectiveCamera();
 
     // Orthographic camera (frustum updated on resize)
-    orthoCamera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 1000);
-    setCameraUp(orthoCamera);
-    orthoCamera.position.set(12, 8, 12);
-    orthoCamera.lookAt(0, 0, 0);
+    orthoCamera = createViewerOrthographicCamera();
 
     camera = uiStore.cameraMode3D === 'orthographic' ? orthoCamera : perspCamera;
 
     // Renderer
-    renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.localClippingEnabled = true;
-    container.appendChild(renderer.domElement);
+    renderer = createViewerRenderer(container);
 
-    // Orbit controls
-    controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.1;
-    controls.target.set(0, 0, 0);
-    // The wheel zooms toward what is under the pointer, as in the 2D view and
-    // in CAD, rather than toward the orbit centre: a detail far from the
-    // middle of the model can be reached without panning to it first.
-    controls.zoomToCursor = true;
+    // Orbit controls. The wheel zooms toward what is under the pointer, as in the 2D view and
+    // in CAD, rather than toward the orbit centre.
+    controls = createViewerControls(camera, renderer.domElement);
     // Close in on a small part, the near plane follows (see nearPlaneFor).
     controls.addEventListener('change', syncNearPlane);
     applyNavigation();
@@ -720,15 +705,7 @@
       }, 100);
     });
 
-    // Lighting
-    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
-    scene.add(ambient);
-    const dir1 = new THREE.DirectionalLight(0xffffff, 0.8);
-    dir1.position.set(10, 20, 10);
-    scene.add(dir1);
-    const dir2 = new THREE.DirectionalLight(0xffffff, 0.3);
-    dir2.position.set(-10, 10, -10);
-    scene.add(dir2);
+    addViewerLights(scene);
 
     // Grid (reactive — updated by syncGrid effect)
     updateGrid();
@@ -3939,14 +3916,7 @@
     const plan = uiStore.planView3D;
     // In the plan view the Pan tool slides over the floor; another tool keeps its own drag.
     const leftSlides = uiStore.currentTool === 'pan' && (plan || uiStore.dragMode3D === 'slide');
-    controls.enableRotate = !plan;
-    controls.screenSpacePanning = true;
-    controls.mouseButtons = {
-      LEFT: leftSlides ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE,
-      MIDDLE: THREE.MOUSE.DOLLY,
-      RIGHT: leftSlides && !plan ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN,
-    };
-    controls.touches = { ONE: leftSlides ? THREE.TOUCH.PAN : THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+    applyDefaultNavigation(controls, { leftSlides, plan });
   }
   $effect(() => {
     void uiStore.planView3D; void uiStore.dragMode3D; void uiStore.currentTool;
