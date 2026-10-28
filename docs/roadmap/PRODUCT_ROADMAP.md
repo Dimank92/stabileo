@@ -61,6 +61,30 @@ ROI order for users:
 6. lightweight collaboration that makes review and sharing easier
 7. workflow polish and breadth after the above are solid
 
+## Priority now: catch wrong results before they ship (2026-10-28)
+
+Before new features, close the ways a wrong result can still reach users unnoticed. Each gap below
+was exposed in the week of 2026-10-21: a steel verdict change merged with no changelog or re-check
+entry (#461), the nightly verification failing four days with nobody told, a raw i18n key shown as
+a project name. These items come first in every section below; work on new features goes after
+them.
+
+| Order | Item | Issue | Section |
+|---|---|---|---|
+| 1 | **Results snapshot gate:** a reference corpus solved on every PR; any changed number, verdict or refusal fails CI unless the PR registers the result change | [#716](https://github.com/lambdaclass/stabileo/issues/716) | Release safety |
+| 2 | **Nightly verification that is green and alerts:** fix the runs failing since 2026-10-24; every scheduled failure opens an issue | [#717](https://github.com/lambdaclass/stabileo/issues/717), [#354](https://github.com/lambdaclass/stabileo/issues/354) | Trust and verification |
+| 3 | **Old project files:** a corpus saved by every release and file format; each opens, migrates and gives the same results | [#718](https://github.com/lambdaclass/stabileo/issues/718) | Release safety |
+| 4 | **Design checks against published worked examples,** chosen and signed off by an independent structural engineer (code manuals, INTI/CIRSOC example books, textbooks) | [#450](https://github.com/lambdaclass/stabileo/issues/450), [#360](https://github.com/lambdaclass/stabileo/issues/360) | Trust and verification |
+| 5 | **No raw i18n key visible,** web and desktop, every language | [#719](https://github.com/lambdaclass/stabileo/issues/719) | Release safety |
+| 6 | **Production health check** after every deploy and hourly (stabileo.com and staging) | [#720](https://github.com/lambdaclass/stabileo/issues/720) | Release safety |
+| 7 | **Backend security tests and a tested backup restore** | [#721](https://github.com/lambdaclass/stabileo/issues/721) | Release safety |
+| 8 | **Exported documents:** visual regression for PDF reports, DXF drawings and exports | [#722](https://github.com/lambdaclass/stabileo/issues/722) | Trust and verification |
+| 9 | **Desktop app:** install scripts, update from one version to the next, launch on each OS (macOS by hand: no WebDriver for its webview) | PR [#663](https://github.com/lambdaclass/stabileo/pull/663) | Release safety |
+
+Needs people, not only code: item 4's engineer sign-off; real users' project files for item 3's
+corpus; production access for item 7's restore test; testers on real Linux GPUs for the desktop's
+3D viewer.
+
 ## Multipliers
 
 > **Backlog conventions.** The five backlog sections below (Multipliers, Trust and verification, Engineering coverage, Solver and proof depth, Release safety) are the single backlog. Every item links to its GitHub issue; the tracker is [#396](https://github.com/lambdaclass/stabileo/issues/396). Each section ends with **exit criteria** (when the section is done) and the **metrics** that track them. The metrics are computed by `scripts/verification-metrics.py` and published on the verification [dashboard](../verification/DASHBOARD.md) (current values and per-release history); a metric that cannot be measured yet says "not yet measured" there, never an estimate. Per-item verification levels are in [MATURITY.md](../verification/MATURITY.md). Entry point for all roadmap documents: [README.md](README.md).
