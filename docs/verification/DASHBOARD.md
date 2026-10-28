@@ -157,3 +157,16 @@ From [DESIGN_EXAMPLES.md](DESIGN_EXAMPLES.md): pass, fixed (was wrong, now match
 ### Rust mutation testing (cargo-mutants, newest nightly on `main`)
 
 [Run 2026-10-18](https://github.com/lambdaclass/stabileo/actions/runs/39099586668), 8 shards: caught 714, missed 478, timeout 8, unviable 51; 1251 of 23264 planned mutants tested. Missed mutants fail the job and are triaged in [FUZZ_MUTANTS.md](FUZZ_MUTANTS.md).
+
+
+### Variant analysis: bug classes and checks
+
+Tracks bug classes identified in audits and postmortems, and the class-level automated CI check catching them ([VARIANT_ANALYSIS.md](VARIANT_ANALYSIS.md), [#448](https://github.com/lambdaclass/stabileo/issues/448)).
+
+| Bug Class | Automated Check in CI | Description |
+|---|---|---|
+| Frame / rotation / sign conventions | engine/tests/symbolic_elements.rs | Local and global coordinate transform & rotation sign parity |
+| Unit conversions | engine/tests/cirsoc301_check.rs | Dimensional consistency across design equations and load cases |
+| Double counting | engine/tests/validation/domains/response/reaction_checks.rs | Global reaction and force equilibrium summation |
+| NaN / degenerate input accepted | engine/tests/integration/design_check_evaluability.rs | Degenerate geometry and IEEE non-finite value refusal |
+| Silent drops | engine/tests/feature_matrix.rs | Exhaustive feature-matrix support & refusal verification |

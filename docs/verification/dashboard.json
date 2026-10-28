@@ -147,7 +147,7 @@
   "fm_cells": {
    "label": "Feature-matrix cells (2D + 3D)",
    "value": 1384,
-   "display": "R 85, ~ 20, · 267, ✓ 1012",
+   "display": "R 85, ~ 20, \u00b7 267, \u2713 1012",
    "status": "measured",
    "source": "FEATURE_MATRIX.md",
    "note": "",
@@ -511,7 +511,7 @@
     "issues": []
    },
    {
-    "name": "Craig–Bampton",
+    "name": "Craig\u2013Bampton",
     "level": "Benchmarked",
     "evidence": {
      "Benchmarked": "[BENCHMARKS](../BENCHMARKS.md#solver-capability-matrix): Model reduction / substructuring (Good)",
@@ -552,7 +552,7 @@
   ],
   "elements": [
    {
-    "name": "Frame, Euler–Bernoulli (2D, 3D)",
+    "name": "Frame, Euler\u2013Bernoulli (2D, 3D)",
     "level": "Certified",
     "evidence": {
      "Certified": "[symbolic derivation](SYMBOLIC.md): `frame_local_stiffness_2d`, `frame_local_stiffness_3d`",
@@ -1167,7 +1167,7 @@
   "439": {
    "pr": false,
    "state": "open",
-   "title": "Web: 3D sections send no Cw and fall back to J = 0.001·Iy; with torsional buckling in Kg these now drive 3D buckling/P-Delta"
+   "title": "Web: 3D sections send no Cw and fall back to J = 0.001\u00b7Iy; with torsional buckling in Kg these now drive 3D buckling/P-Delta"
   },
   "442": {
    "pr": false,
@@ -1375,7 +1375,7 @@
    },
    {
     "number": 439,
-    "title": "Web: 3D sections send no Cw and fall back to J = 0.001·Iy; with torsional buckling in Kg these now drive 3D buckling/P-Delta"
+    "title": "Web: 3D sections send no Cw and fall back to J = 0.001\u00b7Iy; with torsional buckling in Kg these now drive 3D buckling/P-Delta"
    },
    {
     "number": 441,
@@ -1467,15 +1467,15 @@
   },
   "feature_matrix": {
    "2D": {
-    "✓": 427,
+    "\u2713": 427,
     "R": 16,
-    "·": 93,
+    "\u00b7": 93,
     "~": 8
    },
    "3D": {
-    "✓": 585,
+    "\u2713": 585,
     "R": 69,
-    "·": 174,
+    "\u00b7": 174,
     "~": 12
    }
   },
@@ -1694,5 +1694,39 @@
    "date": "2026-10-18"
   },
   "ts_mutants": null
+ },
+ "variant_analysis": {
+  "classes": [
+   {
+    "name": "Frame / rotation / sign conventions",
+    "slug": "conventions",
+    "check_file": "engine/tests/symbolic_elements.rs",
+    "check_type": "symbolic"
+   },
+   {
+    "name": "Unit conversions",
+    "slug": "units",
+    "check_file": "engine/tests/cirsoc301_check.rs",
+    "check_type": "regression"
+   },
+   {
+    "name": "Double counting",
+    "slug": "double_counting",
+    "check_file": "engine/tests/validation/domains/response/reaction_checks.rs",
+    "check_type": "equilibrium"
+   },
+   {
+    "name": "NaN / degenerate input accepted",
+    "slug": "nan_degenerate",
+    "check_file": "engine/tests/integration/design_check_evaluability.rs",
+    "check_type": "evaluability"
+   },
+   {
+    "name": "Silent drops",
+    "slug": "silent_drops",
+    "check_file": "engine/tests/feature_matrix.rs",
+    "check_type": "feature_matrix"
+   }
+  ]
  }
 }

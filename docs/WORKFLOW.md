@@ -28,6 +28,11 @@ never silently wrong and verification never silently stops working.
   in a planned order, resolves conflicts once, and runs the full suite. It is never merged
   itself; its merge plan is recorded (example: [MERGE_PLAN_SAFETY_WAVE.md](MERGE_PLAN_SAFETY_WAVE.md)).
   Each PR is then merged on its own, in that order.
+- **Variant analysis after every bug.** When fixing any defect (safety or non-safety), developers
+  must search the codebase for the same bug class and add a class-level automated check in CI
+  that covers the class, not only the single instance ([verification/VARIANT_ANALYSIS.md](verification/VARIANT_ANALYSIS.md),
+  [#448](https://github.com/lambdaclass/stabileo/issues/448)). The PR must record the bug class,
+  search method, other instances found, and the class-level check added.
 - **Review before merge.** Every PR gets an independent review (Codex review, plus a human
   reviewer for solver, certificate and design-check changes) before it leaves draft and merges.
 - **Required checks** must be green (engine, web, e2e, Kani, Lean, symbolic; see
