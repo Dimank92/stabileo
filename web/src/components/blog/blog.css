@@ -367,6 +367,23 @@
   }
 }
 
+.landing.blog .post-figure.post-shot {
+  margin-inline: 0;
+}
+
+.landing.blog .post-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--hair);
+  border-radius: var(--lp-radius);
+}
+
+.landing.blog .post-shot.portrait {
+  max-width: 300px;
+  margin-inline: auto;
+}
+
 /* The scroller moves, never the page: a seven-column table on a phone would
    otherwise widen the document and let the whole article slide sideways. */
 .landing.blog .post-table-scroll {

@@ -61,6 +61,7 @@ const SECTIONS = [
   'education',
   'pricing',
   'blog',
+  'changelog',
 ] as const;
 
 async function bootLanding(page: Page, opts: { locale?: string; manual?: boolean } = {}) {
@@ -84,6 +85,21 @@ async function bootLanding(page: Page, opts: { locale?: string; manual?: boolean
 }
 
 test.describe('@landing landing page', () => {
+  test('the changelog at the foot shows the three newest weeks and leads to the whole history', async ({ page }) => {
+    await bootLanding(page, { locale: 'es' });
+    const section = page.locator('#changelog');
+    await section.scrollIntoViewIfNeeded();
+
+    await expect(section.getByRole('heading', { level: 2 })).toHaveText('Qué cambió en Stabileo');
+    await expect(section.getByTestId('changelog-week')).toHaveCount(3);
+    await expect(section.locator('time').first()).toHaveText('23 de octubre de 2026');
+    await expect(section.locator('figure img')).toHaveAttribute('src', '/screenshots/changelog-basic-report-1600.webp');
+
+    await section.getByRole('link', { name: 'Ver todos los cambios' }).click();
+    await expect(page).toHaveURL(/\/es\/changelog\/$/);
+    await expect(page.locator('.post-title')).toHaveText('Historial de cambios de Stabileo');
+  });
+
   test('the nav\'s Blog item opens the blog, not the teaser at the foot of the page', async ({ page }) => {
     // It used to be a button scrolling to the #blog section. Now a real link:
     // crawlable, middle-clickable, in the reader's language.

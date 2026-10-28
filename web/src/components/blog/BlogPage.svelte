@@ -107,14 +107,18 @@
                 }
               : {}),
           },
-          {
-            '@type': 'FAQPage',
-            mainEntity: standingBody.faq.map((f) => ({
-              '@type': 'Question',
-              name: f.q,
-              acceptedAnswer: { '@type': 'Answer', text: f.a },
-            })),
-          },
+          ...(standingBody.faq.length
+            ? [
+                {
+                  '@type': 'FAQPage',
+                  mainEntity: standingBody.faq.map((f) => ({
+                    '@type': 'Question',
+                    name: f.q,
+                    acceptedAnswer: { '@type': 'Answer', text: f.a },
+                  })),
+                },
+              ]
+            : []),
         ],
       });
       return restorePageMeta;
@@ -198,7 +202,7 @@
 
         <div class="post-body">
           <BlogBlocks blocks={standingBody.blocks} />
-          <h2>{standingBody.faqTitle}</h2>
+          {#if standingBody.faq.length}<h2>{standingBody.faqTitle}</h2>{/if}
           {#each standingBody.faq as f}
             <h3>{f.q}</h3>
             <p>{f.a}</p>

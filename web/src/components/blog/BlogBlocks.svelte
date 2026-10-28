@@ -9,6 +9,7 @@
   import { findPost, inLocale, type Block } from '../../lib/blog';
   import { publicI18n } from '../../lib/i18n/store.svelte';
   import PostEmbed from './PostEmbed.svelte';
+  import Shot from '../landing/Shot.svelte';
   import PublicLink from '../landing/PublicLink.svelte';
   import { smartQuotes as q } from '../../lib/blog/typography';
 
@@ -47,6 +48,10 @@
       <span class="post-link-lead">{q(block.t)}</span>
       <a href={block.href} class="link-arrow" rel="noopener" target="_blank">{block.label}</a>
     </aside>
+  {:else if block.k === 'shot'}
+    <figure class="post-figure post-shot" class:portrait={block.h > block.w}>
+      <Shot base={block.base} w={block.w} h={block.h} alt={block.alt} sizes="(max-width: 760px) 92vw, 720px" />
+    </figure>
   {:else if block.k === 'embed'}
     <PostEmbed query={block.query} mode={block.mode} label={block.label} />
   {:else if block.k === 'table'}

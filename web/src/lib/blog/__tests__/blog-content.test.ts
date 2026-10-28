@@ -114,6 +114,10 @@ describe('blog posts', () => {
               expect(b.head.length).toBeGreaterThan(1);
               expect(b.rows.length).toBeGreaterThan(0);
               for (const row of b.rows) expect(row).toHaveLength(b.head.length);
+            } else if (b.k === 'shot') {
+              expect(b.alt.trim()).not.toBe('');
+              expect(b.w).toBeGreaterThan(0);
+              expect(b.h).toBeGreaterThan(0);
             } else {
               expect(b.t.trim()).not.toBe('');
             }

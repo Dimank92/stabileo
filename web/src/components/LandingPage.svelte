@@ -13,6 +13,7 @@
   import LandingVerification from './landing/LandingVerification.svelte';
   import LandingEducation from './landing/LandingEducation.svelte';
   import LandingBlog from './landing/LandingBlog.svelte';
+  import LandingChangelog from './landing/LandingChangelog.svelte';
   import LandingFooter from './landing/LandingFooter.svelte';
   import LinksButton from './landing/LinksButton.svelte';
   import { enterApp } from './landing/landing-utils';
@@ -195,6 +196,7 @@
   <LandingEducation />
   <LandingPricing />
   <LandingBlog />
+  <LandingChangelog />
   <LandingFooter />
   <LinksButton />
 </div>

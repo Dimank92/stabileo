@@ -3,6 +3,7 @@ import { pickLanguage } from './fixtures';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { PUBLIC_LOCALES } from '../src/lib/i18n/offered';
+import { CHANGELOG } from '../src/lib/changelog';
 
 /**
  * The blog at /blog.
@@ -41,6 +42,23 @@ async function boot(page: Page, path: string, locale = 'en') {
 }
 
 test.describe('@smoke blog', () => {
+  test('the changelog page lists every week, newest first, with its screenshots', async ({ page }) => {
+    await boot(page, '/es/changelog/', 'es');
+
+    await expect(page.locator('.post-title')).toHaveText('Historial de cambios de Stabileo');
+    const weeks = page.locator('.post-body h2.post-h');
+    await expect(weeks).toHaveCount(CHANGELOG.length);
+    await expect(weeks.first()).toHaveText(`23 de octubre de 2026 · ${CHANGELOG[0].i18n.es.title}`);
+    await expect(page.locator('.post-body li').first()).toHaveText(`Motor: ${CHANGELOG[0].i18n.es.items[0]}`);
+
+    const shots = page.locator('.post-shot img');
+    await expect(shots).toHaveCount(CHANGELOG.filter((e) => e.shot).length);
+    await expect(shots.first()).toHaveAttribute('src', '/screenshots/changelog-basic-report-1600.webp');
+    await shots.first().scrollIntoViewIfNeeded();
+    await expect.poll(() => shots.first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+    await expect(page.locator('.post-body').getByText('Preguntas frecuentes')).toHaveCount(0);
+  });
+
   test('renders the index at /blog', async ({ page }) => {
     await boot(page, '/blog');
 
