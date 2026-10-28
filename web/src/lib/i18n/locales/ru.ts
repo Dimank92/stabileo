@@ -2507,7 +2507,6 @@ const ru: Translations = {
   'report.printBtn': 'Печать / PDF',
   'report.docTitle': '{name} — Расчётный отчёт',
   'report.coverSubtitle': 'Расчётный отчёт конструкций',
-  'report.coverCode': 'Проверка по CIRSOC 201',
   'report.coverFooter': 'Stabileo — Расчёт конструкций',
   'report.modelData': '1. Данные модели',
   'report.view3d': '3D вид',

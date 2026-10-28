@@ -2930,7 +2930,6 @@ const ar: Translations = {
   'report.printBtn': 'طباعة / PDF',
   'report.docTitle': '{name} — تقرير الحسابات',
   'report.coverSubtitle': 'تقرير الحسابات الإنشائية',
-  'report.coverCode': 'التحقق وفقاً لـ CIRSOC 201',
   'report.coverFooter': 'Stabileo — تحليل إنشائي',
   'report.modelData': '1. بيانات النموذج',
   'report.view3d': 'عرض ثلاثي الأبعاد',

@@ -2501,7 +2501,6 @@ const id: Translations = {
   'report.printBtn': 'Cetak / PDF',
   'report.docTitle': '{name} — Laporan Perhitungan',
   'report.coverSubtitle': 'Laporan Perhitungan Struktural',
-  'report.coverCode': 'Verifikasi menurut CIRSOC 201',
   'report.coverFooter': 'Stabileo — Analisis Struktur',
   'report.modelData': '1. Data Model',
   'report.view3d': 'Tampilan 3D',

@@ -2517,7 +2517,6 @@ const it: Translations = {
   'report.printBtn': 'Stampa / PDF',
   'report.docTitle': '{name} — Relazione di Calcolo',
   'report.coverSubtitle': 'Relazione di Calcolo Strutturale',
-  'report.coverCode': 'Verifica secondo CIRSOC 201',
   'report.coverFooter': 'Stabileo — Analisi Strutturale',
   'report.modelData': '1. Dati del Modello',
   'report.view3d': 'Vista 3D',

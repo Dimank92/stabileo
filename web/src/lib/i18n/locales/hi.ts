@@ -2258,7 +2258,6 @@ const hi: Translations = {
   'report.printBtn': 'प्रिंट / PDF',
   'report.docTitle': '{name} — गणना रिपोर्ट',
   'report.coverSubtitle': 'संरचनात्मक गणना रिपोर्ट',
-  'report.coverCode': 'CIRSOC 201 के अनुसार सत्यापन',
   'report.coverFooter': 'Stabileo — संरचनात्मक विश्लेषण',
   'report.modelData': '1. मॉडल डेटा',
   'report.view3d': '3D दृश्य',

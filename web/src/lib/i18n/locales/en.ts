@@ -4173,7 +4173,6 @@ const en: Record<string, string> = {
   'report.toc': 'Table of Contents',
   'report.docTitle': '{name} — Calculation Report',
   'report.coverSubtitle': 'Structural Calculation Report',
-  'report.coverCode': 'Verification per CIRSOC 201',
   'report.coverFooter': 'Stabileo — Structural Analysis',
   'report.modelData': '1. Model Data',
   'report.view3d': '3D View',
@@ -14213,5 +14212,7 @@ const en: Record<string, string> = {
   "plates.scopeNowElement": "A click on a plate now picks a mesh element. To go back to the whole plate: Selection → «Whole plate», or «Select plate» in the element's panel.",
   "useZones.planFinishNoCase": "{n} zone(s) with finishes that are not applied: the model has no dead-load case (D). Add one and generate again.",
   "useZones.diag.finishNoCase": "Zone with finishes not applied: there is no dead-load case (D)",
+  "docx.pageOf": "Page {page} of {pages}",
+  "docx.figureMissing": "[Figure not included]",
 };
 export default en;

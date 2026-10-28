@@ -1,0 +1,14 @@
+### Changed
+#### The calculation report in Word carries its figures, cover, header and page numbers (2026-10-28)
+
+The Word version of PRO's calculation report is written from the same HTML as the PDF, with the
+same choices of the report dialog. It used to keep only headings, paragraphs and tables. It now
+also carries every figure as an image drawn at 300 dpi of its printed size, the logo and the
+letterhead on a cover page without header or footer, the page breaks, the notes and the warnings
+(stale or incomplete results among them) as styled paragraphs, a header with the program and
+version, and a footer with the report, its date and "page n of m". Symbols in table headers keep
+their sub- and superscripts as text; formulas are text, not editable equations. Number columns are
+right-aligned and narrow tables take only the width they need. The provenance table is no longer
+written twice. The same improvements reach every report exported to Word through the shared
+writer (the design report and the detailing report when design is on). The calculation report's
+cover no longer says "Verification per CIRSOC 201": it carries no code check.

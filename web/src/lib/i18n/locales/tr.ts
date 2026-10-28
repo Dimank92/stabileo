@@ -2258,7 +2258,6 @@ const tr: Translations = {
   'report.printBtn': 'Yazdır / PDF',
   'report.docTitle': '{name} — Hesap Raporu',
   'report.coverSubtitle': 'Yapısal Hesap Raporu',
-  'report.coverCode': 'CIRSOC 201\'e göre doğrulama',
   'report.coverFooter': 'Stabileo — Yapısal Analiz',
   'report.modelData': '1. Model Verileri',
   'report.view3d': '3B Görünüm',

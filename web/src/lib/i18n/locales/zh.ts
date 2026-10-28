@@ -2506,7 +2506,6 @@ const zh: Translations = {
   'report.printBtn': '打印 / PDF',
   'report.docTitle': '{name} — 计算报告',
   'report.coverSubtitle': '结构计算报告',
-  'report.coverCode': '按 CIRSOC 201 验算',
   'report.coverFooter': 'Stabileo — 结构分析',
   'report.modelData': '1. 模型数据',
   'report.view3d': '3D 视图',

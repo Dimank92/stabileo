@@ -4166,7 +4166,6 @@ const es: Record<string, string> = {
   'report.toc': 'Índice',
   'report.docTitle': '{name} — Memoria de Cálculo',
   'report.coverSubtitle': 'Memoria de Cálculo Estructural',
-  'report.coverCode': 'Verificación según CIRSOC 201',
   'report.coverFooter': 'Stabileo — Análisis Estructural',
   'report.modelData': '1. Datos del Modelo',
   'report.view3d': 'Vista 3D',
@@ -14202,5 +14201,7 @@ const es: Record<string, string> = {
   "plates.scopeNowElement": "Un clic sobre una placa ahora elige un elemento de malla. Para volver a la placa completa: Selección → «Placa completa», o «Seleccionar la placa» en el panel del elemento.",
   "useZones.planFinishNoCase": "{n} zona(s) con terminaciones que no se aplican: el modelo no tiene un caso de carga muerta (D). Creá uno y volvé a generar.",
   "useZones.diag.finishNoCase": "Zona con terminaciones sin aplicar: falta un caso de carga muerta (D)",
+  "docx.pageOf": "Página {page} de {pages}",
+  "docx.figureMissing": "[Figura no incluida]",
 };
 export default es;

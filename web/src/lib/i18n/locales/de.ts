@@ -2524,7 +2524,6 @@ const de: Translations = {
   'report.printBtn': 'Drucken / PDF',
   'report.docTitle': '{name} — Berechnungsbericht',
   'report.coverSubtitle': 'Statischer Berechnungsbericht',
-  'report.coverCode': 'Nachweis nach CIRSOC 201',
   'report.coverFooter': 'Stabileo — Tragwerksanalyse',
   'report.modelData': '1. Modelldaten',
   'report.view3d': '3D-Ansicht',

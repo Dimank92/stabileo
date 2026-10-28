@@ -6809,7 +6809,6 @@ const pt: Translations = {
   'report.configTitle': 'Configurar Memória de Cálculo',
   'report.convergence': 'Convergência',
   'report.count': 'Qtd.',
-  'report.coverCode': 'Verificação conforme CIRSOC 201',
   'report.coverFooter': 'Stabileo — Análise Estrutural',
   'report.coverSubtitle': 'Memória de Cálculo Estrutural',
   'report.criticalFactor': 'Fator de carga crítica',
@@ -13853,5 +13852,7 @@ const pt: Translations = {
   "plates.scopeNowElement": "Um clique em uma placa agora escolhe um elemento de malha. Para voltar à placa inteira: Seleção → «Placa inteira», ou «Selecionar a placa» no painel do elemento.",
   "useZones.planFinishNoCase": "{n} zona(s) com acabamentos que não são aplicados: o modelo não tem um caso de carga permanente (D). Crie um e gere de novo.",
   "useZones.diag.finishNoCase": "Zona com acabamentos não aplicados: falta um caso de carga permanente (D)",
+  "docx.pageOf": "Página {page} de {pages}",
+  "docx.figureMissing": "[Figura não incluída]",
 };
 export default pt;

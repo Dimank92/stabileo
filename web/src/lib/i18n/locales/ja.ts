@@ -2924,7 +2924,6 @@ const ja: Translations = {
   'report.printBtn': '印刷 / PDF',
   'report.docTitle': '{name} — 計算書レポート',
   'report.coverSubtitle': '構造計算書',
-  'report.coverCode': 'CIRSOC 201に基づく検定',
   'report.coverFooter': 'Stabileo — 構造解析',
   'report.modelData': '1. モデルデータ',
   'report.view3d': '3Dビュー',

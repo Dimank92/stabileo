@@ -2504,7 +2504,6 @@ const ko: Translations = {
   'report.printBtn': '인쇄 / PDF',
   'report.docTitle': '{name} — 계산 보고서',
   'report.coverSubtitle': '구조 계산 보고서',
-  'report.coverCode': 'CIRSOC 201 검증',
   'report.coverFooter': 'Stabileo — 구조 해석',
   'report.modelData': '1. 모델 데이터',
   'report.view3d': '3D 뷰',

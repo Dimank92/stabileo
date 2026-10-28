@@ -2258,7 +2258,6 @@ const fr: Translations = {
   'report.printBtn': 'Imprimer / PDF',
   'report.docTitle': '{name} — Note de Calcul',
   'report.coverSubtitle': 'Note de Calcul Structurale',
-  'report.coverCode': 'Vérification selon CIRSOC 201',
   'report.coverFooter': 'Stabileo — Analyse Structurale',
   'report.modelData': '1. Données du Modèle',
   'report.view3d': 'Vue 3D',
