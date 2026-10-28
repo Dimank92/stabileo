@@ -10,10 +10,3 @@ Drawings opens on what to include, with three quick sets (model only, model and 
 everything) above the checks, and, when more than one drawing is chosen, whether they come out
 on one sheet or one file each in a .zip. PRO's DXF offers the same: one drawing with a layer per
 content, or a .zip with the model's drawing and one per result with the model underneath.
-
-### Fixed
-#### Exported files named after a translation key (2026-10-28)
-
-A new, unnamed model was exported as `tabBarnewStructure.xlsx` (and the like): the model was named
-before the application's dictionaries loaded. It is named «Nueva estructura» / «New structure»
-from the start; a saved project that carries the old name takes the right one when the language changes.
