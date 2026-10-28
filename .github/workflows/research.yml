@@ -1,0 +1,55 @@
+name: Research
+
+# Stabileo Research (research/): experimental, not part of the required checks, never on self-hosted
+# runners. Path-filtered so product changes do not run it and research changes run nothing else.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'research/**'
+      - '.github/workflows/research.yml'
+      - 'engine/**'
+      - 'web/src/lib/engine/**'
+  pull_request:
+    paths:
+      - 'research/**'
+      - '.github/workflows/research.yml'
+      - 'engine/**'
+      - 'web/src/lib/engine/**'
+  schedule:
+    - cron: '17 6 * * 1'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  isolation:
+    name: Research isolation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: research/tools/check_isolation.sh
+
+  catalog:
+    name: Research catalog (Crossref, licenses)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned checker dependencies
+        run: |
+          python3 -m venv /tmp/catalog-venv
+          /tmp/catalog-venv/bin/pip install --require-hashes -r research/tools/requirements.txt
+      - name: Checker rejects bad entries
+        run: /tmp/catalog-venv/bin/python -I research/tools/test_catalog.py --online
+      - name: Every DOI, title, author list, year, venue and code license matches its source
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: /tmp/catalog-venv/bin/python -I research/tools/catalog.py check --links
