@@ -1,5 +1,5 @@
 // Runs the built browser bundle in Node on cases with exact answers (same tolerances as
-// tests/validation.rs) and on the paper's foam strip, checked against the native build's value.
+// tests/validation.rs), runs the paper's foam strip and checks that bad input is refused.
 //   node check.mjs <bundle dir>
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

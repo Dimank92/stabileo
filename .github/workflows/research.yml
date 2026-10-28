@@ -88,3 +88,34 @@ jobs:
           assert not extra, extra
           print(len(m["files_sha256"]), "reference files match MANIFEST.json")
           PY
+
+  springs:
+    name: Spring networks (Grossman 2026) validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: research/metamaterials/grossman-2026
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Toolchain from rust-toolchain.toml
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Tests, including the checks against the paper's published values
+        run: cargo test --release --locked -- --nocapture
+      - name: The committed comparison series are what the code computes
+        run: |
+          cargo run --release --locked --bin reproduce -- /tmp/stabileo_results.json
+          cmp /tmp/stabileo_results.json results/stabileo_results.json
+      - name: Reference values match their manifest
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os
+          m = json.load(open("reference-results/MANIFEST.json"))
+          for name, digest in m["files_sha256"].items():
+              assert hashlib.sha256(open(os.path.join("reference-results", name), "rb").read()).hexdigest() == digest, name
+          extra = set(os.listdir("reference-results")) - set(m["files_sha256"]) - {"MANIFEST.json"}
+          assert not extra, extra
+          print(len(m["files_sha256"]), "reference files match MANIFEST.json")
+          PY
