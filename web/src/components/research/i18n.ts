@@ -16,6 +16,7 @@ export type ResearchStrings = {
   paper: string;
   code: string;
   openInStabileo: string;
+  editInStabileo: string;
   soon: string;
   notDesign: string;
   checksPass: string;
