@@ -7,8 +7,9 @@
    * Layout: the article (left) and a sticky app pane (right: viewer, controls, plots). Links in
    * the article call `apply`, which drives the app.
    */
-  import { onDestroy, onMount } from 'svelte';
-  import validation from '../../../../../research/metamaterials/grossman-2026/VALIDATION.json';
+  import { onDestroy, onMount, untrack } from 'svelte';
+  import { evidence } from './evidence';
+  import { Simulation } from './simulation.svelte';
   import results from '../../../../../research/metamaterials/grossman-2026/results/stabileo_results.json';
   import fig5Csv from '../../../../../research/metamaterials/grossman-2026/reference-results/fig5_simulation_digitized.csv?raw';
   import { REPO_URL } from '../../landing/landing-utils';
@@ -19,7 +20,7 @@
   import { publicI18n } from '../../../lib/i18n/store.svelte';
   import { Playback, SOURCE_LABEL } from '../shell/playback.svelte';
   import PlotXY, { type PlotSeries } from './PlotXY.svelte';
-  import { loadSprings, solvePeriodic, solveStrip, type LatticeKind, type NetworkSpec, type PeriodicResult, type StripResult } from './springs';
+  import { loadSprings, type LatticeKind, type NetworkSpec, type PeriodicResult, type StripResult } from './springs';
   import { embeddedEditorUrl, fullEditorUrl, type StripLabel } from './open-in-stabileo';
 
   const SOURCE = `${REPO_URL}/tree/main/research/metamaterials/grossman-2026`;
@@ -72,11 +73,13 @@
 
   let glue = $state.raw<Awaited<ReturnType<typeof loadSprings>> | null>(null);
   let loadError = $state<string | null>(null);
-  let strip = $state.raw<StripResult | null>(null);
-  let cell = $state.raw<PeriodicResult | null>(null);
-  let ordered = $state.raw<{ hook: PeriodicResult; eq: PeriodicResult } | null>(null);
-  let solveError = $state<string | null>(null);
-  let solveMs = $state(0);
+  const simulation = new Simulation();
+  const strip = $derived(simulation.result?.strip ?? null);
+  const cell = $derived(simulation.result?.cell ?? null);
+  const ordered = $derived(simulation.result?.ordered ?? null);
+  const solved = $derived(simulation.result?.input);
+  const solveError = $derived(simulation.error);
+  const solveMs = $derived(simulation.ms);
 
   const playback = new Playback(140, 1800);
   const SWEEP = Array.from({ length: 26 }, (_, i) => i * 0.02);
@@ -84,23 +87,17 @@
 
   function solve() {
     if (!glue) return;
-    const t0 = performance.now();
-    try {
-      const spec = $state.snapshot(network) as NetworkSpec;
-      strip = solveStrip(glue, { network: spec, width: 13, height: 52, theta: stripTheta, clamp_band: 0.5, strain });
-      cell = solvePeriodic(glue, { network: spec, n1: cells, n2: cells, strain: [0, 0, 0] });
-      if (family === 'ordered' && keep === 1 && prestress === 0) {
-        const base = { ...spec, keep: 1, prestress: 0 };
-        ordered = {
-          hook: solvePeriodic(glue, { network: { ...base, spring_law: 'hookean' }, n1: 4, n2: 4, strain: [0, 0, 0] }),
-          eq: solvePeriodic(glue, { network: { ...base, spring_law: 'equal_weight' }, n1: 4, n2: 4, strain: [0, 0, 0] }),
-        };
-      } else ordered = null;
-      solveError = null;
-    } catch (e) {
-      solveError = e instanceof Error ? e.message : String(e);
+    simulation.run(glue, {
+      network: $state.snapshot(network) as NetworkSpec,
+      label: { family, eta, keep, seed, strain },
+      theta: stripTheta, cells, phi, psi,
+    });
+    if (untrack(() => simulation.error)) {
+      editorSrc = null;
+      editorStrip = null;
+      editorLoading = false;
+      editorError = null;
     }
-    solveMs = performance.now() - t0;
   }
 
   $effect(() => {
@@ -173,7 +170,7 @@
       if (t === 'experiment' || t === 'params' || t === 'edit') showTab(t);
     },
   };
-  const passed = validation.checks.filter((c) => c.passed).length;
+  const paperChecks = evidence[0];
 
   /** Links in the article set the app's state. */
   function apply(p: Partial<{ family: Family; eta: number; phi: number; psi: number; theta: number; ell: number; keep: number; prestress: number; diagonals: boolean; law: 'hookean' | 'equal_weight'; strain: number }>) {
@@ -249,7 +246,7 @@
   const bars = $derived(strip ? Uint32Array.from(strip.bonds.flat()) : new Uint32Array());
   const disp = $derived(strip ? Float64Array.from(strip.displacement.flatMap((u) => [u[1], -u[0]])) : null);
   // Forces per unit imposed strain, N / (k ε), so the colours do not depend on the strain's size.
-  const forceScale = $derived(Math.abs(strain) > 0 ? 1 / Math.abs(strain) : 1);
+  const forceScale = $derived(Math.abs(solved?.label.strain ?? 0) > 0 ? 1 / Math.abs(solved!.label.strain) : 1);
   const forces = $derived(strip ? strip.force.map((f) => f * forceScale) : null);
   const forceRange = $derived.by(() => {
     if (!forces) return { min: -1, max: 1 };
@@ -260,7 +257,7 @@
   let thumbMode = $state(false);
   const VIEW = $derived<[number, number, number, number]>(thumbMode ? [-8, -16, 61, 30] : [-1, -9, 53 * (1 + Math.max(0, deform * strain)) + 1, 14]);
   // The paper's convention for the pulled direction, in the periodic cell's frame.
-  const pullAngle = $derived(family === 'honeycomb' ? 0 : Math.PI / 2 - stripTheta);
+  const pullAngle = $derived(solved?.label.family === 'honeycomb' ? 0 : Math.PI / 2 - (solved?.theta ?? 0));
   const cellAlong = $derived(cell ? uniaxial(cell.c, pullAngle) : null);
 
   // ---- plots ---------------------------------------------------------------------------------
@@ -296,7 +293,7 @@
     const ts = Array.from({ length: 91 }, (_, i) => (Math.PI * i) / 90);
     const pick = (r: PeriodicResult) => ts.map((t) => ({ x: t, y: uniaxial(r.c, Math.PI / 2 - t)?.[1] ?? NaN }));
     return [
-      { name: 'Paper, Supplemental Eq. (9)', color: PAPER, kind: 'line', points: ts.map((t) => ({ x: t, y: eq9(phi, psi, t) })) },
+      { name: 'Paper, Supplemental Eq. (9)', color: PAPER, kind: 'line', points: ts.map((t) => ({ x: t, y: eq9(solved!.phi, solved!.psi, t) })) },
       { name: 'Ours, equal-weight springs (k ∝ 1/ℓ²)', color: OURS, kind: 'line', dashed: true, points: pick(ordered.eq) },
       { name: 'Ours, equal Hookean springs (Eq. 3)', color: OURS, kind: 'line', points: pick(ordered.hook) },
     ];
@@ -315,19 +312,22 @@
   let editorLoading = $state(false);
   let editorStrip = $state.raw<StripResult | null>(null);
   let editorError = $state<string | null>(null);
-  const labelParams = (): StripLabel => ({ family, eta, keep, seed, strain });
+  const labelParams = (): StripLabel => solved!.label;
   const e2e = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('e2e') === '1';
 
   async function loadEditor() {
     if (!strip) return;
     editorError = null;
     editorLoading = true;
+    const current = simulation.result;
     editorStrip = strip;
     // Test builds with ?e2e=1: the strip handed to the editor, so a spec can compare the
     // production engine's bar forces with ours.
     if (e2e) (window as unknown as { __springsEditorStrip?: StripResult }).__springsEditorStrip = strip;
     try {
-      editorSrc = await embeddedEditorUrl(strip, labelParams(), e2e);
+      const url = await embeddedEditorUrl(strip, labelParams(), e2e);
+      if (simulation.result === current) editorSrc = url;
+      else editorLoading = false;
     } catch (e) {
       editorError = e instanceof Error ? e.message : String(e);
       editorLoading = false;
@@ -358,7 +358,7 @@
   lead="Pull a strip of Hookean springs and read how much it narrows. Shake the nodes of the triangular lattice and it starts to widen instead: it becomes auxetic. The network on the right is solved in your browser as a truss on Stabileo’s engine, and the same strip opens in the real Stabileo editor. No reference code is public (“available at request”), so we compare with the paper’s published numbers, closed forms and figures, and with exact results."
   verification={{
     reference: { kind: 'none', why: 'None is public: the authors’ code is “available at request”' },
-    published: { kind: 'checks', passed, total: validation.checks.length, href: '#checks' },
+    published: { kind: 'checks', passed: paperChecks.passed, total: paperChecks.total, href: '#checks' },
   }}
   {actions}
   sourcePath="research/metamaterials/grossman-2026"
@@ -456,15 +456,18 @@
       <PlotXY series={dilSeries} xLabel="mean coordination z" yLabel="modulus / k" xDomain={[2.4, 6]} rules={[{ x: 4, label: 'z = 4' }]} current={family === 'foam' && eta === 0 && cell ? { x: cell.coordination, y: cell.isotropic.shear, label: 'This network: G' } : null} ariaLabel="Moduli against coordination" />
 
       <h3>All checks</h3>
-      <table class="sp-checks" id="checks">
-        <caption>{validation.checks.length} validation checks run in CI, each with its tolerance</caption>
+      <div id="checks"></div>
+      {#each evidence as group (group.category)}
+      <table class="sp-checks">
+        <caption>{group.total} {group.category === 'paper' ? 'comparisons with published paper values' : 'independent checks'} run in CI, each with its tolerance</caption>
         <thead><tr><th scope="col">Check</th><th scope="col">Observed</th><th scope="col">Tolerance</th><th scope="col">Result</th></tr></thead>
         <tbody>
-          {#each validation.checks as c (c.name)}
+          {#each group.checks as c (c.name)}
             <tr><td>{c.name}<br /><span class="m">{c.metric}</span></td><td>{fmtSci(c.observed)}</td><td>{fmtSci(c.tolerance)}</td><td>{c.passed ? 'pass' : 'FAIL'}</td></tr>
           {/each}
         </tbody>
       </table>
+      {/each}
 
       <h2>Limitations</h2>
       <ul>
@@ -494,7 +497,7 @@
             <p class="sp-source">
               Stabileo editor (production engine): this strip as an ordinary truss, end rows pinned, the far end moved by the imposed strain. Edit and press Solve. Bar forces are
               1000 × the experiment’s (E·A/L = 1000 k kN/m).{#if prestress > 0} Prestress is not carried over.{/if}
-              {#if editorStrip && strip !== editorStrip}<button class="link" type="button" onclick={loadEditor}>Load the experiment’s current network</button>{/if}
+              {#if strip && editorStrip && strip !== editorStrip}<button class="link" type="button" onclick={loadEditor}>Load the experiment’s current network</button>{/if}
             </p>
             {#if editorError}<p class="warnt">{editorError}</p>{/if}
             <div class="sp-frame">
@@ -527,7 +530,7 @@
                 colourMap="diverging"
                 perCell={true}
                 range={forceRange}
-                title={Math.abs(strain) > 0 ? 'Axial force N / (k ε)' : 'Axial force N / k'}
+                title={Math.abs(solved?.label.strain ?? 0) > 0 ? 'Axial force N / (k ε)' : 'Axial force N / k'}
                 unit=""
                 legendFooter="tension positive · strip pulled left to right, end rows held"
                 view={VIEW}

@@ -21,6 +21,7 @@ fn dir() -> PathBuf {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 struct Check {
+    category: String,
     name: String,
     metric: String,
     tolerance: f64,
@@ -33,7 +34,8 @@ struct Checks(Vec<Check>);
 
 impl Checks {
     fn at_most(&mut self, name: &str, metric: &str, observed: f64, tolerance: f64) {
-        self.0.push(Check { name: name.into(), metric: metric.into(), tolerance, observed, passed: observed <= tolerance });
+        assert!(observed.is_finite() && tolerance.is_finite());
+        self.0.push(Check { category: "independent".into(), name: name.into(), metric: metric.into(), tolerance, observed, passed: observed <= tolerance });
     }
 }
 
@@ -50,13 +52,33 @@ fn periodic(s: NetworkSpec, n: usize) -> springs_grossman_2026::experiment::Peri
 }
 
 fn max_diff(a: &[[f64; 3]; 3], b: &[[f64; 3]; 3]) -> f64 {
-    let mut m: f64 = 0.0;
-    for i in 0..3 {
-        for j in 0..3 {
-            m = m.max((a[i][j] - b[i][j]).abs());
-        }
-    }
-    m
+    finite_max(a.iter().flatten().zip(b.iter().flatten()).map(|(a, b)| (a - b).abs()))
+}
+
+fn finite_max(values: impl IntoIterator<Item = f64>) -> f64 {
+    values.into_iter().fold(0.0, |m, v| {
+        assert!(v.is_finite(), "non-finite validation value");
+        if v > m { v } else { m }
+    })
+}
+
+fn finite_min(a: f64, b: f64) -> f64 {
+    assert!(a.is_finite() && b.is_finite());
+    if a < b { a } else { b }
+}
+
+fn inside_error_bar(mean: f64, lo: f64, hi: f64) -> bool {
+    assert!(mean.is_finite() && lo.is_finite() && hi.is_finite());
+    mean >= lo - 0.003 && mean <= hi + 0.003
+}
+
+fn records_match(a: &[Check], b: &[Check]) -> bool {
+    a.len() == b.len() && a.iter().zip(b).all(|(a, b)| {
+        a.category == b.category && a.name == b.name && a.metric == b.metric
+            && a.tolerance == b.tolerance && a.passed == b.passed
+            && a.observed.is_finite() && b.observed.is_finite()
+            && (a.observed - b.observed).abs() <= 1e-12 + 1e-8 * b.observed.abs()
+    })
 }
 
 /// Affine (Cauchy-Born) stiffness of a Bravais lattice with bonds `bonds` and cell area `area`:
@@ -123,9 +145,9 @@ fn part_a(c: &mut Checks) {
             let r = periodic(s, 6);
             let (bonds, area) = triangular_bonds(phi, psi, law);
             let cb = cauchy_born(&bonds, area);
-            let scale = r.c.iter().flatten().fold(0.0f64, |m, v| m.max(v.abs()));
-            worst = worst.max(max_diff(&r.c, &cb) / scale);
-            worst_cauchy = worst_cauchy.max((r.c[0][1] - r.c[2][2] / 4.0).abs() / scale);
+            let scale = finite_max(r.c.iter().flatten().map(|v| v.abs()));
+            worst = finite_max([worst, max_diff(&r.c, &cb) / scale]);
+            worst_cauchy = finite_max([worst_cauchy, (r.c[0][1] - r.c[2][2] / 4.0).abs() / scale]);
         }
     }
     c.at_most("Bravais triangular lattices (7 shapes, 2 spring laws): periodic stiffness = Cauchy-Born", "max relative difference", worst, 1e-9);
@@ -134,7 +156,7 @@ fn part_a(c: &mut Checks) {
     // A3. Square lattice: no shear stiffness without diagonals; C11 = 1, C12 = 0.
     let r = periodic(spec(LatticeKind::Square { diagonals: false }), 6);
     c.at_most("square lattice: zero shear modulus (floppy)", "|C33|", r.c[2][2].abs(), 1e-8);
-    c.at_most("square lattice: C11 = C22 = k, C12 = 0", "max difference", (r.c[0][0] - 1.0).abs().max((r.c[1][1] - 1.0).abs()).max(r.c[0][1].abs()), 1e-9);
+    c.at_most("square lattice: C11 = C22 = k, C12 = 0", "max difference", finite_max([(r.c[0][0] - 1.0).abs(), (r.c[1][1] - 1.0).abs(), r.c[0][1].abs()]), 1e-9);
 
     // A4. Square lattice in tension (rest lengths shortened by s): shear stiffness from the
     // initial-tension term only, C33 = 2 t with t = k s / (1 - s)... for unit k and rest (1 - s): t = k s.
@@ -170,7 +192,7 @@ fn part_a(c: &mut Checks) {
                     q += dir[i] * resp.c[i][j] * dir[j];
                 }
             }
-            worst = worst.max((d2 - q * area).abs() / (q * area));
+            worst = finite_max([worst, (d2 - q * area).abs() / (q * area)]);
         }
         c.at_most(&format!("{label}: e^T C e A equals the second difference of the relaxed nonlinear energy"), "max relative difference", worst, 1e-5);
     }
@@ -189,7 +211,7 @@ fn part_a(c: &mut Checks) {
     rn.cell = Some([rot(cell[0]), rot(cell[1])]);
     let turned = solve::periodic_response(&rn, &rn.nodes).unwrap();
     let expect = moduli::rotate(&turned.c, a);
-    let scale = base.c.iter().flatten().fold(0.0f64, |m, v| m.max(v.abs()));
+    let scale = finite_max(base.c.iter().flatten().map(|v| v.abs()));
     c.at_most("frame invariance: C of the rotated foam is C rotated", "max relative difference", max_diff(&expect, &base.c) / scale, 1e-9);
 
     // A7. Rigidity percolation (random bond dilution of the triangular lattice, z = 6 p): well
@@ -200,11 +222,11 @@ fn part_a(c: &mut Checks) {
         let mut lo = spec(tri(1.0, 1.0));
         lo.keep = 0.5;
         lo.seed = seed;
-        floppy = floppy.max(periodic(lo, 20).isotropic.shear.abs());
+        floppy = finite_max([floppy, periodic(lo, 20).isotropic.shear.abs()]);
         let mut hi = spec(tri(1.0, 1.0));
         hi.keep = 0.9;
         hi.seed = seed;
-        rigid = rigid.min(periodic(hi, 20).isotropic.shear);
+        rigid = finite_min(rigid, periodic(hi, 20).isotropic.shear);
     }
     c.at_most("dilution z = 3 (5 samples, 20 x 20): shear modulus vanishes", "max G / k", floppy, 1e-6);
     c.at_most("dilution z = 5.4 (5 samples, 20 x 20): every shear modulus at least 0.1 k", "0.1 - min G / k", 0.1 - rigid, 0.0);
@@ -215,10 +237,12 @@ fn part_a(c: &mut Checks) {
     fs.seed = 11;
     let strip = run_strip(&StripSpec { network: fs, width: 13.0, height: 52.0, theta: 0.0, clamp_band: 0.5, strain: 0.01 }).unwrap();
     let (ue, fe) = engine_model::solve_with_engine(&strip).unwrap();
-    let umax = strip.displacement.iter().map(|u| u[0].abs().max(u[1].abs())).fold(0.0, f64::max);
-    let du = strip.displacement.iter().zip(&ue).map(|(a, b)| (a[0] - b[0]).abs().max((a[1] - b[1]).abs())).fold(0.0, f64::max);
-    let fmax = strip.force.iter().map(|v| v.abs()).fold(0.0, f64::max);
-    let df = strip.force.iter().zip(&fe).map(|(a, b)| (a - b).abs()).fold(0.0, f64::max);
+    assert_eq!(strip.displacement.len(), ue.len());
+    assert_eq!(strip.force.len(), fe.len());
+    let umax = finite_max(strip.displacement.iter().flatten().map(|v| v.abs()));
+    let du = finite_max(strip.displacement.iter().flatten().zip(ue.iter().flatten()).map(|(a, b)| (a - b).abs()));
+    let fmax = finite_max(strip.force.iter().map(|v| v.abs()));
+    let df = finite_max(strip.force.iter().zip(&fe).map(|(a, b)| (a - b).abs()));
     c.at_most("foam strip (eta 0.3): displacements equal the production engine's solve_2d", "max |du| / max |u|", du / umax, 1e-8);
     c.at_most("foam strip (eta 0.3): bond forces equal the engine's axial forces", "max |dN| / max |N|", df / fmax, 1e-8);
 
@@ -248,7 +272,7 @@ fn part_b(c: &mut Checks) {
         for i in 0..=36 {
             let t = PI * i as f64 / 36.0;
             let ours = moduli::uniaxial(&r.c, PI / 2.0 - t).unwrap().1;
-            worst = worst.max((ours - paper::ordered_poisson(phi, psi, t)).abs());
+            worst = finite_max([worst, (ours - paper::ordered_poisson(phi, psi, t)).abs()]);
         }
     }
     c.at_most("Supplemental Eq. (9) = periodic network with equal-weight springs (7 lattices x 37 angles)", "max |nu difference|", worst, 1e-9);
@@ -271,7 +295,7 @@ fn part_b(c: &mut Checks) {
     for p in v["fig7"]["calculation_line"].as_array().unwrap() {
         let (t, y) = (p[0].as_f64().unwrap(), p[1].as_f64().unwrap());
         let ours = moduli::uniaxial(&r.c, PI / 2.0 - t).unwrap().0 * tri_area;
-        worst = worst.max((ours - y).abs());
+        worst = finite_max([worst, (ours - y).abs()]);
     }
     c.at_most("Fig. 7 calculation line (741 points) = equal-weight Young's modulus x triangle area", "max |Y difference|", worst, 0.01);
 
@@ -281,7 +305,7 @@ fn part_b(c: &mut Checks) {
         for i in 1..20 {
             let l = 0.05 * i as f64;
             let r = periodic(spec(LatticeKind::Honeycomb { l, k_radial: kr }), 4);
-            worst = worst.max((r.uniaxial_x.unwrap().1 - paper::honeycomb_poisson(l)).abs());
+            worst = finite_max([worst, (r.uniaxial_x.unwrap().1 - paper::honeycomb_poisson(l)).abs()]);
         }
         c.at_most(&format!("Eq. (23) honeycomb, k_radial = {kr:e} (l = 0.05 ... 0.95)"), "max |nu difference|", worst, tol);
     }
@@ -289,7 +313,7 @@ fn part_b(c: &mut Checks) {
     // B5. Fig. 9 at eta = 0 (vector data) against the exact triangular lattice.
     let b0 = v["fig9"]["B"]["mean_line"][0][1].as_f64().unwrap();
     let g0 = v["fig9"]["G"]["mean_line"][0][1].as_f64().unwrap();
-    c.at_most("Fig. 9 at eta = 0: B = sqrt(3)/2, G = sqrt(3)/4", "max absolute difference", (b0 - 3f64.sqrt() / 2.0).abs().max((g0 - 3f64.sqrt() / 4.0).abs()), 5e-3);
+    c.at_most("Fig. 9 at eta = 0: B = sqrt(3)/2, G = sqrt(3)/4", "max absolute difference", finite_max([(b0 - 3f64.sqrt() / 2.0).abs(), (g0 - 3f64.sqrt() / 4.0).abs()]), 5e-3);
 
     // B6. Foam: exact periodic moduli, 10 samples of 26 x 26 cells per eta, against the paper's
     // simulations (Fig. 5, digitised markers and error bars) and statements (p. 6).
@@ -307,10 +331,11 @@ fn part_b(c: &mut Checks) {
             nus.push(periodic(s, 26).isotropic.poisson);
         }
         let m = nus.iter().sum::<f64>() / nus.len() as f64;
+        assert!(m.is_finite());
         means.push((eta, m));
         if f[4] == "up" {
             let (lo, hi): (f64, f64) = (f[2].parse().unwrap(), f[3].parse().unwrap());
-            if m < lo - 0.003 || m > hi + 0.003 {
+            if !inside_error_bar(m, lo, hi) {
                 outside += 1;
             }
         }
@@ -332,7 +357,13 @@ fn part_b(c: &mut Checks) {
 fn main_checks() -> Checks {
     let mut c = Checks::default();
     part_a(&mut c);
+    let independent = c.0.len();
     part_b(&mut c);
+    for ch in &mut c.0[independent..] {
+        if !ch.name.starts_with("lattice (1, 0.5), theta = 0") {
+            ch.category = "paper".into();
+        }
+    }
     c
 }
 
@@ -348,9 +379,35 @@ fn validation() {
     }
     assert!(c.0.iter().all(|ch| ch.passed), "a validation check failed");
     let committed: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(dir().join("VALIDATION.json")).unwrap_or_else(|_| "{}".into())).unwrap();
-    let names = |v: &serde_json::Value| -> Vec<(String, String, bool)> {
-        v["checks"].as_array().map(|a| a.iter().map(|c| (c["name"].as_str().unwrap().to_string(), c["tolerance"].to_string(), c["passed"].as_bool().unwrap())).collect()).unwrap_or_default()
-    };
-    let now: serde_json::Value = serde_json::from_str(&json).unwrap();
-    assert_eq!(names(&committed), names(&now), "VALIDATION.json is stale: copy target/VALIDATION.json over it");
+    let committed: Vec<Check> = serde_json::from_value(committed["checks"].clone()).unwrap();
+    assert!(records_match(&committed, &c.0), "VALIDATION.json is stale: copy target/VALIDATION.json over it");
+}
+
+#[test]
+#[should_panic(expected = "non-finite")]
+fn nan_matrix_is_rejected() {
+    let mut matrix = [[0.0; 3]; 3];
+    matrix[1][2] = f64::NAN;
+    max_diff(&matrix, &[[0.0; 3]; 3]);
+}
+
+#[test]
+#[should_panic]
+fn nan_mean_is_rejected() {
+    inside_error_bar(f64::NAN, -0.1, 0.1);
+}
+
+#[test]
+fn changed_records_are_rejected() {
+    let mut checks = Checks::default();
+    checks.at_most("example", "difference", 0.001, 0.01);
+    let original = checks.0.clone();
+    checks.0[0].observed = 0.002;
+    assert!(!records_match(&original, &checks.0));
+    checks.0 = original.clone();
+    checks.0[0].metric = "another metric".into();
+    assert!(!records_match(&original, &checks.0));
+    checks.0 = original.clone();
+    checks.0[0].observed += 1e-13;
+    assert!(records_match(&original, &checks.0));
 }

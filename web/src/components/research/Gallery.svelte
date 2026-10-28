@@ -33,8 +33,7 @@
     <header class="rs-g-head">
       <h1>Stabileo Research</h1>
       <p class="rs-g-lead">
-        Computational-mechanics papers you can run. We reproduce the authors’ code, re-implement the method on Stabileo’s engine,
-        validate it against that reference, and let you run it here with your own parameters, in Stabileo’s viewer.
+        Computational-mechanics papers you can run. We re-implement published methods and validate against available reference code, published results, and independent checks, and let you run it here with your own parameters, in Stabileo’s viewer.
       </p>
       <p class="rs-g-note"><strong>{s.notDesign}.</strong> Nothing here is an engineering result; agreement with a reference code is not a certification.
         Contributions: <a href="https://github.com/lambdaclass/stabileo/blob/main/research/CONTRIBUTING.md" rel="noreferrer" target="_blank">research/CONTRIBUTING.md</a>.</p>
