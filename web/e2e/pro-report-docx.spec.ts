@@ -9,7 +9,7 @@ async function download(page: Page, format: 'html' | 'docx') {
   await page.getByTestId('pp-export-report').click();
   const dialog = page.getByTestId('pro-report-dialog');
   await expect(dialog).toBeVisible();
-  await dialog.getByTestId('rpt-format').selectOption(format);
+  await dialog.getByTestId(`rpt-format-${format}`).click();
   const wait = page.waitForEvent('download');
   await dialog.getByTestId('rpt-pdf').click();
   const dl = await wait;

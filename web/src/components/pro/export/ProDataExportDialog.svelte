@@ -133,7 +133,14 @@
   }
 </script>
 
-<ExportDialog bind:open width={640} title={format === 'xlsx' ? t('proExport.dataTitleXlsx') : t('proExport.dataTitleCsv')} testid="pro-data-export-dialog">
+<ExportDialog bind:open width={640} title={t('proExport.resultsTitle')} testid="pro-data-export-dialog">
+  <ExportSection title={t('proExport.format')} summary={formatSummary} open testid="pro-data-export-format">
+    <div class="xs-seg">
+      <button type="button" class:on={format === 'xlsx'} onclick={() => (format = 'xlsx')} data-testid="pro-data-format-xlsx">Excel</button>
+      <button type="button" class:on={format === 'csv'} onclick={() => (format = 'csv')} data-testid="pro-data-format-csv">CSV</button>
+    </div>
+    <p class="xs-note">{format === 'xlsx' ? t('proExport.formatXlsxNote') : t('proExport.formatCsvNote')}</p>
+  </ExportSection>
   <ExportSection title={t('viewExport.sectionContent')} summary={contentSummary} open testid="pro-data-export-content">
     <div class="dx-bar">
       <p class="xs-note">{t('proExport.dataAlways')}</p>
@@ -186,13 +193,6 @@
     </ExportSection>
   {/if}
 
-  <ExportSection title={t('proExport.format')} summary={formatSummary}>
-    <div class="xs-seg">
-      <button type="button" class:on={format === 'xlsx'} onclick={() => (format = 'xlsx')} data-testid="pro-data-format-xlsx">Excel</button>
-      <button type="button" class:on={format === 'csv'} onclick={() => (format = 'csv')} data-testid="pro-data-format-csv">CSV</button>
-    </div>
-    <p class="xs-note">{format === 'xlsx' ? t('proExport.formatXlsxNote') : t('proExport.formatCsvNote')}</p>
-  </ExportSection>
 
   {#snippet actions()}
     <button type="button" onclick={() => (open = false)}>{t('calcReport.cancel')}</button>

@@ -18,8 +18,10 @@
   import { SHELL_CONTOUR_COMPONENTS, shellComponentLabelKey, type ShellContourComponent } from '../../../lib/engine/shell-stress';
   import { ensureProResults, hasShells, resultSet, resultSetChoices } from '../../../lib/pro/export-results';
   import CheckGroup from './CheckGroup.svelte';
+  import DrawingFormatRow, { type DrawingFormat } from './DrawingFormatRow.svelte';
 
-  let { open = $bindable(false), format = $bindable('svg') }: { open: boolean; format: ViewFormat } = $props();
+  let { open = $bindable(false), format = $bindable('svg'), onformat }: { open: boolean; format: ViewFormat; onformat?: (f: DrawingFormat) => void } = $props();
+  function pick(f: DrawingFormat) { if (f !== 'dxf') format = f; onformat?.(f); }
 
   const KEY = 'stabileo-pro-view-export';
   type Saved = Omit<FigureOptions, 'results' | 'resultsName'>;
@@ -67,7 +69,6 @@
   const STYLES: Array<{ id: InkStyle; key: string }> = [
     { id: 'color', key: 'viewExport.styleColor' }, { id: 'bw', key: 'viewExport.styleBw' }, { id: 'screen', key: 'viewExport.styleScreen' },
   ];
-  const FORMATS: ViewFormat[] = ['svg', 'png', 'jpg'];
   const compName = (k: ShellContourComponent) => t(shellComponentLabelKey(k));
 
   const MODEL_PART: FigureContent[] = ['model', 'despiece'];
@@ -119,7 +120,8 @@
   }
 </script>
 
-<ExportDialog bind:open width={560} title={`${t('proExport.imageTitle')} — ${format.toUpperCase()}`} testid="pro-view-export-dialog">
+<ExportDialog bind:open width={560} title={`${t('proExport.drawingsTitle')} — ${format.toUpperCase()}`} testid="pro-view-export-dialog">
+  <DrawingFormatRow current={format} onpick={pick} />
   <ExportSection title={t('viewExport.sectionContent')} summary={contentSummary} open testid="pro-view-export-content">
     <div class="vx-cols">
       <CheckGroup title={t('proExport.groupModel')} items={groupItems('model')} on={(id) => contents.includes(id as FigureContent)}
@@ -168,14 +170,6 @@
   </ExportSection>
 
   <ExportSection title={t('viewExport.sectionOutput')} summary={outputSummary}>
-    <div class="xs-field">
-      <span>{t('proExport.format')}</span>
-      <div class="xs-seg">
-        {#each FORMATS as f (f)}
-          <button type="button" class:on={format === f} onclick={() => (format = f)} data-testid={`pro-view-export-format-${f}`}>{f.toUpperCase()}</button>
-        {/each}
-      </div>
-    </div>
     <div class="xs-field">
       <span>{t('viewExport.style')}</span>
       <div class="xs-seg">

@@ -4,6 +4,7 @@
    * Each content goes on its own layer, so what is turned on here can still be hidden in CAD.
    */
   import { t } from '../../../lib/i18n';
+  import DrawingFormatRow, { type DrawingFormat } from './DrawingFormatRow.svelte';
   import ExportDialog from '../../export/ExportDialog.svelte';
   import ExportSection from '../../export/ExportSection.svelte';
   import { DXF_CONTENTS, DXF_NEEDS_RESULTS, type DxfContents, type DxfProjection } from '../../../lib/dxf/writer';
@@ -13,7 +14,7 @@
   import { uiStore } from '../../../lib/store';
   import CheckGroup from './CheckGroup.svelte';
 
-  let { open = $bindable(false) }: { open: boolean } = $props();
+  let { open = $bindable(false), onformat }: { open: boolean; onformat?: (f: DrawingFormat) => void } = $props();
 
   const KEY = 'stabileo-pro-dxf-export';
   interface Prefs { contents: DxfContents; projection: DxfProjection; units: DxfUnit; diagramFactor: number }
@@ -79,7 +80,8 @@
   }
 </script>
 
-<ExportDialog bind:open width={560} title={t('proExport.dxfTitle')} testid="pro-dxf-export-dialog">
+<ExportDialog bind:open width={560} title={`${t('proExport.drawingsTitle')} — DXF`} testid="pro-dxf-export-dialog">
+  <DrawingFormatRow current="dxf" onpick={(f) => { if (f !== 'dxf') onformat?.(f); }} />
   <ExportSection title={t('viewExport.sectionContent')} summary={contentSummary} open testid="pro-dxf-export-content">
     <div class="dx-cols">
       <CheckGroup title={t('proExport.groupModel')} items={groupItems(true)} on={(id) => contents[id as keyof DxfContents]}

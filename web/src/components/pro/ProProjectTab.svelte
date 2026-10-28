@@ -22,6 +22,7 @@
   import ProDataExportDialog from './export/ProDataExportDialog.svelte';
   import ProDxfExportDialog from './export/ProDxfExportDialog.svelte';
   import ProViewExportDialog from './export/ProViewExportDialog.svelte';
+  import type { DrawingFormat } from './export/DrawingFormatRow.svelte';
   import type { ViewFormat } from '../../lib/export/view-export';
   import { MAX_URL_SAFE } from '../../lib/utils/url-sharing';
   import { codeShareUrl } from '../../lib/model/code/share';
@@ -191,8 +192,13 @@
   let dxfOpen = $state(false);
   let imageOpen = $state(false);
   let imageFormat = $state<ViewFormat>('svg');
-  function openData(f: 'xlsx' | 'csv') { dataFormat = f; dataOpen = true; }
-  function openImage(f: ViewFormat) { imageFormat = f; imageOpen = true; }
+  let drawingFormat = $state<DrawingFormat>('dxf');
+  function openDrawings() { pickDrawing(drawingFormat); }
+  function pickDrawing(f: DrawingFormat) {
+    drawingFormat = f;
+    if (f === 'dxf') { imageOpen = false; dxfOpen = true; }
+    else { dxfOpen = false; imageFormat = f; imageOpen = true; }
+  }
   async function exportIfc() {
     const record = await prepareExportProvenance();
     if (!record) return;
@@ -415,54 +421,24 @@
     </div>
 
     <span class="pp-sub">{t('project.export')}</span>
-    <!--
-      ── Export groups by what comes out, and every button opens its dialog ──
-      Data (the workbook, as Excel or as CSV), the report (a PDF) and drawings (DXF and
-      pictures). Each dialog says what goes in, with everything on by default: the panel used to
-      carry a bare "Estaciones 5 / 13 / Críticas" beside the workbook, which said nothing about
-      what it changed, and two buttons whose content had to be guessed.
-    -->
-    <div class="pp-group">
-      <span class="pp-group-label">{t('proExport.groupData')}</span>
-      <div class="pp-grid">
-        <HelpTip text={t('proExport.excelTip')}>
-          <button class="pp-btn" data-testid="project-workbook" onclick={() => openData('xlsx')} disabled={!hasModel}>Excel</button>
-        </HelpTip>
-        <HelpTip text={t('proExport.csvTip')}>
-          <button class="pp-btn" data-testid="pp-export-csv" onclick={() => openData('csv')} disabled={!hasModel}>CSV</button>
-        </HelpTip>
-      </div>
+    <div class="pp-grid pp-export">
+      <HelpTip text={t('proExport.resultsTip')}>
+        <button class="pp-btn" data-testid="pp-export-results" onclick={() => (dataOpen = true)} disabled={!hasModel}>{t('proExport.resultsBtn')}</button>
+      </HelpTip>
+      <HelpTip text={t('proExport.reportTip')}>
+        <button class="pp-btn" data-testid="pp-export-report" disabled={!hasModel}
+                onclick={() => window.dispatchEvent(new Event('stabileo-open-report'))}
+        >{t('proExport.reportBtn')}</button>
+      </HelpTip>
+      <HelpTip text={t('proExport.drawingsTip')}>
+        <button class="pp-btn" data-testid="pp-export-drawings" onclick={openDrawings} disabled={!hasModel}>{t('proExport.drawingsBtn')}</button>
+      </HelpTip>
+      <HelpTip text={t('proExport.ifcTip')}>
+        <button class="pp-btn" data-testid="pp-export-ifc" onclick={exportIfc} disabled={!hasModel}>{t('proExport.ifcBtn')}</button>
+      </HelpTip>
     </div>
-    <div class="pp-group">
-      <span class="pp-group-label">{t('proExport.groupReport')}</span>
-      <div class="pp-grid">
-        <HelpTip text={t('proExport.reportTip')}>
-          <button class="pp-btn pp-btn-wide" data-testid="pp-export-report" disabled={!hasModel}
-                  onclick={() => window.dispatchEvent(new Event('stabileo-open-report'))}
-          >{t('proExport.reportBtn')}</button>
-        </HelpTip>
-      </div>
-      <button class="pp-link" title={t('provenance.reproduce.intro')} onclick={() => window.dispatchEvent(new Event('stabileo-reproduce'))}
-              data-testid="pp-reproduce">{t('provenance.reproduce.link')}</button>
-    </div>
-    <div class="pp-group">
-      <span class="pp-group-label">{t('proExport.groupDrawings')}</span>
-      <div class="pp-grid">
-        <HelpTip text={t('proExport.dxfTip')}>
-          <button class="pp-btn" data-testid="pp-export-dxf" onclick={() => (dxfOpen = true)} disabled={!hasModel}>DXF</button>
-        </HelpTip>
-        <HelpTip text={t('proExport.ifcTip')}>
-          <!-- The model as an exchange file: physical members, plates with their outlines and
-               holes, and the results' provenance; with design off, nothing of the design. -->
-          <button class="pp-btn" data-testid="pp-export-ifc" onclick={exportIfc} disabled={!hasModel}>IFC</button>
-        </HelpTip>
-        {#each (['svg', 'png', 'jpg'] as const) as f (f)}
-          <HelpTip text={t(`proExport.${f}Tip`)}>
-            <button class="pp-btn" data-testid={`pp-export-${f}`} onclick={() => openImage(f)} disabled={!hasModel}>{f.toUpperCase()}</button>
-          </HelpTip>
-        {/each}
-      </div>
-    </div>
+    <button class="pp-link" title={t('provenance.reproduce.intro')} onclick={() => window.dispatchEvent(new Event('stabileo-reproduce'))}
+            data-testid="pp-reproduce">{t('provenance.reproduce.link')}</button>
   </section>
 
   <!--
@@ -541,8 +517,8 @@
 <!-- The export dialogs, over the whole application rather than inside the panel. -->
 <div use:portal>
   <ProDataExportDialog bind:open={dataOpen} bind:format={dataFormat} />
-  <ProDxfExportDialog bind:open={dxfOpen} />
-  <ProViewExportDialog bind:open={imageOpen} bind:format={imageFormat} />
+  <ProDxfExportDialog bind:open={dxfOpen} onformat={pickDrawing} />
+  <ProViewExportDialog bind:open={imageOpen} bind:format={imageFormat} onformat={pickDrawing} />
 </div>
 </div>
 

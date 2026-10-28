@@ -42,7 +42,8 @@ test.describe('@smoke PRO — the Project panel', () => {
   test('the importers exist once, under Import', async ({ pro: page }) => {
     /* They were under "New model" as well. What belongs there is what starts
        a model with no file to start it from — today Examples. */
-    await expect(page.getByRole('button', { name: /DXF/ })).toHaveCount(2); // import + export
+    // The import; the DXF export is a format inside Drawings.
+    await expect(page.getByRole('button', { name: /DXF/ })).toHaveCount(1);
     const newModel = page.locator('.pp-card').first();
     await expect(newModel.getByRole('button', { name: /IFC/ })).toHaveCount(0);
     await expect(page.getByTestId('pp-examples')).toBeVisible();
