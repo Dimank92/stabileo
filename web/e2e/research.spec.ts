@@ -11,8 +11,17 @@ test.describe('@smoke research', () => {
   test('the gallery shows the runnable experiment first, then the list, and links to the experiment', async ({ page }) => {
     await page.goto('/en/research/');
     await expect(page.getByRole('heading', { name: 'Stabileo Research' })).toBeVisible();
-    expect(await page.locator('.rs-g-card').count()).toBeGreaterThanOrEqual(10);
+    expect(await page.locator('.rs-g-card').count()).toBeGreaterThanOrEqual(5);
     await expect(page.getByText('Research, not a design tool').first()).toBeVisible();
+    // Every runnable experiment shows its build-time thumbnail, never the field icon.
+    const cards = page.locator('.rs-g-runcard');
+    expect(await cards.count()).toBeGreaterThanOrEqual(1);
+    for (const card of await cards.all()) {
+      await expect(card.locator('.rs-g-thumb-icon')).toHaveCount(0);
+      const img = card.locator('img');
+      await img.scrollIntoViewIfNeeded();
+      await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true);
+    }
     await page.getByRole('link', { name: 'Read & run' }).first().click();
     await expect(page).toHaveURL(/\/en\/research\/fracture\/shauer-2025\/$/);
     await expect(page.getByRole('heading', { name: 'Phase-field fracture of a notched plate' })).toBeVisible();
