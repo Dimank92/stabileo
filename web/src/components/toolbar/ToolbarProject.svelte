@@ -343,11 +343,11 @@
             data-testid="help-import"
           >?</button>
         </span>
-        <div class="file-grid file-io">
-          <button class="file-btn" onclick={() => xlsInput?.click()} title={t('xls.ui.importTooltip')} data-testid="xls-import">
+        <div class="xls-row">
+          <button class="file-btn xls-main" onclick={() => xlsInput?.click()} title={t('xls.ui.importTooltip')} data-testid="xls-import">
             {t('xls.ui.import')}
           </button>
-          <button class="file-btn file-btn-quiet" onclick={handleDownloadTemplate} title={t('xls.ui.templateTooltip')} data-testid="xls-template">
+          <button class="file-btn xls-aside" onclick={handleDownloadTemplate} title={t('xls.ui.templateTooltip')} data-testid="xls-template">
             {t('xls.ui.template')}
           </button>
         </div>
@@ -358,7 +358,7 @@
       <span class="file-sub-header">{t('project.export')}</span>
 
       <div class="file-sub-group">
-        <div class="file-grid file-io">
+        <div class="file-grid file-io file-io-stack">
           <button class="file-btn" onclick={() => (resultsOpen = true)} title={t('project.exportResultsHelp')} data-testid="export-results">
             {t('export.resultsBtn')}
           </button>
@@ -421,6 +421,28 @@
 
 
 
+
+  .xls-row {
+    display: flex;
+    gap: 0.3rem;
+    align-items: stretch;
+  }
+
+  .xls-main { flex: 1 1 auto; }
+
+  .xls-aside {
+    flex: 0 0 auto;
+    font-size: 0.62rem;
+    padding-left: 0.45rem;
+    padding-right: 0.45rem;
+    color: var(--st-text-3);
+    background: none;
+  }
+
+  .xls-aside:hover {
+    color: var(--st-accent);
+    border-color: var(--st-accent);
+  }
 
   .xls-hint {
     margin: 0.25rem 0 0;
@@ -527,7 +549,7 @@
     gap: 0.3rem;
   }
   .file-io { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .file-btn-quiet { color: var(--st-text-3); }
+  .file-io-stack { grid-template-columns: minmax(0, 1fr); }
   .file-io > .file-btn { display: block; height: 32px; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   /*

@@ -390,13 +390,13 @@
     <span class="pp-sub">{t('project.importLabel')}</span>
     <div class="pp-group">
       <span class="pp-group-label">{t('project.importSpreadsheet')}</span>
-      <div class="pp-grid pp-io">
+      <div class="pp-xls-row">
         <HelpTip text={t('xls.ui.importTooltip')}>
           <button class="pp-btn" onclick={() => xlsInput?.click()} data-testid="pp-xls-import"
           >{t('xls.ui.import')}</button>
         </HelpTip>
         <HelpTip text={t('xls.ui.templateTooltip')}>
-          <button class="pp-btn pp-btn-quiet" onclick={handleDownloadTemplate} data-testid="pp-xls-template"
+          <button class="pp-btn pp-xls-aside" onclick={handleDownloadTemplate} data-testid="pp-xls-template"
           >{t('xls.ui.template')}</button>
         </HelpTip>
       </div>
@@ -422,7 +422,7 @@
 
     <span class="pp-sub">{t('project.export')}</span>
     <div class="pp-group">
-      <div class="pp-grid pp-io">
+      <div class="pp-grid pp-io pp-io-stack">
         <HelpTip text={t('proExport.resultsTip')}>
           <button class="pp-btn" data-testid="pp-export-results" onclick={() => (dataOpen = true)} disabled={!hasModel}>{t('proExport.resultsBtn')}</button>
         </HelpTip>
@@ -809,8 +809,6 @@
 
   /* Quieter than its neighbour: the template is what you take AWAY to fill
      in, next to the button that brings a filled-in one back. */
-  .pp-btn-quiet { color: var(--st-text-3); }
-  .pp-btn-quiet:hover { color: var(--st-text); }
 
   .pp-row-end { justify-content: flex-end; }
 
@@ -828,6 +826,13 @@
   .pp-grid :global(.ht-wrap) { width: 100%; }
   .pp-grid :global(.ht-wrap > button) { width: 100%; }
   .pp-io { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pp-io-stack { grid-template-columns: minmax(0, 1fr); }
+  .pp-xls-row { display: flex; gap: 0.3rem; align-items: stretch; }
+  .pp-xls-row > :global(.ht-wrap:first-child) { flex: 1 1 auto; }
+  .pp-xls-row > :global(.ht-wrap:first-child > button) { width: 100%; }
+  .pp-xls-row > :global(.ht-wrap:last-child) { flex: 0 0 auto; }
+  .pp-xls-aside { height: 100%; font-size: 0.62rem; padding-left: 0.45rem; padding-right: 0.45rem; color: var(--st-text-3); }
+  .pp-xls-aside:hover:not(:disabled) { color: var(--st-accent); border-color: var(--st-accent); }
   .pp-io :global(.ht-wrap > button) { display: block; height: 32px; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
 
   .pp-disclose { justify-content: space-between; margin-top: 0.3rem; }
