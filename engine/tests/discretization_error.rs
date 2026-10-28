@@ -1158,3 +1158,36 @@ fn richardson_roundoff_after_convergence_is_converged() {
     assert_eq!(richardson(&[1.0, 1.001, 1.0005]).3, "oscillating");
 }
 
+
+
+/// Issue #501: Guaranteed a-posteriori upper bounds on discretization error via
+/// Ainsworth–Oden equilibrated residuals for shells, plates, and solids.
+#[test]
+fn test_issue_501_guaranteed_equilibrated_upper_bound() {
+    let m_mitc4 = square_plate(Fam::Mitc4, 4, false);
+    let r_mitc4 = solve(&m_mitc4.input);
+    let est_mitc4 = estimate(&m_mitc4.input, &r_mitc4);
+
+    assert!(est_mitc4.guaranteed_upper_bound.is_some(), "guaranteed upper bound must be computed for MITC4");
+    assert!(est_mitc4.guaranteed_relative_bound.is_some(), "guaranteed relative bound must be computed for MITC4");
+    assert!(est_mitc4.notes.contains(&"guaranteedBoundEquilibrated".to_string()), "notes must contain guaranteedBoundEquilibrated");
+
+    let bound_mitc4 = est_mitc4.guaranteed_upper_bound.unwrap();
+    assert!(bound_mitc4 >= est_mitc4.error_norm, "guaranteed bound ({}) must be >= ZZ error norm ({})", bound_mitc4, est_mitc4.error_norm);
+    assert!(est_mitc4.elements.iter().all(|el| el.guaranteed_eta.is_some()), "every element must have guaranteed_eta");
+
+    let m_dkt = square_plate(Fam::Dkt, 4, false);
+    let r_dkt = solve(&m_dkt.input);
+    let est_dkt = estimate(&m_dkt.input, &r_dkt);
+
+    assert!(est_dkt.guaranteed_upper_bound.is_some(), "guaranteed upper bound must be computed for DKT");
+    assert!(est_dkt.notes.contains(&"guaranteedBoundEquilibrated".to_string()));
+    assert!(est_dkt.guaranteed_upper_bound.unwrap() >= est_dkt.error_norm);
+
+    let mut unloaded = m_mitc4.input.clone();
+    unloaded.loads.clear();
+    let r_unloaded = solve(&unloaded);
+    let est_unloaded = estimate(&unloaded, &r_unloaded);
+    assert!(est_unloaded.guaranteed_upper_bound.is_none());
+    assert!(est_unloaded.notes.contains(&"guaranteedBoundUnavailable".to_string()));
+}

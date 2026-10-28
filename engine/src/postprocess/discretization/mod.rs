@@ -20,6 +20,7 @@
 //! segments) are approximate, and are listed as not estimated instead.
 
 pub mod convergence;
+pub mod equilibrated;
 pub mod recovery;
 pub mod refine;
 pub mod samples;
@@ -52,6 +53,8 @@ pub struct ElementErrorIndicator {
     /// recovery patches, or the model's estimate could not be made): never a 0 standing in for
     /// "unknown".
     pub local_percent: Option<f64>,
+    /// Guaranteed upper bound on the element error from Ainsworth–Oden equilibrated residuals.
+    pub guaranteed_eta: Option<f64>,
 }
 
 /// Recovery-based estimate of the discretization error of a linear static solution.
@@ -80,6 +83,10 @@ pub struct DiscretizationEstimate {
     /// Energy norm of the computed solution over the same (estimated, non-isolated) elements
     /// and components.
     pub solution_norm: f64,
+    /// Guaranteed upper bound on the energy-norm error: ‖u - u_h‖_E ≤ η_upper (Ainsworth–Oden).
+    pub guaranteed_upper_bound: Option<f64>,
+    /// Guaranteed upper bound on relative energy error: ‖u - u_h‖_E / ‖u‖_E ≤ guaranteed_relative_bound.
+    pub guaranteed_relative_bound: Option<f64>,
     pub threshold: f64,
     pub exceeds_threshold: bool,
     pub elements: Vec<ElementErrorIndicator>,
@@ -100,6 +107,16 @@ pub struct DiscretizationEstimate {
     pub notes: Vec<String>,
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct RawElemMeta {
+    pub family: samples::Family,
+    pub id: usize,
+    pub thickness: f64,
+    pub e: f64,
+    pub nu: f64,
+    pub area: f64,
+}
+
 /// Element and global energy-norm error of the computed stress field against the recovered one.
 pub(crate) struct RawEstimate {
     pub per_element: Vec<(samples::Family, usize, f64, f64)>, // (family, id, η², U)
@@ -108,6 +125,7 @@ pub(crate) struct RawEstimate {
     /// Per element (aligned with `per_element`): alone in every recovery patch, so its
     /// recovered field is its own and its indicator says nothing.
     pub isolated: Vec<bool>,
+    pub meta: Vec<RawElemMeta>,
 }
 
 /// Whether anything loads the model: a nonzero reaction or displacement (loads that go straight
@@ -142,7 +160,24 @@ pub(crate) fn raw_estimate(input: &SolverInput3D, results: &AnalysisResults3D) -
         }
         per_element.push((e.family, e.id, eta2, u));
     }
-    Ok(RawEstimate { per_element, energy_scale, isolated })
+    let mut meta = Vec::with_capacity(elems.len());
+    for e in &elems {
+        let volume: f64 = e.samples.iter().map(|s| s.weight).sum();
+        let area = if e.thickness > 0.0 {
+            volume / e.thickness
+        } else {
+            volume.powf(2.0 / 3.0)
+        };
+        meta.push(RawElemMeta {
+            family: e.family,
+            id: e.id,
+            thickness: e.thickness,
+            e: e.e,
+            nu: e.nu,
+            area,
+        });
+    }
+    Ok(RawEstimate { per_element, energy_scale, isolated, meta })
 }
 
 /// Estimate the discretization error of a 3D linear static solution of `input`.
@@ -211,6 +246,21 @@ pub fn estimate_3d(input: &SolverInput3D, results: &AnalysisResults3D) -> Result
     if frame_members > 0 && inexact_members.is_empty() && input.curved_beams.is_empty() {
         notes.push("framesExact".into());
     }
+    // Ainsworth–Oden equilibrated residual upper bound
+    let eq_bounds = equilibrated::compute_equilibrated_bounds(input, &raw, u, &estimated);
+    let (guaranteed_upper_bound, guaranteed_relative_bound) = if relative_error.is_some() && unestimable_reason.is_none() && n_estimated > 0 {
+        if eq_bounds.guaranteed_upper_bound.is_some() {
+            notes.push("guaranteedBoundEquilibrated".into());
+            (eq_bounds.guaranteed_upper_bound, eq_bounds.guaranteed_relative_bound)
+        } else {
+            notes.push("guaranteedBoundUnavailable".into());
+            (None, None)
+        }
+    } else {
+        notes.push("guaranteedBoundUnavailable".into());
+        (None, None)
+    };
+
     let mean = if n_estimated > 0 { ((u + eta2) / n_estimated as f64).sqrt() } else { 0.0 };
     let elements = raw
         .per_element
@@ -222,6 +272,7 @@ pub fn estimate_3d(input: &SolverInput3D, results: &AnalysisResults3D) -> Result
             eta: e2.sqrt(),
             energy_norm: ue.sqrt(),
             local_percent: (relative_error.is_some() && estimated(i) && mean > 0.0).then(|| 100.0 * e2.sqrt() / mean),
+            guaranteed_eta: if guaranteed_upper_bound.is_some() { eq_bounds.element_bounds.get(i).copied().flatten() } else { None },
         })
         .collect();
     let threshold = DEFAULT_THRESHOLD;
@@ -237,6 +288,8 @@ pub fn estimate_3d(input: &SolverInput3D, results: &AnalysisResults3D) -> Result
         unestimable_reason,
         error_norm: eta2.sqrt(),
         solution_norm: u.sqrt(),
+        guaranteed_upper_bound,
+        guaranteed_relative_bound,
         threshold,
         elements,
         frame_members,

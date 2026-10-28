@@ -23,6 +23,8 @@ export interface ElementErrorIndicator {
   /** Element error on the scale of the global percentage (see the engine docs); absent when
    *  the element is not estimated (alone in its recovery patches). */
   localPercent?: number | null;
+  /** Guaranteed upper bound on element error from Ainsworth–Oden equilibrated residuals. */
+  guaranteedEta?: number | null;
 }
 
 export interface DiscretizationEstimate {
@@ -33,6 +35,10 @@ export interface DiscretizationEstimate {
   unestimableReason?: 'unloaded' | 'noStrainEnergy' | 'tooCoarse' | 'nonFinite' | null;
   errorNorm: number;
   solutionNorm: number;
+  /** Guaranteed upper bound on energy-norm error: ‖u - u_h‖_E ≤ guaranteedUpperBound (Ainsworth–Oden). */
+  guaranteedUpperBound?: number | null;
+  /** Guaranteed upper bound on relative energy error: ‖u - u_h‖_E / ‖u‖_E ≤ guaranteedRelativeBound. */
+  guaranteedRelativeBound?: number | null;
   threshold: number;
   exceedsThreshold: boolean;
   elements: ElementErrorIndicator[];
@@ -77,6 +83,8 @@ export interface ConvergenceStudy {
  */
 export interface DiscretizationClaims {
   percent: number | null;
+  guaranteedBound: number | null;
+  guaranteedRelativeBound: number | null;
   unestimable: 'unloaded' | 'noStrainEnergy' | 'tooCoarse' | 'nonFinite' | null;
   /** The i18n key of the warning for an estimate that could not be made, if it warrants one. */
   warnUnestimable: string | null;
@@ -89,9 +97,13 @@ export interface DiscretizationClaims {
 
 export function discretizationClaims(e: DiscretizationEstimate, variableMembers: number): DiscretizationClaims {
   const percent = e.relativeError == null || !Number.isFinite(e.relativeError) ? null : e.relativeError;
+  const guaranteedBound = e.guaranteedUpperBound ?? null;
+  const guaranteedRelativeBound = e.guaranteedRelativeBound ?? null;
   const unestimable = percent === null ? e.unestimableReason ?? null : null;
   return {
     percent,
+    guaranteedBound,
+    guaranteedRelativeBound,
     unestimable,
     warnUnestimable: unestimable === 'noStrainEnergy' ? 'discretization.warningUnestimable'
       : unestimable === 'tooCoarse' ? 'discretization.warningTooCoarse' : null,

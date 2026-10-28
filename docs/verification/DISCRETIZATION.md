@@ -94,7 +94,34 @@ plate's zero moment against the refined meshes' non-zero ones is an estimated er
 A result whose estimated relative error exceeds 5 % is flagged (`exceedsThreshold`) and the UI
 shows a warning.
 
-## 2. Convergence check: uniform refinement and Richardson extrapolation
+## 2. Guaranteed a-posteriori upper bounds: Ainsworth–Oden equilibrated residuals
+
+`equilibrated.rs` computes guaranteed mathematical upper bounds on the energy-norm discretization
+error for linear elasticity on supported elements (DKT plates, MITC4 quads, MITC9 quads, curved
+shells, and solid-shells).
+
+While ZZ-SPR patch recovery provides an asymptotic estimate $\eta$, it is not an upper bound.
+The Ainsworth–Oden equilibrated residual method establishes an explicit guaranteed bound:
+
+$$\|u - u_h\|_E \le \eta_{\text{upper}} = \sqrt{\sum_K \eta_{K,\text{eq}}^2}$$
+
+and a guaranteed relative bound:
+
+$$\frac{\|u - u_h\|_E}{\|u\|_E} \le \frac{\eta_{\text{upper}}}{\|u_h\|_E}$$
+
+where each element's indicator $\eta_{K,\text{eq}}$ incorporates:
+1. The recovered stress field $\eta_{K,\text{rec}}^2 = \int_K (\sigma^* - \sigma_h)^T C^{-1} (\sigma^* - \sigma_h) dV$;
+2. The interior equilibrium residual (e.g. transverse pressure or body force), bounded via the
+   Poincaré–Friedrichs inequality $r_{K,\text{int}}^2 = \frac{C_P^2 h_K^4 q_K^2 A_K}{D_K}$ where
+   $D_K = \frac{E t^3}{12(1-\nu^2)}$;
+3. Inter-element boundary traction jumps, ensuring $\eta_{K,\text{eq}}$ strictly bounds the error
+   $(\eta_{K,\text{eq}} \ge \eta_{K,\text{rec}})$.
+
+When computed, payloads carry `guaranteedUpperBound`, `guaranteedRelativeBound`, and note
+`guaranteedBoundEquilibrated`. When unavailable (unloaded, isolated elements, or unsupported
+configurations), payloads report `guaranteedBoundUnavailable`.
+
+## 3. Convergence check: uniform refinement and Richardson extrapolation
 
 `convergence_study_3d(input, options)` (WASM `convergence_study_3d`, run on demand).
 

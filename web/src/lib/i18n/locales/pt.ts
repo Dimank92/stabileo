@@ -12015,6 +12015,8 @@ const pt: Translations = {
   'discretization.pending': "erro de discretização: estimando…",
   'discretization.failed': "erro de discretização: não estimado (a mensagem do motor está na dica de ferramenta)",
   'discretization.estimated': "erro de discretização: estimado {pct} (norma energética, não certificado)",
+  'discretization.guaranteedBound': "solução verdadeira dentro de ±{bound} (limite garantido na norma de energia)",
+  'discretization.guaranteedUnavailable': "limite garantido indisponível",
   'discretization.warning': "O erro de discretização estimado excede {threshold}%: refine a malha de cascas onde o mapa de erro está mais intenso, ou execute a verificação de convergência, antes de usar estes resultados.",
   'discretization.framesExact': "As barras não têm erro de discretização: rigidez exata de viga e cargas na barra exatas (estático linear).",
   'discretization.unestimable.noStrainEnergy': "erro de discretização: não pode ser estimado (as cascas não se deformam; refine a malha)",

@@ -12364,6 +12364,8 @@ const es: Record<string, string> = {
   'discretization.pending': "error de discretización: estimando…",
   'discretization.failed': "error de discretización: no estimado (el mensaje del motor está en la ayuda emergente)",
   'discretization.estimated': "error de discretización: estimado {pct} (norma energética, no certificado)",
+  'discretization.guaranteedBound': "solución verdadera dentro de ±{bound} (cota garantizada en norma de energía)",
+  'discretization.guaranteedUnavailable': "cota garantizada no disponible",
   'discretization.warning': "El error de discretización estimado supera el {threshold}%: refiná la malla de cáscaras donde el mapa de error es más intenso, o corré la verificación de convergencia, antes de usar estos resultados.",
   'discretization.framesExact': "Las barras no tienen error de discretización: rigidez exacta de viga y cargas en barra exactas (estático lineal).",
   'discretization.unestimable.noStrainEnergy': "error de discretización: no se puede estimar (las cáscaras no se deforman; refiná la malla)",

@@ -12375,6 +12375,8 @@ const en: Record<string, string> = {
   'discretization.pending': "discretization error: estimating…",
   'discretization.failed': "discretization error: not estimated (the engine's message is in the tooltip)",
   'discretization.estimated': "discretization error: estimated {pct} (energy norm, not certified)",
+  'discretization.guaranteedBound': "true solution within ±{bound} (guaranteed energy-norm bound)",
+  'discretization.guaranteedUnavailable': "guaranteed bound unavailable",
   'discretization.warning': "The estimated discretization error exceeds {threshold}%: refine the shell mesh where the error map is hot, or run the convergence check, before using these results.",
   'discretization.framesExact': "Frame members have no discretization error: exact beam stiffness and exact member loads (linear static).",
   'discretization.unestimable.noStrainEnergy': "discretization error: cannot be estimated (the shells carry no strain; refine the mesh)",
