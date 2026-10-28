@@ -20,6 +20,7 @@ use serde::Serialize;
 use crate::network::Network;
 
 pub const REGULARISATION: f64 = 1e-10;
+pub const REFINEMENT_STEPS: usize = 3;
 
 /// Tangent of each bond at positions `pos`: (S, tension, unit direction, length).
 pub fn bond_tangents(net: &Network, pos: &[[f64; 2]]) -> Vec<([[f64; 2]; 2], f64, [f64; 2], f64)> {
@@ -115,9 +116,25 @@ impl System {
             vals.push(REGULARISATION * dmax);
         }
         let m = CscMatrix::from_triplets(self.n, &rows, &cols, &vals);
+        let k = CscMatrix::from_triplets(self.n, &self.rows, &self.cols, &self.vals);
         let sym = Rc::new(symbolic_cholesky(&m));
         let f = numeric_cholesky(&sym, &m).ok_or("stiffness is not positive semi-definite (compressed bonds?)")?;
-        Ok(rhs.iter().map(|b| sparse_cholesky_solve(&f, b)).collect())
+        // Iterative refinement against the unshifted K: each step multiplies the shift's error by
+        // delta / (lambda + delta) on the non-floppy modes and adds nothing on the floppy ones
+        // (the residual of a load orthogonal to them stays orthogonal).
+        Ok(rhs
+            .iter()
+            .map(|b| {
+                let mut x = sparse_cholesky_solve(&f, b);
+                for _ in 0..REFINEMENT_STEPS {
+                    let kx = k.sym_mat_vec(&x);
+                    let r: Vec<f64> = b.iter().zip(&kx).map(|(bi, ki)| bi - ki).collect();
+                    let dx = sparse_cholesky_solve(&f, &r);
+                    x.iter_mut().zip(&dx).for_each(|(xi, di)| *xi += di);
+                }
+                x
+            })
+            .collect())
     }
 }
 
