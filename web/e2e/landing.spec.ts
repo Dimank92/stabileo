@@ -243,17 +243,15 @@ test.describe('@landing landing page', () => {
     expect(await page.evaluate(() => localStorage.getItem('stabileo-lang-manual'))).toBe('1');
   });
 
-  test('the landing offers exactly the languages it fully speaks', async ({ page }) => {
+  test('the landing offers the application\'s languages', async ({ page }) => {
     await bootLanding(page);
 
-    // PUBLIC_LOCALES. Portuguese joined once every landing key existed — the
-    // list and the copy are kept in step by landing-i18n-parity.test.ts.
     await page.getByTestId('nav-lang-button').click();
     const names = await page
       .getByTestId('nav-lang-list')
       .getByRole('option')
       .allInnerTexts();
-    expect(names.map((n) => n.trim())).toEqual(['English', 'Español', 'Português']);
+    expect(names.map((n) => n.trim())).toEqual(['English', 'Español', 'Português', 'Deutsch', 'Français', 'Türkçe']);
   });
 
   test('a Brazilian browser gets the Portuguese landing', async ({ browser }) => {
@@ -273,10 +271,16 @@ test.describe('@landing landing page', () => {
     await ctx.close();
   });
 
-  test('any other browser language gets the English landing', async ({ browser }) => {
-    // French is a language the *application* speaks, so this asserts the
-    // landing's allow-list rather than a missing dictionary.
+  test('a French browser gets the French landing', async ({ browser }) => {
     const ctx = await browser.newContext({ locale: 'fr-FR' });
+    const page = await ctx.newPage();
+    await bootLanding(page, { manual: false });
+    await expect(page.getByTestId('nav-lang')).toHaveAttribute('data-value', 'fr');
+    await ctx.close();
+  });
+
+  test('any other browser language gets the English landing', async ({ browser }) => {
+    const ctx = await browser.newContext({ locale: 'it-IT' });
     const page = await ctx.newPage();
     await bootLanding(page, { manual: false });
     await expect(page.locator('.landing h1')).toHaveText('Structural analysis, in a browser tab.');

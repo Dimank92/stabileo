@@ -52,6 +52,26 @@ export type Block =
    */
   | { k: 'ext'; href: string; label: string; t: string };
 
+export type Localized<T> = Record<'en' | 'es' | 'pt', T> & Partial<Record<PublicLocale, T>>;
+
+export function inLocale<T>(texts: Localized<T>, locale: PublicLocale): T {
+  return texts[locale] ?? texts.en;
+}
+
+/** Attaches `translations/<locale>/<id>.ts` bodies to the items they name, so a language arrives as files only. */
+export function addTranslations<T extends { i18n: Localized<unknown> }>(
+  items: T[],
+  id: (item: T) => string,
+  modules: Record<string, unknown>,
+): void {
+  for (const [path, body] of Object.entries(modules)) {
+    const m = /translations\/([a-z]{2})\/(.+)\.ts$/.exec(path);
+    const item = m && items.find((i) => id(i) === m[2]);
+    if (!m || !item) throw new Error(`blog translation without a match: ${path}`);
+    (item.i18n as Record<string, unknown>)[m[1]] = body;
+  }
+}
+
 /** One post in one language. */
 export type PostBody = {
   title: string;
@@ -90,7 +110,7 @@ export type Post = {
   authors: string[];
   /** `blog.tag.*` dictionary keys, so the tags themselves translate. */
   tagKeys: string[];
-  i18n: Record<PublicLocale, PostBody>;
+  i18n: Localized<PostBody>;
 };
 
 /**

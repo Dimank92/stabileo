@@ -32,10 +32,10 @@ import type { Translations } from '../types';
 import es from './es';
 import en from './en';
 import pt from './pt';
-import de from './de';
-import fr from './fr';
+import de, { COMPLETE as deComplete } from './full/de';
+import fr, { COMPLETE as frComplete } from './full/fr';
 import it from './it';
-import tr from './tr';
+import tr, { COMPLETE as trComplete } from './full/tr';
 import hi from './hi';
 import ja from './ja';
 import ko from './ko';
@@ -46,6 +46,7 @@ import id from './id';
 import steelEs from './steel/es';
 import steelEn from './steel/en';
 import steelPt from './steel/pt';
+import { stepsEs, stepsEn, stepsPt } from './steps';
 
 /**
  * Every dictionary that exists, offered or not. Gates only.
@@ -64,9 +65,9 @@ import steelPt from './steel/pt';
  * out to avoid rather than to introduce.
  */
 export const ALL_DICTS: Record<string, Translations> = {
-  es: { ...es, ...steelEs },
-  en: { ...en, ...steelEn },
-  pt: { ...pt, ...steelPt },
+  es: { ...es, ...steelEs, ...stepsEs },
+  en: { ...en, ...steelEn, ...stepsEn },
+  pt: { ...pt, ...steelPt, ...stepsPt },
   de, fr, it, tr, hi, ja, ko, ru, zh, ar, id,
 };
 
@@ -78,4 +79,14 @@ export function allShippedLocales(): string[] {
 /** One dictionary by code, offered or not. Gates only. */
 export function allDictFor(locale: string): Record<string, string> {
   return (ALL_DICTS[locale] ?? {}) as Record<string, string>;
+}
+
+export function completeLocales(): string[] {
+  const lazy: Record<string, boolean> = { de: deComplete, fr: frComplete, tr: trComplete };
+  return ['es', 'en', 'pt', ...Object.keys(lazy).filter((l) => lazy[l])];
+}
+
+export function partialLocales(): string[] {
+  const complete = completeLocales();
+  return ['de', 'fr', 'tr'].filter((l) => !complete.includes(l));
 }

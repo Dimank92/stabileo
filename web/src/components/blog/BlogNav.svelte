@@ -13,7 +13,7 @@
   import PublicLink from '../landing/PublicLink.svelte';
   import BrandMark from '../landing/BrandMark.svelte';
 
-  const LOCALE_NAMES: Record<string, string> = { en: 'English', es: 'Español', pt: 'Português' };
+  const LOCALE_NAMES: Record<string, string> = { en: 'English', es: 'Español', pt: 'Português', de: 'Deutsch', fr: 'Français', tr: 'Türkçe' };
 
   /**
    * Whether to offer a way back to the index.

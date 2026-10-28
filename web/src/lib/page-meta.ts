@@ -18,7 +18,10 @@ import { alternateUrls, publicUrl } from './i18n/public-routes';
 const OG_LOCALE: Record<PublicLocale, string> = {
 	en: 'en_US',
 	es: 'es_AR',
-	pt: 'pt_BR'
+	pt: 'pt_BR',
+	de: 'de_DE',
+	fr: 'fr_FR',
+	tr: 'tr_TR'
 };
 
 const META_TAGS = [

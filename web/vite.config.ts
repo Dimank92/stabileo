@@ -43,7 +43,7 @@ function publicI18nPlugin(): Plugin {
     load(resolved) {
       if (resolved !== '\0' + id) return null;
       let out = '';
-      for (const loc of ['en', 'es', 'pt']) {
+      for (const loc of ['en', 'es', 'pt', 'de', 'fr', 'tr']) {
         const file = resolve(__dirname, 'src/lib/i18n/locales', `${loc}.ts`);
         this.addWatchFile(file);
         const lines = readFileSync(file, 'utf8').split('\n').filter((l) => {

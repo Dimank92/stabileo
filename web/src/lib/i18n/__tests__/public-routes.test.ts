@@ -73,7 +73,7 @@ describe('publicHref / publicUrl', () => {
 describe('alternateUrls', () => {
   it('names every language plus x-default, absolutely', () => {
     const alts = alternateUrls('/blog/x');
-    expect(alts.map((a) => a.hreflang).sort()).toEqual(['en', 'es', 'pt', 'x-default']);
+    expect(alts.map((a) => a.hreflang).sort()).toEqual(['de', 'en', 'es', 'fr', 'pt', 'tr', 'x-default']);
     // Relative hreflang is ignored by crawlers, silently.
     for (const a of alts) expect(a.href.startsWith('https://')).toBe(true);
     // x-default names the English version OF THIS PAGE — `/en/blog/x`, not
@@ -99,12 +99,15 @@ describe('preferredPublicLocale', () => {
   it('takes the first language it speaks', () => {
     expect(preferredPublicLocale(['pt-BR', 'en-US'])).toBe('pt');
     expect(preferredPublicLocale(['es-AR'])).toBe('es');
+    expect(preferredPublicLocale(['de-DE', 'en'])).toBe('de');
+    expect(preferredPublicLocale(['fr-CA'])).toBe('fr');
+    expect(preferredPublicLocale(['tr-TR'])).toBe('tr');
   });
 
   it('falls back to English for a browser it does not speak', () => {
-    // The x-default rule: German and Japanese browsers get English, not a
+    // The x-default rule: Italian and Japanese browsers get English, not a
     // half-translated page and not a 404.
-    expect(preferredPublicLocale(['de-DE', 'ja'])).toBe('en');
+    expect(preferredPublicLocale(['it-IT', 'ja'])).toBe('en');
     expect(preferredPublicLocale([])).toBe('en');
   });
 });

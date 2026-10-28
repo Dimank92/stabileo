@@ -20,6 +20,7 @@ import steelEn from '../locales/steel/en';
 import steelEs from '../locales/steel/es';
 import steelPt from '../locales/steel/pt';
 import { stepsEn, stepsEs, stepsPt } from '../locales/steps';
+import { ALL_DICTS } from '../locales/all';
 
 const merged = {
   en: { ...en, ...steelEn, ...stepsEn } as Record<string, string>,
@@ -98,4 +99,19 @@ describe('in Basic mode each dictionary speaks one variant', () => {
     const usted = /\b(haga(?! falta)|elija|seleccione|presione|ingrese|(?<!se )verifique|asegúrese|revise|intente|elimínelo|conéctelo|cambie a|considere|sepárelas)\b/i;
     expect(offenders(merged.es, usted)).toEqual([]);
   });
+});
+
+describe('German, French and Turkish address the reader formally', () => {
+  const informal: Record<string, RegExp> = {
+    de: /(?<![\p{L}-])(du|dich|dir|dein|deine|deinen|deinem|deiner)(?![\p{L}-])/u,
+    fr: /(?<![\p{L}'-])(tu|toi|ton|tes)(?![\p{L}-])/u,
+    tr: /(?<![\p{L}])sen(?![\p{L}])|(?<![\p{L}])senin(?![\p{L}])/u,
+  };
+  for (const [code, pattern] of Object.entries(informal)) {
+    it(`${code} never uses the informal second person`, () => {
+      const dict = ALL_DICTS[code];
+      const hits = Object.keys(dict).filter((k) => pattern.test(dict[k].replace(/\{\w+\}/g, ''))).map((k) => `${k}: ${dict[k]}`);
+      expect(hits).toEqual([]);
+    });
+  }
 });

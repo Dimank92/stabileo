@@ -16,7 +16,7 @@
   import LandingPage from './components/LandingPage.svelte';
   import BlogPage from './components/blog/BlogPage.svelte';
   import { parsePublicPath, publicHref } from './lib/i18n/public-routes';
-  import { publicI18n, setLocale } from './lib/i18n/store.svelte';
+  import { publicI18n, setLocale, ensureLocale, i18n } from './lib/i18n/store.svelte';
   import { routeKind } from './lib/public-route';
   import { modeToPath } from './lib/app-mode';
 
@@ -35,7 +35,8 @@
   let loading: Promise<void> | null = null;
 
   function loadApp() {
-    loading ??= import('./App.svelte').then(async (m) => {
+    // A lazily loaded language must be registered before the first paint, or it paints in English.
+    loading ??= Promise.all([import('./App.svelte'), ensureLocale(i18n.locale)]).then(async ([m]) => {
       app = m.default;
       // Tell main.ts the application is up: it installs the browser-test hooks then (in an
       // e2e build only), so that "the hooks are there" still means "the application is up".

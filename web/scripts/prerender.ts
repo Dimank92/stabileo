@@ -58,7 +58,7 @@ const DIST = process.env.PRERENDER_OUT
   ? resolve(process.env.PRERENDER_OUT)
   : join(ROOT, 'dist');
 const ORIGIN = 'https://stabileo.com';
-const LOCALES = ['en', 'es', 'pt'] as const;
+const LOCALES = ['en', 'es', 'pt', 'de', 'fr', 'tr'] as const;
 /**
  * The language a browser we do not speak is sent to, and the one the root
  * serves. Kept beside LOCALES because `ROOT_REDIRECT` is built from both.
