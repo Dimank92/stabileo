@@ -359,3 +359,34 @@
   --st-model-deformed: rgba(229, 72, 42, 0.85);
   --st-model-deformed-fill: rgba(229, 72, 42, 0.55);
 }
+
+/* ── Research and reading (Stabileo Research pages; values from the blog's reading column) ── */
+:root {
+  --rs-text: 1.125rem;
+  --rs-leading: 1.55;
+  --rs-small: 0.9375rem;
+  --rs-ui: 0.875rem;
+  --rs-micro: 0.75rem;
+  --rs-h2: clamp(1.35rem, 2.6vw, 1.8rem);
+  --rs-h3: 1.125rem;
+  --rs-measure: 38rem;
+  --rs-text-prose: color-mix(in srgb, var(--st-paper-2) 82%, var(--st-slate-2));
+  --rs-space-1: 0.25rem;
+  --rs-space-2: 0.5rem;
+  --rs-space-3: 0.75rem;
+  --rs-space-4: 1rem;
+  --rs-space-5: 1.5rem;
+  --rs-space-6: 2rem;
+  --rs-space-7: 3rem;
+  --rs-space-8: 4rem;
+  --rs-control-h: 2.25rem;
+  /* 3.32:1 on ink, 3.08:1 on --st-surface: a visible control boundary (WCAG 1.4.11). */
+  --rs-control-border: #5b6b78;
+  --rs-link: #ff7a55;
+  --rs-plot-ours: var(--st-blue-text);
+  --rs-plot-ref: #d95926;
+  --rs-plot-variant: #7fb3ff;
+  --rs-plot-grid: var(--st-canvas-grid);
+  --rs-plot-axis: var(--st-text-2);
+  --rs-viewer-h: clamp(16rem, 42dvh, 24rem);
+}

@@ -138,6 +138,8 @@
   let deform = $state(10);
   let showMesh = $state(MESH_BY_DEFAULT && (typeof window === 'undefined' || window.innerWidth >= 640));
   let hideBroken = $state(true);
+  let paramsOpen = $state(false);
+  let moreOpen = $state(false);
 
   const VIEWS: Record<'plate' | 'band' | 'tip', [number, number, number, number]> = {
     plate: [-0.55, -0.6, 0.55, 0.6],
@@ -204,6 +206,7 @@
     goToStep: (s: number) => playback.seek(s),
     setParams: (p: Record<string, number | string | boolean>) => {
       playback.interact();
+      paramsOpen = true;
       if (typeof p.l0 === 'number') l0 = p.l0;
       if (typeof p.e === 'number') e = p.e;
       if (typeof p.gc === 'number') gc = p.gc;
@@ -264,7 +267,7 @@
 <ExperimentShell
   paperId="shauer-2025"
   name="Phase-field fracture of a notched plate"
-  lead="A square plate with a notch from its left edge to the centre is pulled apart at the top. The AT2 phase-field model represents the crack as a damage field d between 0 (intact) and 1 (broken), smeared over a length ℓ. The experiment on the right is the Stabileo Rust implementation, shown in Stabileo’s viewer; the dashed curve is what the author’s Python code computed."
+  lead="A square plate with a notch from its left edge to the centre is pulled apart at the top. The AT2 phase-field model represents the crack as a damage field d between 0 (intact) and 1 (broken), smeared over a length ℓ. The experiment pane runs the Stabileo Rust implementation in Stabileo’s viewer; the orange curve is what the author’s Python code computed."
   {checks}
   {actions}
   sourcePath="research/fracture/shauer-2025"
@@ -309,6 +312,7 @@
     </ol>
 
     <h2>Comparison with the reference</h2>
+    <div class="rs-table-scroll" role="region" aria-label="Validation checks" tabindex="0">
     <table class="rs-checks">
       <thead><tr><th>Check</th><th>Observed</th><th>Tolerance</th><th></th></tr></thead>
       <tbody>
@@ -317,6 +321,7 @@
         {/each}
       </tbody>
     </table>
+    </div>
     <p>
       One finding: the plate is symmetric about the notch plane, and the crack runs along the row of elements just above it in one code and
       just below it in the other. Which row is chosen is decided by floating-point round-off; against the mirror image the final damage
@@ -343,7 +348,7 @@
   {/snippet}
 
   {#snippet app()}
-    <div class="rs-app" bind:this={pane} data-steps={frames.length} data-source={source}>
+    <div class="rs-app" lang="en" bind:this={pane} data-steps={frames.length} data-source={source}>
       <p class="rs-mode" data-testid="rs-mode"><span class="dot dot-{source}"></span>{SOURCE_LABEL[source]}</p>
 
       {#if nodes && elements}
@@ -374,7 +379,7 @@
             {showMesh}
             {hideCell}
             view={VIEWS[view]}
-            height="min(26rem, 62vw)"
+            height="clamp(16rem, 42dvh, 24rem)"
             status={statusItems}
             ariaLabel="Stabileo viewer: {field} on the {deformed ? 'deformed' : 'undeformed'} mesh"
           />
@@ -388,10 +393,24 @@
           <button class="btn btn-sm" type="button" onclick={() => (playback.playing ? playback.pause() : playback.play())}>{playback.playing ? 'Pause' : 'Play'}</button>
           <input type="range" min="0" max={frames.length - 1} value={playback.shown} oninput={(ev) => playback.seek(Number((ev.currentTarget as HTMLInputElement).value))} aria-label="Load step shown" />
         </div>
-        <p class="rs-note">Unconstrained AT2, as in the reference code, can give d slightly above 1; values are shown as computed, only the colours are clamped to [0, 1].</p>
       {/if}
 
-      <details class="rs-params" open oninputcapture={() => playback.interact()}>
+
+
+
+      <figure>
+        <figcaption>Reaction force against imposed top displacement</figcaption>
+        <LineChart series={forceSeries} xLabel="top displacement u, mm" yLabel="force F, kN" fx={(v) => v.toFixed(4)} fy={(v) => v.toFixed(2)} marker={frame ? frame.step.displacement : null} height={180} />
+        {#if !showsReference}<p class="rs-note">The reference curve is shown only for the reference parameters.</p>{/if}
+      </figure>
+      {#if comparison}
+        <p class="rs-compare-line" role="status">
+          <span class="ok" aria-hidden="true">✓</span>
+          {source === 'replay' ? 'This replay' : 'This run'} matches the reference code: peak {comparison.peak.step.reaction.toFixed(6)} kN at step {comparison.peak.step.step}, identical iterations at {comparison.sameIterations} of {reference.length} steps.
+          <button type="button" class="rs-textbtn" onclick={() => { moreOpen = true; requestAnimationFrame(() => document.getElementById('rs-compare-detail')?.scrollIntoView({ block: 'nearest' })); }}>Details</button>
+        </p>
+      {/if}
+      <details class="rs-params" bind:open={paramsOpen} oninputcapture={() => playback.interact()}>
         <summary>Parameters</summary>
         <div class="rs-grid2">
           <label><span class="lbl"><i>E</i></span><NumberField label="E, Young’s modulus, kN/mm²" min={LIMITS.e[0]} max={LIMITS.e[1]} bind:value={e} /><span class="u">kN/mm²</span></label>
@@ -446,28 +465,21 @@
           {/if}
         </p>
       </details>
-
-      <figure>
-        <figcaption>Reaction force against imposed top displacement</figcaption>
-        <LineChart series={forceSeries} xLabel="top displacement u, mm" yLabel="force F, kN" fx={(v) => v.toFixed(4)} fy={(v) => v.toFixed(2)} marker={frame ? frame.step.displacement : null} height={220} />
-        {#if !showsReference}<p class="rs-note">The reference curve is shown only for the reference parameters.</p>{/if}
-      </figure>
-
-      {#if comparison}
-        <div class="rs-compare" role="status">
-          <h3>{source === 'replay' ? 'This replay' : 'This run'} against the reference code</h3>
-          <ul>
-            <li>Peak force {comparison.peak.step.reaction.toFixed(6)} kN at step {comparison.peak.step.step}; reference {refPeak.reaction.toFixed(6)} kN at step {refPeak.step}.</li>
-            <li>Largest relative force difference up to the peak: {comparison.worstPre.toExponential(1)} (test tolerance 1e-9).</li>
-            <li>Largest absolute force difference, fracture included: {comparison.worstAll.toExponential(1)} kN (bounded by the staggered tolerance 1e-5).</li>
-            <li>Identical number of staggered iterations at {comparison.sameIterations} of {reference.length} steps.</li>
-          </ul>
-        </div>
-      {/if}
-
       {#if frames.length}
-        <details class="rs-more">
-          <summary>Convergence and energies</summary>
+        <details class="rs-more" bind:open={moreOpen}>
+          <summary>Comparison, convergence and energies</summary>
+      {#if comparison}
+            <div class="rs-compare" id="rs-compare-detail">
+              <h3>{source === 'replay' ? 'This replay' : 'This run'} against the reference code</h3>
+              <ul>
+                <li>Peak force {comparison.peak.step.reaction.toFixed(6)} kN at step {comparison.peak.step.step}; reference {refPeak.reaction.toFixed(6)} kN at step {refPeak.step}.</li>
+                <li>Largest relative force difference up to the peak: {comparison.worstPre.toExponential(1)} (test tolerance 1e-9).</li>
+                <li>Largest absolute force difference, fracture included: {comparison.worstAll.toExponential(1)} kN (bounded by the staggered tolerance 1e-5).</li>
+                <li>Identical number of staggered iterations at {comparison.sameIterations} of {reference.length} steps.</li>
+              </ul>
+            </div>
+          {/if}
+
           <figure>
             <figcaption>Staggered iterations per load step{showsReference ? ' (dots where the reference differs; none expected)' : ''}</figcaption>
             <IterationsChart steps={frames.map((f) => f.step)} reference={showsReference ? reference.map((r) => r.iterations) : null} />
@@ -496,6 +508,7 @@
 <style>
   .rs-app {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.9rem;
     color: var(--fg);
   }
@@ -504,6 +517,7 @@
     font: 12px var(--lp-mono);
     color: var(--fg-2);
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem;
   }
@@ -604,7 +618,7 @@
   .rs-grid2 select {
     background: var(--card);
     color: var(--fg);
-    border: 1px solid var(--hair);
+    border: 1px solid var(--rs-control-border);
     border-radius: 3px;
     padding: 0.3rem 0.4rem;
     font: 13px var(--lp-mono);
@@ -643,6 +657,13 @@
     padding: 0.6rem 0.9rem;
     font-size: 0.88rem;
   }
+  .rs-compare-line {
+    margin: 0;
+    font-size: 0.9rem;
+  }
+  .rs-compare-line .ok {
+    color: var(--ok);
+  }
   .rs-compare h3 {
     margin: 0 0 0.4rem;
     font-size: 0.95rem;
@@ -668,8 +689,16 @@
     padding: 0.25rem 0.5rem;
     text-align: left;
   }
-  :global(.rs-checks) {
-    display: block;
+  :global(.rs-table-scroll) {
     overflow-x: auto;
+  }
+  .rs-textbtn {
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    color: var(--lp-accent);
+    text-decoration: underline;
+    cursor: pointer;
   }
 </style>

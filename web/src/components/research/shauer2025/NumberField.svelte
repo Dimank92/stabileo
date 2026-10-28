@@ -39,7 +39,7 @@
   input {
     background: var(--card);
     color: var(--fg);
-    border: 1px solid var(--hair);
+    border: 1px solid var(--rs-control-border);
     border-radius: 3px;
     padding: 0.3rem 0.4rem;
     font: 13px var(--lp-mono);

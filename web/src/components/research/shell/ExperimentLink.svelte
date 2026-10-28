@@ -10,7 +10,9 @@
     if (params) exp?.setParams(params);
     if (step !== undefined) exp?.goToStep(step);
     const pane = document.querySelector('.rs-shell-app');
-    if (pane && window.innerWidth < 1100) pane.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const stacked = window.matchMedia('(max-width: 69.99rem)').matches;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (pane && stacked) pane.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
   }
 </script>
 

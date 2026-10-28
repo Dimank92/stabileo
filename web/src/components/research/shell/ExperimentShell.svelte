@@ -12,6 +12,7 @@
   import { fieldName, statusName, rs } from '../i18n';
   import { provideExperiment, type ExperimentActions } from './context';
   import { BUILD_COMMIT } from '../../../lib/build-info';
+  import { publicI18n } from '../../../lib/i18n/store.svelte';
 
   type Props = {
     paperId: string;
@@ -32,13 +33,28 @@
   const commit = BUILD_COMMIT;
   const s = $derived(rs());
   const authors = paper.crossref.authors.join(', ');
+
+  // The sticky pane fades at the bottom while it can still scroll, so the reader knows there is more.
+  let pane: HTMLElement | undefined = $state();
+  let more = $state(false);
+  function updateMore() {
+    if (pane) more = pane.scrollHeight - pane.scrollTop - pane.clientHeight > 1;
+  }
+  $effect(() => {
+    if (!pane) return;
+    const ro = new ResizeObserver(updateMore);
+    ro.observe(pane);
+    for (const c of pane.children) ro.observe(c);
+    updateMore();
+    return () => ro.disconnect();
+  });
 </script>
 
 <section class="sec sec--ink rs-shell">
   <div class="wrap rs-shell-wrap">
     <header class="rs-shell-head">
       <p class="rs-crumb"><PublicLink to="/research">{s.research}</PublicLink> / {fieldName(paper.area)}</p>
-      <h1>{name}</h1>
+      <h1 lang="en">{name}</h1>
       <p class="rs-cite">
         After {authors}, “{paper.crossref.title}”, <em>{paper.crossref.venue}</em> ({paper.crossref.year}),
         <a href="https://doi.org/{paper.doi}" rel="noreferrer" target="_blank">doi:{paper.doi}</a>.
@@ -48,10 +64,11 @@
         {#if !paper.reproduced_published_results}<li>{s.notCompared}</li>{/if}
         <li class="warn">{s.notDesign}</li>
       </ul>
-      <p class="rs-lead">{lead}</p>
+      <p class="rs-lead" lang="en">{lead}</p>
     </header>
     <div class="rs-shell-grid">
-      <article class="rs-shell-article">
+      <article class="rs-shell-article" lang="en">
+        {#if publicI18n.locale !== 'en'}<p class="rs-only-en" lang={publicI18n.locale}>{s.onlyEnglish}</p>{/if}
         {@render article()}
         <h2 id="cite">Cite this</h2>
         <p class="rs-citebox">
@@ -60,7 +77,7 @@
           Engine: the Stabileo engine at the same commit. Permanent links to this exact build are planned.
         </p>
       </article>
-      <aside class="rs-shell-app" aria-label="The experiment">
+      <aside class="rs-shell-app" class:more aria-label="The experiment" bind:this={pane} onscroll={updateMore}>
         {@render app()}
       </aside>
     </div>
@@ -73,6 +90,7 @@
     padding-bottom: 3rem;
   }
   .rs-shell-wrap {
+    --lp-gut: clamp(1rem, 3vw, 2.5rem);
     max-width: 96rem;
   }
   .rs-shell-head {
@@ -125,22 +143,41 @@
     color: var(--fg);
     font-size: 1.05rem;
   }
+  /* Below 70rem the experiment comes first, right after the lead, and the article follows. */
   .rs-shell-grid {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: 2rem;
+  }
+  .rs-shell-app {
+    order: -1;
+  }
+  .rs-shell-article,
+  .rs-shell-app {
+    min-width: 0;
   }
   @media (min-width: 70rem) {
     .rs-shell-grid {
-      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      display: grid;
+      grid-template-columns: minmax(30rem, 38rem) minmax(28rem, 1fr);
+      column-gap: 3rem;
       align-items: start;
     }
     .rs-shell-app {
+      order: 0;
       position: sticky;
       top: calc(var(--lp-nav-h, 3.6rem) + 0.75rem);
-      max-height: calc(100vh - var(--lp-nav-h, 3.6rem) - 1.5rem);
-      overflow-y: auto;
+      max-height: calc(100dvh - var(--lp-nav-h, 3.6rem) - 1.5rem);
+      overflow: hidden auto;
+      scrollbar-gutter: stable;
       overscroll-behavior: contain;
     }
+    .rs-shell-app.more {
+      mask-image: linear-gradient(to bottom, #000 calc(100% - 2rem), transparent);
+    }
+  }
+  :global(.research .mobile-sticky) {
+    display: none;
   }
   .rs-shell-article {
     color: var(--fg);
@@ -164,6 +201,12 @@
     color: inherit;
     text-decoration: underline;
     text-underline-offset: 2px;
+  }
+  .rs-only-en {
+    color: var(--fg-2);
+    font-size: var(--rs-small);
+    border-left: 2px solid var(--hair);
+    padding-left: 0.75rem;
   }
   .rs-citebox {
     font: 13px/1.6 var(--lp-mono);

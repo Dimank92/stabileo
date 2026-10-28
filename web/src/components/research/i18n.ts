@@ -22,6 +22,7 @@ export type ResearchStrings = {
   notCompared: string;
   research: string;
   suggest: string;
+  onlyEnglish: string;
 };
 
 const STRINGS: Record<'en' | 'es' | 'pt', ResearchStrings> = {
@@ -46,6 +47,7 @@ const STRINGS: Record<'en' | 'es' | 'pt', ResearchStrings> = {
     notCompared: 'Published figures not compared',
     research: 'Research',
     suggest: 'Suggest a paper to reproduce →',
+    onlyEnglish: '',
   },
   es: {
     sourceLabel: { 'crossref-abstract': 'a partir del resumen', 'publisher-abstract': 'a partir del resumen', 'repository-readme': 'a partir del README del código', 'full-text': 'a partir del artículo', 'reference-code': 'a partir del código de referencia' },
@@ -68,6 +70,7 @@ const STRINGS: Record<'en' | 'es' | 'pt', ResearchStrings> = {
     notCompared: 'Sin comparar con las figuras publicadas',
     research: 'Investigación',
     suggest: 'Sugerí un artículo para reproducir →',
+    onlyEnglish: 'Este artículo está disponible solo en inglés.',
   },
   pt: {
     sourceLabel: { 'crossref-abstract': 'a partir do resumo', 'publisher-abstract': 'a partir do resumo', 'repository-readme': 'a partir do README do código', 'full-text': 'a partir do artigo', 'reference-code': 'a partir do código de referência' },
@@ -90,6 +93,7 @@ const STRINGS: Record<'en' | 'es' | 'pt', ResearchStrings> = {
     notCompared: 'Sem comparar com as figuras publicadas',
     research: 'Pesquisa',
     suggest: 'Sugira um artigo para reproduzir →',
+    onlyEnglish: 'Este artigo está disponível apenas em inglês.',
   },
 };
 

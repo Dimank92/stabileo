@@ -58,4 +58,22 @@ test.describe('@smoke research', () => {
     await page.waitForLoadState('networkidle');
     expect(research).toEqual([]);
   });
+
+  for (const width of [390, 1120, 1280]) {
+    test(`the experiment page reflows at ${width} px: nothing is cut off`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto('/en/research/fracture/shauer-2025/');
+      await expect(page.locator('.rs-app')).toHaveAttribute('data-source', 'replay');
+      await page.waitForTimeout(1000);
+      const m = await page.evaluate(() => {
+        const landing = document.querySelector('.landing') as HTMLElement;
+        const pane = document.querySelector('.rs-shell-app') as HTMLElement;
+        const article = document.querySelector('.rs-shell-article') as HTMLElement;
+        return { lw: landing.scrollWidth, lc: landing.clientWidth, pw: pane.scrollWidth, pc: pane.clientWidth, ar: article.getBoundingClientRect().right, iw: innerWidth };
+      });
+      expect(m.lw).toBeLessThanOrEqual(m.lc + 1);
+      expect(m.pw).toBeLessThanOrEqual(m.pc + 1);
+      expect(m.ar).toBeLessThanOrEqual(m.iw + 1);
+    });
+  }
 });
