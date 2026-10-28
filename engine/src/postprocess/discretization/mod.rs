@@ -22,6 +22,7 @@
 pub mod convergence;
 pub mod recovery;
 pub mod refine;
+pub mod adaptive;
 pub mod samples;
 
 use std::collections::HashMap;
