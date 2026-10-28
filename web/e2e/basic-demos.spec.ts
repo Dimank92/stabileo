@@ -170,7 +170,14 @@ test.describe('@smoke drawing a beam', () => {
      */
     const canvasBox = async () =>
       (await page.locator('canvas:not(.axis-gizmo)').first().boundingBox())!;
+    /*
+     * The canvas has to be what is under the pointer. The card of these steps sits at the bottom
+     * of the viewport, and in a 720 px window its top edge is where the canvas's middle row
+     * was: a click there went to the card, the node never appeared, and the step waited.
+     */
     const click = async (x: number, y: number) => {
+      const under = await page.evaluate(([px, py]) => document.elementFromPoint(px, py)?.tagName ?? null, [x, y]);
+      expect(under, `the canvas, not something over it, at (${Math.round(x)}, ${Math.round(y)})`).toBe('CANVAS');
       await page.mouse.click(x, y);
       await page.waitForTimeout(400);
     };
@@ -212,8 +219,8 @@ test.describe('@smoke drawing a beam', () => {
     // step notices.
     await doUntil('member', async () => {
       const box = await canvasBox();
-      await click(box.x + box.width * 0.34, box.y + box.height * 0.55);
-      await click(box.x + box.width * 0.64, box.y + box.height * 0.55);
+      await click(box.x + box.width * 0.34, box.y + box.height * 0.3);
+      await click(box.x + box.width * 0.64, box.y + box.height * 0.3);
     });
 
     /*
