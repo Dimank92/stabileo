@@ -7,7 +7,7 @@
 | Issue | [#488](https://github.com/lambdaclass/stabileo/issues/488) |
 | Fix | PR [#491](https://github.com/lambdaclass/stabileo/pull/491) (merged 2026-10-20) |
 | Affected versions | every version with 3D supports and per-DOF springs, up to 0.2.0 and `main` until the fix; introduction not yet bisected |
-| Re-check registry | to add with the fix |
+| Re-check registry | `springs-on-fixed-supports` in web/src/lib/provenance/result-changes.json |
 
 ## Affected features
 

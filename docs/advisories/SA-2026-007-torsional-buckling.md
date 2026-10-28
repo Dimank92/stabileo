@@ -7,7 +7,7 @@
 | Issue | [#404](https://github.com/lambdaclass/stabileo/issues/404) (related: [#439](https://github.com/lambdaclass/stabileo/issues/439)) |
 | Fix | PR [#434](https://github.com/lambdaclass/stabileo/pull/434) (merged via #507, 2026-10-21) |
 | Affected versions | every version with 3D buckling, up to 0.2.0 and `main` until the fix |
-| Re-check registry | to add with the fix |
+| Re-check registry | `torsional-buckling-3d` in web/src/lib/provenance/result-changes.json |
 
 ## Affected features
 

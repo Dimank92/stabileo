@@ -42,6 +42,8 @@ export interface ResultChange {
   explanation: Localised;
   /** Where the change is written up: a repository file and one of its headings. */
   changelog: { file: string; heading: string };
+  /** Associated safety advisory identifier (e.g. "SA-2026-024"), when published. */
+  advisory?: string;
 }
 
 export interface ResultChangeRegistry {
@@ -64,6 +66,12 @@ export function githubSlug(heading: string): string {
 /** The public link to an entry's write-up. */
 export function changelogUrl(c: ResultChange): string {
   return `${REPO_BLOB}${c.changelog.file}#${githubSlug(c.changelog.heading)}`;
+}
+
+/** The public link to an entry's safety advisory write-up if one exists. */
+export function advisoryUrl(c: ResultChange): string | undefined {
+  if (!c.advisory) return undefined;
+  return `${REPO_BLOB}docs/advisories/${c.advisory}.md`;
 }
 
 /** Every condition group of an entry, normalised to OR-groups that must all hold. */
@@ -98,6 +106,7 @@ export function validateRegistry(r: ResultChangeRegistry, knownFeatures: Readonl
       if (!c.explanation?.[loc]?.trim()) problems.push(`${where}: missing explanation.${loc}`);
     }
     if (!c.changelog?.file || !c.changelog?.heading) problems.push(`${where}: missing changelog link`);
+    if (c.advisory && !/^SA-\d{4}-\d{3}$/.test(c.advisory)) problems.push(`${where}: invalid advisory format "${c.advisory}", expected SA-YYYY-NNN`);
     const groups = conditionGroups(c.when ?? {});
     for (const g of groups) {
       if (g.length === 0) problems.push(`${where}: empty condition group`);

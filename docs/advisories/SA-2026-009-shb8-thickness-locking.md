@@ -7,7 +7,7 @@
 | Issue | [#400](https://github.com/lambdaclass/stabileo/issues/400) |
 | Fix | PR [#401](https://github.com/lambdaclass/stabileo/pull/401) (merged 2026-10-19) |
 | Affected versions | every version with the SHB8-ANS solid shell, up to 0.2.0 and `main` until the fix |
-| Re-check registry | to add with the fix |
+| Re-check registry | `shb8-thickness-locking` in web/src/lib/provenance/result-changes.json |
 
 ## Affected features
 

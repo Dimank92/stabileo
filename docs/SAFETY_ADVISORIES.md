@@ -52,7 +52,7 @@ is filed at the highest one.
 | **Release notes** (`docs/releases/vX.Y.Z{,.es,.pt}.md`): a "Safety advisories" section linking each advisory, in English, Spanish and Portuguese | In the release that fixes it | Release manager |
 | **In-app notice**: the release's "your results may have changed" notice (`web/src/lib/release/whats-new.ts`), and the per-project re-check prompt, which shows the advisory to projects that use the affected feature. Each advisory has an entry in the re-check registry, `web/src/lib/provenance/result-changes.json` (PR [#328](https://github.com/lambdaclass/stabileo/pull/328), schema in `docs/verification/PROVENANCE.md`), whose `when` condition is the advisory's "how to tell if your model is affected" | In the release that fixes it | Author of the fix |
 | **GitHub Security Advisory** (repository Security tab) | Critical and High, so that the advisory has a stable public identifier | Maintainers |
-| **Email** | There is no mailing list today. When one exists (opt-in, see [#441](https://github.com/lambdaclass/stabileo/issues/441)), Critical and High advisories are mailed at publication | — |
+| **Email / Feed / Webhook** | Opt-in notification list, security advisory RSS/JSON feed, and GitHub notifications (see [Notification list](#safety-advisory-notification-list-opt-in)). Critical and High advisories mailed on publication | Release manager |
 
 ## Timelines
 
@@ -113,6 +113,66 @@ Every advisory has these sections; the [template](#template) lists them.
 
 ## Credits and references
 ```
+
+## Safety advisory notification list (opt-in)
+
+Structural engineering software defects can affect building safety. To ensure practicing engineers
+and design offices receive immediate notice when an advisory is published, Stabileo provides four
+distinct notification channels for users who opt in:
+
+1. **GitHub Security Alerts & Issue Subscription**:
+   - Engineers can watch the repository on GitHub with notification settings configured to
+     "Custom -> Security alerts", or subscribe to the `safety-advisory` label.
+   - Every advisory is assigned a GitHub Security Advisory (GHSA) for Critical and High severities,
+     providing permanent CVE/GHSA tracking across dependency checkers.
+
+2. **Opt-in Email Notification List**:
+   - Registered users can opt in under Account Settings (`stabileo.com/settings/notifications`) to
+     receive immediate broadcast emails for safety advisories.
+   - **Preference tiers**:
+     - *All advisories*: All published advisories across Critical, High, Medium, and Low.
+     - *Critical and High only* (recommended default for design team leads): Advisories with >10 %
+       unconservative error or missing governing failure modes.
+     - *Project-scoped*: Only advisories whose `when` condition matches features found in the user's
+       saved projects.
+   - **Privacy commitment**: The notification list is dedicated exclusively to engineering safety
+     advisories. No marketing, promotional, or telemetry emails are ever dispatched through this list.
+
+3. **Machine-Readable Feeds (JSON & Atom/RSS)**:
+   - Security feeds are published at `https://stabileo.com/api/advisories/feed.json` and
+     `https://stabileo.com/api/advisories/feed.xml`.
+   - Structural design offices and quality managers can ingest these endpoints directly into
+     automated QA pipelines, Slack/Teams incoming webhooks, or compliance tracking dashboards.
+   - Each entry in the JSON feed provides `id`, `severity`, `title`, `affected_versions`, `fixed_in`,
+     `recheck_registry_id`, and full Markdown text.
+
+4. **In-App Re-Check Prompts (Active Models)**:
+   - Every advisory has an associated entry in `web/src/lib/provenance/result-changes.json`.
+   - When a user opens any existing model solved under an affected version, the application detects
+     matching features via `applicability.ts` and highlights the advisory with concrete instructions
+     on what results to re-verify.
+
+## Release safety checklist
+
+Before tagging and deploying any release (minor, patch, or scheduled wave), the release manager
+must execute the following verification checklist:
+
+- [ ] **100 % Safety Issue Coverage**:
+  - Every closed GitHub issue carrying the `safety` label must have:
+    - a published advisory in `docs/advisories/SA-YYYY-NNN-<slug>.md`, OR
+    - an explicit recorded reason in the issue and in the release notes justifying why no advisory
+      was necessary (e.g. bug was introduced and fixed on unreleased branch, or backlog feature request).
+- [ ] **Timelines Adhered**:
+  - Critical/High advisories are published simultaneously with the release tag (same day).
+- [ ] **Re-Check Registry Sync**:
+  - Every advisory that affects app-accessible models has a corresponding entry in
+    `web/src/lib/provenance/result-changes.json` with matching `advisory` identifier and condition groups.
+- [ ] **Release Notes Inclusion**:
+  - The release notes (`docs/releases/vX.Y.Z{,.es,.pt}.md`) contain a dedicated "Safety advisories"
+    section listing all new advisories in English, Spanish, and Portuguese.
+- [ ] **Automated Verification**:
+  - Run `python scripts/check-safety-advisories.py` to confirm zero broken links, no unresolved
+    placeholders, and valid schema across all advisories.
 
 ## Index
 

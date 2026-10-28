@@ -7,7 +7,7 @@
 | Issue | [#343](https://github.com/lambdaclass/stabileo/issues/343) |
 | Fix | PR [#437](https://github.com/lambdaclass/stabileo/pull/437) (rebase of #274; merged via #507, 2026-10-21) |
 | Affected versions | axial part: deployments from 2026-09-25 (commit `6c196dd0`, "loads in global axes") through 0.2.0 and `main` until the fix; member couples on the 3D path: not yet bisected, up to 0.2.0 |
-| Re-check registry | to add with the fix |
+| Re-check registry | `inclined-member-loads` in web/src/lib/provenance/result-changes.json |
 
 ## Affected features
 

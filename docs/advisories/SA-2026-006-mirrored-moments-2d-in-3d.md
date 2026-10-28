@@ -7,7 +7,7 @@
 | Issue | [#435](https://github.com/lambdaclass/stabileo/issues/435) |
 | Fix | PR [#436](https://github.com/lambdaclass/stabileo/pull/436) (merged via #507, 2026-10-21) |
 | Affected versions | up to 0.2.0 and `main` until the fix; introduction not yet bisected |
-| Re-check registry | to add with the fix |
+| Re-check registry | `mirrored-moments-2d-in-3d` in web/src/lib/provenance/result-changes.json |
 
 ## Affected features
 
