@@ -626,3 +626,271 @@ fn benchmark_reduction_scaled_model() {
     }
     eprintln!("40-elem CB: n_reduced={}, n_modes={}", cb.n_reduced, cb.n_modes_kept);
 }
+
+// ================================================================
+// 8. Multi-Storey Building Floor Superelement Benchmarks (Issue #485)
+// ================================================================
+
+/// Helper to build a 3D multi-storey building frame model.
+/// n_storeys high, 2 bays in X, 2 bays in Y.
+fn building_3d(n_storeys: usize, bay_x: f64, bay_y: f64, storey_h: f64) -> SolverInput3D {
+    let mut nodes = HashMap::new();
+    let mut elements = HashMap::new();
+    let mut supports = HashMap::new();
+
+    let rect = |b: f64, h: f64| (b * h, b * h * h * h / 12.0, h * b * b * b / 12.0, b * h * h * h / 3.0);
+    let (a_col, iy_col, iz_col, j_col) = rect(0.40, 0.40);
+    let (a_bm, iy_bm, iz_bm, j_bm) = rect(0.30, 0.50);
+
+    let mut sections = HashMap::new();
+    sections.insert("1".to_string(), SolverSection3D {
+        id: 1, name: None, a: a_col, iy: iy_col, iz: iz_col, j: j_col, cw: None, as_y: None, as_z: None,
+        shear_center_y: None, shear_center_z: None,
+    });
+    sections.insert("2".to_string(), SolverSection3D {
+        id: 2, name: None, a: a_bm, iy: iy_bm, iz: iz_bm, j: j_bm, cw: None, as_y: None, as_z: None,
+        shear_center_y: None, shear_center_z: None,
+    });
+
+    let mut materials = HashMap::new();
+    materials.insert("1".to_string(), SolverMaterial {
+        id: 1, e: 30_000_000.0, nu: 0.2, // 30 GPa
+    });
+
+    let node_id = |ix: usize, iy: usize, iz: usize| -> usize {
+        iz * 9 + iy * 3 + ix + 1
+    };
+
+    // Nodes: 3x3 grid per level
+    for iz in 0..=n_storeys {
+        let z = iz as f64 * storey_h;
+        for iy in 0..3 {
+            let y = iy as f64 * bay_y;
+            for ix in 0..3 {
+                let x = ix as f64 * bay_x;
+                let id = node_id(ix, iy, iz);
+                nodes.insert(id.to_string(), SolverNode3D { id, x, y, z });
+                if iz == 0 {
+                    supports.insert(id.to_string(), SolverSupport3D {
+                        node_id: id,
+                        rx: true, ry: true, rz: true, rrx: true, rry: true, rrz: true,
+                        kx: None, ky: None, kz: None, krx: None, kry: None, krz: None,
+                        dx: None, dy: None, dz: None, drx: None, dry: None, drz: None,
+                        normal_x: None, normal_y: None, normal_z: None, is_inclined: None, rw: None, kw: None,
+                    });
+                }
+            }
+        }
+    }
+
+    let mut elem_id = 1;
+    // Columns (Section 1)
+    for iz in 0..n_storeys {
+        for iy in 0..3 {
+            for ix in 0..3 {
+                let n1 = node_id(ix, iy, iz);
+                let n2 = node_id(ix, iy, iz + 1);
+                elements.insert(elem_id.to_string(), SolverElement3D {
+                    id: elem_id,
+                    elem_type: "frame".to_string(),
+                    node_i: n1,
+                    node_j: n2,
+                    material_id: 1,
+                    section_id: 1,
+                    release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+                    local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
+                });
+                elem_id += 1;
+            }
+        }
+    }
+
+    // Beams (Section 2) along X and Y
+    for iz in 1..=n_storeys {
+        // X-beams
+        for iy in 0..3 {
+            for ix in 0..2 {
+                let n1 = node_id(ix, iy, iz);
+                let n2 = node_id(ix + 1, iy, iz);
+                elements.insert(elem_id.to_string(), SolverElement3D {
+                    id: elem_id,
+                    elem_type: "frame".to_string(),
+                    node_i: n1,
+                    node_j: n2,
+                    material_id: 1,
+                    section_id: 2,
+                    release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+                    local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
+                });
+                elem_id += 1;
+            }
+        }
+        // Y-beams
+        for ix in 0..3 {
+            for iy in 0..2 {
+                let n1 = node_id(ix, iy, iz);
+                let n2 = node_id(ix, iy + 1, iz);
+                elements.insert(elem_id.to_string(), SolverElement3D {
+                    id: elem_id,
+                    elem_type: "frame".to_string(),
+                    node_i: n1,
+                    node_j: n2,
+                    material_id: 1,
+                    section_id: 2,
+                    release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+                    local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
+                });
+                elem_id += 1;
+            }
+        }
+    }
+
+    // Apply gravity load and lateral wind loads
+    let mut loads = Vec::new();
+    for iz in 1..=n_storeys {
+        for iy in 0..3 {
+            for ix in 0..3 {
+                let nid = node_id(ix, iy, iz);
+                loads.push(SolverLoad3D::Nodal(SolverNodalLoad3D {
+                    node_id: nid,
+                    fx: 15.0 * iz as f64, // Wind in X
+                    fy: 5.0 * iz as f64,  // Wind in Y
+                    fz: -120.0,           // Floor dead + live
+                    mx: 0.0, my: 0.0, mz: 0.0,
+                    bw: None,
+                }));
+            }
+        }
+    }
+
+    SolverInput3D {
+        nodes,
+        materials,
+        sections,
+        elements,
+        supports,
+        loads,
+        constraints: Vec::new(),
+        solver_options: None,
+        masses: Default::default(),
+        left_hand: None,
+        plates: HashMap::new(),
+        quads: HashMap::new(),
+        quad9s: HashMap::new(),
+        solid_shells: HashMap::new(),
+        curved_beams: vec![],
+        curved_shells: HashMap::new(),
+        connectors: HashMap::new(),
+    }
+}
+
+#[test]
+fn building_floor_superelement_static_parity() {
+    let n_storeys = 3;
+    let bldg = building_3d(n_storeys, 6.0, 5.0, 3.5);
+
+    // Solve full building without reduction
+    let full_res = dedaliano_engine::solver::linear::solve_3d(&bldg).expect("Full 3D building solve must succeed");
+
+    // Superelement substructuring:
+    // Retain corner columns and foundation columns as boundary, condense interior floor nodes
+    // Level 0: 1..9 (foundation supports)
+    // Level 1: 10..18
+    // Level 2: 19..27
+    // Level 3: 28..36
+    // Boundary nodes: all columns (1..9, 10, 12, 16, 18, 19, 21, 25, 27, 28, 30, 34, 36)
+    // Interior nodes: center floor nodes (11, 13, 14, 15, 17, 20, 22, 23, 24, 26, 29, 31, 32, 33, 35)
+    let boundary_nodes: Vec<usize> = vec![
+        1, 2, 3, 4, 5, 6, 7, 8, 9,
+        10, 12, 16, 18,
+        19, 21, 25, 27,
+        28, 30, 34, 36
+    ];
+
+    let t0 = std::time::Instant::now();
+    let red_res = guyan_reduce_3d(&GuyanInput3D {
+        solver: bldg.clone(),
+        boundary_nodes: boundary_nodes.clone(),
+    }).expect("3D building floor Guyan reduction must succeed");
+    let red_time = t0.elapsed();
+
+    assert_eq!(red_res.n_boundary, 12 * 6); // 12 free boundary nodes * 6 DOFs (nodes 1..9 are restrained by supports)
+    assert!(red_res.n_interior > 0);
+
+    // Verify exact displacement recovery on all nodes (both boundary and interior)
+    for d_red in &red_res.displacements {
+        let nid = d_red.node_id;
+        let d_full = full_res.displacements.iter().find(|d| d.node_id == nid)
+            .unwrap_or_else(|| panic!("Node {} missing from full solve", nid));
+
+        let tol = 1e-9;
+        assert!((d_red.ux - d_full.ux).abs() < tol, "ux mismatch on node {}: {} vs {}", nid, d_red.ux, d_full.ux);
+        assert!((d_red.uy - d_full.uy).abs() < tol, "uy mismatch on node {}: {} vs {}", nid, d_red.uy, d_full.uy);
+        assert!((d_red.uz - d_full.uz).abs() < tol, "uz mismatch on node {}: {} vs {}", nid, d_red.uz, d_full.uz);
+        assert!((d_red.rx - d_full.rx).abs() < tol, "rx mismatch on node {}: {} vs {}", nid, d_red.rx, d_full.rx);
+        assert!((d_red.ry - d_full.ry).abs() < tol, "ry mismatch on node {}: {} vs {}", nid, d_red.ry, d_full.ry);
+        assert!((d_red.rz - d_full.rz).abs() < tol, "rz mismatch on node {}: {} vs {}", nid, d_red.rz, d_full.rz);
+    }
+
+    // Verify exact reaction recovery
+    for r_red in &red_res.reactions {
+        let nid = r_red.node_id;
+        let r_full = full_res.reactions.iter().find(|r| r.node_id == nid)
+            .unwrap_or_else(|| panic!("Reaction missing on node {}", nid));
+        let tol = 1e-7;
+        assert!((r_red.fx - r_full.fx).abs() < tol, "Fx reaction mismatch on node {}", nid);
+        assert!((r_red.fy - r_full.fy).abs() < tol, "Fy reaction mismatch on node {}", nid);
+        assert!((r_red.fz - r_full.fz).abs() < tol, "Fz reaction mismatch on node {}", nid);
+    }
+
+    // Verify element internal force recovery
+    for ef_red in &red_res.element_forces {
+        let eid = ef_red.element_id;
+        let ef_full = full_res.element_forces.iter().find(|ef| ef.element_id == eid)
+            .unwrap_or_else(|| panic!("Element force missing for element {}", eid));
+        let tol = 1e-6;
+        assert!((ef_red.n_start - ef_full.n_start).abs() < tol, "Axial force mismatch on element {}", eid);
+        assert!((ef_red.vy_start - ef_full.vy_start).abs() < tol, "Vy mismatch on element {}", eid);
+        assert!((ef_red.vz_start - ef_full.vz_start).abs() < tol, "Vz mismatch on element {}", eid);
+        assert!((ef_red.my_start - ef_full.my_start).abs() < tol, "My mismatch on element {}", eid);
+        assert!((ef_red.mz_start - ef_full.mz_start).abs() < tol, "Mz mismatch on element {}", eid);
+    }
+
+    eprintln!("Building 3D Guyan floor reduction successfully recovered all DOFs and forces in {:?}", red_time);
+}
+
+#[test]
+fn building_floor_craig_bampton_dynamics() {
+    let bldg = building_3d(2, 6.0, 5.0, 3.5);
+
+    let mut dens = HashMap::new();
+    dens.insert("1".to_string(), 7.85); // Concrete/steel mass density
+
+    let boundary_nodes: Vec<usize> = vec![1, 3, 7, 9, 10, 12, 16, 18, 19, 21, 25, 27];
+
+    let cb = craig_bampton_3d(&CraigBamptonInput3D {
+        solver: bldg,
+        boundary_nodes: boundary_nodes.clone(),
+        n_modes: 6,
+        densities: dens,
+    }).expect("3D Craig-Bampton reduction must succeed");
+
+    assert_eq!(cb.n_boundary, 8 * 6); // 8 free boundary nodes * 6 DOFs (nodes 1, 3, 7, 9 are restrained by supports)
+    assert_eq!(cb.n_modes_kept, 6);
+    assert_eq!(cb.n_reduced, cb.n_boundary + 6);
+
+    // Verify Craig-Bampton reduced stiffness and mass matrices are positive definite
+    let nr = cb.n_reduced;
+    for i in 0..nr {
+        assert!(cb.k_reduced[i * nr + i] > 0.0, "CB K diagonal {} non-positive", i);
+        assert!(cb.m_reduced[i * nr + i] > -1e-10, "CB M diagonal {} negative", i);
+    }
+
+    // Verify frequencies are positive and ascending
+    for (i, f) in cb.interior_frequencies.iter().enumerate() {
+        assert!(*f > 0.0, "Frequency {} non-positive: {}", i, f);
+        if i > 0 {
+            assert!(*f >= cb.interior_frequencies[i - 1], "Frequencies not monotonic");
+        }
+    }
+}
