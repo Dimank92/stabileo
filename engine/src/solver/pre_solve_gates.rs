@@ -1197,7 +1197,7 @@ pub fn check_rigid_body_restraint_3d(input: &SolverInput3D) -> Vec<StructuredDia
     // rotation axes coupled to the elements at each node
     let mut axes: HashMap<usize, Vec<[f64; 3]>> = HashMap::new();
     let mut connected: HashSet<usize> = HashSet::new();
-    let mut link = |p: &mut Vec<usize>, nodes: &[usize]| -> bool {
+    let link = |p: &mut Vec<usize>, nodes: &[usize]| -> bool {
         if nodes.iter().any(|n| !index.contains_key(n)) {
             return false;
         }
@@ -1490,6 +1490,116 @@ pub fn refuse_broken_elements(diags: &[StructuredDiagnostic]) -> Result<(), Stri
         Some(d) => Err(format!("Invalid model: {}", d.message)),
         None => Ok(()),
     }
+}
+
+/// Refuse a structure with a hinged member connected to an unrestrained leaf (tip) node.
+pub fn check_hinged_free_tip_mechanisms_3d(input: &SolverInput3D) -> Result<(), String> {
+    let mut node_ref_count: HashMap<usize, usize> = HashMap::new();
+    for e in crate::ordered::values(&input.elements) {
+        *node_ref_count.entry(e.node_i).or_default() += 1;
+        *node_ref_count.entry(e.node_j).or_default() += 1;
+    }
+    for p in crate::ordered::values(&input.plates) {
+        for &nid in &p.nodes { *node_ref_count.entry(nid).or_default() += 1; }
+    }
+    for q in crate::ordered::values(&input.quads) {
+        for &nid in &q.nodes { *node_ref_count.entry(nid).or_default() += 1; }
+    }
+    for q9 in crate::ordered::values(&input.quad9s) {
+        for &nid in &q9.nodes { *node_ref_count.entry(nid).or_default() += 1; }
+    }
+    for cs in crate::ordered::values(&input.curved_shells) {
+        for &nid in &cs.nodes { *node_ref_count.entry(nid).or_default() += 1; }
+    }
+    for ss in crate::ordered::values(&input.solid_shells) {
+        for &nid in &ss.nodes { *node_ref_count.entry(nid).or_default() += 1; }
+    }
+    for conn in crate::ordered::values(&input.connectors) {
+        *node_ref_count.entry(conn.node_i).or_default() += 1;
+        *node_ref_count.entry(conn.node_j).or_default() += 1;
+    }
+
+    let supported_nodes: HashSet<usize> = crate::ordered::values(&input.supports)
+        .filter(|s| {
+            s.rx || s.ry || s.rz || s.rrx || s.rry || s.rrz ||
+            s.kx.map_or(false, |k| k > 0.0) ||
+            s.ky.map_or(false, |k| k > 0.0) ||
+            s.kz.map_or(false, |k| k > 0.0) ||
+            s.krx.map_or(false, |k| k > 0.0) ||
+            s.kry.map_or(false, |k| k > 0.0) ||
+            s.krz.map_or(false, |k| k > 0.0)
+        })
+        .map(|s| s.node_id)
+        .collect();
+
+    let is_free_tip = |nid: usize| -> bool {
+        node_ref_count.get(&nid).copied().unwrap_or(0) == 1
+            && !supported_nodes.contains(&nid)
+            && !input.constraints.iter().any(|c| c.references_node(nid))
+    };
+
+    for e in crate::ordered::values(&input.elements) {
+        if e.elem_type != "frame" {
+            continue;
+        }
+        if is_free_tip(e.node_j) {
+            if e.release_my_start || e.release_mz_start || e.release_t_start
+                || e.release_my_end || e.release_mz_end || e.release_t_end
+            {
+                return Err("Singular stiffness matrix — structure is a mechanism".to_string());
+            }
+        }
+        if is_free_tip(e.node_i) {
+            if e.release_my_end || e.release_mz_end || e.release_t_end
+                || e.release_my_start || e.release_mz_start || e.release_t_start
+            {
+                return Err("Singular stiffness matrix — structure is a mechanism".to_string());
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Refuse a 2D structure with a hinged member connected to an unrestrained leaf (tip) node.
+pub fn check_hinged_free_tip_mechanisms_2d(input: &SolverInput) -> Result<(), String> {
+    let mut node_ref_count: HashMap<usize, usize> = HashMap::new();
+    for e in crate::ordered::values(&input.elements) {
+        *node_ref_count.entry(e.node_i).or_default() += 1;
+        *node_ref_count.entry(e.node_j).or_default() += 1;
+    }
+    for conn in crate::ordered::values(&input.connectors) {
+        *node_ref_count.entry(conn.node_i).or_default() += 1;
+        *node_ref_count.entry(conn.node_j).or_default() += 1;
+    }
+
+    let supported_nodes: HashSet<usize> = crate::ordered::values(&input.supports)
+        .filter(|s| {
+            s.support_type != "none" ||
+            s.kx.map_or(false, |k| k > 0.0) ||
+            s.ky.map_or(false, |k| k > 0.0) ||
+            s.kz.map_or(false, |k| k > 0.0)
+        })
+        .map(|s| s.node_id)
+        .collect();
+
+    let is_free_tip = |nid: usize| -> bool {
+        node_ref_count.get(&nid).copied().unwrap_or(0) == 1
+            && !supported_nodes.contains(&nid)
+            && !input.constraints.iter().any(|c| c.references_node(nid))
+    };
+
+    for e in crate::ordered::values(&input.elements) {
+        if e.elem_type != "frame" {
+            continue;
+        }
+        if is_free_tip(e.node_j) && (e.hinge_start || e.hinge_end) {
+            return Err("Singular stiffness matrix — structure is a mechanism".to_string());
+        }
+        if is_free_tip(e.node_i) && (e.hinge_end || e.hinge_start) {
+            return Err("Singular stiffness matrix — structure is a mechanism".to_string());
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

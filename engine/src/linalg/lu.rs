@@ -7,6 +7,15 @@ pub fn lu_factor(a: &mut [f64], n: usize) -> Option<Vec<usize>> {
         piv[i] = i;
     }
 
+    let mut max_entry = 0.0f64;
+    for &x in a.iter() {
+        let ax = x.abs();
+        if ax > max_entry {
+            max_entry = ax;
+        }
+    }
+    let tol = (max_entry * 1e-12).max(1e-14);
+
     // Forward elimination with partial pivoting
     for k in 0..n {
         // Find pivot
@@ -20,7 +29,7 @@ pub fn lu_factor(a: &mut [f64], n: usize) -> Option<Vec<usize>> {
             }
         }
 
-        if max_val < 1e-14 {
+        if max_val < tol {
             return None; // Singular
         }
 

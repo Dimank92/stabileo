@@ -4240,6 +4240,7 @@ fn reject_unimposed_settlements_3d(input: &SolverInput3D) -> Result<(), String> 
 }
 
 pub(crate) fn validate_input_2d(input: &SolverInput) -> Result<(), String> {
+    super::pre_solve_gates::check_hinged_free_tip_mechanisms_2d(input)?;
     // 0. Non-finite input rejection (NaN/Inf). Note: JSON cannot carry NaN, so
     // this primarily protects native/Rust API callers and internally-built inputs.
     for n in crate::ordered::values(&input.nodes) {
@@ -4581,6 +4582,7 @@ fn moment_lost_2d(node: usize, why: &str) -> String {
 }
 
 pub(crate) fn validate_input_3d(input: &SolverInput3D) -> Result<(), String> {
+    super::pre_solve_gates::check_hinged_free_tip_mechanisms_3d(input)?;
     // Left-handed member axes are refused. `compute_local_axes_3d` reverses ey,
     // which makes the triad (ex, ey, ez) improper, but the element kernels assume
     // the right-hand kinematics θz = v', θy = −w': the v–θz and w–θy coupling

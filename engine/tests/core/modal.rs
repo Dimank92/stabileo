@@ -352,3 +352,107 @@ fn modal_2d_refuses_hinged_tip_mechanism_338() {
         err
     );
 }
+
+#[test]
+fn static_3d_refuses_mystran_744196_mechanism_338() {
+    use dedaliano_engine::types::{SolverInput3D, SolverLoad3D, SolverNodalLoad3D};
+    use dedaliano_engine::solver::linear::solve_3d;
+    let json_str = include_str!("../fixtures/model_744196.json");
+    let mut input: SolverInput3D = serde_json::from_str(json_str).unwrap();
+    input.loads.push(SolverLoad3D::Nodal(SolverNodalLoad3D {
+        node_id: 9,
+        fx: 1.0,
+        fy: 0.0,
+        fz: 0.0,
+        mx: 0.0,
+        my: 0.0,
+        mz: 0.0,
+        bw: None,
+    }));
+    let res = solve_3d(&input);
+    assert!(
+        res.is_err(),
+        "Static 3D analysis on model 744196 must refuse, but returned Ok"
+    );
+    let err = res.err().unwrap();
+    assert!(
+        err.contains("Singular stiffness matrix — structure is a mechanism"),
+        "Expected mechanism refusal error, got: {}",
+        err
+    );
+}
+
+#[test]
+fn static_3d_refuses_hinged_tip_mechanism_338() {
+    use dedaliano_engine::types::{SolverLoad3D, SolverNodalLoad3D};
+    use dedaliano_engine::solver::linear::solve_3d;
+    let mut input = make_3d_input(
+        vec![(1, 0.0, 0.0, 0.0), (2, 1.0, 0.0, 0.0), (3, 2.0, 0.0, 0.0)],
+        vec![(1, 200_000.0, 0.3)],
+        vec![(1, 0.01, 1e-4, 1e-4, 2e-4)],
+        vec![
+            (1, "frame", 1, 2, 1, 1),
+            (2, "frame", 2, 3, 1, 1),
+        ],
+        vec![(1, vec![true, true, true, true, true, true])],
+        vec![],
+    );
+    if let Some(e2) = input.elements.get_mut("2") {
+        e2.release_my_start = true;
+    }
+    input.loads.push(SolverLoad3D::Nodal(SolverNodalLoad3D {
+        node_id: 3,
+        fx: 0.0,
+        fy: 1.0,
+        fz: 0.0,
+        mx: 0.0,
+        my: 0.0,
+        mz: 0.0,
+        bw: None,
+    }));
+    let res = solve_3d(&input);
+    assert!(
+        res.is_err(),
+        "Static 3D analysis on a mechanism must refuse, but returned Ok"
+    );
+    let err = res.err().unwrap();
+    assert!(
+        err.contains("Singular stiffness matrix — structure is a mechanism"),
+        "Expected mechanism refusal error, got: {}",
+        err
+    );
+}
+
+#[test]
+fn static_2d_refuses_hinged_tip_mechanism_338() {
+    use dedaliano_engine::types::{SolverLoad, SolverNodalLoad};
+    use dedaliano_engine::solver::linear::solve_2d;
+    let mut input = make_input(
+        vec![(1, 0.0, 0.0), (2, 1.0, 0.0), (3, 2.0, 0.0)],
+        vec![(1, 200_000.0, 0.3)],
+        vec![(1, 0.01, 1e-4)],
+        vec![
+            (1, "frame", 1, 2, 1, 1, false, false),
+            (2, "frame", 2, 3, 1, 1, true, false), // hinge_start = true
+        ],
+        vec![(1, 1, "fixed")],
+        vec![],
+    );
+    input.loads.push(SolverLoad::Nodal(SolverNodalLoad {
+        node_id: 3,
+        fx: 0.0,
+        fz: 1.0,
+        my: 0.0,
+    }));
+    let res = solve_2d(&input);
+    assert!(
+        res.is_err(),
+        "Static 2D analysis on a mechanism must refuse, but returned Ok"
+    );
+    let err = res.err().unwrap();
+    assert!(
+        err.contains("Singular stiffness matrix — structure is a mechanism"),
+        "Expected mechanism refusal error, got: {}",
+        err
+    );
+}

@@ -179,7 +179,7 @@ pub fn solve_modal_2d(
     let n_converged = result.values.len();
     for idx in 0..n_converged {
         let eigenvalue = result.values[idx];
-        if eigenvalue.is_finite() && eigenvalue <= 1e-7 {
+        if eigenvalue.is_finite() && eigenvalue <= 1e-10 {
             return Err("Singular stiffness matrix — structure is a mechanism".to_string());
         }
         // ∞: a massless direction (lumped-mass rotations), not a mode.
@@ -411,7 +411,7 @@ pub fn solve_modal_3d(
     let n_converged = result.values.len();
     for idx in 0..n_converged {
         let eigenvalue = result.values[idx];
-        if eigenvalue.is_finite() && eigenvalue <= 1e-7 {
+        if eigenvalue.is_finite() && eigenvalue <= 1e-10 {
             return Err("Singular stiffness matrix — structure is a mechanism".to_string());
         }
         // ∞: a massless direction (lumped-mass rotations), not a mode.

@@ -1450,6 +1450,18 @@ pub enum Constraint {
     EccentricConnection(EccentricConnectionConstraint),
 }
 
+impl Constraint {
+    pub fn references_node(&self, node_id: usize) -> bool {
+        match self {
+            Constraint::RigidLink(c) => c.master_node == node_id || c.slave_node == node_id,
+            Constraint::Diaphragm(c) => c.master_node == node_id || c.slave_nodes.contains(&node_id),
+            Constraint::LinearMPC(c) => c.terms.iter().any(|t| t.node_id == node_id),
+            Constraint::EqualDOF(c) => c.master_node == node_id || c.slave_node == node_id,
+            Constraint::EccentricConnection(c) => c.master_node == node_id || c.slave_node == node_id,
+        }
+    }
+}
+
 /// Rigid link: slave node follows master node with rigid-body offset.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
