@@ -76,4 +76,15 @@ test.describe('@smoke research', () => {
       expect(m.ar).toBeLessThanOrEqual(m.iw + 1);
     });
   }
+
+  test('the research page uses Plex Sans for Latin text and its Greek and maths subset', async ({ page }) => {
+    await page.goto('/en/research/fracture/shauer-2025/');
+    await page.waitForLoadState('networkidle');
+    const loaded = await page.evaluate(async () => {
+      await document.fonts.ready;
+      return [...document.fonts].filter((f) => f.family.includes('IBM Plex Sans') && f.status === 'loaded').map((f) => f.unicodeRange);
+    });
+    expect(loaded.some((r) => r.includes('U+20-7E'))).toBe(true);
+    expect(loaded.some((r) => r.includes('U+370-3FF'))).toBe(true);
+  });
 });
