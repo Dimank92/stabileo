@@ -596,3 +596,32 @@ fn plastic_3d_frame3d_2_is_a_lower_bound_of_its_certificate() {
     assert!(r.warnings.iter().any(|w| w.contains("no consistent set of active hinges") && w.contains("lower bound")), "{:?}", r.warnings);
     assert!(!r.warnings.iter().any(|w| w.contains("exceeds the yield surface")), "{:?}", r.warnings);
 }
+
+/// Issue #759: 3D modal analysis returns modes that are not mass-orthogonal (one mode returned twice)
+#[test]
+fn modal_3d_mass_orthogonality_regression_759() {
+    let p = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metamorphic_corpus/feature_matrix/3d-warping-torsion-restrained-cantilever-with.json");
+    let text = std::fs::read_to_string(p).unwrap();
+    let s: SolverInput3D = serde_json::from_str(&text).unwrap();
+    let c = crate::case::Case3::new("cantilever", s);
+    let cond = dedaliano_engine::metamorphic::conditioning::of_3d(&c.s).unwrap();
+    let v = crate::modal_checks::check_3d(&c.s, &c.dens, &cond);
+    assert!(matches!(v, crate::tally::Verdict::Pass(_)), "Warping cantilever modal orthogonality failed: {:?}", v);
+
+    let (s_fuzz, dens_fuzz) = crate::corpus::fuzz_models::random_3d_model_rich(20754);
+    let cond_fuzz = dedaliano_engine::metamorphic::conditioning::of_3d(&s_fuzz).unwrap();
+    let v_fuzz = crate::modal_checks::check_3d(&s_fuzz, &dens_fuzz, &cond_fuzz);
+    assert!(matches!(v_fuzz, crate::tally::Verdict::Pass(_)), "fuzz_rich_3d/20754 modal orthogonality failed: {:?}", v_fuzz);
+
+    // Also check other fuzz seeds around 20754 to verify stability
+    for sd in 20754..20760 {
+        let (s_fuzz, dens_fuzz) = crate::corpus::fuzz_models::random_3d_model_rich(sd);
+        if let Ok(cond_fuzz) = dedaliano_engine::metamorphic::conditioning::of_3d(&s_fuzz) {
+            let v_fuzz = crate::modal_checks::check_3d(&s_fuzz, &dens_fuzz, &cond_fuzz);
+            assert!(
+                !matches!(v_fuzz, crate::tally::Verdict::Fail(_)),
+                "fuzz_rich_3d/{} modal orthogonality failed: {:?}", sd, v_fuzz
+            );
+        }
+    }
+}

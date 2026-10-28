@@ -5,7 +5,7 @@
 //! (engine/tests/fuzz_models).
 
 #[path = "../fuzz_models/mod.rs"]
-mod fuzz_models;
+pub(crate) mod fuzz_models;
 
 use crate::case::{Case2, Case3};
 use dedaliano_engine::types::*;
