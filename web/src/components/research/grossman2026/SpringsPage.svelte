@@ -119,7 +119,7 @@
   let pane: HTMLElement;
   onMount(() => {
     // Deep links: #edit opens the editor tab; ?eta=… (foam) sets the disorder and skips the sweep
-    // (also how the gallery thumbnail is rendered, see scripts/research-thumbs-grossman.mjs).
+    // (also how the gallery thumbnail is rendered: scripts/research-thumbs.mjs with thumbnailQuery).
     const q = new URLSearchParams(window.location.search);
     const qEta = Number(q.get('eta'));
     const deepLinked = q.has('eta') && Number.isFinite(qEta) && qEta >= 0 && qEta <= 0.5;
