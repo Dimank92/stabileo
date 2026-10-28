@@ -192,6 +192,11 @@ pub fn check_3d(s: &SolverInput3D, dens: &HashMap<String, f64>, cond: &Condition
                     v[i] = val;
                 }
             }
+            if let Some(w) = d.warping {
+                if let Some(i) = dof.global_dof(d.node_id, 6) {
+                    v[i] = w;
+                }
+            }
         }
         phi.push(v);
     }

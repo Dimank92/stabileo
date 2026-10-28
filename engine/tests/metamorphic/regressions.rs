@@ -596,3 +596,18 @@ fn plastic_3d_frame3d_2_is_a_lower_bound_of_its_certificate() {
     assert!(r.warnings.iter().any(|w| w.contains("no consistent set of active hinges") && w.contains("lower bound")), "{:?}", r.warnings);
     assert!(!r.warnings.iter().any(|w| w.contains("exceeds the yield surface")), "{:?}", r.warnings);
 }
+
+
+/// Issue #760: Linear time history violates reciprocity on some models (up to 33x between i<-j and j<-i)
+#[test]
+fn time_history_reciprocity_fuzz_20843_repro() {
+    let cases = crate::corpus::cases_2d(crate::corpus::Tier::Nightly, 20754);
+    let c = cases.iter().find(|c| c.name == "fuzz_rich_2d/20843").unwrap();
+    let tally = crate::tally::Tally::default();
+    let ctx = crate::checks2::Ctx { tally: &tally, rng_seed: 20754 };
+    let a_th: Vec<_> = crate::ana2::rows().into_iter().filter(|a| a.name == "time history").collect();
+    crate::checks2::check_case(&ctx, c, &a_th, crate::INV_2D);
+    let failures = tally.failures();
+    println!("Failures on fuzz_rich_2d/20843: {:#?}", failures);
+    assert!(failures.is_empty(), "Failures: {:#?}", failures);
+}
