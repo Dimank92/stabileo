@@ -364,6 +364,27 @@ fn de_ratio<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f64, D::Error> {
     Ok(v.unwrap_or(f64::INFINITY))
 }
 
+/// CIRSOC 301 checks stay labelled experimental until an independent licensed engineer
+/// has completed and recorded a peer review (Roadmap: Release safety #389).
+pub const CIRSOC301_EXPERIMENTAL: bool = true;
+
+/// Record of independent peer review for CIRSOC 301 checks.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Cirsoc301ReviewRecord {
+    pub reviewer: String,
+    pub license: Option<String>,
+    pub date: String,
+    pub review_notes: String,
+}
+
+/// The recorded peer review of CIRSOC 301 checks. None until an independent
+/// licensed engineer reviews and signs off on the implementation.
+pub const CIRSOC301_REVIEW: Option<Cirsoc301ReviewRecord> = None;
+
+fn default_experimental() -> bool {
+    CIRSOC301_EXPERIMENTAL && CIRSOC301_REVIEW.is_none()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Cirsoc301CheckResult {
@@ -388,6 +409,9 @@ pub struct Cirsoc301CheckResult {
     pub governing_check: String,
     /// Every check run passed (ratio ≤ 1) and none was refused under load.
     pub pass: bool,
+    /// Whether this check result is experimental (unreviewed by an independent licensed engineer).
+    #[serde(default = "default_experimental")]
+    pub experimental: bool,
     /// Names of the loaded checks that could not be evaluated.
     pub unevaluated: Vec<String>,
 }
@@ -1959,6 +1983,7 @@ pub fn check_member_with(m: &Cirsoc301MemberData, f: &Cirsoc301DesignForces, tra
         unity_ratio: unity,
         governing_check: gov.into(),
         pass,
+        experimental: CIRSOC301_EXPERIMENTAL && CIRSOC301_REVIEW.is_none(),
         unevaluated,
     }
 }

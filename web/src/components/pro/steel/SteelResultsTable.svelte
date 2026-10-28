@@ -118,7 +118,15 @@
             <td>{r.section}</td>
             <td>{t(`steel.results.check.${r.governing}`)}</td>
             <td class="num" data-testid="steel-result-ratio-{r.id}">{pct(r.ratio)}</td>
-            <td><span class="st st-{r.status}" data-testid="steel-result-status-{r.id}">{t(`steel.results.status.${r.status}`)}</span></td>
+            <td>
+              {#if r.status === 'pass'}
+                <span class="st st-proven" data-testid="steel-result-status-{r.id}">
+                  {r.proven ? t('steel.results.proven') : t('steel.status.EXPERIMENTAL')}
+                </span>
+              {:else}
+                <span class="st st-{r.status}" data-testid="steel-result-status-{r.id}">{t(`steel.results.status.${r.status}`)}</span>
+              {/if}
+            </td>
             <td>
               {#if r.proven}
                 <span class="badge" data-testid="steel-result-proven-{r.id}" title={t('steel.results.provenHint')}>
@@ -146,7 +154,11 @@
                       <td class="num">{c.status === 'notEvaluated' ? '—' : c.capacity}</td>
                       <td class="num">{pct(c.ratio)}</td>
                       <td>
-                        <span class="st st-{c.status}">{t(`steel.results.status.${c.status}`)}</span>
+                        {#if c.status === 'pass'}
+                          <span class="st st-proven">{t('steel.results.proven')}</span>
+                        {:else}
+                          <span class="st st-{c.status}">{t(`steel.results.status.${c.status}`)}</span>
+                        {/if}
                         {#if c.reason}<span class="why" data-testid="steel-check-why-{r.id}-{c.key}"> — {te(c.reason)}</span>{/if}
                       </td>
                     </tr>
@@ -176,7 +188,7 @@
   .num { font-family: var(--st-mono); text-align: right; white-space: nowrap; }
   .ne, .st-notEvaluated, .why { color: var(--st-warn); }
   .st-fail { color: var(--st-danger, var(--st-warn)); font-weight: 600; }
-  .st-pass { color: var(--st-text-2); }
+  .st-proven, .st-experimental, .st-pass { color: var(--st-text-2); }
   .badge { font-family: var(--st-mono); font-size: 0.6rem; border: 1px solid var(--st-border); border-radius: 3px; padding: 0 4px; color: var(--st-text-2); }
   .dim { color: var(--st-text-3); font-size: 0.6rem; }
   .link { background: none; border: none; color: var(--st-accent); cursor: pointer; font-size: 0.62rem; padding: 0; text-decoration: underline; }

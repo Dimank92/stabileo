@@ -1,6 +1,7 @@
 /**
  * Steel visible in the design: a steel beam's CIRSOC 301 utilisation reaches the verification
  * store, so the design table and the 3D view read it as they read a concrete member's.
+ * Under Release safety #389, steel results stay labelled experimental (no pass styling).
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { historyStore, modelStore, resultsStore, uiStore } from '../index';
@@ -34,7 +35,9 @@ describe('the steel check in the design', () => {
     const low = ratioUnder(2), high = ratioUnder(20);
     expect(low.u).toBeGreaterThan(0);
     expect(high.u).toBeGreaterThan(low.u * 5);
-    expect(low.s).toBe('ok');
+    // Release safety #389: steel results stay labelled experimental (no pass styling)
+    expect(low.s).not.toBe('ok');
+    expect(low.s).toBe('warn');
     expect(['warn', 'fail']).toContain(high.s);
   });
 });

@@ -579,3 +579,16 @@ fn certify_members_over_demand_boxes() {
     let res = certify_cirsoc301_members(&CertifiedCirsoc301CheckInput { members: vec![bad], demands: vec![d(-100.0, 10.0)] });
     assert!(!res[0].certified && !res[0].certified_ok);
 }
+
+#[test]
+fn steel_results_stay_labelled_experimental_until_independent_review() {
+    // Release safety #389: CIRSOC 301 checks stay labelled experimental
+    // until an independent engineer has reviewed the checks.
+    assert!(CIRSOC301_EXPERIMENTAL, "CIRSOC 301 results must stay labelled experimental");
+    assert!(CIRSOC301_REVIEW.is_none(), "Independent review is not yet recorded");
+
+    let m = ipn180(json!({"tensionConnection": {"allElementsConnected": true}}));
+    let f = Cirsoc301DesignForces { element_id: 1, nu: 50.0, mu_strong: 10.0, mu_weak: 0.0, vu: 5.0 };
+    let res = check_member(&m, &f);
+    assert!(res.experimental, "Member check result must be flagged experimental: {res:?}");
+}

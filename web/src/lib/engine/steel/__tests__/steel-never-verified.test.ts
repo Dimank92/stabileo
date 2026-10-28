@@ -17,12 +17,13 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { STEEL_MEMBER_STATUSES } from '../steel-status';
 import steelEn from '../../../i18n/locales/steel/en';
 import steelEs from '../../../i18n/locales/steel/es';
 import steelPt from '../../../i18n/locales/steel/pt';
 
-const SRC = new URL('../../../..', import.meta.url).pathname;
+const SRC = fileURLToPath(new URL('../../../..', import.meta.url));
 const read = (p: string) => readFileSync(join(SRC, p), 'utf8');
 
 /**

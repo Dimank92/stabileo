@@ -28,8 +28,9 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const SRC = new URL('../..', import.meta.url).pathname;
+const SRC = fileURLToPath(new URL('../..', import.meta.url));
 const read = (p: string) => readFileSync(join(SRC, p), 'utf8');
 
 /** Every component under a directory, so a metallic screen added later is covered by default. */

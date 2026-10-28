@@ -8,6 +8,7 @@
  * surface colours by.
  */
 import type { SteelVerification } from '../codes/argentina/cirsoc301';
+import { steelAllowsPassStyling } from './steel-status';
 
 export function steelUtilization(v: SteelVerification): number {
   const ratios = [v.tension?.ratio, v.compression?.ratio, v.flexureZ?.ratio, v.flexureY?.ratio, v.shear?.ratio, v.shearWeak?.ratio, v.interaction?.ratio]
@@ -19,7 +20,14 @@ export function steelUtilization(v: SteelVerification): number {
  * The member's local status from its CIRSOC 301 checks, in the words every design surface reads:
  * its verdict (`overallStatus`), with `held` (a limit state not evaluated, or a verdict that
  * depends on an undeclared datum) as `unavailable`, never as a pass or a failure.
+ *
+ * Release safety (#389): Steel results stay labelled experimental ("Proven bound", no pass styling)
+ * until an independent engineer has reviewed the CIRSOC 301 checks.
  */
 export function steelMemberStatus(v: SteelVerification): 'ok' | 'warn' | 'fail' | 'unavailable' {
-  return v.overallStatus === 'held' ? 'unavailable' : v.overallStatus;
+  if (v.overallStatus === 'held') return 'unavailable';
+  if (v.overallStatus === 'ok' || v.overallStatus === ('pass' as never)) {
+    return steelAllowsPassStyling() ? 'ok' : 'warn';
+  }
+  return v.overallStatus;
 }

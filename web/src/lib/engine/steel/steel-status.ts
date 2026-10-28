@@ -161,3 +161,39 @@ export function steelStatusGlyph(status: SteelMemberStatus): string {
 export function steelStatusLabelKey(status: SteelMemberStatus): string {
   return `steel.status.${status}`;
 }
+
+/**
+ * Release safety flag (Roadmap: Release safety #389).
+ *
+ * Steel results stay labelled experimental ("Proven bound", no pass styling)
+ * until an independent engineer has reviewed the CIRSOC 301 checks.
+ */
+export const STEEL_RESULTS_EXPERIMENTAL: boolean = true;
+
+/**
+ * Record of independent review.
+ * Must be populated with reviewer details, date, and review artifact
+ * before `STEEL_RESULTS_EXPERIMENTAL` can be set to false.
+ */
+export interface SteelReviewRecord {
+  reviewedBy: string;
+  licenseNumber?: string;
+  date: string;
+  reviewArtifact: string;
+  notes: string;
+}
+
+/**
+ * The recorded independent review of CIRSOC 301 checks.
+ * Null until an independent licensed engineer completes and records the review.
+ */
+export const CIRSOC301_INDEPENDENT_REVIEW: SteelReviewRecord | null = null;
+
+/**
+ * Whether steel results may render with pass styling.
+ * Guaranteed to return false while STEEL_RESULTS_EXPERIMENTAL is true or review is null.
+ */
+export function steelAllowsPassStyling(): boolean {
+  if (STEEL_RESULTS_EXPERIMENTAL) return false;
+  return CIRSOC301_INDEPENDENT_REVIEW !== null;
+}
