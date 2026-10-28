@@ -11,6 +11,8 @@ export type Experiment = {
   thumbnail: string;
   /** What the thumbnail shows (its alt text). */
   thumbnailAlt: string;
+  /** The page's query that sets up the thumbnail's view (step, mesh, view...); rendered at build time. */
+  thumbnailQuery: string;
   code: string;
   /** The page embeds the Stabileo editor with the experiment's model (opened by `#edit`). */
   editor?: boolean;
@@ -24,6 +26,7 @@ export const EXPERIMENTS: Experiment[] = [
     hook: 'Pull a notched plate apart and watch an AT2 phase-field crack form and run, solved in your browser and checked step by step against the author’s code.',
     thumbnail: 'research-thumbs/shauer-2025.webp',
     thumbnailAlt: 'Damage field from our run of the experiment',
+    thumbnailQuery: 'step=70&mesh=0&view=plate&deformed=1',
     code: 'https://github.com/lambdaclass/stabileo/tree/main/research/fracture/shauer-2025',
   },
   {
@@ -33,10 +36,14 @@ export const EXPERIMENTS: Experiment[] = [
     hook: 'Shake the nodes of a triangular lattice of springs until it widens when pulled: a truss network solved in your browser, against the paper’s published numbers.',
     thumbnail: 'research-thumbs/grossman-2026.webp',
     thumbnailAlt: 'The auxetic spring network (eta = 0.5) from our run, bars coloured by axial force on the deformed strip',
+    thumbnailQuery: 'eta=0.5&thumb',
     editor: true,
     code: 'https://github.com/lambdaclass/stabileo/tree/main/research/metamaterials/grossman-2026',
   },
 ];
+
+/** The "Coming next" row; set false to hide it. */
+export const SHOW_COMING_NEXT = true;
 
 export type Upcoming = { name: string; field: string; note: string };
 
