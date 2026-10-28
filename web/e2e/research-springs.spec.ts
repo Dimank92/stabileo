@@ -24,7 +24,7 @@ test.describe('@smoke research springs', () => {
   test('the embedded editor solves the same strip with the production engine', async ({ page }) => {
     await page.goto('/en/research/metamaterials/grossman-2026/?e2e=1');
     await expect.poll(async () => Number(await page.locator('.sp-viewer').getAttribute('data-nodes')), { timeout: 30_000 }).toBeGreaterThan(500);
-    await page.getByRole('tab', { name: 'Experiment' }).click(); // stops the sweep: the strip stays put
+    await page.getByRole('button', { name: 'Pause sweep' }).click(); // the strip stays put
     await page.getByRole('tab', { name: 'Edit in Stabileo' }).click();
     await expect(page.locator('iframe[title="Stabileo editor (production engine)"]')).toBeVisible();
     const editor = () => page.frames().find((f) => f.url().includes('/app/basic'));

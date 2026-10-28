@@ -15,6 +15,7 @@
   import ExperimentShell from '../shell/ExperimentShell.svelte';
   import ExperimentLink from '../shell/ExperimentLink.svelte';
   import StabileoViewer from '../shell/StabileoViewer.svelte';
+  import PaneTabs from '../shell/PaneTabs.svelte';
   import { publicI18n } from '../../../lib/i18n/store.svelte';
   import { Playback, SOURCE_LABEL } from '../shell/playback.svelte';
   import PlotXY, { type PlotSeries } from './PlotXY.svelte';
@@ -168,6 +169,9 @@
     setParams(p: Record<string, number | string | boolean>) {
       apply(p as Parameters<typeof apply>[0]);
     },
+    showTab(t: string) {
+      if (t === 'experiment' || t === 'edit') showTab(t);
+    },
   };
   const passed = validation.checks.filter((c) => c.passed).length;
 
@@ -300,6 +304,11 @@
 
   // ---- the Stabileo editor, embedded (loaded only when its tab is opened) -------------------
   let tab = $state<'experiment' | 'edit'>('experiment');
+  // PaneTabs binds a plain string; any switch counts as the visitor taking over.
+  let tabId = $state<string>('experiment');
+  $effect(() => {
+    if (tabId !== tab) showTab(tabId === 'edit' ? 'edit' : 'experiment');
+  });
   let editorSrc = $state<string | null>(null);
   let editorLoading = $state(false);
   let editorStrip = $state.raw<StripResult | null>(null);
@@ -325,6 +334,7 @@
   function showTab(t: 'experiment' | 'edit') {
     touch();
     tab = t;
+    tabId = t;
   }
   // The embedded editor needs the page's width (the app switches to its phone layout below 768 px):
   // while it is shown, the shell's grid is one column with the app first.
@@ -337,13 +347,6 @@
   $effect(() => {
     if (tab === 'edit' && strip && !editorSrc && !editorLoading) void loadEditor();
   });
-  function tabKey(e: KeyboardEvent) {
-    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-    e.preventDefault();
-    const next = tab === 'experiment' ? 'edit' : 'experiment';
-    showTab(next);
-    document.getElementById(next === 'edit' ? 'sp-tab-edit' : 'sp-tab-exp')?.focus();
-  }
   async function openFullEditor() {
     if (!strip) return;
     const w = window.open('about:blank', '_blank');
@@ -358,7 +361,10 @@
   paperId="grossman-2026"
   name="Auxetic spring networks"
   lead="Pull a strip of Hookean springs and read how much it narrows. Shake the nodes of the triangular lattice and it starts to widen instead: it becomes auxetic. The network on the right is solved in your browser as a truss on Stabileo’s engine, and the same strip opens in the real Stabileo editor. No reference code is public (“available at request”), so we compare with the paper’s published numbers, closed forms and figures, and with exact results."
-  checks={{ passed, total: validation.checks.length }}
+  verification={{
+    reference: { kind: 'none', why: 'None is public: the authors’ code is “available at request”' },
+    published: { kind: 'checks', passed, total: validation.checks.length, href: '#checks' },
+  }}
   {actions}
   sourcePath="research/metamaterials/grossman-2026"
 >
@@ -485,13 +491,10 @@
   {#snippet app()}
       <div class="sp-app" bind:this={pane}>
         <div class="sp-tabbar">
-          <div class="sp-tabs" role="tablist" aria-label="Experiment or editor">
-            <button role="tab" id="sp-tab-exp" aria-controls="sp-panel-exp" aria-selected={tab === 'experiment'} tabindex={tab === 'experiment' ? 0 : -1} class:on={tab === 'experiment'} onclick={() => showTab('experiment')} onkeydown={tabKey}>Experiment</button>
-            <button role="tab" id="sp-tab-edit" aria-controls="sp-panel-edit" aria-selected={tab === 'edit'} tabindex={tab === 'edit' ? 0 : -1} class:on={tab === 'edit'} onclick={() => showTab('edit')} onkeydown={tabKey}>Edit in Stabileo</button>
-          </div>
+          <PaneTabs tabs={[{ id: 'experiment', label: 'Experiment' }, { id: 'edit', label: 'Edit in Stabileo' }]} bind:active={tabId} />
           <button class="sp-full" type="button" onclick={openFullEditor} disabled={!strip}>Open full editor ↗</button>
         </div>
-          <div class="sp-editor" role="tabpanel" id="sp-panel-edit" aria-labelledby="sp-tab-edit" hidden={tab !== 'edit'}>
+          <div class="sp-editor" role="tabpanel" id="rs-panel-edit" aria-labelledby="rs-tab-edit" hidden={tab !== 'edit'}>
             <p class="sp-source">
               Stabileo editor (production engine): this strip as an ordinary truss, end rows pinned, the far end moved by the imposed strain. Edit and press Solve. Bar forces are
               1000 × the experiment’s (E·A/L = 1000 k kN/m).{#if prestress > 0} Prestress is not carried over.{/if}
@@ -505,7 +508,7 @@
               {/if}
             </div>
           </div>
-        <div role="tabpanel" id="sp-panel-exp" aria-labelledby="sp-tab-exp" hidden={tab !== 'experiment'}>
+        <div role="tabpanel" id="rs-panel-experiment" aria-labelledby="rs-tab-experiment" hidden={tab !== 'experiment'}>
         <p class="sp-source" aria-live="polite">
           {#if loadError}
             <span class="warnt">The simulation bundle is not part of this build ({loadError}). Build it with research/metamaterials/grossman-2026/wasm/build.sh.</span>
@@ -724,26 +727,6 @@
     font: 12px var(--lp-mono);
     color: var(--fg-2);
     text-align: right;
-  }
-  .sp-tabs {
-    display: flex;
-    gap: 0.25rem;
-    align-items: center;
-  }
-  .sp-tabs [role='tab'] {
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    color: var(--fg-2);
-    padding: 0.45rem 0.75rem;
-    font: inherit;
-    font-size: 0.9rem;
-    white-space: nowrap;
-    cursor: pointer;
-  }
-  .sp-tabs [role='tab'].on {
-    color: var(--fg);
-    border-bottom-color: var(--accent, #e8613c);
   }
   .sp-full {
     margin-left: auto;
