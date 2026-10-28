@@ -8,7 +8,7 @@ import { test, expect } from '@playwright/test';
  *   npx playwright test --grep "@smoke research"
  */
 test.describe('@smoke research', () => {
-  test('the gallery lists the catalogue and links to the experiment', async ({ page }) => {
+  test('the gallery shows the runnable experiment first, then the list, and links to the experiment', async ({ page }) => {
     await page.goto('/en/research/');
     await expect(page.getByRole('heading', { name: 'Stabileo Research' })).toBeVisible();
     expect(await page.locator('.rs-g-card').count()).toBeGreaterThanOrEqual(10);

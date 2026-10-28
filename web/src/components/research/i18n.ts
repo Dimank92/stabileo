@@ -9,7 +9,7 @@ const STRINGS = {
     runIt: 'Run it',
     comingNext: 'Coming next',
     inProgress: 'in progress',
-    catalog: 'Catalogue',
+    catalog: 'On our list: papers we plan to reproduce',
     field: 'Field',
     status: 'Status',
     all: 'All',
@@ -22,6 +22,7 @@ const STRINGS = {
     checksPass: 'checks pass',
     notCompared: 'Published figures not compared',
     research: 'Research',
+    suggest: 'Suggest a paper to reproduce →',
   },
   es: {
     sourceLabel: { 'crossref-abstract': 'a partir del resumen', 'publisher-abstract': 'a partir del resumen', 'repository-readme': 'a partir del README del código', 'full-text': 'a partir del artículo', 'reference-code': 'a partir del código de referencia' },
@@ -30,7 +31,7 @@ const STRINGS = {
     runIt: 'Ejecutalo',
     comingNext: 'Próximamente',
     inProgress: 'en curso',
-    catalog: 'Catálogo',
+    catalog: 'En nuestra lista: artículos que planeamos reproducir',
     field: 'Área',
     status: 'Estado',
     all: 'Todos',
@@ -43,6 +44,7 @@ const STRINGS = {
     checksPass: 'controles aprobados',
     notCompared: 'Sin comparar con las figuras publicadas',
     research: 'Investigación',
+    suggest: 'Sugerí un artículo para reproducir →',
   },
   pt: {
     sourceLabel: { 'crossref-abstract': 'a partir do resumo', 'publisher-abstract': 'a partir do resumo', 'repository-readme': 'a partir do README do código', 'full-text': 'a partir do artigo', 'reference-code': 'a partir do código de referência' },
@@ -51,7 +53,7 @@ const STRINGS = {
     runIt: 'Execute',
     comingNext: 'Em breve',
     inProgress: 'em andamento',
-    catalog: 'Catálogo',
+    catalog: 'Na nossa lista: artigos que planejamos reproduzir',
     field: 'Área',
     status: 'Status',
     all: 'Todos',
@@ -64,6 +66,7 @@ const STRINGS = {
     checksPass: 'verificações aprovadas',
     notCompared: 'Sem comparar com as figuras publicadas',
     research: 'Pesquisa',
+    suggest: 'Sugira um artigo para reproduzir →',
   },
 } as const;
 

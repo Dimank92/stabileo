@@ -26,6 +26,9 @@ export const EXPERIMENTS: Experiment[] = [
   },
 ];
 
+/** The "Coming next" row; set false to hide it. */
+export const SHOW_COMING_NEXT = true;
+
 export type Upcoming = { name: string; field: string; note: string };
 
 export const COMING_NEXT: Upcoming[] = [
