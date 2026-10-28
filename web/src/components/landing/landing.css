@@ -1671,7 +1671,11 @@
 .landing .footer-links button {
   background: none;
   border: 0;
-  padding: 0;
+  /* At least 24 px tall (WCAG 2.5.8); the links measured 23 px. */
+  padding: 0.25rem 0;
+  min-height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
   cursor: pointer;
   font-family: var(--lp-sans);
   font-size: 0.9rem;
