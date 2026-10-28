@@ -144,6 +144,18 @@ const BLOG_LEAD = new Map<string, string>();
 /** A post's publication day, for its feed entry and its card. */
 const POST_DATE = new Map<string, string>();
 
+/** The languages always written; the others count for a post or standing page only once its translation file exists. */
+const BASE_LOCALES: readonly Locale[] = ['en', 'es', 'pt'];
+
+/** The languages a public path is written in, which are the only ones the sitemap and the feeds publish it under. */
+function writtenIn(path: string): Locale[] {
+  if (path === '/' || path === '/blog') return [...LOCALES];
+  const id = path.startsWith('/blog/') ? path.slice('/blog/'.length) : `page-${path.slice(1)}`;
+  return LOCALES.filter(
+    (l) => BASE_LOCALES.includes(l) || existsSync(join(ROOT, `src/lib/blog/translations/${l}/${id}.ts`)),
+  );
+}
+
 /** What a captured post says about itself, read back from its own <head>: the feed and the card use it. */
 type PostHead = { path: string; locale: Locale; title: string; description: string };
 
@@ -171,7 +183,7 @@ function headMeta(head: string, attr: string, name: string): string | undefined 
  */
 function feedXml(locale: Locale, posts: PostHead[]): string {
   const items = posts
-    .filter((p) => p.locale === locale)
+    .filter((p) => p.locale === locale && writtenIn(p.path).includes(locale))
     .sort((a, b) => (POST_DATE.get(b.path) ?? '').localeCompare(POST_DATE.get(a.path) ?? ''))
     .map((p) => {
       const url = `${ORIGIN}/${locale}${p.path}/`;
@@ -388,12 +400,12 @@ async function main() {
       join(DIST, 'sitemap.xml'),
       `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n` +
         LOCALES.flatMap((locale) =>
-          paths.map((path) => {
+          paths.filter((path) => writtenIn(path).includes(locale)).map((path) => {
             // Trailing slash, matching the canonical the page declares — see
             // publicHref in src/lib/i18n/public-routes.ts. Without it every
             // entry in this file was a URL that answers 301.
             const loc = `${ORIGIN}/${locale}${path === '/' ? '' : path}/`;
-            const alts = LOCALES.map(
+            const alts = writtenIn(path).map(
               (l) =>
                 `    <xhtml:link rel="alternate" hreflang="${l}" href="${ORIGIN}/${l}${path === '/' ? '' : path}/"/>`,
             ).join('\n');
