@@ -316,6 +316,9 @@ pub fn solve_pdelta_2d_on(
     }
     for it in its { rotate_inclined_f_2d(&mut u_prev, &it.dofs, &it.r); }
 
+    let u_lin_norm = u_prev[..nf].iter().map(|x| x * x).sum::<f64>().sqrt();
+    let u_tot_norm = u_prev.iter().map(|x| x * x).sum::<f64>().sqrt();
+    let u_scale_ref = if u_lin_norm > u_tot_norm * f64::EPSILON { u_lin_norm } else { u_tot_norm };
     let mut state = Iteration { u: u_prev.clone(), iterations: 0, converged: false, indefinite: false };
     let mut symbolic = None;
     for iter in 0..max_iter {
@@ -332,7 +335,9 @@ pub fn solve_pdelta_2d_on(
         let diff = u[..nf].iter().zip(&state.u[..nf]).map(|(a, b)| (a - b).powi(2)).sum::<f64>().sqrt();
         let norm = u[..nf].iter().map(|x| x * x).sum::<f64>().sqrt();
         state.u[..nf].copy_from_slice(&u[..nf]);
-        if (norm == 0.0 && diff == 0.0) || (norm > 1e-20 && diff / norm < tolerance) {
+        let scale = norm.max(u_scale_ref);
+        let effective_tol = tolerance.max(1e-11);
+        if diff == 0.0 || (scale > 0.0 && diff <= effective_tol * scale) {
             state.converged = true;
             break;
         }
@@ -581,6 +586,9 @@ fn solve_pdelta_3d_on(input: &SolverInput3D, dof_num: &DofNumbering, cs: Option<
         }
     }
     for it in its { rotate_inclined_f_3d(&mut u_prev, &it.dofs, &it.r); }
+    let u_lin_norm = u_prev[..nf].iter().map(|x| x * x).sum::<f64>().sqrt();
+    let u_tot_norm = u_prev.iter().map(|x| x * x).sum::<f64>().sqrt();
+    let u_scale_ref = if u_lin_norm > u_tot_norm * f64::EPSILON { u_lin_norm } else { u_tot_norm };
     let mut state = Iteration { u: u_prev.clone(), iterations: 0, converged: false, indefinite: false };
     let mut symbolic = None;
     for iter in 0..max_iter {
@@ -595,7 +603,9 @@ fn solve_pdelta_3d_on(input: &SolverInput3D, dof_num: &DofNumbering, cs: Option<
         let diff = u[..nf].iter().zip(&state.u[..nf]).map(|(a,b)| (a-b).powi(2)).sum::<f64>().sqrt();
         let norm = u[..nf].iter().map(|x| x*x).sum::<f64>().sqrt();
         state.u[..nf].copy_from_slice(&u[..nf]);
-        if (norm == 0.0 && diff == 0.0) || (norm > 1e-20 && diff / norm < tolerance) { state.converged = true; break; }
+        let scale = norm.max(u_scale_ref);
+        let effective_tol = tolerance.max(1e-11);
+        if diff == 0.0 || (scale > 0.0 && diff <= effective_tol * scale) { state.converged = true; break; }
     }
     let u_global = to_global_3d(&state.u, its);
     let b2 = stability_b2(state.indefinite, b2_factor(dof_num, 3, &to_global_3d(&u_prev, its), &u_global));

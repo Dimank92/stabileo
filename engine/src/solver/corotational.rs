@@ -227,14 +227,15 @@ pub fn solve_corotational_2d(
 
             let r_norm: f64 = r_check.iter().map(|v| v * v).sum::<f64>().sqrt();
             let f_norm: f64 = f_check.iter().map(|v| v * v).sum::<f64>().sqrt();
-
-            let rel_error = if f_norm > 1e-30 {
-                r_norm / f_norm
+            let f_total_norm: f64 = f_ext.iter().map(|v| v * v).sum::<f64>().sqrt();
+            let f_scale = f_norm.max(f_total_norm);
+            let converged = if f_scale > 0.0 {
+                r_norm <= tolerance * f_scale
             } else {
-                r_norm
+                r_norm == 0.0
             };
 
-            if rel_error < tolerance {
+            if converged {
                 nr_converged = true;
                 break;
             }
@@ -1436,9 +1437,15 @@ pub fn solve_corotational_3d(
 
             let r_norm: f64 = r_check.iter().map(|v| v * v).sum::<f64>().sqrt();
             let f_norm: f64 = f_check.iter().map(|v| v * v).sum::<f64>().sqrt();
-            let ref_val = if f_norm > 1e-30 { f_norm } else { 1.0 };
+            let f_total_norm: f64 = f_ext.iter().map(|v| v * v).sum::<f64>().sqrt();
+            let f_scale = f_norm.max(f_total_norm);
+            let converged = if f_scale > 0.0 {
+                r_norm <= tolerance * f_scale
+            } else {
+                r_norm == 0.0
+            };
 
-            if r_norm / ref_val < tolerance {
+            if converged {
                 nr_converged = true;
                 break;
             }

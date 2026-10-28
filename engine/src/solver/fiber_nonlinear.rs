@@ -255,9 +255,15 @@ pub fn solve_fiber_nonlinear_2d(input: &FiberNonlinearInput) -> Result<FiberNonl
             };
             let r_norm: f64 = r_check.iter().map(|v| v * v).sum::<f64>().sqrt();
             let f_norm: f64 = f_check.iter().map(|v| v * v).sum::<f64>().sqrt();
-            let rel_error = if f_norm > 1e-30 { r_norm / f_norm } else { r_norm };
+            let f_total_norm: f64 = f_ext.iter().map(|v| v * v).sum::<f64>().sqrt();
+            let f_scale = f_norm.max(f_total_norm);
+            let converged = if f_scale > 0.0 {
+                r_norm <= input.tolerance * f_scale
+            } else {
+                r_norm == 0.0
+            };
 
-            if rel_error < input.tolerance {
+            if converged {
                 nr_converged = true;
                 break;
             }
@@ -962,9 +968,15 @@ pub fn solve_fiber_nonlinear_3d(input: &FiberNonlinearInput3D) -> Result<FiberNo
             };
             let r_norm: f64 = r_check.iter().map(|v| v * v).sum::<f64>().sqrt();
             let f_norm: f64 = f_check.iter().map(|v| v * v).sum::<f64>().sqrt();
-            let rel_error = if f_norm > 1e-30 { r_norm / f_norm } else { r_norm };
+            let f_total_norm: f64 = f_ext.iter().map(|v| v * v).sum::<f64>().sqrt();
+            let f_scale = f_norm.max(f_total_norm);
+            let converged = if f_scale > 0.0 {
+                r_norm <= input.tolerance * f_scale
+            } else {
+                r_norm == 0.0
+            };
 
-            if rel_error < input.tolerance {
+            if converged {
                 nr_converged = true;
                 break;
             }

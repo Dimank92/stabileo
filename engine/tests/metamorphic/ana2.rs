@@ -54,7 +54,7 @@ fn mat_e(s: &SolverInput, sec: usize) -> f64 {
     s.elements.values().find(|e| e.section_id == sec).map_or(200_000.0, |e| s.materials[&e.material_id.to_string()].e)
 }
 
-fn rect_fibers(b: f64, h: f64, ny: usize, nz: usize, e: f64) -> FiberSectionDef {
+pub fn rect_fibers(b: f64, h: f64, ny: usize, nz: usize, e: f64) -> FiberSectionDef {
     let mut fibers = Vec::new();
     for i in 0..ny {
         for j in 0..nz {

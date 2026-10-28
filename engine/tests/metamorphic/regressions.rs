@@ -596,3 +596,45 @@ fn plastic_3d_frame3d_2_is_a_lower_bound_of_its_certificate() {
     assert!(r.warnings.iter().any(|w| w.contains("no consistent set of active hinges") && w.contains("lower bound")), "{:?}", r.warnings);
     assert!(!r.warnings.iter().any(|w| w.contains("exceeds the yield surface")), "{:?}", r.warnings);
 }
+
+/// Issue #761: P-Delta, fiber and corotational iterations refuse a mirrored or rotated model
+/// whose loads are on supports (free displacement norm is zero / roundoff ~1e-21).
+#[test]
+fn pdelta_and_fiber_converge_on_transformed_support_loaded_models() {
+    let text = std::fs::read_to_string("tests/fixtures/random-29-input.json").unwrap();
+    let s: SolverInput = serde_json::from_str(&text).unwrap();
+
+    // 1. Unrotated P-Delta converges
+    let p_unrot = dedaliano_engine::solver::pdelta::solve_pdelta_2d(&s, 100, 1e-12).unwrap();
+    assert!(p_unrot.converged, "Unrotated P-Delta should converge");
+
+    // 2. Transformed model (arbitrary mirror line with translation)
+    let iso = Iso2::mirror_line(0.7).translated(10.0, 5.0);
+    let s_trans = transform_2d(&s, &iso).unwrap();
+    
+    // P-Delta 2D
+    let p_trans = dedaliano_engine::solver::pdelta::solve_pdelta_2d(&s_trans, 100, 1e-12).unwrap();
+    assert!(p_trans.converged, "Transformed 2D P-Delta did not converge");
+
+    // Corotational 2D
+    let c_trans = dedaliano_engine::solver::corotational::solve_corotational_2d(&s_trans, 100, 1e-10, 2, false).unwrap();
+    assert!(c_trans.converged, "Transformed 2D Corotational did not converge");
+
+    // Fiber Nonlinear 2D
+    let mut sections = std::collections::HashMap::new();
+    let sec = s_trans.sections.get("1").unwrap();
+    let (b, h) = crate::ana2::rect(sec.a, sec.iz);
+    let e = s_trans.materials.get("1").unwrap().e;
+    sections.insert("1".to_string(), crate::ana2::rect_fibers(b, h, 20, 1, e));
+    let f_inp = dedaliano_engine::solver::fiber_nonlinear::FiberNonlinearInput {
+        solver: s_trans.clone(),
+        fiber_sections: sections,
+        n_integration_points: 5,
+        max_iter: 60,
+        tolerance: 1e-6,
+        n_increments: 2,
+        modified_nr: false,
+    };
+    let f_trans = dedaliano_engine::solver::fiber_nonlinear::solve_fiber_nonlinear_2d(&f_inp).unwrap();
+    assert!(f_trans.converged, "Transformed 2D Fiber Nonlinear did not converge");
+}
