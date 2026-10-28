@@ -1,6 +1,7 @@
 # Stabileo Research catalog. Schema and rules: research/CONTRIBUTING.md.
 # `crossref` blocks are copied from api.crossref.org and checked by `research/tools/catalog.py check`
-# in CI; never edit them by hand. `summary` is our own wording; `summary_basis` says what it rests on.
+# in CI; never edit them by hand. `summary` is our own wording of `summary_source` (crossref-abstract, publisher-abstract,
+# repository-readme, full-text or reference-code); with no such source it stays empty.
 # `status` must be backed by files in the implementation directory (see research/README.md).
 papers:
 - id: shauer-2025
@@ -24,7 +25,8 @@ papers:
     problem and a damage problem driven by the tensile part of the strain energy, solved alternately until
     the elasticity residual falls below a tolerance. Examples are a bar in tension (compared with the
     1D AT2 analytical response), a single-edge notched plate in tension and a three-point bending test.'
-  summary_basis: reference code read in full (commit 61037c6); paper full text not accessed
+  summary_source: reference-code
+  summary_note: phasefield-jr-py read in full at commit 61037c6; paper full text not accessed
   code:
   - url: https://github.com/nathanshauer/phasefield-jr-py
     license: MIT
@@ -69,10 +71,8 @@ papers:
   - fracture nucleation
   - strength surface
   - variational fracture
-  summary: Argues that classical variational phase-field models, whose only material inputs are elasticity
-    and toughness, cannot describe crack nucleation under general loading because they lack an independent
-    material strength; motivates models that add a strength surface.
-  summary_basis: title and prior knowledge of the authors' line of work; full text not read here
+  summary: ''
+  summary_source: null
   code: []
   data: []
   methods:
@@ -103,10 +103,8 @@ papers:
   - nucleation
   - elastomers
   - poker-chip test
-  summary: Explains the classic poker-chip experiments on elastomers (thin discs bonded between rigid
-    plates and pulled apart) with a phase-field model that accounts for strength-driven nucleation and
-    large deformations.
-  summary_basis: title and prior knowledge; full text not read here
+  summary: ''
+  summary_source: null
   code: []
   data: []
   methods:
@@ -137,9 +135,8 @@ papers:
   - multiphysics
   - thermo-mechanical fracture
   - Abaqus
-  summary: A general framework for phase-field modelling of coupled problems, applied to thermo-mechanical
-    fracture and other couplings.
-  summary_basis: title only; full text not read here
+  summary: ''
+  summary_source: null
   code: []
   data: []
   methods:
@@ -175,9 +172,8 @@ papers:
   - GPU
   - inverse design
   - 3D FEM
-  summary: A finite element solver written in JAX so that forward solves run on GPUs and sensitivities
-    for inverse problems and design come from automatic differentiation.
-  summary_basis: title and repository README; full text not read here
+  summary: ''
+  summary_source: null
   code:
   - url: https://github.com/deepmodeling/jax-fem
     license: GPL-3.0
@@ -213,9 +209,8 @@ papers:
   - JAX
   - shells
   - frames
-  summary: Structural shape optimization in which the finite element response and its sensitivities are
-    computed with automatic differentiation, the adjoint method and accelerated linear algebra.
-  summary_basis: title and repository README; full text not read here
+  summary: ''
+  summary_source: null
   code:
   - url: https://github.com/GaoyuanWu/JaxSSO
     license: MIT
@@ -246,9 +241,8 @@ papers:
   - topology optimization
   - benchmarking
   - scientific practice
-  summary: A position paper on how topology optimization methods should be benchmarked and compared, and
-    on good scientific practice when claiming improvements.
-  summary_basis: title and prior knowledge; full text not read here
+  summary: ''
+  summary_source: null
   code: []
   data: []
   methods:
@@ -277,8 +271,8 @@ papers:
   - topology optimization
   - neural networks
   - review
-  summary: A critical review of the use of artificial neural networks in topology optimisation.
-  summary_basis: title only; full text not read here
+  summary: ''
+  summary_source: null
   code: []
   data: []
   methods:
@@ -309,7 +303,7 @@ papers:
   summary: Video denoising diffusion models trained on full-field simulation data of periodic stochastic
     cellular structures predict and tune their large-strain nonlinear stress response under compression,
     including buckling and contact.
-  summary_basis: Crossref abstract and repository README
+  summary_source: crossref-abstract
   code:
   - url: https://github.com/jhbastek/VideoMetamaterials
     license: MIT
@@ -344,7 +338,7 @@ papers:
   summary: Derives the elastic continuum model of an arbitrary network of Hookean springs from its geometry
     and topology alone, including the nonaffine displacements, and checks it against simulations of crystalline
     and disordered networks.
-  summary_basis: Crossref abstract; full text not read here
+  summary_source: crossref-abstract
   code: []
   data: []
   methods:
@@ -371,9 +365,8 @@ papers:
   - constitutive artificial neural networks
   - hyperelasticity
   - model discovery
-  summary: Constitutive artificial neural networks whose architecture encodes classical hyperelastic building
-    blocks, so that training on data selects an interpretable material model.
-  summary_basis: title, repository README and prior knowledge; full text not read here
+  summary: ''
+  summary_source: null
   code:
   - url: https://github.com/LivingMatterLab/CANN
     license: none
@@ -408,10 +401,8 @@ papers:
   - unsupervised learning
   - generalized standard materials
   - plasticity
-  summary: Extends the EUCLID approach to discover generalized standard material models (elasticity with
-    dissipation, such as plasticity) from displacement and reaction-force data, without stress labels,
-    with sparsity favouring interpretable models.
-  summary_basis: title and repository description; full text not read here
+  summary: ''
+  summary_source: null
   code:
   - url: https://github.com/EUCLID-code/EUCLID-plasticity
     license: GPL-3.0
@@ -447,9 +438,8 @@ papers:
   - structural health monitoring
   - civil structures
   - deep learning
-  summary: A digital twin framework for civil engineering structures that combines physics-based models
-    with data-driven damage identification from monitoring data.
-  summary_basis: title and prior knowledge; full text not read here
+  summary: ''
+  summary_source: null
   code: []
   data: []
   methods:
@@ -498,7 +488,7 @@ papers:
   - finite elements
   summary: Recent development of the MFEM C++ finite element library, centred on performance portability
     across leadership-class and exascale machines and on new capabilities.
-  summary_basis: Crossref abstract
+  summary_source: crossref-abstract
   code:
   - url: https://github.com/mfem/mfem
     license: BSD-3-Clause
@@ -534,9 +524,8 @@ papers:
   - finite element basis functions
   - FEniCSx
   - element library
-  summary: A library that tabulates finite element basis functions for a wide range of element families
-    at runtime; part of the FEniCSx project.
-  summary_basis: title and repository README
+  summary: ''
+  summary_source: null
   code:
   - url: https://github.com/FEniCS/basix
     license: MIT

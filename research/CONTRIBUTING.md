@@ -4,13 +4,16 @@ You do not need to know the rest of Stabileo to contribute here. A contribution 
 under `research/<area>/<id>/` plus one entry in `papers.yaml`, opened as a pull request. Once the
 repository's external-contribution policy (issue #726) exists, it applies here as well.
 
+Read [DESIGN.md](DESIGN.md) first: what a research page offers, how statuses are earned, and how
+papers are chosen.
+
 ## What a contribution must contain
 
 Copy `templates/paper/` to `research/<area>/<id>/` and fill it in.
 
-1. **Catalog entry** in `papers.yaml`. Get the bibliographic block with
+1. **Catalog entry** in `papers.yaml`. Write a `summary` only from the abstract (Crossref or publisher), the full text, or the repository README for code facts, and name it in `summary_source`; otherwise leave the summary empty. Get the bibliographic block with
    `python3 -I research/tools/catalog.py show <doi>` and paste it unchanged; CI compares it with
-   Crossref on every run. Write the `summary` in your own words and say in `summary_basis` what it
+   Crossref on every run. Write the `summary` in your own words and say in `summary_source` what it
    rests on (full text, abstract, code). Code links must be GitHub repositories whose license, as
    GitHub detects it, matches the `license` you give (`none` when there is no license file).
 2. **`paper.yaml`**: the experiment's equations and assumptions, inputs with units, mesh, solver
@@ -22,7 +25,11 @@ Copy `templates/paper/` to `research/<area>/<id>/` and fill it in.
 4. **A test that reproduces a published or reference number**, with its tolerance stated and
    justified, that runs in the research CI workflow. A status of `numerically-validated` requires a
    `VALIDATION.json` written by those tests in which every check passed.
-5. **A README** covering what was reproduced, how to run it, what agrees and by how much, what
+5. **Views through the Stabileo viewer.** Every geometric view of the model or its results uses
+   the shared viewer component (the app's viewport with scalar-field-on-mesh support); a page that
+   creates its own canvas or WebGL context for a model view fails `tools/check_viewer.sh`. Plots
+   (force–displacement, convergence) may be charts.
+6. **A README** covering what was reproduced, how to run it, what agrees and by how much, what
    does not, and the limitations.
 
 ## Rules

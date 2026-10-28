@@ -112,7 +112,7 @@
       const c = field === 'damage' ? seq(v) : div(v / stressScale);
       ctx.fillStyle = c;
       ctx.fill();
-      ctx.strokeStyle = showMesh ? 'rgba(143,163,179,0.35)' : c;
+      ctx.strokeStyle = showMesh ? 'rgba(143,163,179,0.18)' : c;
       ctx.stroke();
     }
   });

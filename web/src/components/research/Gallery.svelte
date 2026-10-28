@@ -69,8 +69,12 @@
           </div>
           <h2>{p.crossref.title}</h2>
           <p class="rs-g-by">{authors(p.crossref.authors)} · {p.crossref.venue} · {p.crossref.year} · <a href="https://doi.org/{p.doi}" rel="noreferrer" target="_blank">doi:{p.doi}</a></p>
-          <p>{p.summary}</p>
-          <p class="rs-g-basis">Summary based on: {p.summary_basis}</p>
+          {#if p.summary}
+            <p>{p.summary}</p>
+            <p class="rs-g-basis">Summary in our words, from: {p.summary_source}</p>
+          {:else}
+            <p class="rs-g-basis">Abstract not available.</p>
+          {/if}
           {#if p.code.length}
             <p class="rs-g-code">
               Code:

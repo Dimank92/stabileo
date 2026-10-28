@@ -26,27 +26,33 @@
 
   let width = $state(600);
   let hoverX = $state<number | null>(null);
-  const M = { l: 64, r: 16, t: 12, b: 40 };
+  const M = { l: 84, r: 16, t: 12, b: 40 };
 
+  /** Ticks that cover [lo, hi]: the first at or below lo, the last at or above hi. */
   function niceTicks(lo: number, hi: number, n = 5): number[] {
-    if (!(hi > lo)) return [lo];
+    if (!(hi > lo)) return [lo, lo + 1];
     const raw = (hi - lo) / n;
     const p = 10 ** Math.floor(Math.log10(raw));
     const step = [1, 2, 2.5, 5, 10].map((k) => k * p).find((s) => s >= raw) ?? raw;
+    const first = Math.floor(lo / step + 1e-9) * step;
+    const last = Math.ceil(hi / step - 1e-9) * step;
     const out: number[] = [];
-    for (let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9; v += step) out.push(Number(v.toPrecision(12)));
+    for (let v = first; v <= last + step * 1e-6; v += step) out.push(Number(v.toPrecision(12)));
     return out;
   }
 
-  const all = $derived(series.flatMap((s) => s.points));
-  const xMax = $derived(Math.max(1e-12, ...all.map((p) => p[0])));
-  const yMin = $derived(Math.min(0, ...all.map((p) => p[1])));
-  const yMax = $derived(Math.max(1e-12, ...all.map((p) => p[1])) * 1.05);
-  const xTicks = $derived(niceTicks(0, xMax));
-  const yTicks = $derived(niceTicks(yMin, yMax));
-  const sx = (x: number) => M.l + (x / (xTicks[xTicks.length - 1] || xMax)) * (width - M.l - M.r);
-  const yTop = $derived(Math.max(yMax, yTicks[yTicks.length - 1]));
-  const sy = (y: number) => M.t + (1 - (y - yMin) / (yTop - yMin || 1)) * (height - M.t - M.b);
+  const all = $derived(series.flatMap((s) => s.points).filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1])));
+  const xTicks = $derived(niceTicks(0, Math.max(1e-12, ...all.map((p) => p[0]))));
+  const yLo = $derived(Math.min(0, ...all.map((p) => p[1])));
+  const yHi = $derived(Math.max(1e-12, ...all.map((p) => p[1])));
+  const yTicks = $derived(niceTicks(yLo, yHi + 0.04 * (yHi - yLo)));
+  const x0 = $derived(xTicks[0]);
+  const x1 = $derived(xTicks[xTicks.length - 1]);
+  const y0 = $derived(yTicks[0]);
+  const y1 = $derived(yTicks[yTicks.length - 1]);
+  const sx = (x: number) => M.l + ((x - x0) / (x1 - x0)) * (width - M.l - M.r);
+  const sy = (y: number) => M.t + (1 - (y - y0) / (y1 - y0)) * (height - M.t - M.b);
+  const clipId = `clip-${Math.random().toString(36).slice(2)}`;
 
   function path(points: [number, number][]) {
     return points.map((p, i) => `${i ? 'L' : 'M'}${sx(p[0]).toFixed(1)},${sy(p[1]).toFixed(1)}`).join('');
@@ -71,7 +77,7 @@
       hoverX = null;
       return;
     }
-    hoverX = ((px - M.l) / (width - M.l - M.r)) * (xTicks[xTicks.length - 1] || xMax);
+    hoverX = x0 + ((px - M.l) / (width - M.l - M.r)) * (x1 - x0);
   }
 </script>
 
@@ -90,6 +96,8 @@
     {#if marker !== null}
       <line x1={sx(marker)} x2={sx(marker)} y1={M.t} y2={height - M.b} class="marker" />
     {/if}
+    <defs><clipPath id={clipId}><rect x={M.l} y={M.t - 4} width={width - M.l - M.r} height={height - M.t - M.b + 8} /></clipPath></defs>
+    <g clip-path="url(#{clipId})">
     {#each series as s (s.name)}
       <path d={path(s.points)} fill="none" stroke={s.color} stroke-width="2" stroke-dasharray={s.dashed ? '5 4' : undefined} stroke-linejoin="round" />
       {#if s.markers}
@@ -98,6 +106,7 @@
         {/each}
       {/if}
     {/each}
+    </g>
     {#if readout}
       <line x1={sx(readout.x)} x2={sx(readout.x)} y1={M.t} y2={height - M.b} class="cross" />
       {#each readout.rows as r (r.s.name)}
@@ -117,11 +126,12 @@
       {/each}
     </div>
   {/if}
-  {#if series.length > 1}
+  {#if series.length > 1 || marker !== null}
     <ul class="legend">
       {#each series as s (s.name)}
         <li><span class="sw" class:dashed={s.dashed} style:border-color={s.color} style:background={s.dashed ? 'transparent' : s.color}></span>{s.name}</li>
       {/each}
+      {#if marker !== null}<li><span class="sw dotted"></span>step shown in the field view</li>{/if}
     </ul>
   {/if}
 </div>
@@ -179,7 +189,7 @@
     gap: 1rem;
     list-style: none;
     padding: 0;
-    margin: 0.4rem 0 0 64px;
+    margin: 0.4rem 0 0 84px;
     font-size: 13px;
     color: var(--fg-2);
   }
@@ -196,6 +206,9 @@
     width: 8px;
     border: 0;
     border-radius: 50%;
+  }
+  .sw.dotted {
+    border-top: 2px dotted var(--fg-2);
   }
   .sw.dashed {
     border-top-style: dashed;

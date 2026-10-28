@@ -37,8 +37,9 @@ STATUSES = [
     "numerically-validated", "interactive",
 ]
 COMPLEXITY = {"low", "medium", "high"}
+SUMMARY_SOURCES = {"crossref-abstract", "publisher-abstract", "repository-readme", "full-text", "reference-code"}
 REQUIRED = [
-    "id", "doi", "crossref", "area", "keywords", "summary", "code", "data", "methods",
+    "id", "doi", "crossref", "area", "keywords", "summary", "summary_source", "code", "data", "methods",
     "dependencies", "complexity", "relevance", "status", "reproduced_published_results",
     "benchmarks", "implementation", "contacts",
 ]
@@ -97,6 +98,13 @@ def check_entry(p, errors):
         errors.append(f"{pid}: area '{p.get('area')}' not in {sorted(AREAS)}")
     if p.get("complexity") not in COMPLEXITY:
         errors.append(f"{pid}: complexity must be one of {sorted(COMPLEXITY)}")
+    source = p.get("summary_source")
+    if (p.get("summary") or "").strip():
+        if source not in SUMMARY_SOURCES:
+            errors.append(f"{pid}: a summary needs summary_source in {sorted(SUMMARY_SOURCES)}; "
+                          "never from memory or the title (leave the summary empty instead)")
+    elif source is not None:
+        errors.append(f"{pid}: summary_source given but the summary is empty")
     status = p.get("status")
     if status not in STATUSES:
         errors.append(f"{pid}: status '{status}' not in {STATUSES}")
