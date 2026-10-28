@@ -1,4 +1,6 @@
 import { test, expect, type Browser, type Page } from '@playwright/test';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 /**
  * What a crawler receives, with JavaScript switched off.
@@ -75,6 +77,15 @@ const POST_TITLE = {
 
 const LOCALES = ['en', 'es', 'pt'] as const;
 type Locale = (typeof LOCALES)[number];
+const PUBLIC = ['de', 'en', 'es', 'fr', 'pt', 'tr'];
+
+/** The languages a page names as its alternates: every one for the landing and the blog index, and for a post those it is written in. */
+function writtenIn(path: string): string[] {
+  if (!path.startsWith('/blog/')) return PUBLIC;
+  const slug = path.slice('/blog/'.length);
+  return PUBLIC.filter((l) => (LOCALES as readonly string[]).includes(l) ||
+    existsSync(fileURLToPath(new URL(`../src/lib/blog/translations/${l}/${slug}.ts`, import.meta.url))));
+}
 
 /**
  * Open a URL with scripting disabled.
@@ -122,9 +133,7 @@ async function expectLinks(page: Page, path: string, locale: Locale) {
     .locator('link[rel="alternate"][hreflang]')
     .evaluateAll((els) => els.map((e) => `${e.getAttribute('hreflang')} ${e.getAttribute('href')}`).sort());
   expect(alts, `hreflang set on /${locale}${canonicalPath}`).toEqual([
-    `en ${ORIGIN}/en${canonicalPath}`,
-    `es ${ORIGIN}/es${canonicalPath}`,
-    `pt ${ORIGIN}/pt${canonicalPath}`,
+    ...writtenIn(path).map((l) => `${l} ${ORIGIN}/${l}${canonicalPath}`),
     // x-default follows the page, not the home page.
     `x-default ${ORIGIN}/en${canonicalPath}`,
   ]);
