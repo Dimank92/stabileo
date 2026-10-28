@@ -37,11 +37,11 @@ fn validate_material_models(models: &std::collections::HashMap<String, MaterialM
 
 /// Per-element state tracking for the nonlinear material analysis.
 #[derive(Clone)]
-struct ElementState {
-    yielded_start: bool,
-    yielded_end: bool,
+pub(crate) struct ElementState {
+    pub(crate) yielded_start: bool,
+    pub(crate) yielded_end: bool,
     /// Hardening ratio: EI_effective = alpha * EI when yielded.
-    alpha: f64,
+    pub(crate) alpha: f64,
 }
 
 /// Solve a 2D nonlinear material analysis using incremental load-stepping
@@ -503,6 +503,49 @@ fn lookup_capacities(input: &NonlinearMaterialInput, elem: &SolverElement) -> (f
 // ---------------------------------------------------------------------------
 
 /// Dense (n×n) tangent — small models and the once-per-solve reaction pass.
+
+/// Public entry point to assemble material nonlinear internal forces and tangent stiffness.
+pub fn assemble_material_nonlinear_public(
+    input: &SolverInput,
+    dof_num: &DofNumbering,
+    u_full: &[f64],
+    element_status: &[ElementPlasticStatus],
+    f_int: &mut [f64],
+    k_t: &mut [f64],
+) {
+    let asm = crate::solver::assembly::assemble_2d(input, dof_num);
+    let art = crate::solver::assembly::artificial_stiffness_entries(&asm);
+
+    let mut states: Vec<(usize, ElementState)> = input
+        .elements
+        .values()
+        .map(|elem| {
+            let st = element_status.iter().find(|s| s.element_id == elem.id);
+            let (yielded_start, yielded_end) = match st {
+                Some(s) => (
+                    s.state == "yielded_start" || s.state == "yielded_both",
+                    s.state == "yielded_end" || s.state == "yielded_both",
+                ),
+                None => (false, false),
+            };
+            (
+                elem.id,
+                ElementState {
+                    yielded_start,
+                    yielded_end,
+                    alpha: 0.01,
+                },
+            )
+        })
+        .collect();
+    states.sort_by_key(|&(id, _)| id);
+
+    let f_calc = compute_global_internal_forces(input, dof_num, u_full, &states, &art);
+    f_int.copy_from_slice(&f_calc);
+    let k_calc = assemble_tangent_stiffness(input, dof_num, &states, &art);
+    k_t.copy_from_slice(&k_calc);
+}
+
 fn assemble_tangent_stiffness(
     solver: &SolverInput,
     dof_num: &DofNumbering,
@@ -949,9 +992,9 @@ fn build_element_status(
 /// Per-element state tracking for 3D nonlinear material analysis.
 #[derive(Clone)]
 struct ElementState3D {
-    yielded_start: bool,
-    yielded_end: bool,
-    alpha: f64,
+    pub(crate) yielded_start: bool,
+    pub(crate) yielded_end: bool,
+    pub(crate) alpha: f64,
 }
 
 /// Solve a 3D nonlinear material analysis using incremental load-stepping

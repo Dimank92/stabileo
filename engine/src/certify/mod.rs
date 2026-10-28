@@ -15,6 +15,7 @@ pub mod harmonic;
 pub mod interval;
 pub mod linear;
 pub mod modal;
+pub mod nonlinear;
 pub mod pdelta;
 pub mod plastic;
 pub mod plastic_3d;

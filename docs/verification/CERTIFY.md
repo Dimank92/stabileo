@@ -1401,6 +1401,28 @@ reports `method` (`modal`, `modal+static`, `direct`), `modesUsed`, `nDof`,
 `warnings` (frequencies where the correction could not be applied,
 `harmonic_truncation_is_reported`).
 
+## Nonlinear analyses (co-rotational, material, fiber)
+
+`engine/src/certify/nonlinear.rs` (wasm: `certify_corotational_2d`, `certify_material_nonlinear_2d`, `certify_fiber_nonlinear_2d`).
+
+While linear static, modal, buckling, P-Delta, harmonic, and plastic collapse results have rigorous certificates, nonlinear solvers have traditionally been benchmarked only. The nonlinear certificate computes an a-posteriori enclosure of the converged equilibrium state via the Newton–Kantorovich residual inclusion theorem with interval tangent evaluation.
+
+For the nonlinear equilibrium equations on free DOFs:
+$$F(u) = f_{\\text{int}}(u) - f_{\\text{ext}} = 0$$
+
+Given candidate displacement $\\tilde{u}$ from the nonlinear solver:
+1. **Residual evaluation**: $R(\\tilde{u}) = f_{\\text{ext}} - f_{\\text{int}}(\\tilde{u})$ on free DOFs, with norm $\\rho = \\|R(\\tilde{u})\\|_2$.
+2. **Tangent Jacobian coercivity**: $J = K_T(\\tilde{u})$ on free DOFs is certified coercive via `certify_sigma_auto(&j_sym, nf)`:
+   $$\\lambda_{\\min}(\\operatorname{sym} J) \\ge \\mu > 0 \\implies \\|J^{-1}\\|_2 \\le \\frac{1}{\\mu}.$$
+3. **Newton step bound**: $J d = R(\\tilde{u})$ solved via LU factorization, step bound:
+   $$\\|J^{-1} R(\\tilde{u})\\|_2 \\le \\eta = \\|d\\|_2 + \\frac{\\|R(\\tilde{u}) - J d\\|_2}{\\mu}.$$
+4. **Lipschitz bound $\\beta$ on the tangent operator**:
+   $$\\|K_T(u) - K_T(v)\\|_2 \\le \\beta \\|u - v\\|_2.$$
+5. **Newton–Kantorovich condition**: with $\\gamma = \\beta / \\mu$, if $4 \\gamma \\eta < 1$:
+   - Unique equilibrium solution $u^*$ exists in $\\|u - \\tilde{u}\\|_2 < \\frac{1}{2\\gamma}$.
+   - Exact error bound: $\\|u^* - \\tilde{u}\\|_2 \\le r = \\frac{2\\eta}{1 + \\sqrt{1 - 4\\gamma\\eta}}$.
+   - Stability margin: if $\\mu - \\beta r > 0$, the exact equilibrium state is certified stable ($\\lambda_{\\min}(K_T(u^*)) > 0$).
+
 ## Which K is certified
 
 A certificate is about the K, f (and M, K_G) the solver assembled, right or wrong, except
@@ -1453,8 +1475,6 @@ modelled by abstract `down, up : ℝ → ℝ` with `down x ≤ x ≤ up x`.
 
 ## Out of scope for v1
 
-Corotational / large-displacement nonlinear static solvers (their residuals involve
-rotations and are not polynomial in `u`; the quadratic Kantorovich argument of "P-Delta"
-does not apply as is), material nonlinearity, time integration. Mechanism certificates (exact rational null vectors), and proving the f64 implementation matches the Lean algorithm. (Large
+Time integration state certificates (exact rational null vectors), proving the f64 implementation matches the Lean algorithm (nonlinear analyses: co-rotational, material and fiber are now certified via Newton-Kantorovich residual inclusion in `engine/src/certify/nonlinear.rs`). Mechanism certificates (exact rational null vectors), and proving the f64 implementation matches the Lean algorithm. (Large
 models are covered by the Gram/Gershgorin certificate above; the dense interval
 Cholesky is used only below the solver's sparse threshold.)

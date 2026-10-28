@@ -1086,3 +1086,47 @@ fn harmonic_truncation_is_reported() {
     assert!(res.warnings[0].contains("static correction not applied at 1 frequency"), "{:?}", res.warnings);
     assert!(res.response_points.iter().all(|p| p.amplitude.is_finite()));
 }
+
+
+/// Issue #502: Certificates for nonlinear analyses (co-rotational, material, fiber).
+/// Certify the converged equilibrium state via Newton-Kantorovich residual inclusion.
+#[test]
+fn test_issue_502_nonlinear_equilibrium_certificate() {
+    use dedaliano_engine::certify::nonlinear::{
+        certify_corotational_2d, certify_material_nonlinear_2d, NonlinearCertificate,
+    };
+    use dedaliano_engine::solver::corotational::solve_corotational_2d;
+    use dedaliano_engine::solver::material_nonlinear::solve_nonlinear_material_2d;
+    use dedaliano_engine::types::NonlinearMaterialInput;
+
+    // 1. Co-rotational 2D
+    let input = grid_frame(1, 2, -15.0);
+    let corot_res = solve_corotational_2d(&input, 50, 1e-6, 5, false).expect("solve corotational 2d");
+    assert!(corot_res.converged);
+    let cert = certify_corotational_2d(&input, &corot_res);
+    assert!(cert.is_certified(), "co-rotational 2d should be certified: {:?}", cert);
+    if let NonlinearCertificate::Certified { abs_bound, rel_bound, mu, residual_norm, .. } = cert {
+        assert!(abs_bound > 0.0);
+        assert!(rel_bound > 0.0);
+        assert!(mu > 0.0);
+        assert!(residual_norm < 1e-3);
+    }
+
+    // 2. Material-nonlinear 2D
+    let mat_input = NonlinearMaterialInput {
+        solver: input.clone(),
+        material_models: std::collections::HashMap::new(),
+        section_capacities: std::collections::HashMap::new(),
+        max_iter: 50,
+        tolerance: 1e-6,
+        n_increments: 5,
+    };
+    let mat_res = solve_nonlinear_material_2d(&mat_input).expect("solve material nonlinear 2d");
+    assert!(mat_res.converged);
+    let cert_mat = certify_material_nonlinear_2d(&input, &mat_res);
+    assert!(cert_mat.is_certified(), "material nonlinear 2d should be certified: {:?}", cert_mat);
+    if let NonlinearCertificate::Certified { abs_bound, mu, .. } = cert_mat {
+        assert!(abs_bound > 0.0);
+        assert!(mu > 0.0);
+    }
+}
