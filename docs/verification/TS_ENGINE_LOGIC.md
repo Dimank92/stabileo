@@ -657,7 +657,7 @@ In rough order of safety value:
 | `result-scopes.ts` | 212 | d | - | medium | Which combinations count and named envelopes; envelopes via WASM computeEnvelope3D + shell envelope |
 | `result-tables.ts` | 230 | d | - | low | Multi-combination result tables, summary/envelope rows, max-by-type, CSV |
 | `result-types.ts` | 258 | d | - | low | Shared result type definitions; also getSpectralAcceleration interpolation helper (TS) |
-| `rigid-diaphragm.ts` | 196 | b | solver/constraints.rs Constraint::Diaphragm | medium | Rigid diaphragm via stiff penalty beams (x1e6); appears unused (no importers) while Rust has a real diaphragm constraint |
+| `rigid-diaphragm.ts` | 65 | d | — | low | Floor level detection for UI (`detectFloorLevels`); penalty beams moved to test oracle (`__tests__/differential/oracle/rigid-diaphragm-oracle.ts`) |
 | `section-stress-3d.ts` | 829 | a | postprocess/section_stress_3d.rs | high | WASM computeSectionStress3D when ready; full TS fallback (biaxial Navier, shear, torsion) when !isWasmReady plus legacy quick-compute for colour map: silent TS replacement |
 | `section-stress.ts` | 1493 | a | postprocess/section_stress.rs | high | WASM computeSectionStress2D when ready; otherwise full TS Navier/Jourawski/Mohr/failure fallback silently; central core, shear flow in TS only |
 | `section-teaching.ts` | 311 | b | section/ (centroid, shear centre) | low | Pedagogical step-by-step centroid and shear centre working, re-deriving what the section engine computes |

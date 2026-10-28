@@ -46,6 +46,7 @@ describe('concrete oracles stay in the tests', () => {
       /function\s+compressedZone\b/, /function\s+circularSegment\b/,
       /function\s+solveColumnSectionReference\b/, /function\s+estimateUniaxialCapacity(Local)?\b/,
       /function\s+steelStressAtEquilibrium\b/,
+      /function\s+applyRigidDiaphragm\b/,
     ];
     const offenders: string[] = [];
     for (const f of sources(SRC)) {
