@@ -12,7 +12,9 @@
   import results from '../../../../../research/metamaterials/grossman-2026/results/stabileo_results.json';
   import fig5Csv from '../../../../../research/metamaterials/grossman-2026/reference-results/fig5_simulation_digitized.csv?raw';
   import { REPO_URL } from '../../landing/landing-utils';
-  import PublicLink from '../../landing/PublicLink.svelte';
+  import ExperimentShell from '../shell/ExperimentShell.svelte';
+  import ExperimentLink from '../shell/ExperimentLink.svelte';
+  import StabileoViewer from '../shell/StabileoViewer.svelte';
   import { publicI18n } from '../../../lib/i18n/store.svelte';
   import { Playback, SOURCE_LABEL } from '../shell/playback.svelte';
   import PlotXY, { type PlotSeries } from './PlotXY.svelte';
@@ -157,6 +159,18 @@
     }
   }
 
+  /** What the article's links ask of the app pane (ExperimentLink). */
+  const actions = {
+    goToStep(i: number) {
+      touch();
+      eta = SWEEP[Math.max(0, Math.min(SWEEP.length - 1, i))];
+    },
+    setParams(p: Record<string, number | string | boolean>) {
+      apply(p as Parameters<typeof apply>[0]);
+    },
+  };
+  const passed = validation.checks.filter((c) => c.passed).length;
+
   /** Links in the article set the app's state. */
   function apply(p: Partial<{ family: Family; eta: number; phi: number; psi: number; theta: number; ell: number; keep: number; prestress: number; diagonals: boolean; law: 'hookean' | 'equal_weight'; strain: number }>) {
     touch();
@@ -171,7 +185,6 @@
     keep = p.keep ?? 1;
     prestress = p.prestress ?? 0;
     if (p.strain !== undefined) strain = p.strain;
-    if (window.innerWidth < 960) pane?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   // ---- 2x2 algebra on C (exx, eyy, exy; tensor shear) for directional moduli -------------
@@ -224,7 +237,6 @@
   const eq23 = (l: number) => (-(2 - 4 * l) * (l + 0.5)) / (3 + 4 * l - 4 * l * l);
 
   // ---- what the viewer shows -------------------------------------------------------------
-  const viewer = import('../../viewport/ScalarFieldViewer.svelte');
   // The strip is drawn lying down (the paper's y axis to the right) so it fills the wide pane:
   // drawn (X, Y) = (y, 13 - x).
   const xy = $derived(strip ? Float64Array.from(strip.nodes.flatMap((p) => [p[1], 13 - p[0]])) : new Float64Array());
@@ -284,7 +296,6 @@
     ];
   });
 
-  const passed = validation.checks.filter((c) => c.passed).length;
   const fmtSci = (v: number) => (v === 0 ? '0' : Math.abs(v) >= 0.01 && Math.abs(v) < 1000 ? v.toPrecision(3) : v.toExponential(1));
 
   // ---- the Stabileo editor, embedded (loaded only when its tab is opened) -------------------
@@ -315,6 +326,13 @@
     touch();
     tab = t;
   }
+  // The embedded editor needs the page's width (the app switches to its phone layout below 768 px):
+  // while it is shown, the shell's grid is one column with the app first.
+  $effect(() => {
+    const grid = pane?.closest('.rs-shell-grid');
+    grid?.classList.toggle('rs-editing', tab === 'edit');
+    return () => grid?.classList.remove('rs-editing');
+  });
   // The editor loads the first time its tab is shown (once a strip exists).
   $effect(() => {
     if (tab === 'edit' && strip && !editorSrc && !editorLoading) void loadEditor();
@@ -336,28 +354,15 @@
     } else window.location.assign(url);
   }
 </script>
-
-<section class="sec sec--ink sp-head">
-  <div class="wrap sp-wide">
-    <p class="sp-crumb"><PublicLink to="/research">Research</PublicLink> / Metamaterials</p>
-    <h1>Auxetic spring networks</h1>
-    <p class="sp-cite">
-      After D. Grossman and A. Boudaoud, “Predicting the mechanical properties of spring networks”, <em>Physical Review Research</em> 8, 013224 (2026),
-      <a href={DOI} rel="noreferrer" target="_blank">doi:10.1103/17sg-gzhl</a> (open access, CC BY 4.0). No reference code is public (“available at request”), so we compare with the
-      numbers and figures the paper publishes.
-    </p>
-    <ul class="sp-badges">
-      <li class="ok">{passed}/{validation.checks.length} checks pass (exact results and the paper’s published values)</li>
-      <li class="ok">Published figures compared</li>
-      <li>No reference code</li>
-      <li class="warn">Research, not a design tool</li>
-    </ul>
-  </div>
-</section>
-
-<section class="sec sec--ink sp-body">
-  <div class="wrap sp-wide sp-panes" class:editing={tab === 'edit'}>
-    <article class="sp-article">
+<ExperimentShell
+  paperId="grossman-2026"
+  name="Auxetic spring networks"
+  lead="Pull a strip of Hookean springs and read how much it narrows. Shake the nodes of the triangular lattice and it starts to widen instead: it becomes auxetic. The network on the right is solved in your browser as a truss on Stabileo’s engine, and the same strip opens in the real Stabileo editor. No reference code is public (“available at request”), so we compare with the paper’s published numbers, closed forms and figures, and with exact results."
+  checks={{ passed, total: validation.checks.length }}
+  {actions}
+  sourcePath="research/metamaterials/grossman-2026"
+>
+  {#snippet article()}
       <h2>What the paper shows</h2>
       <p>
         Many materials, from metamaterial lattices to cell membranes, are modelled as networks of Hookean springs. Grossman and Boudaoud derive the elastic continuum
@@ -367,9 +372,9 @@
         <strong>auxetic</strong> (negative Poisson’s ratio: it widens when pulled) as the disorder grows.
       </p>
       <p class="sp-try">
-        Try it: <button class="link" onclick={() => apply({ family: 'foam', eta: 0 })}>perfect lattice, η = 0</button> ·
-        <button class="link" onclick={() => apply({ family: 'foam', eta: 0.3 })}>η = 0.3</button> ·
-        <button class="link" onclick={() => apply({ family: 'foam', eta: 0.5 })}>η = 0.5, auxetic</button>
+        Try it: <ExperimentLink params={{ family: 'foam', eta: 0 }}>perfect lattice, η = 0</ExperimentLink> ·
+        <ExperimentLink params={{ family: 'foam', eta: 0.3 }}>η = 0.3</ExperimentLink> ·
+        <ExperimentLink params={{ family: 'foam', eta: 0.5 }}>η = 0.5, auxetic</ExperimentLink>
       </p>
 
       <h2>The model we solve</h2>
@@ -413,8 +418,8 @@
         A honeycomb of unit edges whose opposing corners are 2ℓ apart is regular at ℓ = 1 and re-entrant below ℓ = ½. The paper triangulates each hexagon with a centre node and
         springs 10⁻³ as stiff as the edges, and compares with the closed form ν(ℓ) = −(2 − 4ℓ)(ℓ + ½)/(3 + 4ℓ − 4ℓ²). Our periodic network agrees to 3.4 × 10⁻³ with those springs and
         to 3.4 × 10⁻⁶ with springs 10⁻⁶ as stiff: the difference is the soft springs’ own stiffness.
-        <button class="link" onclick={() => apply({ family: 'honeycomb', ell: 0.25 })}>Show ℓ = 0.25 (re-entrant)</button> ·
-        <button class="link" onclick={() => apply({ family: 'honeycomb', ell: 0.9 })}>ℓ = 0.9</button>
+        <ExperimentLink params={{ family: 'honeycomb', ell: 0.25 }}>Show ℓ = 0.25 (re-entrant)</ExperimentLink> ·
+        <ExperimentLink params={{ family: 'honeycomb', ell: 0.9 }}>ℓ = 0.9</ExperimentLink>
       </p>
       <PlotXY series={honeySeries} xLabel="ℓ" yLabel="Poisson’s ratio ν" xDomain={[0, 1]} current={family === 'honeycomb' && cellAlong ? { x: ell, y: cellAlong[1], label: 'This network' } : null} ariaLabel="Honeycomb Poisson's ratio: Eq. 23 and our network" />
 
@@ -425,8 +430,8 @@
         calculation line of Fig. 7 (Young’s modulus of the (3, 2) lattice, read from the PDF’s vector data, times the area of one triangle) coincide with that affine result
         for spring constants k<sub>e</sub> ∝ 1/ℓ̄<sub>e</sub>², to 10⁻¹⁴ and 6 × 10⁻⁴. With equal spring constants we obtain ν = 1/6 at (φ, ψ, θ) = (1, 0.5, 0), where Eq. (9)
         gives 8/27. This may reflect a convention we have not identified; it is on our list of questions for the authors.
-        <button class="link" onclick={() => apply({ family: 'ordered', phi: 1, psi: 0.5, theta: 0, law: 'hookean' })}>Show (1, 0.5)</button> ·
-        <button class="link" onclick={() => apply({ family: 'ordered', phi: 2, psi: 0.5, theta: 0.7, law: 'equal_weight' })}>(2, 0.5) at θ = 0.7, equal weight</button>
+        <ExperimentLink params={{ family: 'ordered', phi: 1, psi: 0.5, theta: 0, law: 'hookean' }}>Show (1, 0.5)</ExperimentLink> ·
+        <ExperimentLink params={{ family: 'ordered', phi: 2, psi: 0.5, theta: 0.7, law: 'equal_weight' }}>(2, 0.5) at θ = 0.7, equal weight</ExperimentLink>
       </p>
       {#if family === 'ordered' && orderedSeries.length}
         <PlotXY series={orderedSeries} xLabel="lattice orientation θ, rad" yLabel="Poisson’s ratio ν" xDomain={[0, Math.PI]} current={cellAlong ? { x: theta, y: cellAlong[1], label: 'This network' } : null} ariaLabel="Ordered lattice Poisson's ratio against orientation" />
@@ -443,8 +448,8 @@
         Not in the paper: removing bonds at random from the triangular lattice lowers the mean coordination z from 6. Maxwell’s count (2 degrees of freedom per node against z/2
         bonds per node) says a generic network cannot be rigid below z = 4. Our moduli vanish to rounding at z = 3 and stay finite above about z = 3.9, the rigidity
         percolation threshold (e.g. Jacobs and Thorpe, <a href="https://doi.org/10.1103/PhysRevLett.75.4051" rel="noreferrer" target="_blank">PRL 75, 4051, 1995</a>).
-        <button class="link" onclick={() => apply({ family: 'foam', eta: 0, keep: 0.62 })}>Dilute to z ≈ 3.7</button> ·
-        <button class="link" onclick={() => apply({ family: 'foam', eta: 0, keep: 0.62, prestress: 0.03 })}>…and put it in tension</button>
+        <ExperimentLink params={{ family: 'foam', eta: 0, keep: 0.62 }}>Dilute to z ≈ 3.7</ExperimentLink> ·
+        <ExperimentLink params={{ family: 'foam', eta: 0, keep: 0.62, prestress: 0.03 }}>…and put it in tension</ExperimentLink>
       </p>
       <PlotXY series={dilSeries} xLabel="mean coordination z" yLabel="modulus / k" xDomain={[2.4, 6]} rules={[{ x: 4, label: 'z = 4' }]} current={family === 'foam' && eta === 0 && cell ? { x: cell.coordination, y: cell.isotropic.shear, label: 'This network: G' } : null} ariaLabel="Moduli against coordination" />
 
@@ -469,22 +474,16 @@
         <li>Agreement with a paper is not validation against experiments, and nothing here is an engineering design result.</li>
       </ul>
 
-      <h2>Cite this</h2>
-      <p class="sp-citebox">
-        Stabileo Research, “Auxetic spring networks (Grossman &amp; Boudaoud 2026)”, stabileo.com/research/metamaterials/grossman-2026, code at
-        <a href={SOURCE} rel="noreferrer" target="_blank">research/metamaterials/grossman-2026</a>. Original article: D. Grossman and A. Boudaoud, Phys. Rev. Research 8, 013224 (2026),
-        doi:10.1103/17sg-gzhl.
-      </p>
       <h2>Code and references</h2>
       <ul>
         <li>Implementation, tests, reference values and their provenance: <a href={SOURCE} rel="noreferrer" target="_blank">research/metamaterials/grossman-2026</a> (AGPL-3.0).</li>
         <li>Article and Supplemental Material: <a href={DOI} rel="noreferrer" target="_blank">doi:10.1103/17sg-gzhl</a>, CC BY 4.0. Figures on this page are drawn from our own runs; the paper’s points are its published data.</li>
         <li>Foam construction after J. Liu, Y. Nie, H. Tong and N. Xu, <a href="https://doi.org/10.1103/PhysRevMaterials.3.055607" rel="noreferrer" target="_blank">Phys. Rev. Materials 3, 055607 (2019)</a>, the paper’s Ref. 27.</li>
       </ul>
-    </article>
+      {/snippet}
 
-    <aside class="sp-app" bind:this={pane} aria-label="The experiment">
-      <div class="sp-sticky">
+  {#snippet app()}
+      <div class="sp-app" bind:this={pane}>
         <div class="sp-tabbar">
           <div class="sp-tabs" role="tablist" aria-label="Experiment or editor">
             <button role="tab" id="sp-tab-exp" aria-controls="sp-panel-exp" aria-selected={tab === 'experiment'} tabindex={tab === 'experiment' ? 0 : -1} class:on={tab === 'experiment'} onclick={() => showTab('experiment')} onkeydown={tabKey}>Experiment</button>
@@ -520,8 +519,7 @@
         </p>
         <div class="sp-viewer" data-nodes={strip?.nodes.length ?? 0}>
           {#if strip}
-            {#await viewer then m}
-              <m.default
+                          <StabileoViewer
                 xy={xy}
                 cells={bars}
                 cellSize={2}
@@ -541,7 +539,7 @@
                 status={[{ label: 'nodes', value: String(strip.nodes.length) }, { label: 'springs', value: String(strip.bonds.length) }]}
                 editorButton={false}
               />
-            {/await}
+            
           {:else}
             <div class="sp-placeholder">The network appears here.</div>
           {/if}
@@ -584,110 +582,10 @@
         </form>
         </div>
       </div>
-    </aside>
-  </div>
-</section>
+      {/snippet}
+</ExperimentShell>
 
 <style>
-  .sp-wide {
-    max-width: 92rem;
-  }
-  .sec.sp-head {
-    padding-top: clamp(5rem, 9vw, 6.5rem);
-    padding-bottom: 1rem;
-  }
-  .sp-head h1 {
-    font-family: var(--lp-display);
-    font-size: clamp(2rem, 4.5vw, 3rem);
-    line-height: 1.1;
-    margin: 0.25rem 0 0.75rem;
-    color: var(--fg);
-  }
-  .sp-crumb,
-  .sp-cite {
-    color: var(--fg-2);
-    font-size: 0.95rem;
-    max-width: 60rem;
-  }
-  .sp-crumb :global(a),
-  .sp-cite a,
-  .sp-article a {
-    color: inherit;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-  }
-  .sp-badges {
-    list-style: none;
-    padding: 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin: 1rem 0 0;
-  }
-  .sp-badges li {
-    font: 12px var(--lp-mono);
-    border: 1px solid var(--hair);
-    border-radius: 3px;
-    padding: 0.25rem 0.5rem;
-    color: var(--fg-2);
-  }
-  .sp-badges li.ok {
-    color: var(--ok);
-    border-color: var(--ok);
-  }
-  .sp-badges li.warn {
-    color: #d9a441;
-    border-color: #d9a441;
-  }
-  .sec.sp-body {
-    padding-top: 1rem;
-    padding-bottom: 4rem;
-  }
-  .sp-panes {
-    display: grid;
-    gap: 2rem;
-  }
-  @media (min-width: 60rem) {
-    .sp-panes {
-      grid-template-columns: minmax(0, 1fr) minmax(24rem, 36rem);
-      align-items: start;
-    }
-    /* The grid item itself sticks (a sticky child of a content-height item would not). */
-    .sp-app {
-      order: 2;
-      position: sticky;
-      top: calc(var(--lp-nav-h, 4rem) + 0.75rem);
-      max-height: calc(100dvh - var(--lp-nav-h, 4rem) - 1.5rem);
-      overflow: hidden auto;
-      scrollbar-gutter: stable;
-      overscroll-behavior: contain;
-    }
-  }
-  @media (max-width: 59.99rem) {
-    .sp-app {
-      order: -1;
-    }
-  }
-  .sp-article {
-    color: var(--fg);
-    min-width: 0;
-  }
-  .sp-article h2 {
-    font-family: var(--lp-display);
-    font-size: 1.5rem;
-    margin: 2rem 0 0.75rem;
-  }
-  .sp-article h2:first-child {
-    margin-top: 0;
-  }
-  .sp-article h3 {
-    font-size: 1.1rem;
-    margin: 1.5rem 0 0.5rem;
-  }
-  .sp-article p,
-  .sp-article li {
-    line-height: 1.6;
-  }
   .eq {
     white-space: nowrap;
   }
@@ -734,12 +632,6 @@
   .sp-checks td:nth-child(3) {
     font-family: var(--lp-mono);
     white-space: nowrap;
-  }
-  .sp-citebox {
-    border: 1px solid var(--hair);
-    border-radius: 3px;
-    padding: 0.75rem 1rem;
-    font-size: 0.9rem;
   }
   .sp-source {
     font: 12px var(--lp-mono);
@@ -887,17 +779,14 @@
     color: var(--fg-2);
     font: 13px var(--lp-mono);
   }
-  @media (min-width: 60rem) {
-    .sp-panes.editing {
-      grid-template-columns: minmax(0, 1fr);
-    }
-    .sp-panes.editing .sp-app {
-      order: -1;
-    }
-    .sp-panes.editing .sp-app {
-      position: static;
-      max-height: none;
-      overflow: visible;
-    }
+  /* While the embedded editor is shown: the shell's grid becomes one column, app first. */
+  :global(.rs-shell-grid.rs-editing) {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  :global(.rs-shell-grid.rs-editing .rs-shell-app) {
+    order: -1;
+    position: static !important;
+    max-height: none !important;
+    overflow: visible !important;
   }
 </style>
