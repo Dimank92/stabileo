@@ -54,6 +54,17 @@ function shown(page: Page): Promise<Array<{ where: string; text: string }>> {
         if (v) out.push({ where: `<${el.tagName.toLowerCase()}${id ? ` data-testid="${id}"` : ''}> ${a}`, text: v });
       }
     }
+    // The live value of every visible text-entry control: `innerText` does not include it, and
+    // the project's name is one (the tab's `<input>`, `TabBar.svelte`), the very place the
+    // desktop app showed `tabBar.newStructure`.
+    for (const el of document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+      'input:not([type]), input[type="text"], input[type="search"], input[type="number"], textarea',
+    )) {
+      const visible = typeof el.checkVisibility === 'function' ? el.checkVisibility({ visibilityProperty: true } as never) : true;
+      if (!visible || !el.value) continue;
+      const id = el.dataset?.testid;
+      out.push({ where: `<${el.tagName.toLowerCase()}${id ? ` data-testid="${id}"` : ''}${el.className ? ` class="${el.className}"` : ''}> value`, text: el.value });
+    }
     // SVG tooltips.
     for (const t of document.querySelectorAll('svg title')) out.push({ where: 'svg <title>', text: t.textContent ?? '' });
     return out;
@@ -187,10 +198,35 @@ test('@smoke the check finds a raw key in the title, a tooltip and the visible t
     b.dataset.testid = 'planted-raw-key';
     document.body.prepend(b);
   });
+  // The tab's own name field, as the desktop app showed it: only its live value is the key; the
+  // text and the tooltips around it stay clean.
+  await page.evaluate(() => {
+    const input = document.querySelector<HTMLInputElement>('input.tab-name');
+    if (!input) throw new Error('the project tab has no name field');
+    input.value = 'tabBar.newStructure';
+  });
   const hits = (await shown(page)).flatMap(({ where, text }) => findRawKeys(text, INDEX).map((h) => `${h.text} @ ${where}`));
   expect(hits).toEqual(expect.arrayContaining([
     'tabBar.newStructure @ document.title',
     'design.banner.rerunCodeCheck @ visible text',
     'ribbon.settings @ <button data-testid="planted-raw-key"> title',
   ]));
+  // The tab's value is found as the field's value, and not through the visible text or a title.
+  const fromField = hits.filter((h) => h.startsWith('tabBar.newStructure @ <input'));
+  expect(fromField).toHaveLength(1);
+  expect(fromField[0]).toMatch(/class="tab-name[^"]*"> value$/);
+});
+
+test('@smoke the check reads the live value of a text field, and nothing else needs to show the key', async ({ page }) => {
+  await bootBasic(page, 'en');
+  await page.evaluate(() => {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.dataset.testid = 'planted-raw-key-input';
+    input.title = 'Project name';
+    document.body.prepend(input);
+    input.value = 'tabBar.newStructure';
+  });
+  const hits = (await shown(page)).flatMap(({ where, text }) => findRawKeys(text, INDEX).map((h) => `${h.text} @ ${where}`));
+  expect(hits).toEqual(['tabBar.newStructure @ <input data-testid="planted-raw-key-input"> value']);
 });
