@@ -170,7 +170,7 @@
       apply(p as Parameters<typeof apply>[0]);
     },
     showTab(t: string) {
-      if (t === 'experiment' || t === 'edit') showTab(t);
+      if (t === 'experiment' || t === 'params' || t === 'edit') showTab(t);
     },
   };
   const passed = validation.checks.filter((c) => c.passed).length;
@@ -178,6 +178,8 @@
   /** Links in the article set the app's state. */
   function apply(p: Partial<{ family: Family; eta: number; phi: number; psi: number; theta: number; ell: number; keep: number; prestress: number; diagonals: boolean; law: 'hookean' | 'equal_weight'; strain: number }>) {
     touch();
+    tab = 'experiment';
+    tabId = 'experiment';
     if (p.family !== undefined) family = p.family;
     if (p.eta !== undefined) eta = p.eta;
     if (p.phi !== undefined) phi = p.phi;
@@ -303,11 +305,11 @@
   const fmtSci = (v: number) => (v === 0 ? '0' : Math.abs(v) >= 0.01 && Math.abs(v) < 1000 ? v.toPrecision(3) : v.toExponential(1));
 
   // ---- the Stabileo editor, embedded (loaded only when its tab is opened) -------------------
-  let tab = $state<'experiment' | 'edit'>('experiment');
+  let tab = $state<'experiment' | 'params' | 'edit'>('experiment');
   // PaneTabs binds a plain string; any switch counts as the visitor taking over.
   let tabId = $state<string>('experiment');
   $effect(() => {
-    if (tabId !== tab) showTab(tabId === 'edit' ? 'edit' : 'experiment');
+    if (tabId !== tab) showTab(tabId === 'edit' ? 'edit' : tabId === 'params' ? 'params' : 'experiment');
   });
   let editorSrc = $state<string | null>(null);
   let editorLoading = $state(false);
@@ -331,18 +333,11 @@
       editorLoading = false;
     }
   }
-  function showTab(t: 'experiment' | 'edit') {
+  function showTab(t: 'experiment' | 'params' | 'edit') {
     touch();
     tab = t;
     tabId = t;
   }
-  // The embedded editor needs the page's width (the app switches to its phone layout below 768 px):
-  // while it is shown, the shell's grid is one column with the app first.
-  $effect(() => {
-    const grid = pane?.closest('.rs-shell-grid');
-    grid?.classList.toggle('rs-editing', tab === 'edit');
-    return () => grid?.classList.remove('rs-editing');
-  });
   // The editor loads the first time its tab is shown (once a strip exists).
   $effect(() => {
     if (tab === 'edit' && strip && !editorSrc && !editorLoading) void loadEditor();
@@ -367,6 +362,7 @@
   }}
   {actions}
   sourcePath="research/metamaterials/grossman-2026"
+  wide={tab === 'edit'}
 >
   {#snippet article()}
       <h2>What the paper shows</h2>
@@ -491,7 +487,7 @@
   {#snippet app()}
       <div class="sp-app" bind:this={pane}>
         <div class="sp-tabbar">
-          <PaneTabs tabs={[{ id: 'experiment', label: 'Experiment' }, { id: 'edit', label: 'Edit in Stabileo' }]} bind:active={tabId} />
+          <PaneTabs tabs={[{ id: 'experiment', label: 'Network' }, { id: 'params', label: 'Parameters' }, { id: 'edit', label: 'Edit in Stabileo' }]} bind:active={tabId} />
           <button class="sp-full" type="button" onclick={openFullEditor} disabled={!strip}>Open full editor ↗</button>
         </div>
           <div class="sp-editor" role="tabpanel" id="rs-panel-edit" aria-labelledby="rs-tab-edit" hidden={tab !== 'edit'}>
@@ -528,6 +524,7 @@
                 cellSize={2}
                 lineWidth={2}
                 values={forces}
+                colourMap="diverging"
                 perCell={true}
                 range={forceRange}
                 title={Math.abs(strain) > 0 ? 'Axial force N / (k ε)' : 'Axial force N / k'}
@@ -537,7 +534,7 @@
                 displacement={disp}
                 deformScale={deform}
                 showMesh={false}
-                height="min(26rem, 55vh)"
+                height="clamp(16rem, 46dvh, 26rem)"
                 ariaLabel="Stabileo viewer: the spring network coloured by axial force on its deformed shape"
                 status={[{ label: 'nodes', value: String(strip.nodes.length) }, { label: 'springs', value: String(strip.bonds.length) }]}
                 editorButton={false}
@@ -554,6 +551,8 @@
           <div><dt>B / k · G / k (affine)</dt><dd>{nf(cell?.isotropic.bulk)} · {nf(cell?.isotropic.shear)} <span class="m">({nf(cell?.isotropic_affine.bulk)} · {nf(cell?.isotropic_affine.shear)})</span></dd></div>
           <div><dt>coordination z · nonaffinity</dt><dd>{nf(cell?.coordination, 2)} · {nf(cell?.nonaffinity_shear, 4)}</dd></div>
         </dl>
+        </div>
+        <div role="tabpanel" id="rs-panel-params" aria-labelledby="rs-tab-params" hidden={tab !== 'params'}>
         <form class="sp-controls" oninput={touch} onsubmit={(e) => e.preventDefault()}>
           <label>Network
             <select bind:value={family} aria-label="Network">
@@ -583,6 +582,7 @@
           <label>Deformation × <input type="range" min="0" max="60" step="1" bind:value={deform} aria-label="Deformation scale" /><span class="v">{deform}</span></label>
           <label>Seed <input class="seed" type="number" min="0" max="999" step="1" bind:value={seed} aria-label="Random seed" /></label>
         </form>
+          <p class="sp-note">Every change re-solves the strip and the periodic cell at once ({nf(solveMs, 0)} ms for the last one).</p>
         </div>
       </div>
       {/snippet}
@@ -761,15 +761,5 @@
     place-items: center;
     color: var(--fg-2);
     font: 13px var(--lp-mono);
-  }
-  /* While the embedded editor is shown: the shell's grid becomes one column, app first. */
-  :global(.rs-shell-grid.rs-editing) {
-    grid-template-columns: minmax(0, 1fr) !important;
-  }
-  :global(.rs-shell-grid.rs-editing .rs-shell-app) {
-    order: -1;
-    position: static !important;
-    max-height: none !important;
-    overflow: visible !important;
   }
 </style>
