@@ -19,8 +19,8 @@
   import StabileoViewer from '../shell/StabileoViewer.svelte';
   import PaneTabs from '../shell/PaneTabs.svelte';
 
-  const STABILEO = '#3987e5';
-  const REFERENCE = '#d95926';
+  const STABILEO = 'var(--rs-plot-ours)';
+  const REFERENCE = 'var(--rs-plot-ref)';
   const BASE = `${import.meta.env.BASE_URL}research-wasm/shauer-2025/`;
   /** This experiment shows its mesh by default: the refined band is part of the method. */
   const MESH_BY_DEFAULT = true;
@@ -236,9 +236,28 @@
 
   const forceSeries = $derived.by<Series[]>(() => {
     const out: Series[] = [];
-    if (frames.length) out.push({ name: source === 'replay' ? 'Stabileo (Rust, precomputed replay)' : 'Stabileo (Rust, in this browser)', color: STABILEO, points: frames.map((f) => [f.step.displacement, f.step.reaction]), markers: true });
+    if (frames.length) out.push({ name: source === 'replay' ? 'Stabileo (Rust, precomputed replay)' : 'Stabileo (Rust, in this browser)', color: STABILEO, points: frames.map((f) => [f.step.displacement, f.step.reaction]) });
     if (showsReference) out.push({ name: 'Reference code (Python, committed outputs)', color: REFERENCE, dashed: true, points: reference.map((r) => [r.pseudotime * REF_TOP_DISPLACEMENT, r.reaction]) });
     return out;
+  });
+  const peakFrame = $derived(frames.length ? frames.reduce((a, f) => (f.step.reaction > a.step.reaction ? f : a), frames[0]) : null);
+  const forceLabels = $derived(
+    peakFrame
+      ? [{ x: peakFrame.step.displacement, y: peakFrame.step.reaction, anchor: 'end' as const, text: showsReference ? `Stabileo (blue) inside the reference (orange halo): peak ${peakFrame.step.reaction.toFixed(4)} kN` : `Stabileo: peak ${peakFrame.step.reaction.toFixed(4)} kN` }]
+      : [],
+  );
+  const residualSeries = $derived.by<Series[]>(() => {
+    if (!showsReference || !frames.length) return [];
+    return [{ name: 'difference from the reference', color: STABILEO, points: frames.map((f, i) => [f.step.displacement, Math.max(1e-16, Math.abs(f.step.reaction - (reference[i]?.reaction ?? f.step.reaction)))]) }];
+  });
+  const energyLabels = $derived.by(() => {
+    if (!frames.length) return [];
+    const last = frames[frames.length - 1].step;
+    const peak = frames.reduce((a, f) => (f.step.elastic_energy > a.step.elastic_energy ? f : a), frames[0]).step;
+    return [
+      { x: peak.displacement, y: peak.elastic_energy, anchor: 'end' as const, text: 'elastic' },
+      { x: last.displacement, y: last.fracture_energy, anchor: 'end' as const, text: 'fracture Gc·Γ' },
+    ];
   });
   const energySeries = $derived.by<Series[]>(() =>
     frames.length
@@ -431,7 +450,10 @@
       <div class="rs-panel" id="rs-panel-force" role="tabpanel" aria-labelledby="rs-tab-force" hidden={tab !== 'force'} bind:clientHeight={forceH}>
         <figure>
           <figcaption>Reaction force against imposed top displacement</figcaption>
-          <LineChart series={forceSeries} xLabel="top displacement u, mm" yLabel="force F, kN" fx={(v) => v.toFixed(4)} fy={(v) => v.toFixed(2)} marker={frame ? frame.step.displacement : null} height={Math.max(180, forceH - 90)} />
+          <LineChart series={forceSeries} xLabel="top displacement u (mm)" yLabel="F (kN)" marker={frame ? frame.step.displacement : null} markerLabel={frame ? `step ${frame.step.step}` : ''} labels={forceLabels} height={Math.max(170, forceH - 190)} />
+          {#if residualSeries.length}
+            <LineChart series={residualSeries} xLabel="top displacement u (mm)" yLabel="|F − F_ref| (kN)" log rules={[{ y: 1e-5, text: 'staggered tolerance' }]} marker={frame ? frame.step.displacement : null} height={110} />
+          {/if}
           {#if !showsReference}<p class="rs-note">The reference curve is shown only for the reference parameters.</p>{/if}
         </figure>
       </div>
@@ -455,7 +477,7 @@
           </figure>
           <figure>
             <figcaption>Energies</figcaption>
-            <LineChart series={energySeries} xLabel="top displacement u, mm" yLabel="energy, kN·mm" fx={(v) => v.toFixed(4)} fy={(v) => v.toExponential(1)} marker={frame ? frame.step.displacement : null} height={Math.max(150, convH - (comparison ? 420 : 260))} />
+            <LineChart series={energySeries} xLabel="top displacement u (mm)" yLabel="energy (kN·mm)" marker={frame ? frame.step.displacement : null} labels={energyLabels} height={Math.max(150, convH - (comparison ? 420 : 260))} />
           </figure>
         {/if}
       </div>

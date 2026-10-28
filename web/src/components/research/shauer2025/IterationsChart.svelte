@@ -58,7 +58,7 @@
     display: block;
   }
   .grid {
-    stroke: var(--hair);
+    stroke: var(--rs-plot-grid);
   }
   .tick {
     fill: var(--fg-2);
@@ -70,10 +70,10 @@
     font: 12px var(--lp-sans);
   }
   .bar {
-    fill: #3987e5;
+    fill: var(--rs-plot-ours);
   }
   .ref {
-    fill: #d95926;
+    fill: var(--rs-plot-ref);
   }
   .readout {
     position: absolute;
