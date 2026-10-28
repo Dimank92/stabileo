@@ -208,11 +208,15 @@ function captureAdvanced(c: SnapshotCase, out: Values): void {
   }
 }
 
-/** Run one case and return its snapshot. */
-export async function capture(c: SnapshotCase): Promise<Snapshot> {
+/**
+ * Run one case and return its snapshot. `afterOpen` edits the opened project before the solve:
+ * the negative test's deliberate result change (`__tests__/negative.test.ts`).
+ */
+export async function capture(c: SnapshotCase, opts: { afterOpen?: () => void } = {}): Promise<Snapshot> {
   setLocale('en');
   reset(c);
   await open(c);
+  opts.afterOpen?.();
   const values: Values = {};
   values['model.nodes'] = modelStore.nodes.size;
   values['model.elements'] = modelStore.elements.size;
