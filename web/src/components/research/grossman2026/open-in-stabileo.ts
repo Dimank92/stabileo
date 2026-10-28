@@ -12,7 +12,7 @@
 import { deflateSync } from 'fflate';
 import type { StripResult } from './springs';
 
-export function stripCompact(strip: StripResult, label: string) {
+export function stripCompact(strip: StripResult, label: string, stamp?: unknown) {
   const n = strip.nodes.map((p, i) => [i + 1, p[0], p[1]]);
   const sections: (string | number)[][] = [];
   const sectionOf = new Map<number, number>();
@@ -50,6 +50,7 @@ export function stripCompact(strip: StripResult, label: string) {
     l: [],
     ni: [n.length + 1, 2, sections.length + 1, e.length + 1, s.length + 1, 1],
     _: { autoSolve: true, diagramType: 'axial' },
+    ...(stamp ? { sw: stamp } : {}),
   };
 }
 
@@ -59,8 +60,8 @@ function base64url(bytes: Uint8Array): string {
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-export function stripShareHash(strip: StripResult, label: string): string {
-  const bytes = new TextEncoder().encode(JSON.stringify(stripCompact(strip, label)));
+export function stripShareHash(strip: StripResult, label: string, stamp?: unknown): string {
+  const bytes = new TextEncoder().encode(JSON.stringify(stripCompact(strip, label, stamp)));
   return `#data=2.${base64url(deflateSync(bytes, { level: 9 }))}`;
 }
 
@@ -70,5 +71,8 @@ export async function openStripInStabileo(
 ): Promise<void> {
   const what = p.family === 'foam' ? `foam η = ${p.eta.toFixed(2)}` : p.family;
   const label = `From Stabileo Research: spring network (${what}, bonds kept ${p.keep.toFixed(2)}, seed ${p.seed}, strain ${p.strain})`;
-  window.location.assign(`${import.meta.env.BASE_URL}app/basic${stripShareHash(strip, label)}`);
+  // A new project that this build has not solved yet (the app's own stamp for a fresh project),
+  // so the editor does not treat it as results from an unknown older version.
+  const { freshStamp } = await import('../../../lib/provenance/solve-stamp');
+  window.location.assign(`${import.meta.env.BASE_URL}app/basic${stripShareHash(strip, label, freshStamp())}`);
 }

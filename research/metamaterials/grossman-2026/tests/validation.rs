@@ -258,7 +258,7 @@ fn part_b(c: &mut Checks) {
     let r = periodic(spec(tri(1.0, 0.5)), 4);
     let hook = moduli::uniaxial(&r.c, PI / 2.0).unwrap().1;
     c.at_most("lattice (1, 0.5), theta = 0, equal Hookean springs: exact nu = 1/6", "absolute difference", (hook - 1.0 / 6.0).abs(), 1e-12);
-    c.at_most("lattice (1, 0.5), theta = 0: Supplemental Eq. (9) gives 8/27, not 1/6", "absolute difference", (paper::ordered_poisson(1.0, 0.5, 0.0) - 8.0 / 27.0).abs(), 1e-12);
+    c.at_most("lattice (1, 0.5), theta = 0: Supplemental Eq. (9) evaluates to 8/27", "absolute difference", (paper::ordered_poisson(1.0, 0.5, 0.0) - 8.0 / 27.0).abs(), 1e-12);
 
     // B3. Fig. 7 (vector data): the calculation line is the equal-weight Young's modulus times
     // the area of one triangle. Tolerance: line width plus axis calibration, about 0.5 % of the axis.

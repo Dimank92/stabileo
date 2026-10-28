@@ -370,14 +370,13 @@
       </p>
       <PlotXY series={honeySeries} xLabel="ℓ" yLabel="Poisson’s ratio ν" xDomain={[0, 1]} current={family === 'honeycomb' && cellAlong ? { x: ell, y: cellAlong[1], label: 'This network' } : null} ariaLabel="Honeycomb Poisson's ratio: Eq. 23 and our network" />
 
-      <h3>Ordered lattices: a finding about spring constants</h3>
+      <h3>Ordered lattices: an observation about spring constants</h3>
       <p>
         For ordered triangular lattices the paper gives a closed form, Supplemental Eq. (9), for ν as a function of the cell shape (φ, ψ) and orientation θ, plotted in its Fig. 4.
-        A Bravais lattice has no nonaffine displacements, so the exact answer is the uniform-strain one, which we compute independently. Eq. (9) matches it to 10⁻¹⁴, but only
-        when every bond carries the same weight, that is spring constants k<sub>e</sub> ∝ 1/ℓ̄<sub>e</sub>². With equal spring constants, the setting of the paper’s Eq. (3), the
-        exact value differs: for (φ, ψ) = (1, 0.5) at θ = 0 it is ν = 1/6, where Eq. (9) gives 8/27. The calculation line of the paper’s Fig. 7 (Young’s modulus of the (3, 2)
-        lattice, read from the PDF’s vector data) is the same equal-weight result times the area of one triangle, to 6 × 10⁻⁴. We report this as a question of convention for the
-        authors, not as an error.
+        A Bravais lattice has no nonaffine displacements, so the exact answer is the uniform-strain one, which we compute independently. Supplemental Eq. (9) and the
+        calculation line of Fig. 7 (Young’s modulus of the (3, 2) lattice, read from the PDF’s vector data, times the area of one triangle) coincide with that affine result
+        for spring constants k<sub>e</sub> ∝ 1/ℓ̄<sub>e</sub>², to 10⁻¹⁴ and 6 × 10⁻⁴. With equal spring constants we obtain ν = 1/6 at (φ, ψ, θ) = (1, 0.5, 0), where Eq. (9)
+        gives 8/27. This may reflect a convention we have not identified; it is on our list of questions for the authors.
         <button class="link" onclick={() => apply({ family: 'ordered', phi: 1, psi: 0.5, theta: 0, law: 'hookean' })}>Show (1, 0.5)</button> ·
         <button class="link" onclick={() => apply({ family: 'ordered', phi: 2, psi: 0.5, theta: 0.7, law: 'equal_weight' })}>(2, 0.5) at θ = 0.7, equal weight</button>
       </p>

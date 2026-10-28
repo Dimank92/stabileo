@@ -149,7 +149,7 @@
     },
     {
       "metric": "absolute difference",
-      "name": "lattice (1, 0.5), theta = 0: Supplemental Eq. (9) gives 8/27, not 1/6",
+      "name": "lattice (1, 0.5), theta = 0: Supplemental Eq. (9) evaluates to 8/27",
       "observed": 0.0,
       "passed": true,
       "tolerance": 1e-12
