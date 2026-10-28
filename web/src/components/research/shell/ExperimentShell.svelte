@@ -34,20 +34,6 @@
   const s = $derived(rs());
   const authors = paper.crossref.authors.join(', ');
 
-  // The sticky pane fades at the bottom while it can still scroll, so the reader knows there is more.
-  let pane: HTMLElement | undefined = $state();
-  let more = $state(false);
-  function updateMore() {
-    if (pane) more = pane.scrollHeight - pane.scrollTop - pane.clientHeight > 1;
-  }
-  $effect(() => {
-    if (!pane) return;
-    const ro = new ResizeObserver(updateMore);
-    ro.observe(pane);
-    for (const c of pane.children) ro.observe(c);
-    updateMore();
-    return () => ro.disconnect();
-  });
 </script>
 
 <section class="sec sec--ink rs-shell">
@@ -77,7 +63,7 @@
           Engine: the Stabileo engine at the same commit. Permanent links to this exact build are planned.
         </p>
       </article>
-      <aside class="rs-shell-app" class:more aria-label="The experiment" bind:this={pane} onscroll={updateMore}>
+      <aside class="rs-shell-app" aria-label="The experiment">
         {@render app()}
       </aside>
     </div>
@@ -163,17 +149,14 @@
       column-gap: 3rem;
       align-items: start;
     }
+    /* One scroll for the page: the pane is sticky, exactly a viewport tall, and never scrolls on
+       its own; its content is organised in tabs (PaneTabs) instead. */
     .rs-shell-app {
       order: 0;
       position: sticky;
       top: calc(var(--lp-nav-h, 3.6rem) + 0.75rem);
-      max-height: calc(100dvh - var(--lp-nav-h, 3.6rem) - 1.5rem);
-      overflow: hidden auto;
-      scrollbar-gutter: stable;
-      overscroll-behavior: contain;
-    }
-    .rs-shell-app.more {
-      mask-image: linear-gradient(to bottom, #000 calc(100% - 2rem), transparent);
+      height: calc(100dvh - var(--lp-nav-h, 3.6rem) - 1.5rem);
+      overflow: hidden;
     }
   }
   :global(.research .mobile-sticky) {

@@ -3,10 +3,11 @@
   import type { Snippet } from 'svelte';
   import { useExperiment } from './context';
 
-  let { step, params, children }: { step?: number; params?: Record<string, number | string | boolean>; children: Snippet } = $props();
+  let { step, params, tab, children }: { step?: number; params?: Record<string, number | string | boolean>; tab?: string; children: Snippet } = $props();
   const exp = useExperiment();
 
   function go() {
+    if (tab) exp?.showTab(tab);
     if (params) exp?.setParams(params);
     if (step !== undefined) exp?.goToStep(step);
     const pane = document.querySelector('.rs-shell-app');

@@ -4,6 +4,8 @@ import { getContext, setContext } from 'svelte';
 export type ExperimentActions = {
   goToStep(step: number): void;
   setParams(params: Record<string, number | string | boolean>): void;
+  /** Bring a pane tab forward (e.g. 'force' when the text points at the force curve). */
+  showTab(tab: string): void;
 };
 
 const KEY = Symbol('research-experiment');

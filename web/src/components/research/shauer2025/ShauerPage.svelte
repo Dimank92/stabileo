@@ -17,6 +17,7 @@
   import { Playback, SOURCE_LABEL, type Source } from '../shell/playback.svelte';
   import { fetchReplay } from '../shell/replay';
   import StabileoViewer from '../shell/StabileoViewer.svelte';
+  import PaneTabs from '../shell/PaneTabs.svelte';
 
   const STABILEO = '#3987e5';
   const REFERENCE = '#d95926';
@@ -138,8 +139,21 @@
   let deform = $state(10);
   let showMesh = $state(MESH_BY_DEFAULT && (typeof window === 'undefined' || window.innerWidth >= 640));
   let hideBroken = $state(true);
-  let paramsOpen = $state(false);
-  let moreOpen = $state(false);
+  const TABS = [
+    { id: 'viewer', label: 'Viewer' },
+    { id: 'force', label: 'Force' },
+    { id: 'convergence', label: 'Convergence' },
+    { id: 'parameters', label: 'Parameters' },
+  ];
+  let tab = $state('viewer');
+  let flashTab = $state<string | null>(null);
+  let forceH = $state(400);
+  let convH = $state(600);
+  function showTab(t: string) {
+    tab = t;
+    flashTab = t;
+    setTimeout(() => (flashTab = null), 1300);
+  }
 
   const VIEWS: Record<'plate' | 'band' | 'tip', [number, number, number, number]> = {
     plate: [-0.55, -0.6, 0.55, 0.6],
@@ -204,9 +218,10 @@
 
   const actions = {
     goToStep: (s: number) => playback.seek(s),
+    showTab,
     setParams: (p: Record<string, number | string | boolean>) => {
       playback.interact();
-      paramsOpen = true;
+      showTab('parameters');
       if (typeof p.l0 === 'number') l0 = p.l0;
       if (typeof p.e === 'number') e = p.e;
       if (typeof p.gc === 'number') gc = p.gc;
@@ -281,10 +296,10 @@
       everything below about the method comes from it.
     </p>
     <p>
-      In the replay on the right the damage grows smoothly ahead of the notch while the force rises linearly to
+      In the replay the damage grows smoothly ahead of the notch while <ExperimentLink tab="force">the force</ExperimentLink> rises linearly to
       <ExperimentLink step={56}>the peak load (step 56)</ExperimentLink>; at the next increment
-      <ExperimentLink step={57}>the crack runs through the plate in a single step (step 57)</ExperimentLink>, after 308 alternating
-      iterations, and the force drops to almost zero. <ExperimentLink step={78}>The final state</ExperimentLink> shows the open crack on
+      <ExperimentLink step={57}>the crack runs through the plate in a single step (step 57)</ExperimentLink>, after <ExperimentLink tab="convergence">308 alternating
+      iterations</ExperimentLink>, and the force drops to almost zero. <ExperimentLink step={78}>The final state</ExperimentLink> shows the open crack on
       the deformed plate.
     </p>
 
@@ -328,6 +343,20 @@
       fields agree to 3 × 10<sup>−10</sup>.
     </p>
 
+    {#if frames.length}
+      <details class="rs-table">
+        <summary>Step table ({frames.length} steps)</summary>
+        <table>
+          <thead><tr><th>step</th><th>u, mm</th><th>F, kN</th><th>iterations</th><th>residual</th><th>max d</th>{#if showsReference}<th>reference F, kN</th>{/if}</tr></thead>
+          <tbody>
+            {#each frames as f, i (i)}
+              <tr><td>{f.step.step}</td><td>{f.step.displacement.toFixed(5)}</td><td>{f.step.reaction.toExponential(6)}</td><td>{f.step.iterations}</td><td>{f.step.residual.toExponential(2)}</td><td>{f.step.damage_max.toFixed(4)}</td>{#if showsReference}<td>{reference[i]?.reaction.toExponential(6)}</td>{/if}</tr>
+            {/each}
+          </tbody>
+        </table>
+      </details>
+    {/if}
+
     <h2>Comparison with the paper</h2>
     <p>Not done: the article’s full text was not accessible to us, so no number printed in it has been compared. Figures here come from our own runs.</p>
 
@@ -350,68 +379,88 @@
   {#snippet app()}
     <div class="rs-app" lang="en" bind:this={pane} data-steps={frames.length} data-source={source}>
       <p class="rs-mode" data-testid="rs-mode"><span class="dot dot-{source}"></span>{SOURCE_LABEL[source]}</p>
-
-      {#if nodes && elements}
-        <div class="rs-ribbon" role="group" aria-label="Result shown" onclickcapture={() => playback.interact()}>
-          <button class="diagram-btn" class:active={field === 'damage'} onclick={() => (field = 'damage')}>Damage d</button>
-          <button class="diagram-btn" class:active={field === 'disp'} onclick={() => (field = 'disp')}>Displacement</button>
-          <button class="diagram-btn" class:active={field === 'syy'} disabled={!frame?.syy} title={frame?.syy ? '' : 'Stress is available after a live run'} onclick={() => (field = 'syy')}>σyy</button>
-          <span class="rs-sep"></span>
-          <button class="diagram-btn" class:active={deformed} onclick={() => (deformed = !deformed)}>Deformed ×{deform}</button>
-          <button class="diagram-btn" class:active={showMesh} onclick={() => (showMesh = !showMesh)}>Mesh</button>
-          <button class="diagram-btn" class:active={hideBroken} onclick={() => (hideBroken = !hideBroken)} title="Hide elements with two or more corners at d > 0.95 (the open crack)">Hide broken</button>
-          <span class="rs-sep"></span>
-          <button class="diagram-btn" class:active={view === 'plate'} onclick={() => (view = 'plate')}>Plate</button>
-          <button class="diagram-btn" class:active={view === 'band'} onclick={() => (view = 'band')}>Crack band</button>
-          <button class="diagram-btn" class:active={view === 'tip'} onclick={() => (view = 'tip')}>Notch tip</button>
-        </div>
-          <StabileoViewer
-            xy={nodes}
-            cells={elements}
-            values={fieldValues}
-            perCell={field === 'syy'}
-            range={fieldRange}
-            title={field === 'damage' ? 'Damage d' : field === 'disp' ? '|u|' : 'σyy (degraded)'}
-            unit={field === 'damage' ? '' : field === 'disp' ? 'mm' : 'kN/mm²'}
-            legendFooter={field === 'damage' ? 'colours clamped to [0, 1]' : field === 'disp' ? 'mm' : 'kN/mm², element centres'}
-            displacement={deformed ? (frame?.displacement ?? null) : null}
-            deformScale={deform}
-            {showMesh}
-            {hideCell}
-            view={VIEWS[view]}
-            height="clamp(16rem, 42dvh, 24rem)"
-            status={statusItems}
-            ariaLabel="Stabileo viewer: {field} on the {deformed ? 'deformed' : 'undeformed'} mesh"
-          />
-
-      {:else}
-        <div class="rs-placeholder">{replayError ? 'The precomputed replay couldn’t be loaded. Press Recompute live to compute it in your browser.' : 'Loading the replay…'}</div>
-      {/if}
-
-      {#if frames.length}
-        <div class="rs-scrub">
-          <button class="btn btn-sm" type="button" onclick={() => (playback.playing ? playback.pause() : playback.play())}>{playback.playing ? 'Pause' : 'Play'}</button>
-          <input type="range" min="0" max={frames.length - 1} value={playback.shown} oninput={(ev) => playback.seek(Number((ev.currentTarget as HTMLInputElement).value))} aria-label="Load step shown" />
-        </div>
-      {/if}
-
-
-
-
-      <figure>
-        <figcaption>Reaction force against imposed top displacement</figcaption>
-        <LineChart series={forceSeries} xLabel="top displacement u, mm" yLabel="force F, kN" fx={(v) => v.toFixed(4)} fy={(v) => v.toFixed(2)} marker={frame ? frame.step.displacement : null} height={180} />
-        {#if !showsReference}<p class="rs-note">The reference curve is shown only for the reference parameters.</p>{/if}
-      </figure>
       {#if comparison}
         <p class="rs-compare-line" role="status">
           <span class="ok" aria-hidden="true">✓</span>
           {source === 'replay' ? 'This replay' : 'This run'} matches the reference code: peak {comparison.peak.step.reaction.toFixed(6)} kN at step {comparison.peak.step.step}, identical iterations at {comparison.sameIterations} of {reference.length} steps.
-          <button type="button" class="rs-textbtn" onclick={() => { moreOpen = true; requestAnimationFrame(() => document.getElementById('rs-compare-detail')?.scrollIntoView({ block: 'nearest' })); }}>Details</button>
+          <button type="button" class="rs-textbtn" onclick={() => (tab = 'convergence')}>Details</button>
         </p>
       {/if}
-      <details class="rs-params" bind:open={paramsOpen} oninputcapture={() => playback.interact()}>
-        <summary>Parameters</summary>
+      <PaneTabs tabs={TABS} bind:active={tab} flash={flashTab} />
+
+      <div class="rs-panel rs-panel-viewer" id="rs-panel-viewer" role="tabpanel" aria-labelledby="rs-tab-viewer" hidden={tab !== 'viewer'}>
+        {#if nodes && elements}
+          <div class="rs-ribbon" role="group" aria-label="Result shown" onclickcapture={() => playback.interact()}>
+            <button class="diagram-btn" class:active={field === 'damage'} onclick={() => (field = 'damage')}>Damage d</button>
+            <button class="diagram-btn" class:active={field === 'disp'} onclick={() => (field = 'disp')}>Displacement</button>
+            <button class="diagram-btn" class:active={field === 'syy'} disabled={!frame?.syy} title={frame?.syy ? '' : 'Stress is available after a live run'} onclick={() => (field = 'syy')}>σyy</button>
+            <span class="rs-sep"></span>
+            <button class="diagram-btn" class:active={deformed} onclick={() => (deformed = !deformed)}>Deformed ×{deform}</button>
+            <button class="diagram-btn" class:active={showMesh} onclick={() => (showMesh = !showMesh)}>Mesh</button>
+            <button class="diagram-btn" class:active={hideBroken} onclick={() => (hideBroken = !hideBroken)} title="Hide elements with two or more corners at d > 0.95 (the open crack)">Hide broken</button>
+            <span class="rs-sep"></span>
+            <button class="diagram-btn" class:active={view === 'plate'} onclick={() => (view = 'plate')}>Plate</button>
+            <button class="diagram-btn" class:active={view === 'band'} onclick={() => (view = 'band')}>Crack band</button>
+            <button class="diagram-btn" class:active={view === 'tip'} onclick={() => (view = 'tip')}>Notch tip</button>
+          </div>
+          <div class="rs-viewer-slot">
+            <StabileoViewer
+              xy={nodes}
+              cells={elements}
+              values={fieldValues}
+              perCell={field === 'syy'}
+              range={fieldRange}
+              title={field === 'damage' ? 'Damage d' : field === 'disp' ? '|u|' : 'σyy (degraded)'}
+              unit={field === 'damage' ? '' : field === 'disp' ? 'mm' : 'kN/mm²'}
+              legendFooter={field === 'damage' ? 'colours clamped to [0, 1]' : field === 'disp' ? 'mm' : 'kN/mm², element centres'}
+              displacement={deformed ? (frame?.displacement ?? null) : null}
+              deformScale={deform}
+              {showMesh}
+              {hideCell}
+              view={VIEWS[view]}
+              height="100%"
+              status={statusItems}
+              ariaLabel="Stabileo viewer: {field} on the {deformed ? 'deformed' : 'undeformed'} mesh"
+            />
+          </div>
+        {:else}
+          <div class="rs-placeholder">{replayError ? 'The precomputed replay couldn’t be loaded. Press Recompute live to compute it in your browser.' : 'Loading the replay…'}</div>
+        {/if}
+      </div>
+
+      <div class="rs-panel" id="rs-panel-force" role="tabpanel" aria-labelledby="rs-tab-force" hidden={tab !== 'force'} bind:clientHeight={forceH}>
+        <figure>
+          <figcaption>Reaction force against imposed top displacement</figcaption>
+          <LineChart series={forceSeries} xLabel="top displacement u, mm" yLabel="force F, kN" fx={(v) => v.toFixed(4)} fy={(v) => v.toFixed(2)} marker={frame ? frame.step.displacement : null} height={Math.max(180, forceH - 90)} />
+          {#if !showsReference}<p class="rs-note">The reference curve is shown only for the reference parameters.</p>{/if}
+        </figure>
+      </div>
+
+      <div class="rs-panel" id="rs-panel-convergence" role="tabpanel" aria-labelledby="rs-tab-convergence" hidden={tab !== 'convergence'} bind:clientHeight={convH}>
+        {#if comparison}
+          <div class="rs-compare" id="rs-compare-detail">
+            <h3>{source === 'replay' ? 'This replay' : 'This run'} against the reference code</h3>
+            <ul>
+              <li>Peak force {comparison.peak.step.reaction.toFixed(6)} kN at step {comparison.peak.step.step}; reference {refPeak.reaction.toFixed(6)} kN at step {refPeak.step}.</li>
+              <li>Largest relative force difference up to the peak: {comparison.worstPre.toExponential(1)} (test tolerance 1e-9).</li>
+              <li>Largest absolute force difference, fracture included: {comparison.worstAll.toExponential(1)} kN (bounded by the staggered tolerance 1e-5).</li>
+              <li>Identical number of staggered iterations at {comparison.sameIterations} of {reference.length} steps.</li>
+            </ul>
+          </div>
+        {/if}
+        {#if frames.length}
+          <figure>
+            <figcaption>Staggered iterations per load step{showsReference ? ' (dots where the reference differs; none expected)' : ''}</figcaption>
+            <IterationsChart steps={frames.map((f) => f.step)} reference={showsReference ? reference.map((r) => r.iterations) : null} height={130} />
+          </figure>
+          <figure>
+            <figcaption>Energies</figcaption>
+            <LineChart series={energySeries} xLabel="top displacement u, mm" yLabel="energy, kN·mm" fx={(v) => v.toFixed(4)} fy={(v) => v.toExponential(1)} marker={frame ? frame.step.displacement : null} height={Math.max(150, convH - (comparison ? 420 : 260))} />
+          </figure>
+        {/if}
+      </div>
+
+      <div class="rs-panel rs-params" id="rs-panel-parameters" role="tabpanel" aria-labelledby="rs-tab-parameters" hidden={tab !== 'parameters'} oninputcapture={() => playback.interact()}>
         <div class="rs-grid2">
           <label><span class="lbl"><i>E</i></span><NumberField label="E, Young’s modulus, kN/mm²" min={LIMITS.e[0]} max={LIMITS.e[1]} bind:value={e} /><span class="u">kN/mm²</span></label>
           <label><span class="lbl"><i>ν</i></span><NumberField label="ν, Poisson’s ratio" min={LIMITS.nu[0]} max={LIMITS.nu[1]} bind:value={nu} /><span class="u"></span></label>
@@ -464,42 +513,14 @@
             Run computes these parameters in your browser.
           {/if}
         </p>
-      </details>
-      {#if frames.length}
-        <details class="rs-more" bind:open={moreOpen}>
-          <summary>Comparison, convergence and energies</summary>
-      {#if comparison}
-            <div class="rs-compare" id="rs-compare-detail">
-              <h3>{source === 'replay' ? 'This replay' : 'This run'} against the reference code</h3>
-              <ul>
-                <li>Peak force {comparison.peak.step.reaction.toFixed(6)} kN at step {comparison.peak.step.step}; reference {refPeak.reaction.toFixed(6)} kN at step {refPeak.step}.</li>
-                <li>Largest relative force difference up to the peak: {comparison.worstPre.toExponential(1)} (test tolerance 1e-9).</li>
-                <li>Largest absolute force difference, fracture included: {comparison.worstAll.toExponential(1)} kN (bounded by the staggered tolerance 1e-5).</li>
-                <li>Identical number of staggered iterations at {comparison.sameIterations} of {reference.length} steps.</li>
-              </ul>
-            </div>
-          {/if}
+      </div>
 
-          <figure>
-            <figcaption>Staggered iterations per load step{showsReference ? ' (dots where the reference differs; none expected)' : ''}</figcaption>
-            <IterationsChart steps={frames.map((f) => f.step)} reference={showsReference ? reference.map((r) => r.iterations) : null} />
-          </figure>
-          <figure>
-            <figcaption>Energies</figcaption>
-            <LineChart series={energySeries} xLabel="top displacement u, mm" yLabel="energy, kN·mm" fx={(v) => v.toFixed(4)} fy={(v) => v.toExponential(1)} marker={frame ? frame.step.displacement : null} height={200} />
-          </figure>
-          <details class="rs-table">
-            <summary>Step table ({frames.length} steps)</summary>
-            <table>
-              <thead><tr><th>step</th><th>u, mm</th><th>F, kN</th><th>iterations</th><th>residual</th><th>max d</th>{#if showsReference}<th>reference F, kN</th>{/if}</tr></thead>
-              <tbody>
-                {#each frames as f, i (i)}
-                  <tr><td>{f.step.step}</td><td>{f.step.displacement.toFixed(5)}</td><td>{f.step.reaction.toExponential(6)}</td><td>{f.step.iterations}</td><td>{f.step.residual.toExponential(2)}</td><td>{f.step.damage_max.toFixed(4)}</td>{#if showsReference}<td>{reference[i]?.reaction.toExponential(6)}</td>{/if}</tr>
-                {/each}
-              </tbody>
-            </table>
-          </details>
-        </details>
+      {#if frames.length}
+        <div class="rs-scrub">
+          <button class="btn btn-sm" type="button" onclick={() => (playback.playing ? playback.pause() : playback.play())}>{playback.playing ? 'Pause' : 'Play'}</button>
+          <input type="range" min="0" max={frames.length - 1} value={playback.shown} oninput={(ev) => playback.seek(Number((ev.currentTarget as HTMLInputElement).value))} aria-label="Load step shown" />
+          <span class="rs-stepread">step {frame?.step.step ?? 0} of {frames.length - 1}</span>
+        </div>
       {/if}
     </div>
   {/snippet}
@@ -507,10 +528,57 @@
 
 <style>
   .rs-app {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
     color: var(--fg);
+    min-width: 0;
+  }
+  .rs-panel {
+    min-width: 0;
+  }
+  .rs-panel[hidden] {
+    display: none;
+  }
+  .rs-panel-viewer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .rs-viewer-slot {
+    height: clamp(18rem, 70vw, 26rem);
+    min-height: 0;
+  }
+  .rs-viewer-slot :global(.rs-viewer-host),
+  .rs-viewer-slot :global(.sfv-wrap) {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  .rs-viewer-slot :global(.sfv) {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  /* In the sticky pane (wide screens) the app is exactly the pane's height and its panels share
+     what is left after the tabs and the step player: nothing scrolls inside it. */
+  @media (min-width: 70rem) {
+    .rs-app {
+      height: 100%;
+    }
+    .rs-panel {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .rs-viewer-slot {
+      flex: 1 1 auto;
+      height: auto;
+    }
+  }
+  .rs-stepread {
+    font-size: var(--rs-ui);
+    color: var(--fg-2);
+    white-space: nowrap;
   }
   .rs-mode {
     margin: 0;
@@ -573,12 +641,7 @@
     padding: 1rem;
     text-align: center;
   }
-  .rs-params,
-  .rs-more {
-    border: 1px solid var(--hair);
-    border-radius: 4px;
-    padding: 0.5rem 0.9rem;
-  }
+
   summary {
     cursor: pointer;
     color: var(--fg);
