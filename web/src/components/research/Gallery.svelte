@@ -58,9 +58,9 @@
             <p class="rs-g-by">{p.crossref.title}. {authors(p.crossref.authors)}, <em>{p.crossref.venue}</em>, {p.crossref.year}.</p>
             <div class="rs-g-actions">
               <PublicLink to={e.path} class="btn btn-primary btn-sm">{s.readRun}</PublicLink>
-              <a class="btn btn-sm" href="https://doi.org/{p.doi}" rel="noreferrer" target="_blank">{s.paper}</a>
-              <a class="btn btn-sm" href={e.code} rel="noreferrer" target="_blank">{s.code}</a>
-              {#if e.editor}<PublicLink to="{e.path}#edit" class="btn btn-ghost btn-sm">{s.editInStabileo}</PublicLink>{:else}<span class="rs-g-soon" title={s.soon}>{s.openInStabileo}: {s.soon}</span>{/if}
+              <a class="btn btn-ghost btn-sm" href="https://doi.org/{p.doi}" rel="noreferrer" target="_blank">{s.paper} ↗</a>
+              <a class="btn btn-ghost btn-sm" href={e.code} rel="noreferrer" target="_blank">{s.code} ↗</a>
+              {#if e.editor}<PublicLink to="{e.path}#edit" class="btn btn-ghost btn-sm">{s.editInStabileo}</PublicLink>{/if}
             </div>
           </div>
         </li>
