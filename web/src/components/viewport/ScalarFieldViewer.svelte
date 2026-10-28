@@ -102,7 +102,7 @@
   let field: ScalarFieldMesh | null = null;
   let ro: ResizeObserver | null = null;
   let damping = 0;
-  let mode = $state<'2d' | '3d'>('2d');
+  let projection = $state<'plan' | 'orbit'>('plan');
   let menuOpen = $state(false);
   let pointer = $state<string>('—');
   let zoomText = $state<string>('—');
@@ -135,7 +135,7 @@
     return [x0, y0, x1, y1];
   }
 
-  /** Fit the region: in 2D the app's plan view (tipped 1° so Z stays the orbit axis), in 3D an oblique view. */
+  /** Fit the region: in the plan view the app's top view (tipped 1° so Z stays the orbit axis), in 3D an oblique view. */
   export function fit() {
     if (!renderer) return;
     const [x0, y0, x1, y1] = bounds();
@@ -146,7 +146,7 @@
     const aspect = container.clientWidth / Math.max(1, container.clientHeight);
     const fov = THREE.MathUtils.degToRad(camera.fov);
     const dist = (1.08 * Math.max(h, w / aspect)) / 2 / Math.tan(fov / 2);
-    if (mode === '2d') {
+    if (projection === 'plan') {
       const tip = 0.018;
       camera.position.set(cx, cy - dist * Math.sin(tip), dist * Math.cos(tip));
     } else {
@@ -156,13 +156,13 @@
     camera.far = dist * 100;
     camera.updateProjectionMatrix();
     controls.target.set(cx, cy, 0);
-    controls.enableRotate = mode === '3d';
+    controls.enableRotate = projection === 'orbit';
     camera.lookAt(cx, cy, 0);
     invalidate();
   }
 
-  function setMode(m: '2d' | '3d') {
-    mode = m;
+  function setProjection(m: 'plan' | 'orbit') {
+    projection = m;
     menuOpen = false;
     fit();
   }
@@ -276,12 +276,12 @@
           <div class="cam-menu">
             <button class="cam-item" onclick={() => { menuOpen = false; fit(); }}><span class="cam-glyph">⤢</span><span>Zoom to extents</span></button>
             <div class="cam-sep"></div>
-            <button class="cam-item" class:on={mode === '2d'} onclick={() => setMode('2d')}><span class="cam-glyph">⊤</span><span>2D (plan, orbit locked)</span></button>
-            <button class="cam-item" class:on={mode === '3d'} onclick={() => setMode('3d')}><span class="cam-glyph">◇</span><span>3D (orbit)</span></button>
+            <button class="cam-item" class:on={projection === 'plan'} onclick={() => setProjection('plan')}><span class="cam-glyph">⊤</span><span>2D (plan, orbit locked)</span></button>
+            <button class="cam-item" class:on={projection === 'orbit'} onclick={() => setProjection('orbit')}><span class="cam-glyph">◇</span><span>3D (orbit)</span></button>
           </div>
         {/if}
       </div>
-      <button class="sfv-mode" onclick={() => setMode(mode === '2d' ? '3d' : '2d')} title="Switch between 2D and 3D">{mode === '2d' ? '2D' : '3D'}</button>
+      <button class="sfv-mode" onclick={() => setProjection(projection === 'plan' ? 'orbit' : 'plan')} title="Switch between the plan view and orbiting in 3D">{projection === 'plan' ? '2D' : '3D'}</button>
       <button class="sfv-mode" onclick={() => fit()} title="Zoom to extents" aria-label="Zoom to extents">⤢</button>
     </div>
     {#if values}
