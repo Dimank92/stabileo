@@ -291,3 +291,55 @@ fn steel_check_multiple_members() {
     close(results[1].phi_mn_y, 140_860.7, "element 2 phi·Mn_y");
     close(results[2].phi_mn_y, 49_794.5, "element 3 phi·Mn_y");
 }
+
+/// Issue #576: Invalid inputs for Shear G2, Compression E3, and LTB F2 must be refused or marked unevaluated.
+#[test]
+fn steel_check_invalid_inputs_are_refused() {
+    let mut m = w14x22_data(1, 4.0, 4.0);
+    m.aw = Some(1e-3);
+    m.cv1 = Some(0.0); // Invalid zero capacity under shear load
+
+    let r = check_steel_members(&SteelCheckInput {
+        members: vec![m.clone()],
+        forces: vec![ElementDesignForces {
+            element_id: 1,
+            n: 0.0,
+            my: 0.0,
+            mz: None,
+            vy: Some(50_000.0),
+        }],
+    });
+    assert!(!r[0].unevaluated.is_empty(), "Shear G2 with zero capacity must be unevaluated");
+    assert!(r[0].unevaluated.iter().any(|u| u == "Shear G2"));
+
+    // Compression with zero radius of gyration on unbraced axis
+    let mut m_comp = w14x22_data(2, 4.0, 4.0);
+    m_comp.ry = 0.0;
+    let r_comp = check_steel_members(&SteelCheckInput {
+        members: vec![m_comp],
+        forces: vec![ElementDesignForces {
+            element_id: 2,
+            n: -100_000.0,
+            my: 0.0,
+            mz: None,
+            vy: None,
+        }],
+    });
+    assert!(r_comp[0].unevaluated.iter().any(|u| u == "Compression E3/E7"));
+
+    // Unbraced LTB with zero iy
+    let mut m_ltb = w14x22_data(3, 4.0, 4.0);
+    m_ltb.lb = Some(4.0);
+    m_ltb.iy = 0.0;
+    let r_ltb = check_steel_members(&SteelCheckInput {
+        members: vec![m_ltb],
+        forces: vec![ElementDesignForces {
+            element_id: 3,
+            n: 0.0,
+            my: 50_000.0,
+            mz: None,
+            vy: None,
+        }],
+    });
+    assert!(r_ltb[0].unevaluated.iter().any(|u| u == "Flexure-Y F2"));
+}

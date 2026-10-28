@@ -172,8 +172,12 @@ pub fn steel_ratio_enclosures(
     let compression = loaded_ratio(CHECK_NAMES[1], (-n).max(zero), phi_pn_c)?;
     let flex_y = loaded_ratio(CHECK_NAMES[2], my, phi_mn_y)?;
     let flex_z = loaded_ratio(CHECK_NAMES[3], mz, phi_mn_z)?;
-    // Shear: `if phi_vn > 0 { vy / phi_vn } else { 0 }`.
-    let shear = branch(zero.lt(phi_vn), || vy.div(phi_vn), || zero);
+    // Shear: `loaded_ratio` when web area is supplied, else 0.
+    let shear = if m.aw.is_some() {
+        loaded_ratio(CHECK_NAMES[4], vy, phi_vn)?
+    } else {
+        zero
+    };
     let axial = branch(n.lt(zero), || compression, || tension);
     let interaction = interaction_h1(axial, flex_y, flex_z);
     let out = [tension, compression, flex_y, flex_z, shear, interaction];

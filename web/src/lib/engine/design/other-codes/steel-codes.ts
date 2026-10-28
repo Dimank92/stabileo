@@ -71,7 +71,15 @@ export function aiscGaps(p: SteelProps, fy: number, E: number): { flexure: boole
   const r = Math.sqrt(E / fy);
   if (p.shape === 'CHS') {
     const Dt = p.h / p.tw;
-    return { flexure: Dt > (0.07 * E) / fy, compression: Dt > (0.11 * E) / fy, shear: false };
+    // AISC 360-22 G5 Eq. (G5-2b): Fcr < 0.6 Fy when D/t > (0.78/0.60)^(2/3) * (E/Fy)^(2/3) ≈ 1.191 * (E/Fy)^(2/3)
+    // and D/t > 0.45 E / Fy is not permitted.
+    const shearLimit = 1.191 * Math.pow(E / fy, 2 / 3);
+    const shearDisallowed = Dt > (0.45 * E) / fy;
+    return {
+      flexure: Dt > (0.07 * E) / fy,
+      compression: Dt > (0.11 * E) / fy,
+      shear: Dt > shearLimit || shearDisallowed,
+    };
   }
   if (p.shape === 'RHS') {
     const fl = (p.b - 3 * p.tf) / p.tf, web = (p.h - 3 * p.tw) / p.tw;
@@ -137,6 +145,7 @@ export const AISC360: OtherCode = {
         j: p.J, cw: p.Cw, lb: ctx.Lb,
         e: E, g: E / (2 * (1 + (ctx.material.nu ?? 0.3))),
         depth: p.h,
+        ...(p.shape !== 'CHS' && p.shape !== 'RHS' && p.tf > 0 ? { flangeSlenderness: p.b / (2 * p.tf) } : {}),
         compressionElements: aiscElements(p, !!(ctx.section as { profileFamily?: string }).profileFamily),
         gaps: aiscGaps(p, ctx.material.fy!, ctx.material.e),
       },

@@ -238,7 +238,7 @@ export async function certifyOtherCode(
   for (const ctx of contexts) {
     const m = code.member(ctx);
     if ('skip' in m || ctx.demands.length === 0) continue;
-    if ((m.unevaluated ?? []).length > 0) { refuse(ctx.elementId, 'otherCodes.cert.partial'); continue; }
+    if (m.unevaluated && m.unevaluated.length > 0) { refuse(ctx.elementId, m.unevaluated[0]!); continue; }
     ready.push({ ctx, data: m.data });
   }
   const rounds = ready.reduce((n, r) => Math.max(n, r.ctx.demands.length), 0);
@@ -253,7 +253,7 @@ export async function certifyOtherCode(
       if (code.at) {
         const at = code.at(r.ctx, d, r.data);
         if ('reading' in at) { refuse(id, 'otherCodes.cert.noEngineCheck'); continue; }
-        if ((at.unevaluated ?? []).length > 0) { refuse(id, 'otherCodes.cert.partial'); continue; }
+        if (at.unevaluated && at.unevaluated.length > 0) { refuse(id, at.unevaluated[0]!); continue; }
         data = at.data;
       }
       if ((code.extraParts?.(r.ctx, d, r.data) ?? []).length > 0) { refuse(id, 'otherCodes.cert.partial'); continue; }

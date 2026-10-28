@@ -226,3 +226,22 @@ describe('shear across the web', () => {
     expect(p.AwWeak).toBeCloseTo(2 * 0.15 * 0.0107, 9);
   });
 });
+
+describe('Issue #576: AISC 360 CHS shear gap and I-shape flange slenderness', () => {
+  it('flags CHS shear gap when D/t exceeds G5 limit', () => {
+    const compactCHS = { shape: 'CHS' as const, h: 0.20, b: 0.20, tw: 0.010, tf: 0.010 }; // D/t = 20
+    const gapsCompact = aiscGaps(compactCHS as never, 235e6, 200e9);
+    expect(gapsCompact.shear).toBe(false);
+
+    // Slender tube: D = 0.50 m, t = 0.002 m -> D/t = 250 > 1.191 * (200e9 / 235e6)^(2/3) ≈ 106.9
+    const slenderCHS = { shape: 'CHS' as const, h: 0.50, b: 0.50, tw: 0.002, tf: 0.002 };
+    const gapsSlender = aiscGaps(slenderCHS as never, 235e6, 200e9);
+    expect(gapsSlender.shear).toBe(true);
+  });
+
+  it('populates flangeSlenderness for I-shapes in AISC360.member', () => {
+    const ctx = column()[0]!;
+    const res = AISC360.member(ctx) as { data: { flangeSlenderness?: number } };
+    expect(res.data.flangeSlenderness).toBeCloseTo(0.15 / (2 * 0.0107), 3);
+  });
+});

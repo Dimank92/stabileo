@@ -311,7 +311,11 @@ fn check_single_member(member: &SteelMemberData, forces: &ElementDesignForces) -
     // AISC G2 shear
     let phi_vn: f64 = shear_capacity(member);
     let vy = forces.vy.unwrap_or(0.0).abs();
-    let shear_ratio = if phi_vn > 0.0 { vy / phi_vn } else { 0.0 };
+    let shear_ratio = if member.aw.is_some() {
+        ledger.ratio_if_loaded("Shear G2", vy, phi_vn)
+    } else {
+        0.0
+    };
 
     // AISC H1 interaction (using appropriate axial capacity)
     let axial_ratio = if n < 0.0 { compression_ratio } else { tension_ratio };
@@ -412,7 +416,11 @@ fn compression_fcr<T: Real>(m: &SteelMemberData) -> T {
     let (fy, e) = (T::exact(m.fy), T::exact(m.e));
     let pi2e = T::pi() * T::pi() * e;
 
-    // Slenderness ratio about each axis
+    // Slenderness ratio about each axis. Refuse if an unbraced axis has non-positive radius of gyration,
+    // or if E / Fy are non-positive.
+    if (ky * m.lby > 0.0 && m.ry <= 0.0) || (kz * m.lbz > 0.0 && m.rz <= 0.0) || m.e <= 0.0 || m.fy <= 0.0 {
+        return T::exact(f64::NAN);
+    }
     let kl_r_y = if m.ry > 0.0 { (T::exact(ky) * T::exact(m.lby)).dv(T::exact(m.ry)) } else { zero };
     let kl_r_z = if m.rz > 0.0 { (T::exact(kz) * T::exact(m.lbz)).dv(T::exact(m.rz)) } else { zero };
     let kl_r = kl_r_y.max(kl_r_z);
@@ -558,7 +566,11 @@ pub(crate) fn flexural_capacity_y<T: Real>(m: &SteelMemberData) -> T {
     // it caps the continuously braced member too.
     let mn_flb = flange_local_buckling_major(m, mp);
 
-    if m.lb.unwrap_or(m.lby) <= 0.0 || m.iy <= 0.0 {
+    let unbraced_lb = m.lb.unwrap_or(m.lby);
+    if unbraced_lb > 0.0 && (m.iy <= 0.0 || m.rz <= 0.0 || m.sy <= 0.0 || m.e <= 0.0 || m.fy <= 0.0) {
+        return T::exact(f64::NAN);
+    }
+    if unbraced_lb <= 0.0 {
         return T::lit(PHI_B) * mp.min(mn_flb);
     }
 
