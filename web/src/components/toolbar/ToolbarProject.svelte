@@ -414,10 +414,10 @@
           <button class="file-btn" onclick={() => showCalcReport = true} title={t('project.exportPdfTooltip')}>
             PDF
           </button>
-          <button class="file-btn" onclick={() => window.dispatchEvent(new Event('stabileo-reproduce'))} title={t('provenance.reproduce.intro')} data-testid="open-reproduce">
-            {t('provenance.reproduce.menu')}
-          </button>
         </div>
+        <button class="reproduce-link" onclick={() => window.dispatchEvent(new Event('stabileo-reproduce'))} title={t('provenance.reproduce.intro')} data-testid="open-reproduce">
+          {t('provenance.reproduce.link')}
+        </button>
       </div>
       {@render helpPanel('exp-report', 'project.exportReport', 'project.exportReportHelp')}
 
@@ -597,6 +597,20 @@
      three and a row of six produce the same button. The floor is wide enough
      for "Guardar sesión" at the panel's minimum width without wrapping.
   */
+  .reproduce-link {
+    align-self: flex-start;
+    margin-top: 0.25rem;
+    padding: 0;
+    background: none;
+    border: none;
+    font: inherit;
+    font-size: 0.68rem;
+    color: var(--st-text-3);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .reproduce-link:hover { color: var(--st-text-2); }
+
   .file-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));

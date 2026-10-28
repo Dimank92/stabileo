@@ -13852,7 +13852,6 @@ const en: Record<string, string> = {
   "provenance.reproduce.modelDiffers": "The open project is not the model the report was made from.",
   "provenance.reproduce.buildDiffers": "The report was made with a different build ({fields}); a difference in results may be a registered change rather than a defect.",
   "provenance.reproduce.solveFailed": "The model did not solve: {error}",
-  "provenance.reproduce.menu": "Reproduce from provenance…",
   "drawBar.outline": "Plate",
   "drawBar.outlineHint": "A physical plate on an outline of nodes, meshed later.",
   "drawBar.elementHint": "One analysis element of three or four nodes, with no physical plate.",
@@ -14214,5 +14213,6 @@ const en: Record<string, string> = {
   "useZones.diag.finishNoCase": "Zone with finishes not applied: there is no dead-load case (D)",
   "docx.pageOf": "Page {page} of {pages}",
   "docx.figureMissing": "[Figure not included]",
+  "provenance.reproduce.link": "Check an exported report…",
 };
 export default en;
