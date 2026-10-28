@@ -962,3 +962,56 @@ pub struct NodeTimeHistory3D {
     pub ay: Vec<f64>,
     pub az: Vec<f64>,
 }
+
+// ==================== Adjoint Sensitivity Output ====================
+
+/// Target response quantity for adjoint sensitivity analysis.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum AdjointResponseTarget {
+    /// Nodal displacement at a given DOF (0: ux, 1: uy, 2: uz, 3: rx, 4: ry, 5: rz).
+    #[serde(rename = "displacement")]
+    Displacement { node_id: usize, dof: usize },
+    /// Inter-storey drift: displacement(node_i, dof) - displacement(node_j, dof).
+    #[serde(rename = "drift")]
+    Drift { node_i: usize, node_j: usize, dof: usize },
+    /// Support reaction force/moment at a given DOF.
+    #[serde(rename = "reaction")]
+    Reaction { node_id: usize, dof: usize },
+    /// Natural frequency of a given modal index (0-based).
+    #[serde(rename = "modalFrequency")]
+    ModalFrequency { mode: usize },
+    /// Critical load factor for elastic buckling of a given mode index (0-based).
+    #[serde(rename = "bucklingFactor")]
+    BucklingFactor { mode: usize },
+}
+
+/// Derivative of a target response with respect to a single design variable.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DesignVariableGradient {
+    /// Type of variable: "material_e", "section_a", "section_iy", "section_iz", "shell_thickness", "spring_k".
+    pub variable_type: String,
+    /// Identifier of the entity (material id, section id, element id, or support id).
+    pub target_id: usize,
+    /// Analytical adjoint sensitivity dg/dp.
+    pub gradient: f64,
+    /// Numerical derivative via central finite difference for verification (if computed).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub finite_difference_check: Option<f64>,
+}
+
+/// Result payload of an adjoint sensitivity solve.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdjointSensitivityResult {
+    /// Target response quantity evaluated.
+    pub target: AdjointResponseTarget,
+    /// Baseline value of the response quantity at the current design point.
+    pub response_value: f64,
+    /// Computed gradients with respect to active design variables.
+    pub gradients: Vec<DesignVariableGradient>,
+    /// Whether all gradients passed finite-difference verification within tolerance.
+    pub verified_by_finite_difference: bool,
+}
+
