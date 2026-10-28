@@ -37,6 +37,9 @@ confidence-threshold = 0.9
 ignore = true
 
 [bans]
+# Numerics crates (Roadmap: Release safety #388): exact arithmetic (num-bigint,
+# num-rational, num-traits, num-integer) and geometry (spade) kernels must remain
+# coordinated with 0 duplicate versions, and major bumps must leave results bit-identical.
 # Duplicate versions are reported, not fatal: they come from upstream
 # (windows-sys, getrandom) and are not a security property on their own.
 multiple-versions = "warn"

@@ -135,3 +135,24 @@ fn advanced_analyses_are_bit_identical_across_hash_orders() {
         same_every_time::<SolverInput3D, _>(&j3, &format!("3D P-Delta {seed}"), |i| solve_pdelta_3d(i, 30, 1e-8));
     }
 }
+#[test]
+fn golden_corpus_fixtures_are_bit_identical_across_solves() {
+    // Release safety #388: major upgrades of numerics-related crates (e.g. exact
+    // arithmetic) must leave results bit-identical on the golden/certificate corpus.
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("fixtures");
+    for name in ["cantilever", "ss-beam"] {
+        let path = dir.join(format!("{name}-input.json"));
+        if path.exists() {
+            let json = std::fs::read_to_string(&path).unwrap();
+            same_every_time::<SolverInput, _>(&json, name, solve_2d);
+        }
+    }
+
+    for name in ["cantilever-3d", "ex-3d-portal-frame", "ex-3d-tower"] {
+        let path = dir.join(format!("{name}-input.json"));
+        if path.exists() {
+            let json = std::fs::read_to_string(&path).unwrap();
+            same_every_time::<SolverInput3D, _>(&json, name, solve_3d);
+        }
+    }
+}

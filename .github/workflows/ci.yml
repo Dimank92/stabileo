@@ -75,6 +75,9 @@ jobs:
               - 'Makefile'
               - '.github/workflows/ci.yml'
               - '.github/actions/**'
+              - 'deny.toml'
+              - '.github/dependabot.yml'
+              - '.github/workflows/supply-chain.yml'
             engine:
               - *tooling
               - 'engine/**'
@@ -159,6 +162,8 @@ jobs:
         run: nix develop --command make check-pins NIX_RUN=
       - name: Changelog fragments are well formed
         run: nix develop --command make check.changelog NIX_RUN=
+      - name: Numerics dependencies stay coordinated and bit-identical
+        run: nix develop --command make check.numerics-deps NIX_RUN=
       # The engine's test files are modules of a few listed binaries (autotests = false): a file
       # in no binary would never run, one in two would run twice.
       - name: Every engine test file is in exactly one test binary

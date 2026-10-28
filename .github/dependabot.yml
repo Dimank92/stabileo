@@ -10,6 +10,10 @@ updates:
     groups:
       cargo-minor:
         update-types: [minor, patch]
+      # Numerics crates stay coordinated (Release safety #388): exact arithmetic
+      # and geometry crates must move together, never in isolated bumps (#313).
+      cargo-numerics:
+        patterns: ["num-*", "spade*"]
 
   - package-ecosystem: cargo
     directory: /research/fracture/shauer-2025

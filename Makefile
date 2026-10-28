@@ -12,7 +12,7 @@
        services services.stop postgres.start postgres.stop \
        inst inst.check inst.claim inst.release inst.list ports \
        docker.build docker.up docker.down cloud-init.render \
-       check-pins check.changelog check.test-targets worktree worktree-prune hooks \
+       check-pins check.changelog check.test-targets check.numerics-deps worktree worktree-prune hooks \
        fmt check clean
 
 NIX_RUN = nix develop --command
@@ -77,6 +77,7 @@ help:
 	@echo "CI-shaped targets (what each CI job runs):"
 	@echo "  make check-pins           - One version of each tool in rust-toolchain.toml, .nvmrc, flake.nix and CI"
 	@echo "  make check.changelog      - changelog.d/ fragments are well formed"
+	@echo "  make check.numerics-deps  - Numerics dependencies stay coordinated and bit-identical"
 	@echo "  make lint.engine          - Clippy over the engine"
 	@echo "  make test.engine.gates    - The named engine correctness gates"
 	@echo "  make test.engine.metamorphic - Metamorphic tests, in release"
@@ -334,6 +335,10 @@ check.changelog:
 # in no binary would never run, one in two would run twice.
 check.test-targets:
 	python3 -I scripts/check-test-targets.py
+
+## Numerics crates stay coordinated and bit-identical (Roadmap: Release safety #388)
+check.numerics-deps:
+	python3 -I scripts/check-numerics-deps.py --check
 
 test.ci-scripts:
 	python3 -B -I scripts/tests/test_ci_aggregate.py
