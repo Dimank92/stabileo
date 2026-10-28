@@ -125,3 +125,58 @@ fn spectral_enclosure_error_of_non_finite_is_infinite() {
     assert_eq!(e.error_of(f64::INFINITY), f64::INFINITY);
     assert!(e.error_of(1.5) <= 0.5 + 1e-15);
 }
+
+/// model_certify (issue #742): a 3D model with only support settlements
+/// (e.g. rigid body translation where both supports settle equally by -1 mm)
+/// and no applied nodal loads. The exact reactions are zero, but floating-point
+/// cancellation in Ku produces ~1e-12 round-off. The equilibrium verification
+/// tolerance scale in the fuzz harness must incorporate the element stiffness
+/// times displacement magnitude (Ku scale) rather than underflowing to ~1e-18.
+#[test]
+fn settlement_only_3d_equilibrium_is_scaled_by_stiffness() {
+    use dedaliano_engine::certify::certify_linear_3d_full;
+    use dedaliano_engine::types::SolverInput3D;
+
+    let input: SolverInput3D = serde_json::from_value(json!({
+        "nodes": {
+            "1": { "id": 1, "x": -56.0, "y": -31.5, "z": -0.5 },
+            "2": { "id": 2, "x": -64.0, "y": 10.5, "z": 0.0 },
+            "3": { "id": 3, "x": -25.0, "y": -63.0, "z": 55.5 }
+        },
+        "materials": {
+            "1": { "id": 1, "e": 1000000000.0, "nu": 0.3 },
+            "2": { "id": 2, "e": 0.001, "nu": 0.3 }
+        },
+        "sections": {
+            "1": { "id": 1, "name": null, "a": 0.01, "iy": 0.0001, "iz": 0.00005, "j": 0.00003, "cw": null, "asY": null, "asZ": null, "shearCenterY": null, "shearCenterZ": null }
+        },
+        "elements": {
+            "1": { "id": 1, "type": "frame", "nodeI": 2, "nodeJ": 1, "materialId": 2, "sectionId": 1, "releaseMyStart": false, "releaseMyEnd": false, "releaseMzStart": false, "releaseMzEnd": false, "releaseTStart": false, "releaseTEnd": false, "localYx": null, "localYy": null, "localYz": null, "rollAngle": null },
+            "2": { "id": 2, "type": "frame", "nodeI": 1, "nodeJ": 3, "materialId": 1, "sectionId": 1, "releaseMyStart": true, "releaseMyEnd": true, "releaseMzStart": true, "releaseMzEnd": true, "releaseTStart": false, "releaseTEnd": false, "localYx": null, "localYy": null, "localYz": null, "rollAngle": null }
+        },
+        "supports": {
+            "1": { "nodeId": 1, "rx": true, "ry": true, "rz": true, "rrx": true, "rry": true, "rrz": true, "kx": null, "ky": null, "kz": null, "krx": null, "kry": null, "krz": null, "dx": -0.001, "dy": null, "dz": null, "drx": null, "dry": null, "drz": null, "rw": null, "kw": null, "normalX": null, "normalY": null, "normalZ": null, "isInclined": null },
+            "2": { "nodeId": 3, "rx": true, "ry": true, "rz": true, "rrx": true, "rry": true, "rrz": true, "kx": null, "ky": null, "kz": null, "krx": null, "kry": null, "krz": null, "dx": -0.001, "dy": null, "dz": null, "drx": null, "dry": null, "drz": null, "rw": null, "kw": null, "normalX": null, "normalY": null, "normalZ": null, "isInclined": null }
+        },
+        "loads": []
+    }))
+    .unwrap();
+
+    let out = certify_linear_3d_full(&input).expect("certify_linear_3d_full should succeed");
+    assert!(out.certificate.is_certified(), "should be certified: {:?}", out.certificate);
+
+    // Sum reactions across all directions
+    let mut rx_sum = 0.0;
+    let mut ry_sum = 0.0;
+    let mut rz_sum = 0.0;
+    for r in &out.results.reactions {
+        rx_sum += r.fx;
+        ry_sum += r.fy;
+        rz_sum += r.fz;
+    }
+
+    // Exact analytical reactions are zero (rigid-body settlement)
+    assert!(rx_sum.abs() < 1e-9, "reaction sum X must be zero within roundoff: {rx_sum}");
+    assert!(ry_sum.abs() < 1e-9, "reaction sum Y must be zero within roundoff: {ry_sum}");
+    assert!(rz_sum.abs() < 1e-9, "reaction sum Z must be zero within roundoff: {rz_sum}");
+}

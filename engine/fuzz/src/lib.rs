@@ -220,6 +220,40 @@ pub fn check_equilibrium_2d(input: &SolverInput, results: &AnalysisResults, cert
         sum[1] += r.rz;
         scale += r.rx.abs() + r.rz.abs();
     }
+    // Include stiffness * displacement scale for settlement-driven models (#742)
+    let disp_map: std::collections::HashMap<usize, &Displacement> =
+        results.displacements.iter().map(|d| (d.node_id, d)).collect();
+    let node_map: std::collections::HashMap<usize, &SolverNode> =
+        input.nodes.values().map(|n| (n.id, n)).collect();
+    let mat_map: std::collections::HashMap<usize, &SolverMaterial> =
+        input.materials.values().map(|m| (m.id, m)).collect();
+    let sec_map: std::collections::HashMap<usize, &SolverSection> =
+        input.sections.values().map(|s| (s.id, s)).collect();
+
+    for elem in input.elements.values() {
+        if let (Some(&ni), Some(&nj), Some(&mat), Some(&sec)) = (
+            node_map.get(&elem.node_i),
+            node_map.get(&elem.node_j),
+            mat_map.get(&elem.material_id),
+            sec_map.get(&elem.section_id),
+        ) {
+            let dx = nj.x - ni.x;
+            let dz = nj.z - ni.z;
+            let l = (dx * dx + dz * dz).sqrt();
+            if l > 1e-9 {
+                let k_axial = mat.e * sec.a / l;
+                let k_bend = 12.0 * mat.e * sec.iz / (l * l * l);
+                let k_elem = k_axial.max(k_bend);
+                let u_i = disp_map.get(&elem.node_i).map_or(0.0, |d| d.ux.abs().max(d.uz.abs()));
+                let u_j = disp_map.get(&elem.node_j).map_or(0.0, |d| d.ux.abs().max(d.uz.abs()));
+                let u_max = u_i.max(u_j);
+                if k_elem.is_finite() && u_max.is_finite() {
+                    scale += k_elem * u_max;
+                }
+            }
+        }
+    }
+
     let n = results.displacements.len() as f64 * 3.0;
     let tol = n.sqrt() * residual_norm + 1e-6 * scale + 1e-300;
     for (axis, s) in ["x", "z"].iter().zip(sum) {
@@ -261,6 +295,41 @@ pub fn check_equilibrium_3d(input: &SolverInput3D, results: &AnalysisResults3D, 
             scale += f.abs();
         }
     }
+    // Include stiffness * displacement scale for settlement-driven models (#742)
+    let disp_map: std::collections::HashMap<usize, &Displacement3D> =
+        results.displacements.iter().map(|d| (d.node_id, d)).collect();
+    let node_map: std::collections::HashMap<usize, &SolverNode3D> =
+        input.nodes.values().map(|n| (n.id, n)).collect();
+    let mat_map: std::collections::HashMap<usize, &SolverMaterial> =
+        input.materials.values().map(|m| (m.id, m)).collect();
+    let sec_map: std::collections::HashMap<usize, &SolverSection3D> =
+        input.sections.values().map(|s| (s.id, s)).collect();
+
+    for elem in input.elements.values() {
+        if let (Some(&ni), Some(&nj), Some(&mat), Some(&sec)) = (
+            node_map.get(&elem.node_i),
+            node_map.get(&elem.node_j),
+            mat_map.get(&elem.material_id),
+            sec_map.get(&elem.section_id),
+        ) {
+            let dx = nj.x - ni.x;
+            let dy = nj.y - ni.y;
+            let dz = nj.z - ni.z;
+            let l = (dx * dx + dy * dy + dz * dz).sqrt();
+            if l > 1e-9 {
+                let k_axial = mat.e * sec.a / l;
+                let k_bend = 12.0 * mat.e * sec.iy.max(sec.iz) / (l * l * l);
+                let k_elem = k_axial.max(k_bend);
+                let u_i = disp_map.get(&elem.node_i).map_or(0.0, |d| d.ux.abs().max(d.uy.abs()).max(d.uz.abs()));
+                let u_j = disp_map.get(&elem.node_j).map_or(0.0, |d| d.ux.abs().max(d.uy.abs()).max(d.uz.abs()));
+                let u_max = u_i.max(u_j);
+                if k_elem.is_finite() && u_max.is_finite() {
+                    scale += k_elem * u_max;
+                }
+            }
+        }
+    }
+
     let n = results.displacements.len() as f64 * 7.0;
     let tol = n.sqrt() * residual_norm + 1e-6 * scale + 1e-300;
     for (axis, s) in ["x", "y", "z"].iter().zip(sum) {
@@ -271,4 +340,47 @@ pub fn check_equilibrium_3d(input: &SolverInput3D, results: &AnalysisResults3D, 
         );
     }
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use dedaliano_engine::certify::certify_linear_3d_full;
+    use serde_json::json;
+
+    /// model_certify (#742): a 3D model with only support settlements
+    /// (crash-0807a49017029ad21e4e1b70561445b8fda00890) has zero exact reactions,
+    /// but floating-point cancellation in Ku produces ~1e-12 round-off.
+    /// check_equilibrium_3d's tolerance scale must incorporate element stiffness * displacement
+    /// so the oracle does not panic with a false positive.
+    #[test]
+    fn check_equilibrium_3d_settlement_only_scale() {
+        let input: SolverInput3D = serde_json::from_value(json!({
+            "nodes": {
+                "1": { "id": 1, "x": -56.0, "y": -31.5, "z": -0.5 },
+                "2": { "id": 2, "x": -64.0, "y": 10.5, "z": 0.0 },
+                "3": { "id": 3, "x": -25.0, "y": -63.0, "z": 55.5 }
+            },
+            "materials": {
+                "1": { "id": 1, "e": 1000000000.0, "nu": 0.3 },
+                "2": { "id": 2, "e": 0.001, "nu": 0.3 }
+            },
+            "sections": {
+                "1": { "id": 1, "name": null, "a": 0.01, "iy": 0.0001, "iz": 0.00005, "j": 0.00003, "cw": null, "asY": null, "asZ": null, "shearCenterY": null, "shearCenterZ": null }
+            },
+            "elements": {
+                "1": { "id": 1, "type": "frame", "nodeI": 2, "nodeJ": 1, "materialId": 2, "sectionId": 1, "releaseMyStart": false, "releaseMyEnd": false, "releaseMzStart": false, "releaseMzEnd": false, "releaseTStart": false, "releaseTEnd": false, "localYx": null, "localYy": null, "localYz": null, "rollAngle": null },
+                "2": { "id": 2, "type": "frame", "nodeI": 1, "nodeJ": 3, "materialId": 1, "sectionId": 1, "releaseMyStart": true, "releaseMyEnd": true, "releaseMzStart": true, "releaseMzEnd": true, "releaseTStart": false, "releaseTEnd": false, "localYx": null, "localYy": null, "localYz": null, "rollAngle": null }
+            },
+            "supports": {
+                "1": { "nodeId": 1, "rx": true, "ry": true, "rz": true, "rrx": true, "rry": true, "rrz": true, "kx": null, "ky": null, "kz": null, "krx": null, "kry": null, "krz": null, "dx": -0.001, "dy": null, "dz": null, "drx": null, "dry": null, "drz": null, "rw": null, "kw": null, "normalX": null, "normalY": null, "normalZ": null, "isInclined": null },
+                "2": { "nodeId": 3, "rx": true, "ry": true, "rz": true, "rrx": true, "rry": true, "rrz": true, "kx": null, "ky": null, "kz": null, "krx": null, "kry": null, "krz": null, "dx": -0.001, "dy": null, "dz": null, "drx": null, "dry": null, "drz": null, "rw": null, "kw": null, "normalX": null, "normalY": null, "normalZ": null, "isInclined": null }
+            },
+            "loads": []
+        }))
+        .unwrap();
+
+        let out = certify_linear_3d_full(&input).expect("certify_linear_3d_full succeeds");
+        assert!(check_equilibrium_3d(&input, &out.results, &out.certificate));
+    }
 }
