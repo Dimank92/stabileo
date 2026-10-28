@@ -1,0 +1,11 @@
+{
+  "tolerance_bytes": 128,
+  "routes": {
+    "/en/": 1783689,
+    "/es/": 1783689,
+    "/pt/": 1783689,
+    "/app/basic": 22475651,
+    "/app/education": 22475651,
+    "/app/pro": 22475651
+  }
+}

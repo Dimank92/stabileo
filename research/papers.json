@@ -172,46 +172,6 @@
    "contacts": []
   },
   {
-   "id": "torzoni-2024",
-   "doi": "10.1016/j.cma.2023.116584",
-   "crossref": {
-    "title": "A digital twin framework for civil engineering structures",
-    "authors": [
-     "Matteo Torzoni",
-     "Marco Tezzele",
-     "Stefano Mariani",
-     "Andrea Manzoni",
-     "Karen E. Willcox"
-    ],
-    "year": 2024,
-    "venue": "Computer Methods in Applied Mechanics and Engineering"
-   },
-   "area": "digital-twins",
-   "keywords": [
-    "digital twin",
-    "structural health monitoring",
-    "civil structures",
-    "deep learning"
-   ],
-   "summary": "",
-   "summary_source": null,
-   "code": [],
-   "data": [],
-   "methods": [
-    "reduced-order models",
-    "deep learning",
-    "structural health monitoring"
-   ],
-   "dependencies": [],
-   "complexity": "high",
-   "relevance": "Digital-twin track; Stabileo's structural models could supply the physics side.",
-   "status": "proposed",
-   "reproduced_published_results": false,
-   "benchmarks": [],
-   "implementation": null,
-   "contacts": []
-  },
-  {
    "id": "andreassen-2011",
    "doi": "10.1007/s00158-010-0594-7",
    "crossref": {

@@ -34,7 +34,7 @@ AREAS = {
 }
 STATUSES = [
     "proposed", "reference-reproduced", "implementation-in-progress",
-    "numerically-validated", "interactive",
+    "numerically-validated", "published-figures-compared", "interactive",
 ]
 COMPLEXITY = {"low", "medium", "high"}
 SUMMARY_SOURCES = {"crossref-abstract", "publisher-abstract", "repository-readme", "full-text", "reference-code"}

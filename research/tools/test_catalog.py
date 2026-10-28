@@ -37,6 +37,10 @@ def main():
         f(m[0])
         return m
 
+    code, out = run(mutated(lambda p: p.update(status="published-figures-compared")), *flags)
+    assert code == 0, out
+    print("ok   accepts published-figures-compared with validation evidence")
+
     cases = {
         "unknown area": lambda p: p.update(area="astrology"),
         "unknown status": lambda p: p.update(status="certified"),
