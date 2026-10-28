@@ -39,7 +39,7 @@
   let strain = $state(0.01);
   let seed = $state(0);
   let law = $state<'hookean' | 'equal_weight'>('hookean');
-  let deform = $state(20);
+  let deform = $state(10);
 
   const locale = $derived(publicI18n.locale);
   const nf = (v: number | null | undefined, d = 3) =>
@@ -214,14 +214,20 @@
 
   // ---- what the viewer shows -------------------------------------------------------------
   const viewer = import('../../viewport/ScalarFieldViewer.svelte');
-  const xy = $derived(strip ? Float64Array.from(strip.nodes.flat()) : new Float64Array());
+  // The strip is drawn lying down (the paper's y axis to the right) so it fills the wide pane:
+  // drawn (X, Y) = (y, 13 - x).
+  const xy = $derived(strip ? Float64Array.from(strip.nodes.flatMap((p) => [p[1], 13 - p[0]])) : new Float64Array());
   const bars = $derived(strip ? Uint32Array.from(strip.bonds.flat()) : new Uint32Array());
-  const disp = $derived(strip ? Float64Array.from(strip.displacement.flat()) : null);
+  const disp = $derived(strip ? Float64Array.from(strip.displacement.flatMap((u) => [u[1], -u[0]])) : null);
+  // Forces per unit imposed strain, N / (k ε), so the colours do not depend on the strain's size.
+  const forceScale = $derived(Math.abs(strain) > 0 ? 1 / Math.abs(strain) : 1);
+  const forces = $derived(strip ? strip.force.map((f) => f * forceScale) : null);
   const forceRange = $derived.by(() => {
-    if (!strip) return { min: -1, max: 1 };
-    const m = Math.max(1e-12, ...strip.force.map(Math.abs));
+    if (!forces) return { min: -1, max: 1 };
+    const m = Math.max(1e-12, ...forces.map(Math.abs));
     return { min: -m, max: m };
   });
+  const VIEW = $derived<[number, number, number, number]>([-1, -9, 53 * (1 + Math.max(0, deform * strain)) + 1, 14]);
   // The paper's convention for the pulled direction, in the periodic cell's frame.
   const pullAngle = $derived(family === 'honeycomb' ? 0 : Math.PI / 2 - stripTheta);
   const cellAlong = $derived(cell ? uniaxial(cell.c, pullAngle) : null);
@@ -450,16 +456,17 @@
                 cells={bars}
                 cellSize={2}
                 lineWidth={2}
-                values={strip.force}
+                values={forces}
                 perCell={true}
                 range={forceRange}
-                title="Axial force N"
-                unit="k·ℓ"
-                legendFooter="tension positive; top and bottom rows held"
+                title={Math.abs(strain) > 0 ? 'Axial force N / (k ε)' : 'Axial force N / k'}
+                unit=""
+                legendFooter="tension positive · strip pulled left to right, end rows held"
+                view={VIEW}
                 displacement={disp}
                 deformScale={deform}
                 showMesh={false}
-                height="min(30rem, 62vh)"
+                height="min(26rem, 55vh)"
                 ariaLabel="Stabileo viewer: the spring network coloured by axial force on its deformed shape"
                 status={[{ label: 'nodes', value: String(strip.nodes.length) }, { label: 'springs', value: String(strip.bonds.length) }]}
                 onOpenEditor={openInStabileo}
