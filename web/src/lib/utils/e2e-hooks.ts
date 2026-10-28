@@ -194,6 +194,8 @@ export interface StabileoTestHooks {
   plateSelection(): { plates: number[]; shells: string[]; scope: string };
   /** How many local-axis triads the 3-D viewport draws now. */
   localAxesTriads(): number;
+  /** Where a point of the model (scene coordinates) is on the screen, in page pixels. */
+  worldScreenPos(x: number, y: number, z: number): { x: number; y: number } | null;
   /** Which kinds a drag is currently armed to pick up. */
   armedKinds(): string[];
   /** What the viewport is drawing — the walkthrough audit reads this. */
@@ -762,6 +764,7 @@ export function installE2EHooks(): void {
       shells: (p.group.members.quads?.length ?? 0) + (p.group.members.plates?.length ?? 0),
       loads: plateLoadDefs(p.id).length,
     })),
+    worldScreenPos: (x: number, y: number, z: number) => projectWorld(x, y, z),
     localAxesTriads: () => (window as unknown as { __localAxesTriads?: number }).__localAxesTriads ?? 0,
     plateSelection: () => ({ plates: [...uiStore.selectedPlates].sort((a, b) => a - b), shells: [...uiStore.selectedShells].sort(), scope: uiStore.shellPickScope }),
     selectionByKind: () => {

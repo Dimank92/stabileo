@@ -20,7 +20,7 @@
   import { syncStructuralGrid } from '../lib/three/structural-grid-3d';
   import { syncUnderlays } from '../lib/three/underlay-3d';
   import { syncFootings } from '../lib/three/footings-3d';
-  import { snapToUnderlays } from '../lib/model/underlay';
+  import { osnapUnderlays } from '../lib/model/osnap';
   import { PlacementGhost } from '../lib/three/placement-ghost';
   import { placementStore } from '../lib/store/placement.svelte';
   import { editPreview } from '../lib/store/edit-preview.svelte';
@@ -2185,12 +2185,19 @@
    * A point on the working plane, snapped: onto an intersection or an axis of the structural
    * grid when one is within a few pixels (PRO, horizontal plane), else to the drawing grid.
    */
-  function snapToStructure(pos: THREE.Vector3): { x: number; y: number; z: number; label?: string } {
-    // A point of the background drawing on this level, when one is within a few pixels.
+  /** The point drawn last, for the perpendicular snap: the member's first node, else the one node selected. */
+  function osnapFrom(): { x: number; y: number } | null {
+    const id = drawState.memberStart ?? (uiStore.selectedNodes.size === 1 ? [...uiStore.selectedNodes][0]! : null);
+    const n = id !== null ? modelStore.nodes.get(id) : undefined;
+    return n ? { x: n.x, y: n.y } : null;
+  }
+
+  function snapToStructure(pos: THREE.Vector3): { x: number; y: number; z: number; label?: string; mode?: string } {
+    // A point of the background drawing on this level, of the kinds turned on, within a few pixels.
     if (uiStore.analysisMode === 'pro' && uiStore.snapToAxes && uiStore.workingPlane === 'XY' && modelStore.underlays.length > 0 && camera && container) {
       const tol = worldPerPixel(camera, pos, container.clientHeight) * 10;
-      const hit = snapToUnderlays(modelStore.underlays, pos.x, pos.y, tol, uiStore.nodeCreateZ);
-      if (hit) return { x: hit.x, y: hit.y, z: uiStore.nodeCreateZ, label: t('underlay.point') };
+      const hit = osnapUnderlays(modelStore.underlays, pos.x, pos.y, tol, uiStore.nodeCreateZ, uiStore.osnapModes, osnapFrom());
+      if (hit) return { x: hit.x, y: hit.y, z: uiStore.nodeCreateZ, label: t(`osnap.${hit.mode}`), mode: hit.mode };
     }
     const grid = uiStore.analysisMode === 'pro' && uiStore.snapToAxes && uiStore.workingPlane === 'XY' ? modelStore.grid : undefined;
     if (grid && camera && container) {
@@ -2372,6 +2379,29 @@
 
   /** The node tool's marker under the pointer (mouse only: a touch has no hover). */
   let nodeHint = $state<NodePlacement3D | null>(null);
+  /** Drawing members in PRO: the snap point under the pointer, where a click with no node there puts one. */
+  let snapHint = $state<{ sx: number; sy: number; mode: string; label?: string; p: { x: number; y: number; z: number } } | null>(null);
+  let snapHintFrame = 0;
+  let snapHintEvent: MouseEvent | null = null;
+  function scheduleSnapHint(e: MouseEvent) {
+    snapHintEvent = e;
+    if (snapHintFrame) return;
+    snapHintFrame = requestAnimationFrame(() => {
+      snapHintFrame = 0;
+      const ev = snapHintEvent; snapHintEvent = null;
+      snapHint = ev && !isOrbiting ? memberSnapPoint(ev) : null;
+    });
+  }
+  /** The snap point a member click would take, when no node is under the pointer (PRO, horizontal plane). */
+  function memberSnapPoint(e: MouseEvent): { sx: number; sy: number; mode: string; label?: string; p: { x: number; y: number; z: number } } | null {
+    if (uiStore.appMode !== 'pro' || uiStore.workingPlane !== 'XY' || memberSnapNode(e) !== null) return null;
+    const ground = getGroundIntersection(e);
+    if (!ground) return null;
+    const p = snapToStructure(ground);
+    if (!p.mode && !p.label) return null;
+    const s = projectToScreen(p.x, p.y, p.z);
+    return { sx: s.x, sy: s.y, mode: p.mode ?? 'grid', label: p.label, p: { x: p.x, y: p.y, z: p.z } };
+  }
   let nodeHintFrame = 0;
   let nodeHintEvent: MouseEvent | null = null;
   function scheduleNodeHint(e: MouseEvent) {
@@ -2434,11 +2464,14 @@
   }
 
   function handleElementTool(e: MouseEvent) {
-    const nodeId = memberSnapNode(e);
+    let nodeId = memberSnapNode(e);
     if (nodeId === null) {
-      // Clicked empty → cancel pending
-      cancelPendingElement();
-      return;
+      // On a snap point (a background drawing's, a grid axis's) with no node there, PRO puts the
+      // node and goes on drawing: a plan is traced point by point. Elsewhere, an empty click still
+      // cancels the member pending.
+      const sp = memberSnapPoint(e);
+      if (!sp) { cancelPendingElement(); return; }
+      nodeId = modelStore.addNode(sp.p.x, sp.p.y, sp.p.z);
     }
 
     const start = drawState.memberStart;
@@ -3476,6 +3509,8 @@
 
     if (uiStore.currentTool === 'node' && uiStore.nodeMode !== 'hinge') scheduleNodeHint(e);
     else if (nodeHint) nodeHint = null;
+    if (uiStore.currentTool === 'element') scheduleSnapHint(e);
+    else if (snapHint) snapHint = null;
     if (uiStore.currentTool === 'load' && uiStore.loadType === 'distributed' && uiStore.distLoadPartial && uiStore.appMode !== 'pro') scheduleStretchHint(e);
     else if (stretchHint) stretchHint = null;
 
@@ -4251,9 +4286,32 @@
       {:else if h.kind === 'onNode'}
         <circle class="nh-there" cx={h.sx} cy={h.sy} r="11" />
         <text class="nh-text nh-warn" x={h.sx + 14} y={h.sy - 12}>{t('viewport.nodeAlreadyThere')}</text>
+      {:else if h.snap?.mode}
+        {@render osnapGlyph(h.snap.mode, h.sx, h.sy, h.snap.label)}
       {:else}
         <circle class="nh-free" cx={h.sx} cy={h.sy} r="5" />
+        {#if h.snap?.label}<text class="nh-text" x={h.sx + 12} y={h.sy - 12}>{h.snap.label}</text>{/if}
       {/if}
+    </svg>
+  {/if}
+  <!-- The snap's mark, as CAD programs draw them: square end, triangle middle, circle centre,
+       diamond quadrant, cross intersection, right angle perpendicular, hourglass nearest. -->
+  {#snippet osnapGlyph(mode: string, x: number, y: number, label?: string)}
+    <g class="osnap" data-mode={mode}>
+      {#if mode === 'endpoint'}<rect x={x - 6} y={y - 6} width="12" height="12" />
+      {:else if mode === 'midpoint'}<path d={`M${x} ${y - 7}L${x + 7} ${y + 5}L${x - 7} ${y + 5}Z`} />
+      {:else if mode === 'center'}<circle cx={x} cy={y} r="7" />
+      {:else if mode === 'quadrant'}<path d={`M${x} ${y - 7}L${x + 7} ${y}L${x} ${y + 7}L${x - 7} ${y}Z`} />
+      {:else if mode === 'intersection'}<path d={`M${x - 6} ${y - 6}L${x + 6} ${y + 6}M${x + 6} ${y - 6}L${x - 6} ${y + 6}`} />
+      {:else if mode === 'perpendicular'}<path d={`M${x - 7} ${y + 6}H${x + 7}M${x - 3} ${y + 6}V${y - 7}M${x - 3} ${y + 2}H${x + 1}V${y + 6}`} />
+      {:else if mode === 'grid'}<circle cx={x} cy={y} r="5" /><path d={`M${x - 8} ${y}H${x + 8}M${x} ${y - 8}V${y + 8}`} />
+      {:else}<path d={`M${x - 6} ${y - 6}H${x + 6}L${x - 6} ${y + 6}H${x + 6}Z`} />{/if}
+      {#if label}<text class="nh-text" x={x + 12} y={y - 12}>{label}</text>{/if}
+    </g>
+  {/snippet}
+  {#if snapHint && uiStore.currentTool === 'element'}
+    <svg class="node-hint" aria-hidden="true" data-testid="osnap-hint" data-mode={snapHint.mode}>
+      {@render osnapGlyph(snapHint.mode, snapHint.sx, snapHint.sy, snapHint.label)}
     </svg>
   {/if}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -4624,6 +4682,7 @@
   .nh-split { fill: var(--st-surface); stroke: var(--st-accent); stroke-width: 2; }
   .nh-plus { stroke: var(--st-accent); stroke-width: 2; }
   .nh-free { fill: none; stroke: var(--st-accent); stroke-width: 1.5; opacity: 0.85; }
+  .osnap rect, .osnap path, .osnap circle { fill: none; stroke: var(--st-warn, #e2b33c); stroke-width: 2; }
   .nh-there { fill: none; stroke: var(--st-amber, #e0a030); stroke-width: 1.5; stroke-dasharray: 3 3; }
   .nh-text { font: 11px sans-serif; fill: var(--st-accent); paint-order: stroke; stroke: var(--st-bg, #0b1220); stroke-width: 3px; }
   .nh-warn { fill: var(--st-amber, #e0a030); }
