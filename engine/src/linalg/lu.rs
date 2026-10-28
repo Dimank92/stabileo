@@ -7,6 +7,16 @@ pub fn lu_factor(a: &mut [f64], n: usize) -> Option<Vec<usize>> {
         piv[i] = i;
     }
 
+    let mut col_scale = vec![0.0f64; n];
+    for j in 0..n {
+        for i in 0..n {
+            let v = a[i * n + j].abs();
+            if v > col_scale[j] {
+                col_scale[j] = v;
+            }
+        }
+    }
+
     // Forward elimination with partial pivoting
     for k in 0..n {
         // Find pivot
@@ -20,7 +30,8 @@ pub fn lu_factor(a: &mut [f64], n: usize) -> Option<Vec<usize>> {
             }
         }
 
-        if max_val < 1e-14 {
+        let thresh = (col_scale[k] * 1e-10).max(1e-300);
+        if !(max_val > thresh) {
             return None; // Singular
         }
 

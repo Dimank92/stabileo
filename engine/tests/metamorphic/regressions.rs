@@ -596,3 +596,46 @@ fn plastic_3d_frame3d_2_is_a_lower_bound_of_its_certificate() {
     assert!(r.warnings.iter().any(|w| w.contains("no consistent set of active hinges") && w.contains("lower bound")), "{:?}", r.warnings);
     assert!(!r.warnings.iter().any(|w| w.contains("exceeds the yield surface")), "{:?}", r.warnings);
 }
+
+
+/// Issue #762: Mechanism detection and accuracy change with units and
+/// orientation on near-singular models.
+/// Absolute pivot thresholds in Cholesky and LU previously accepted
+/// near-mechanisms with roundoff pivots in base units but refused them as
+/// mechanisms under unit scaling or rigid rotations (and vice versa).
+/// Relative pivot thresholds evaluated against each DOF's initial stiffness scale
+/// ensure invariant mechanism detection across units, rotation, and mirror.
+#[test]
+fn test_repro_issue_762_near_singular_units_invariance() {
+    let cases = crate::corpus::cases_2d(crate::corpus::Tier::Nightly, 20754);
+    let target_names = [
+        "fuzz_rich_2d/20800",
+        "fuzz_rich_2d/20833",
+        "fuzz_rich_2d/20865",
+        "fuzz_rich_2d/20795",
+        "fuzz_rich_2d/20756",
+        "fuzz_rich_2d/20824",
+        "fuzz_rich_2d/20840",
+    ];
+
+    let a_linear: Vec<_> = crate::ana2::rows()
+        .into_iter()
+        .filter(|a| a.name == "linear")
+        .collect();
+
+    let mut total_failures = Vec::new();
+
+    for name in &target_names {
+        if let Some(c) = cases.iter().find(|c| c.name == *name) {
+            let tally = crate::tally::Tally::default();
+            let ctx = crate::checks2::Ctx { tally: &tally, rng_seed: 20754 };
+            crate::checks2::check_case(&ctx, c, &a_linear, crate::INV_2D);
+            let failures = tally.failures();
+            println!("{}: {} failures: {:?}", name, failures.len(), failures);
+            total_failures.extend(failures);
+        }
+    }
+
+    println!("Total metamorphic failures: {}", total_failures.len());
+    assert!(total_failures.is_empty(), "Failures must be resolved: {:#?}", total_failures);
+}

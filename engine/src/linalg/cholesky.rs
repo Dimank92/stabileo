@@ -1,17 +1,17 @@
 /// Cholesky decomposition: A = L*L^T (in-place, lower triangle stored in A)
 /// Returns true if successful (A is SPD), false if not.
 pub fn cholesky_decompose(a: &mut [f64], n: usize) -> bool {
+    let mut diag_orig = vec![0.0f64; n];
+    for i in 0..n {
+        diag_orig[i] = a[i * n + i];
+    }
     for j in 0..n {
         let mut sum = a[j * n + j];
         for k in 0..j {
             sum -= a[j * n + k] * a[j * n + k];
         }
-        // Negated `>` rather than `<=` so a NaN pivot is REJECTED. Every IEEE-754
-        // comparison against NaN is false, so `sum <= 1e-15` waved NaN straight through:
-        // `sqrt(NaN)` became the diagonal and the routine returned "successful (A is SPD)"
-        // for a matrix that is not a number. For every non-NaN value the two forms are
-        // identical, so this changes nothing else.
-        if !(sum > 1e-15) {
+        let tol = (1e-11 * diag_orig[j]).max(1e-300);
+        if !(sum > tol) {
             return false;
         }
         a[j * n + j] = sum.sqrt();

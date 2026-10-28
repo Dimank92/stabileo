@@ -402,12 +402,7 @@ pub fn numeric_cholesky(sym: &Rc<SymbolicCholesky>, a: &CscMatrix) -> Option<Num
     let pa_row_idx = &sym.pa_row_idx;
 
     let mut l_values = vec![0.0f64; sym.l_nnz];
-
-    // Strict threshold: use absolute threshold like dense Cholesky.
-    // A previous 1e-12 * max_diag relative threshold was too aggressive for
-    // shell matrices where drilling DOF pivots are naturally 4+ orders
-    // smaller than membrane pivots.
-    let strict_threshold = 1e-15;
+    let orig_diag = a.diagonal();
 
     let ns = sym.snode_start.len();
     let snode_end = |t: usize| -> usize {
@@ -524,7 +519,9 @@ pub fn numeric_cholesky(sym: &Rc<SymbolicCholesky>, a: &CscMatrix) -> Option<Num
             // `!(diag > t)` (not `diag <= t`) so a NaN pivot — where every
             // comparison is false — is also rejected instead of producing a
             // NaN-filled factor reported as success.
-            if !(diag > strict_threshold) {
+            let d_orig = orig_diag[sym.perm[s + d]].abs();
+            let tol = (1e-11 * d_orig).max(1e-300);
+            if !(diag > tol) {
                 return None;
             }
             let l = diag.sqrt();
@@ -1008,7 +1005,6 @@ mod tests {
         let pa = a.permute_symmetric(&sym.perm);
         let mut l_values = vec![0.0f64; sym.l_nnz];
         let mut x = vec![0.0f64; n];
-        let strict_threshold = 1e-15;
 
         let mut nz_cols_for_row: Vec<Vec<(usize, usize)>> = vec![Vec::new(); n];
         for k in 0..n {
@@ -1041,7 +1037,9 @@ mod tests {
                 }
             }
             let diag = x[j];
-            if !(diag > strict_threshold) {
+            let d_orig = a.diagonal()[sym.perm[j]].abs();
+            let tol = (1e-11 * d_orig).max(1e-300);
+            if !(diag > tol) {
                 return None;
             }
             let ljj = x[j].sqrt();
