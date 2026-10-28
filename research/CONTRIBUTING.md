@@ -11,7 +11,7 @@ papers are chosen.
 
 Copy `templates/paper/` to `research/<area>/<id>/` and fill it in.
 
-1. **Catalog entry** in `papers.yaml`. Get the bibliographic block with
+1. **Catalog entry** in `papers.yaml`. Write a `summary` only from the abstract (Crossref or publisher), the full text, or the repository README for code facts, and name it in `summary_source`; otherwise leave the summary empty. Get the bibliographic block with
    `python3 -I research/tools/catalog.py show <doi>` and paste it unchanged; CI compares it with
    Crossref on every run. Write the `summary` in your own words and say in `summary_basis` what it
    rests on (full text, abstract, code). Code links must be GitHub repositories whose license, as
