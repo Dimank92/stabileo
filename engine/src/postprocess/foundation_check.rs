@@ -2,10 +2,18 @@
 //!
 //! Covers bearing capacity (Terzaghi/Meyerhof), overturning stability,
 //! sliding resistance, and one-way/two-way shear (punching) per ACI 318.
+//!
+//! For full CIRSOC 201-2025 footing checks with separate service vs factored load
+//! combinations, column-face flexure, and plan eccentricity offsets, see
+//! [`crate::postprocess::isolated_footing::check_isolated_footings`].
 
 use serde::{Deserialize, Serialize};
 
 use crate::postprocess::check_ledger::{CheckLedger, Unevaluated};
+use crate::postprocess::isolated_footing::{
+    check_isolated_footings as check_isolated, IsolatedFootingData, IsolatedFootingInput,
+    IsolatedFootingResult,
+};
 
 // ==================== Types ====================
 
@@ -120,7 +128,7 @@ fn index_forces<T>(forces: &[T], id_of: impl Fn(&T) -> usize) -> std::collection
     map
 }
 
-/// Check all spread footings.
+/// Check all spread footings using the screening check.
 pub fn check_spread_footings(input: &SpreadFootingInput) -> Vec<SpreadFootingResult> {
     let mut results = Vec::new();
 
@@ -137,6 +145,48 @@ pub fn check_spread_footings(input: &SpreadFootingInput) -> Vec<SpreadFootingRes
 
     results.sort_by_key(|r| r.footing_id);
     results
+}
+
+/// Forward a spread footing to the comprehensive isolated footing check
+/// ([`crate::postprocess::isolated_footing`]) with separate service and factored loads,
+/// eccentricity, column offsets, one-way shear in both directions/faces, punching with
+/// unbalanced moments, and column-face flexure.
+pub fn check_spread_footing_detailed(
+    data: &SpreadFootingData,
+    service: &SpreadFootingForces,
+    factored: Option<&SpreadFootingForces>,
+    offset_l: f64,
+    offset_b: f64,
+) -> IsolatedFootingResult {
+    let fact = factored.unwrap_or(service);
+    let isolated_data = IsolatedFootingData {
+        footing_id: data.footing_id,
+        kind: Default::default(),
+        b: data.width,
+        l: data.length,
+        thickness: data.thickness,
+        d: data.d.unwrap_or(data.thickness - 0.075),
+        column_b: data.col_width,
+        column_h: data.col_length,
+        fc: data.fc / 1e6,
+        allowable_bearing: data.q_allowable / 1e3,
+        service_axial: service.p / 1e3,
+        factored_axial: fact.p / 1e3,
+        service_moment_b: service.my.unwrap_or(0.0) / 1e3,
+        service_moment_l: service.mx.unwrap_or(0.0) / 1e3,
+        factored_moment_b: fact.my.unwrap_or(0.0) / 1e3,
+        factored_moment_l: fact.mx.unwrap_or(0.0) / 1e3,
+        eccentricity_b: offset_b,
+        eccentricity_l: offset_l,
+        position: Default::default(),
+        rho_w: data.rho_w,
+        moment_tolerance: None,
+    };
+    let input = IsolatedFootingInput {
+        footings: vec![isolated_data],
+    };
+    let mut out = check_isolated(&input);
+    out.remove(0)
 }
 
 fn check_single_footing(

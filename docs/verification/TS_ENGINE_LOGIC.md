@@ -397,10 +397,14 @@ In rough order of safety value:
    (`pdelta-amplification.ts`), and `direct-analysis.ts` uses B2 > 1,7 to decide C2.2b's
    notional loads; a reversed or vanishing displacement is read as unstable, never as stable.
 9. **PRO report slab steel** (finding 13) is no longer printed. The section invented its load, span and f'c, and now says that slab steel is designed in the slab design. A report section built from the slab design's own results would be the real fix.
-10. **Load generation still in TypeScript.** Moved: CIRSOC 101 combinations and the
-    INPRES-CIRSOC 103 spectrum and static method. Not yet: CIRSOC 102 wind (`codes/cirsoc102/*`,
-    `loads/load-plan-wind.ts`, `wind-cases.ts`, `wind-other.ts`), CIRSOC 104 snow
-    (`codes/cirsoc104/*`, `loads/snow-*.ts`), CIRSOC 101 dead/live/roof-live tables and
+10. **Load generation in the engine.** Moved: CIRSOC 101 combinations (`cirsoc101_combinations.rs`),
+    INPRES-CIRSOC 103 spectrum and static method (`cirsoc103_seismic.rs`), and CIRSOC 104 snow
+    load generation (`engine/src/loads/cirsoc104_snow.rs`, #393). `codes/cirsoc104/snow.ts`
+    is a thin adapter delegating `roofSnow` to the Rust engine via `loadsRequest` (op `cirsoc104Snow`),
+    preserving `snow-oracle.ts` as the verified oracle compared in `snow-engine.test.ts`. Footings
+    support eccentricity with column offsets, separate service vs factored loads, and column-face flexure
+    via `isolated_footing.rs` and `foundation_check::check_spread_footing_detailed`. Not yet: CIRSOC 102 wind (`codes/cirsoc102/*`,
+    `loads/load-plan-wind.ts`, `wind-cases.ts`, `wind-other.ts`), remaining CIRSOC 104 drift distributions (`loads/snow-*.ts`), CIRSOC 101 dead/live/roof-live tables and
     reduction (`dead-loads.ts`, `live-loads.ts`, `roof-live.ts`, `loads/case-reduction.ts`),
     service combinations (`service-combinations.ts`), the expansion of symbols onto cases
     (`loads/combination-cases.ts`), accidental torsion (`loads/seismic-cases.ts`) and the modal

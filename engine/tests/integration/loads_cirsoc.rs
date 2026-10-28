@@ -123,3 +123,34 @@ fn with_earth_pressure_the_principal_load_not_acting_is_generated() {
     let i = CombinationInputs { present: Present { l: true, ..Default::default() }, ..Default::default() };
     assert!(!has(&generate_combinations(&i), &[(LoadSymbol::D, 1.2)]));
 }
+
+
+#[test]
+fn cirsoc104_snow_load_generation_and_unbalanced() {
+    use dedaliano_engine::loads::cirsoc104_snow::*;
+    let inputs = SnowInputs {
+        pg: 1.5,
+        terrain: SnowTerrain::C,
+        exposure: RoofExposure::Partial,
+        thermal: ThermalCondition::Normal,
+        category: SnowCategory::II,
+        roof: SnowRoof {
+            kind: RoofKind::Gable,
+            slope_deg: 20.0,
+            w: 8.0,
+            slippery: false,
+        },
+    };
+    let r = roof_snow(&inputs);
+    assert_eq!(r.ce, 1.0);
+    assert_eq!(r.ct, 1.0);
+    assert_eq!(r.importance, 1.0);
+    assert!((r.pf_computed - 1.05).abs() < 1e-6);
+    assert_eq!(r.cs, 1.0);
+    assert!((r.ps - 1.05).abs() < 1e-6);
+    assert!(r.unbalanced.is_some());
+    let u = r.unbalanced.unwrap();
+    // β for pg = 1.5 is 0.75. W = 8 > 6: leeward = 1.2 * (1 + 0.375) * 1.05 / 1.0 = 1.7325
+    assert!((u.leeward - 1.7325).abs() < 1e-4);
+    assert!((u.windward - 0.3 * 1.05).abs() < 1e-4);
+}

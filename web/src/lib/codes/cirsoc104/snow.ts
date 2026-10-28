@@ -1,8 +1,7 @@
 /**
- * CIRSOC 104-2005 — snow load on roofs.
+ * CIRSOC 104-2005 — snow load on roofs: a thin adapter over the engine.
  *
- * The expressions, as the regulation prints them (`docs/codes/CIRSOC/markdown/cirsoc-104-2005`):
- *
+ * The check is the engine's (`engine/src/loads/cirsoc104_snow.rs`, op `cirsoc104Snow`):
  *   Cap. 3  (1)  p_f = 0,7 C_e C_t I p_g,  with, on low-slope roofs (§3.4), p_f ≥ I·p_g for
  *                p_g ≤ 1 kN/m² and p_f ≥ I·1 kN/m² above that;
  *   Cap. 4  (2)  p_s = C_s p_f,  on the horizontal projection of the roof;
@@ -10,20 +9,12 @@
  *   Cap. 7  (4)  γ = 0,426 p_g + 2,2 ≤ 4,70 kN/m³;
  *   Cap. 10      rain on snow, 0,25 kN/m² on roofs under 2,4° where 0 < p_g ≤ 1 kN/m².
  *
- * Tabla 2 (C_e), Tabla 3 (C_t) and Tabla 4 (I, with the categories of Apéndice B) are below.
- *
- * ── Figura 2, C_s ────────────────────────────────────────────────
- *
- * Figura 2 is a drawing. Its labels give where each curve leaves C_s = 1 (5° and 30° for warm
- * roofs, 10° and 37,5° for C_t = 1,1, 15° and 45° for C_t = 1,2: the first for smooth
- * unobstructed surfaces, the second for all others), and its vectors give where they reach
- * zero: every curve, solid or dashed, is a straight line to C_s = 0 at 70°. That end point was
- * read from the page's path coordinates against the axis labels, not assumed; §4.3 says the
- * same of curved roofs beyond 70°.
- *
- * Pure: no store.
+ * This module maps the app's `SnowInputs` in and the engine's numbers out.
+ * The verified TypeScript implementation is kept as the differential oracle
+ * (`__tests__/snow-oracle.ts`), compared in `snow-engine.test.ts`.
  */
 import { clause, type ClauseRef } from '../regulation';
+import { loadsRequest } from '../../engine/wasm-solver';
 
 const R = (c: string, l?: string) => clause('cirsoc-104', '2005', c, l);
 export const REF_PF = R('3', 'cubiertas planas');
@@ -33,9 +24,6 @@ export const REF_CS = R('Figura 2', 'factor de pendiente');
 export const REF_UNBALANCED = R('6.1', 'cargas no balanceadas');
 export const REF_RAIN = R('10', 'carga de lluvia sobre nieve');
 
-// ─── Tablas 2, 3 y 4 ─────────────────────────────────────────────
-
-/** Terrain category of Apéndice A, or above the tree line in wind-swept mountain areas. */
 export type SnowTerrain = 'A' | 'B' | 'C' | 'D' | 'aboveTreeline';
 export type RoofExposure = 'full' | 'partial' | 'sheltered';
 
@@ -61,8 +49,6 @@ export type SnowCategory = 'I' | 'II' | 'III' | 'IV';
 export const IMPORTANCE_FACTOR: Readonly<Record<SnowCategory, number>> = Object.freeze({
   I: 0.8, II: 1.0, III: 1.1, IV: 1.2,
 });
-
-// ─── Roof ────────────────────────────────────────────────────────
 
 export type RoofKind = 'mono' | 'gable';
 
@@ -108,7 +94,9 @@ export interface SnowInputs {
 }
 
 export interface SnowResult {
-  ce: number; ct: number; importance: number;
+  ce: number;
+  ct: number;
+  importance: number;
   /** (1) as computed, and the §3.4 minimum when it applies. */
   pfComputed: number;
   pfMinimum: number | null;
@@ -125,41 +113,55 @@ export interface SnowResult {
   refused?: string;
 }
 
+function engineRoofSnow(i: SnowInputs): SnowResult {
+  const res = loadsRequest({
+    op: 'cirsoc104Snow',
+    inputs: {
+      pg: i.pg,
+      terrain: i.terrain,
+      exposure: i.exposure,
+      thermal: i.thermal,
+      category: i.category,
+      roof: {
+        kind: i.roof.kind,
+        slopeDeg: i.roof.slopeDeg,
+        w: i.roof.W,
+        slippery: i.roof.slippery,
+      },
+    },
+  }) as {
+    ce: number;
+    ct: number;
+    importance: number;
+    pfComputed: number;
+    pfMinimum: number | null;
+    pf: number;
+    cs: number;
+    ps: number;
+    rainOnSnow: number;
+    unbalanced: { leeward: number; windward: number } | null;
+    gamma: number;
+    refs: Array<{ regulation: string; edition: string; clause: string; label: string }>;
+    refused?: string;
+  };
+
+  return {
+    ce: res.ce,
+    ct: res.ct,
+    importance: res.importance,
+    pfComputed: res.pfComputed,
+    pfMinimum: res.pfMinimum,
+    pf: res.pf,
+    cs: res.cs,
+    ps: res.ps,
+    rainOnSnow: res.rainOnSnow,
+    unbalanced: res.unbalanced,
+    gamma: res.gamma,
+    refs: res.refs.map((r) => clause(r.regulation, r.edition, r.clause, r.label)),
+    ...(res.refused ? { refused: res.refused } : {}),
+  };
+}
+
 export function roofSnow(i: SnowInputs): SnowResult {
-  const ce = EXPOSURE_FACTOR[i.terrain][i.exposure];
-  const ct = THERMAL_FACTOR[i.thermal];
-  const importance = IMPORTANCE_FACTOR[i.category];
-  const gamma = snowDensity(i.pg);
-  const refs = [REF_PF, REF_PS, REF_CS];
-  if (ce === null) {
-    return {
-      ce: 0, ct, importance, pfComputed: 0, pfMinimum: null, pf: 0, cs: 0, ps: 0, rainOnSnow: 0,
-      unbalanced: null, gamma, refs, refused: 'snow.refused.exposureNA',
-    };
-  }
-  const pfComputed = 0.7 * ce * ct * importance * i.pg;
-  const pfMinimum = isLowSlope(i.roof) && i.pg > 0 ? importance * Math.min(i.pg, 1) : null;
-  if (pfMinimum !== null) refs.push(REF_MIN);
-  const pf = Math.max(pfComputed, pfMinimum ?? 0);
-  const cs = slopeFactor(i.roof.slopeDeg, ct, i.roof.slippery);
-
-  // Cap. 10: reduced by what the minimum already added over (1), by 0,25 at most.
-  let rainOnSnow = 0;
-  if (i.pg > 0 && i.pg <= 1 && i.roof.slopeDeg < 2.4) {
-    const excess = pfMinimum !== null ? Math.max(pfMinimum - pfComputed, 0) : 0;
-    rainOnSnow = Math.max(0.25 - Math.min(excess, 0.25), 0);
-    refs.push(REF_RAIN);
-  }
-  const ps = cs * pf + rainOnSnow;
-
-  // §6.1: not needed past 70°, nor below 21/W + 0,5.
-  let unbalanced: SnowResult['unbalanced'] = null;
-  if (i.roof.kind === 'gable' && i.roof.slopeDeg <= 70 && i.roof.slopeDeg >= 21 / Math.max(i.roof.W, 1e-9) + 0.5) {
-    const psBal = cs * pf;
-    unbalanced = i.roof.W <= 6
-      ? { leeward: (1.5 * psBal) / ce, windward: 0 }
-      : { leeward: (1.2 * (1 + driftIndex(i.pg) / 2) * psBal) / ce, windward: 0.3 * psBal };
-    refs.push(REF_UNBALANCED);
-  }
-  return { ce, ct, importance, pfComputed, pfMinimum, pf, cs, ps, rainOnSnow, unbalanced, gamma, refs };
+  return engineRoofSnow(i);
 }

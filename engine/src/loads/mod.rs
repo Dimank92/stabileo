@@ -4,6 +4,7 @@
 
 pub mod cirsoc101_combinations;
 pub mod cirsoc103_seismic;
+pub mod cirsoc104_snow;
 
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -31,6 +32,7 @@ pub enum LoadsRequest {
     Cirsoc103Distribution { levels: Vec<s103::MassLevel>, base_shear: f64, uncapped_t: f64, t2: Option<f64> },
     #[serde(rename_all = "camelCase")]
     Cirsoc103Applicability { zone: u8, group: String, height: f64, levels: u32, regularity: String, t: Option<f64>, t2: Option<f64> },
+    Cirsoc104Snow { inputs: cirsoc104_snow::SnowInputs },
 }
 
 /// Answer one request as JSON. `Err` on an input outside the regulation's tables.
@@ -65,5 +67,6 @@ pub fn answer(req: LoadsRequest) -> Result<Value, String> {
         Cirsoc103Applicability { zone, group, height, levels, regularity, t, t2 } => {
             json!(s103::static_method_applicable(zone, &group, height, levels, &regularity, t, t2))
         }
+        Cirsoc104Snow { inputs } => json!(cirsoc104_snow::roof_snow(&inputs)),
     })
 }

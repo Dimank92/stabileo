@@ -391,3 +391,48 @@ fn punching_includes_the_size_factor() {
     assert!((r.punching_shear_ratio - vu / phi_vc).abs() < 1e-9 * (vu / phi_vc),
         "punching {} vs {}", r.punching_shear_ratio, vu / phi_vc);
 }
+
+
+/// Column-face flexure under factored loads and eccentricity with deliberate column offset via detailed check.
+#[test]
+fn flexure_and_column_offset_eccentricity() {
+    let data = SpreadFootingData {
+        footing_id: 1,
+        length: 2.4,
+        width: 2.0,
+        thickness: 0.50,
+        depth: 1.0,
+        q_allowable: 300_000.0,
+        gamma_soil: 18_000.0,
+        fc: 30e6,
+        col_length: 0.40,
+        col_width: 0.40,
+        d: Some(0.425),
+        mu_sliding: None,
+        rho_w: None,
+        neglect_size_effect: None,
+    };
+    let service = SpreadFootingForces {
+        footing_id: 1,
+        p: 400_000.0,
+        mx: Some(20_000.0),
+        my: Some(40_000.0),
+        h: None,
+    };
+    let factored = SpreadFootingForces {
+        footing_id: 1,
+        p: 600_000.0,
+        mx: Some(30_000.0),
+        my: Some(60_000.0),
+        h: None,
+    };
+
+    let r = check_spread_footing_detailed(&data, &service, Some(&factored), 0.10, 0.05);
+
+    // Eccentricity in bearing check: offset + M/N
+    assert_eq!(r.bearing.status, dedaliano_engine::postprocess::isolated_footing::FootingStatus::Ok);
+    // Flexure demands at column faces under factored loads
+    assert!(r.flexure_b.mu > 0.0);
+    assert!(r.flexure_l.mu > 0.0);
+    assert_eq!(r.status, dedaliano_engine::postprocess::isolated_footing::FootingStatus::Ok);
+}
