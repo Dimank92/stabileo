@@ -30,6 +30,11 @@ never silently wrong and verification never silently stops working.
   Each PR is then merged on its own, in that order.
 - **Review before merge.** Every PR gets an independent review (Codex review, plus a human
   reviewer for solver, certificate and design-check changes) before it leaves draft and merges.
+- **Review checklist item (negative case):** Every new design check, verification test,
+  certificate check, CI gate or alert ships with a negative case: an input or mutation that
+  must make it fail (wrong value, missing feature, injected NaN, mutated kernel, red job), run
+  in CI. A check that cannot fail protects nothing ([#451](https://github.com/lambdaclass/stabileo/issues/451)).
+  The PR template line `negative case: <test name>` must be filled in with the exact test verifying it.
 - **Required checks** must be green (engine, web, e2e, Kani, Lean, symbolic; see
   [#355](https://github.com/lambdaclass/stabileo/issues/355)). A red nightly verification job
   opens an issue labelled `verification-failure` and is triaged like a bug.
