@@ -1,14 +1,12 @@
 <script lang="ts">
   /**
-   * The calculation report, as a PDF: who it is from, what it carries and how its figures look.
+   * The calculation report, in the format chosen at the foot (PDF, Word, HTML, Excel, CSV): who it
+   * is from, what it carries and how its figures look.
    *
    * The same frame and folded sections as Basic's report (`components/export/`): each section
    * closed, its title saying in one line what is chosen inside. Each result is printed as its
    * table, its figures or both; the figures are drawn from the model (`pro/report-export.ts`),
    * and figures added from the view still go at the end.
-   *
-   * Only the PDF: the same data as a spreadsheet is Project › Export › Excel, with its own
-   * choice of sheets.
    */
   import { proNav } from '../../lib/store/pro-nav.svelte';
   import { modelStore } from '../../lib/store';
@@ -298,7 +296,7 @@
     <label class="rpt-format">{t('export.formats')}
       <select bind:value={format} data-testid="rpt-format">{#each REPORT_FORMATS as f (f)}<option value={f}>{t(`export.format.${f}`)}</option>{/each}</select>
     </label>
-    <button type="button" class="primary" onclick={handleGenerate} data-testid="rpt-pdf">{t('proReport.generate')}</button>
+    <button type="button" class="primary" onclick={handleGenerate} data-testid="rpt-pdf">{tp('proReport.generate', { format: t(`export.format.${format}`) })}</button>
   {/snippet}
 </ExportDialog>
 
