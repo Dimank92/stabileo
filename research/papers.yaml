@@ -542,3 +542,235 @@ papers:
   benchmarks: []
   implementation: null
   contacts: []
+- id: andreassen-2011
+  doi: 10.1007/s00158-010-0594-7
+  crossref:
+    title: Efficient topology optimization in MATLAB using 88 lines of code
+    authors:
+    - Erik Andreassen
+    - Anders Clausen
+    - Mattias Schevenels
+    - Boyan S. Lazarov
+    - Ole Sigmund
+    year: 2010
+    venue: Structural and Multidisciplinary Optimization
+  area: optimization
+  keywords:
+  - topology optimization
+  - SIMP
+  - MBB beam
+  - educational code
+  summary: ''
+  summary_source: null
+  code: []
+  data: []
+  methods:
+  - SIMP
+  - Q4 elements
+  - density and sensitivity filters
+  - optimality criteria
+  dependencies: []
+  complexity: low
+  relevance: Reference results for the queued topology-optimization experiment (MBB beam), research/DESIGN.md
+    section 6 item 3. Crossref dates it 2010 (online); the print issue is volume 43, 2011. No abstract
+    in Crossref and the publisher page was not readable, so no summary; the code is distributed outside
+    GitHub and its licence has not been checked.
+  status: proposed
+  reproduced_published_results: false
+  benchmarks: []
+  implementation: null
+  contacts: []
+- id: ferrari-2025
+  doi: 10.1002/nme.70082
+  crossref:
+    title: Optimization of the Initial Post‐Buckling Response of Trusses and Frames by an Asymptotic Approach
+    authors:
+    - Federico Ferrari
+    - Ole Sigmund
+    year: 2025
+    venue: International Journal for Numerical Methods in Engineering
+  area: optimization
+  keywords:
+  - post-buckling
+  - Koiter asymptotic theory
+  - imperfection sensitivity
+  - trusses
+  - frames
+  summary: Uses Koiter's asymptotic post-buckling expansion in sizing and topology optimization of trusses
+    and frames. Constraining the first two asymptotic coefficients (initial post-buckling slope and curvature)
+    shapes the post-buckling response and lowers imperfection sensitivity, and the same expansion approximates
+    the nonlinear response so that measures such as end-compliance can be optimized.
+  summary_source: crossref-abstract
+  code: []
+  data: []
+  methods:
+  - linear buckling eigenproblem
+  - Koiter asymptotic expansion
+  - corotational beams
+  - arc-length path following
+  dependencies: []
+  complexity: medium
+  relevance: Queue item 4. Runs on the production buckling, corotational and arc-length solvers; validated
+    against closed-form post-buckling coefficients of the Roorda frame and our own arc-length path. No
+    public code (in-house implementation per the paper).
+  status: proposed
+  reproduced_published_results: false
+  benchmarks: []
+  implementation: null
+  contacts: []
+- id: zmyslony-2026
+  doi: 10.1103/56f8-8gsx
+  crossref:
+    title: Snapping and switching of elastic arches with patterned preferred curvature
+    authors:
+    - Michał Zmyślony
+    - Ammar Khan
+    - John S. Biggins
+    year: 2026
+    venue: Physical Review Research
+  area: metamaterials
+  keywords:
+  - elastic arch
+  - snap-through
+  - bistability
+  - preferred curvature
+  - Euler buckling modes
+  summary: Elastica theory and photomechanical experiments on an arch whose preferred curvature varies
+    along its length and in time. A shallow-arch theory projects the curvature pattern onto Euler buckling
+    modes; overlap with the fundamental mode makes the arch snap, other patterns give a continuous switch
+    to a higher mode. Patterns with the largest energy release and the lowest threshold are found, and
+    the same control applies to passive pre-curved arches loaded at the boundaries.
+  summary_source: crossref-abstract
+  code: []
+  data:
+  - url: https://doi.org/10.5281/zenodo.18256271
+    license: CC-BY-4.0
+  methods:
+  - shallow-arch elastica theory
+  - Euler buckling mode decomposition
+  - experiments
+  dependencies: []
+  complexity: low
+  relevance: Queue item 5. The theory's basis is the Euler buckling modes the production engine already
+    computes; passive arches run on the 2D corotational and arc-length solvers. Zenodo record (data and
+    software, CC-BY-4.0 per the record) not yet inspected file by file.
+  status: proposed
+  reproduced_published_results: false
+  benchmarks: []
+  implementation: null
+  contacts: []
+- id: feher-2026
+  doi: 10.1016/j.euromechsol.2026.106217
+  crossref:
+    title: Controlling the snap-through behavior of an elastica strip by cuts
+    authors:
+    - Eszter Fehér
+    year: 2026
+    venue: European Journal of Mechanics - A/Solids
+  area: metamaterials
+  keywords:
+  - elastica
+  - snap-through
+  - cut sheets
+  - bifurcation
+  summary: ''
+  summary_source: null
+  code: []
+  data: []
+  methods:
+  - elastica with varying bending stiffness
+  - numerical continuation
+  - experiments
+  dependencies: []
+  complexity: low
+  relevance: Queue item 6, sharing the 2D stability tooling of item 5 (a 2D frame with varying stiffness
+    on the arc-length solver). No abstract in Crossref and the publisher page was not readable, so no
+    summary; no code; published values are in figures only.
+  status: proposed
+  reproduced_published_results: false
+  benchmarks: []
+  implementation: null
+  contacts: []
+- id: pastrana-2026
+  doi: 10.1016/j.cma.2026.118783
+  crossref:
+    title: Differentiable force density method for the design of lightweight structures
+    authors:
+    - Rafael Pastrana
+    - Deniz Oktay
+    - Kai-Uwe Bletzinger
+    - Ryan P. Adams
+    - Sigrid Adriaenssens
+    year: 2026
+    venue: Computer Methods in Applied Mechanics and Engineering
+  area: optimization
+  keywords:
+  - form finding
+  - force density method
+  - cable nets
+  - gridshells
+  - inverse design
+  summary: The JAX FDM library computes equilibrium shapes of pin-jointed bar systems with the force density
+    method and solves inverse design problems by tuning force densities, loads and support positions with
+    gradient-based optimization against goals and constraints; written in JAX, so the simulation is differentiable
+    and JIT-compiled.
+  summary_source: repository-readme
+  summary_note: jax_fdm README read 2026-10-28; Crossref has no abstract and the publisher page was not
+    readable, so the summary covers the code only
+  code:
+  - url: https://github.com/arpastrana/jax_fdm
+    license: MIT
+  data: []
+  methods:
+  - force density method
+  - adjoint sensitivities
+  - gradient-based optimization
+  dependencies:
+  - JAX
+  - COMPAS
+  complexity: medium
+  relevance: Queue item 7. Form-finding is one sparse solve with the engine's Cholesky; the found form opens
+    in the editor as a gridshell and is checked with the production 3D analysis and buckling. MIT reference
+    code with ready examples.
+  status: proposed
+  reproduced_published_results: false
+  benchmarks: []
+  implementation: null
+  contacts: []
+- id: fairclough-2026
+  doi: 10.1016/j.compstruc.2025.107997
+  crossref:
+    title: Topology and geometry optimization of grid-shells incorporating design-dependent self-weight
+      loading
+    authors:
+    - Helen E. Fairclough
+    - Karol Bołbotowski
+    - Linwei He
+    - Andrew Liew
+    - Matthew Gilbert
+    year: 2026
+    venue: Computers & Structures
+  area: optimization
+  keywords:
+  - grid-shells
+  - layout optimization
+  - self-weight
+  - second-order cone programming
+  summary: ''
+  summary_source: null
+  code: []
+  data: []
+  methods:
+  - second-order cone programming
+  - ground structure
+  dependencies: []
+  complexity: medium
+  relevance: Queue item 8. Needs a conic optimiser (candidate Clarabel.rs, Apache-2.0); the optimised gridshell
+    is checked with the production 3D truss analysis under self-weight. No abstract in Crossref and the
+    publisher page was not readable, so no summary; the authors' example scripts are cited without a link
+    we could find.
+  status: proposed
+  reproduced_published_results: false
+  benchmarks: []
+  implementation: null
+  contacts: []
