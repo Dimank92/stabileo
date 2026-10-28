@@ -37,6 +37,7 @@ mod element;
 pub(crate) mod ia;
 mod model2d;
 mod model3d;
+pub mod shell;
 mod system;
 
 use serde::{Deserialize, Serialize};

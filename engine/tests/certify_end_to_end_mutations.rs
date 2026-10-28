@@ -433,3 +433,71 @@ fn agreement_reads_the_assembly_the_solver_used() {
         assert!(matches!(e, EndToEnd::Failed { .. }), "nf {nf}: {e:?}");
     }
 }
+
+#[test]
+fn planted_plate_assembly_bug_fails_end_to_end() {
+    let json = r#"{
+      "nodes": {
+        "1": {"id":1,"x":0,"y":0,"z":0},
+        "2": {"id":2,"x":1,"y":0,"z":0},
+        "3": {"id":3,"x":1,"y":1,"z":0},
+        "4": {"id":4,"x":0,"y":1,"z":0}
+      },
+      "materials": {"1": {"id":1,"e":200000,"nu":0.3}},
+      "plates": {
+        "1": {"id":1,"nodes":[1,2,3],"materialId":1,"thickness":0.05},
+        "2": {"id":2,"nodes":[1,3,4],"materialId":1,"thickness":0.05}
+      },
+      "supports": {
+        "1": {"nodeId":1,"rx":true,"ry":true,"rz":true,"rrx":true,"rry":true,"rrz":true},
+        "2": {"nodeId":4,"rx":true,"ry":true,"rz":true,"rrx":true,"rry":true,"rrz":true}
+      },
+      "loads": [
+        {"type":"nodal","data":{"nodeId":2,"fx":0,"fy":0,"fz":-10,"mx":0,"my":0,"mz":0}}
+      ]
+    }"#;
+    let input: SolverInput3D = serde_json::from_str(json).unwrap();
+    let r = solve_3d(&input).unwrap();
+    let cert = end_to_end_3d(&input, &input.loads, &r);
+    assert!(cert.is_certified(), "plate model should be certified end-to-end: {cert:?}");
+
+    let mut bad_engines = engine_assemblies_3d(&input, &input.loads).unwrap();
+    let key = *bad_engines[0].k.keys().next().unwrap();
+    bad_engines[0].k.insert(key, bad_engines[0].k[&key] * 1.05);
+    let bad_cert = end_to_end_3d_with(&input, &input.loads, &r, || Ok(bad_engines));
+    assert!(matches!(bad_cert, EndToEnd::Failed { .. }), "mutated plate assembly must fail end-to-end: {bad_cert:?}");
+}
+
+#[test]
+fn planted_quad_assembly_bug_fails_end_to_end() {
+    let json = r#"{
+      "nodes": {
+        "1": {"id":1,"x":0,"y":0,"z":0},
+        "2": {"id":2,"x":1,"y":0,"z":0},
+        "3": {"id":3,"x":1,"y":1,"z":0},
+        "4": {"id":4,"x":0,"y":1,"z":0}
+      },
+      "materials": {"1": {"id":1,"e":200000,"nu":0.3}},
+      "quads": {
+        "1": {"id":1,"nodes":[1,2,3,4],"materialId":1,"thickness":0.05}
+      },
+      "supports": {
+        "1": {"nodeId":1,"rx":true,"ry":true,"rz":true,"rrx":true,"rry":true,"rrz":true},
+        "2": {"nodeId":4,"rx":true,"ry":true,"rz":true,"rrx":true,"rry":true,"rrz":true}
+      },
+      "loads": [
+        {"type":"nodal","data":{"nodeId":2,"fx":0,"fy":0,"fz":-10,"mx":0,"my":0,"mz":0}}
+      ]
+    }"#;
+    let input: SolverInput3D = serde_json::from_str(json).unwrap();
+    let r = solve_3d(&input).unwrap();
+    let cert = end_to_end_3d(&input, &input.loads, &r);
+    assert!(cert.is_certified(), "quad model should be certified end-to-end: {cert:?}");
+
+    let mut bad_engines = engine_assemblies_3d(&input, &input.loads).unwrap();
+    let key = *bad_engines[0].k.keys().next().unwrap();
+    bad_engines[0].k.insert(key, bad_engines[0].k[&key] * 1.05);
+    let bad_cert = end_to_end_3d_with(&input, &input.loads, &r, || Ok(bad_engines));
+    assert!(matches!(bad_cert, EndToEnd::Failed { .. }), "mutated quad assembly must fail end-to-end: {bad_cert:?}");
+}
+

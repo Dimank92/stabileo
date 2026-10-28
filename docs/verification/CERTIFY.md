@@ -188,6 +188,7 @@ assembly is called to build it.
   by substitution, chains resolved, cycles refused.
 * **Self-weight** reaches the engine as member distributed loads (the app converts it),
   so it is covered as such.
+* **Plates, shells and solids**: independent re-assembly for DKT triangular plates (CST membrane + DKT bending + drilling), MITC4 (ANS shear tying + EAS-7 membrane) and MITC9 quadrilateral shells, SHB8-ANS solid shell elements, and curved shell elements. Equivalent nodal loads cover uniform and gradient pressure, plate/shell thermal loads, self-weight (gravity body force), and edge loads.
 
 ### The certificate
 

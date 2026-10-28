@@ -112,14 +112,6 @@ pub(super) fn local_axes(
 }
 
 pub(super) fn build(input: &SolverInput3D, loads: &[SolverLoad3D]) -> Result<Model, String> {
-    if !input.plates.is_empty()
-        || !input.quads.is_empty()
-        || !input.quad9s.is_empty()
-        || !input.solid_shells.is_empty()
-        || !input.curved_shells.is_empty()
-    {
-        return Err("out of scope: shell and solid elements".into());
-    }
     if !input.curved_beams.is_empty() {
         return Err("out of scope: curved beams".into());
     }
@@ -127,7 +119,8 @@ pub(super) fn build(input: &SolverInput3D, loads: &[SolverLoad3D]) -> Result<Mod
         return Err("out of scope: connector elements".into());
     }
     let has_frame = input.elements.values().any(|e| e.elem_type == "frame");
-    let dpn = if has_frame { 6 } else { 3 };
+    let has_shell = !input.plates.is_empty() || !input.quads.is_empty() || !input.quad9s.is_empty() || !input.curved_shells.is_empty();
+    let dpn = if has_frame || has_shell { 6 } else { 3 };
     let left_hand = input.left_hand.unwrap_or(false);
     let node_ids: Vec<usize> = input.nodes.values().map(|n| n.id).collect();
     let nodes: HashMap<usize, &SolverNode3D> = input.nodes.values().map(|n| (n.id, n)).collect();
@@ -140,26 +133,43 @@ pub(super) fn build(input: &SolverInput3D, loads: &[SolverLoad3D]) -> Result<Mod
     let pos = |n: &SolverNode3D| -> V3 { [inp(n.x), inp(n.y), inp(n.z)] };
 
     let mut by_elem: HashMap<usize, Vec<&SolverLoad3D>> = HashMap::new();
+    let mut by_plate: HashMap<usize, Vec<&SolverLoad3D>> = HashMap::new();
+    let mut by_quad: HashMap<usize, Vec<&SolverLoad3D>> = HashMap::new();
+    let mut by_quad9: HashMap<usize, Vec<&SolverLoad3D>> = HashMap::new();
+    let mut by_solid_shell: HashMap<usize, Vec<&SolverLoad3D>> = HashMap::new();
+    let mut by_curved_shell: HashMap<usize, Vec<&SolverLoad3D>> = HashMap::new();
     for ld in loads {
-        let id = match ld {
-            SolverLoad3D::Distributed(d) => d.element_id,
-            SolverLoad3D::PointOnElement(p) => p.element_id,
-            SolverLoad3D::Thermal(t) => t.element_id,
+        match ld {
+            SolverLoad3D::Distributed(d) => by_elem.entry(d.element_id).or_default().push(ld),
+            SolverLoad3D::PointOnElement(p) => by_elem.entry(p.element_id).or_default().push(ld),
+            SolverLoad3D::Thermal(t) => by_elem.entry(t.element_id).or_default().push(ld),
+            SolverLoad3D::Pressure(p) => by_plate.entry(p.element_id).or_default().push(ld),
+            SolverLoad3D::PlateThermal(t) => by_plate.entry(t.element_id).or_default().push(ld),
+            SolverLoad3D::QuadPressure(p) => by_quad.entry(p.element_id).or_default().push(ld),
+            SolverLoad3D::QuadThermal(t) => by_quad.entry(t.element_id).or_default().push(ld),
+            SolverLoad3D::QuadEdge(e) => by_quad.entry(e.element_id).or_default().push(ld),
+            SolverLoad3D::QuadSelfWeight(sw) => by_quad.entry(sw.element_id).or_default().push(ld),
+            SolverLoad3D::Quad9Pressure(p) => by_quad9.entry(p.element_id).or_default().push(ld),
+            SolverLoad3D::Quad9Thermal(t) => by_quad9.entry(t.element_id).or_default().push(ld),
+            SolverLoad3D::Quad9Edge(e) => by_quad9.entry(e.element_id).or_default().push(ld),
+            SolverLoad3D::Quad9SelfWeight(sw) => by_quad9.entry(sw.element_id).or_default().push(ld),
+            SolverLoad3D::SolidShellPressure(p) => by_solid_shell.entry(p.element_id).or_default().push(ld),
+            SolverLoad3D::SolidShellSelfWeight(sw) => by_solid_shell.entry(sw.element_id).or_default().push(ld),
+            SolverLoad3D::CurvedShellPressure(p) => by_curved_shell.entry(p.element_id).or_default().push(ld),
+            SolverLoad3D::CurvedShellThermal(t) => by_curved_shell.entry(t.element_id).or_default().push(ld),
+            SolverLoad3D::CurvedShellEdge(e) => by_curved_shell.entry(e.element_id).or_default().push(ld),
+            SolverLoad3D::CurvedShellSelfWeight(sw) => by_curved_shell.entry(sw.element_id).or_default().push(ld),
             SolverLoad3D::Nodal(n) => {
                 if n.bw.is_some_and(|b| b != 0.0) {
                     return Err("out of scope: bimoment (warping) loads".into());
                 }
-                continue;
             }
             SolverLoad3D::Bimoment(b) => {
                 if b.bimoment != 0.0 {
                     return Err("out of scope: bimoment (warping) loads".into());
                 }
-                continue;
             }
-            _ => return Err("out of scope: shell or solid loads".into()),
-        };
-        by_elem.entry(id).or_default().push(ld);
+        }
     }
 
     let members: std::collections::HashSet<usize> = input.elements.values().map(|e| e.id).collect();
@@ -333,6 +343,12 @@ pub(super) fn build(input: &SolverInput3D, loads: &[SolverLoad3D]) -> Result<Mod
         let rigid = Rigid { ntrans: 3, nrot: if dpn == 6 { 3 } else { 0 }, delta: sub3(&xj, &xi).to_vec(), handed: if left_hand && needs_axes { -1.0 } else { 1.0 } };
         model.scatter(&dofs, &kg, &fg, Some(rigid));
     }
+
+    super::shell::reassemble_plates(input, &nodes, &mats, &by_plate, &mut model, dpn)?;
+    super::shell::reassemble_quads(input, &nodes, &mats, &by_quad, &mut model, dpn)?;
+    super::shell::reassemble_quad9s(input, &nodes, &mats, &by_quad9, &mut model, dpn)?;
+    super::shell::reassemble_solid_shells(input, &nodes, &mats, &by_solid_shell, &mut model, dpn)?;
+    super::shell::reassemble_curved_shells(input, &nodes, &mats, &by_curved_shell, &mut model, dpn)?;
 
     for ld in loads {
         if let SolverLoad3D::Nodal(nl) = ld {

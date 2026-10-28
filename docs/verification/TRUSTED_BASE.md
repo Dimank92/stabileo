@@ -12,7 +12,7 @@ The short version:
   tested (symbolic element matrices, the cross-path assembly oracle, differential tests
   against OpenSees and Code_Aster) but not certified. Roadmap "Solver and proof depth"
   item 1, **end-to-end certificates**, is the fix: an independent interval re-assembly of
-  `K` and `f` from the model JSON.
+  `K` and `f` from the model JSON (covering frames, trusses, shells, plates, and solids).
 - The mathematics is proved in Lean. The Rust code that runs it is not proved to match
   the Lean algorithm. The exceptions are the bundle checkers (linear, plastic,
   combinations), whose Lean code is itself the checker that runs.

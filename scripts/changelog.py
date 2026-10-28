@@ -29,7 +29,7 @@ def fragments():
 
 
 def parse(path):
-    text = path.read_text().strip() + "\n"
+    text = path.read_text(encoding="utf-8").strip() + "\n"
     first, _, rest = text.partition("\n")
     m = re.fullmatch(r"### (.+)", first.strip())
     problems = []
@@ -60,10 +60,10 @@ def release(version, date):
     for s in SECTIONS:
         if by_section[s]:
             block += f"\n### {s}\n\n" + "\n".join(by_section[s])
-    log = CHANGELOG.read_text()
+    log = CHANGELOG.read_text(encoding="utf-8")
     start = log.index("## Unreleased")
     end = log.index("\n## ", start + 1) + 1
-    CHANGELOG.write_text(log[:start] + UNRELEASED + "\n" + block + "\n" + log[end:])
+    CHANGELOG.write_text(encoding="utf-8", data=log[:start] + UNRELEASED + "\n" + block + "\n" + log[end:])
     for f in fragments():
         f.unlink()
     print(f"CHANGELOG.md: {version} with {sum(map(len, by_section.values()))} entries")
