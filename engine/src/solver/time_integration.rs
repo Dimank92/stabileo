@@ -430,12 +430,39 @@ fn solve_spd_sparse_or_dense(a: &CscMatrix, b: &[f64], what: &str) -> Result<Vec
         .ok_or_else(|| format!("{what}: singular matrix (sparse Cholesky and dense LU both failed)"))
 }
 
+fn rotate_triads_matrix(m: &CscMatrix, n: usize, basis: &[Vec<(usize, f64)>]) -> CscMatrix {
+    let (mut rows, mut cols, mut vals) = (Vec::new(), Vec::new(), Vec::new());
+    for j in 0..n {
+        for p in m.col_ptr[j]..m.col_ptr[j + 1] {
+            let i = m.row_idx[p];
+            let v = m.values[p];
+            let mut push = |i: usize, j: usize| {
+                for &(pi, qi) in &basis[i] {
+                    for &(pj, qj) in &basis[j] {
+                        if pi >= pj {
+                            rows.push(pi);
+                            cols.push(pj);
+                            vals.push(qi * v * qj);
+                        }
+                    }
+                }
+            };
+            push(i, j);
+            if i != j {
+                push(j, i);
+            }
+        }
+    }
+    CscMatrix::from_triplets(n, &rows, &cols, &vals)
+}
+
 /// Compute initial acceleration: M * a0 = F0 - C*v0 - K*u0.
 /// Since typically u0=v0=0, this simplifies, but we handle the general case.
 ///
 /// The mass matrix can be singular (lumped mass with massless rotational
 /// DOFs); the sparse Cholesky correctly reports that, and the fallback chain
 /// mirrors the previous dense path: LU, then the lumped diagonal solve.
+#[allow(clippy::too_many_arguments)]
 fn compute_initial_acceleration(
     m: &CscMatrix, c: Option<&CscMatrix>, k: &CscMatrix,
     u: &[f64], v: &[f64], f: &[f64],
@@ -475,28 +502,65 @@ fn compute_initial_acceleration(
     let md = mt.diagonal();
     let max_m = md.iter().fold(0.0f64, |acc, v| acc.max(v.abs()));
     let massive: Vec<usize> = (0..n).filter(|&i| md[i].abs() > max_m * 1e-12).collect();
+    let massless: Vec<usize> = (0..n).filter(|&i| md[i].abs() <= max_m * 1e-12).collect();
+
     let mut at = vec![0.0; n];
-    let rhs_m: Vec<f64> = massive.iter().map(|&i| rt[i]).collect();
-    let m_mm = mt.extract_principal_submatrix(&massive);
-    match solve_spd_sparse_or_dense(&m_mm, &rhs_m, "initial acceleration") {
-        Ok(x) => {
+
+    if massless.is_empty() {
+        let rhs_m: Vec<f64> = massive.iter().map(|&i| rt[i]).collect();
+        let m_mm = mt.extract_principal_submatrix(&massive);
+        if let Ok(x) = solve_spd_sparse_or_dense(&m_mm, &rhs_m, "initial acceleration") {
             for (k, &i) in massive.iter().enumerate() {
                 at[i] = x[k];
             }
-            // Back to the original coordinates: a = Q·ã.
-            a.iter_mut().for_each(|x| *x = 0.0);
-            for i in 0..n {
-                for &(p, q) in &basis[i] {
-                    a[i] += q * at[p];
+        }
+    } else {
+        let kt = if triads.is_empty() {
+            k.clone()
+        } else {
+            rotate_triads_matrix(k, n, &basis)
+        };
+
+        // Massless DOFs equilibrate quasi-statically: K_ss * u_s = rt_s
+        let k_ss = kt.extract_principal_submatrix(&massless);
+        let rt_s: Vec<f64> = massless.iter().map(|&i| rt[i]).collect();
+        let u_s = solve_spd_sparse_or_dense(&k_ss, &rt_s, "massless initial displacement")
+            .unwrap_or_else(|_| vec![0.0; massless.len()]);
+
+        // Force transmitted to massive DOFs via static transfer: f_trans = K_ms * u_s
+        let mut u_s_full = vec![0.0; n];
+        for (j, &sj) in massless.iter().enumerate() {
+            u_s_full[sj] = u_s[j];
+        }
+        let k_u_s = kt.sym_mat_vec(&u_s_full);
+        let rhs_m: Vec<f64> = massive.iter().map(|&i| rt[i] - k_u_s[i]).collect();
+
+        let m_mm = mt.extract_principal_submatrix(&massive);
+        if let Ok(x) = solve_spd_sparse_or_dense(&m_mm, &rhs_m, "initial acceleration") {
+            for (k, &i) in massive.iter().enumerate() {
+                at[i] = x[k];
+            }
+
+            // Consistent massless acceleration: K_ss * at_s = - K_sm * at_m
+            let mut at_m_full = vec![0.0; n];
+            for (k, &mk) in massive.iter().enumerate() {
+                at_m_full[mk] = x[k];
+            }
+            let k_am = kt.sym_mat_vec(&at_m_full);
+            let rhs_at_s: Vec<f64> = massless.iter().map(|&i| -k_am[i]).collect();
+            if let Ok(at_s) = solve_spd_sparse_or_dense(&k_ss, &rhs_at_s, "massless initial acceleration") {
+                for (j, &si) in massless.iter().enumerate() {
+                    at[si] = at_s[j];
                 }
             }
         }
-        Err(_) => {
-            // Last resort: lumped mass approximation (diagonal)
-            let md = m.diagonal();
-            for i in 0..n {
-                a[i] = if md[i].abs() > 1e-30 { rhs[i] / md[i] } else { 0.0 };
-            }
+    }
+
+    // Back to the original coordinates: a = Q·ã.
+    a.iter_mut().for_each(|x| *x = 0.0);
+    for i in 0..n {
+        for &(p, q) in &basis[i] {
+            a[i] += q * at[p];
         }
     }
 }
