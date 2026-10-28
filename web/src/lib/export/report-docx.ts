@@ -1,61 +1,9 @@
 import { decodeEntities } from './report-formats';
 import type { DocBlock, Run, Tone } from './docx';
+import { mathmlRuns } from './mathml-runs';
 
 export interface Raster { png: Uint8Array; width: number; height: number }
 export type Rasterize = (src: string, size: { width?: number; height?: number }) => Promise<Raster | null>;
-
-const GREEK: Record<string, string> = {
-  alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ε', varepsilon: 'ε', zeta: 'ζ', eta: 'η', theta: 'θ', kappa: 'κ', lambda: 'λ',
-  mu: 'μ', nu: 'ν', xi: 'ξ', pi: 'π', rho: 'ρ', sigma: 'σ', tau: 'τ', phi: 'φ', varphi: 'φ', chi: 'χ', psi: 'ψ', omega: 'ω',
-  Gamma: 'Γ', Delta: 'Δ', Theta: 'Θ', Lambda: 'Λ', Sigma: 'Σ', Phi: 'Φ', Psi: 'Ψ', Omega: 'Ω',
-  cdot: '·', times: '×', leq: '≤', le: '≤', geq: '≥', ge: '≥', neq: '≠', approx: '≈', pm: '±', infty: '∞', sum: 'Σ', partial: '∂',
-  rightarrow: '→', to: '→', degree: '°', ell: 'ℓ', prime: '′',
-};
-
-export function texRuns(tex: string): Run[] {
-  const out: Run[] = [];
-  const push = (text: string, vert?: Run['vert']) => {
-    if (!text) return;
-    const last = out[out.length - 1];
-    if (last && last.vert === vert) last.text += text; else out.push(vert ? { text, vert } : { text });
-  };
-  const group = (s: string, i: number): [string, number] => {
-    if (s[i] === '{') {
-      let depth = 0, j = i;
-      for (; j < s.length; j++) { if (s[j] === '{') depth++; else if (s[j] === '}' && --depth === 0) break; }
-      return [s.slice(i + 1, j), j + 1];
-    }
-    if (s[i] === '\\') { const m = /^\\([a-zA-Z]+)/.exec(s.slice(i)); if (m) return [m[0], i + m[0].length]; }
-    return [s[i] ?? '', i + 1];
-  };
-  const flat = (s: string) => texRuns(s).map((r) => r.text).join('');
-  const walk = (s: string, vert?: Run['vert']) => {
-    for (let i = 0; i < s.length;) {
-      const c = s[i]!;
-      if (c === '_' || c === '^') { const [g, j] = group(s, i + 1); push(flat(g), c === '_' ? 'sub' : 'sup'); i = j; continue; }
-      if (c === '{' || c === '}') { i++; continue; }
-      if (c === '\\') {
-        const m = /^\\([a-zA-Z]+|.)/.exec(s.slice(i))!;
-        const name = m[1]!;
-        i += m[0].length;
-        if (name === 'frac' || name === 'dfrac' || name === 'tfrac') {
-          const [a, j] = group(s, i); const [b, k] = group(s, j);
-          const wrap = (t: string) => (t.length > 1 && /[+\-\s]/.test(t) ? `(${t})` : t);
-          push(`${wrap(flat(a))}/${wrap(flat(b))}`, vert); i = k; continue;
-        }
-        if (name === 'sqrt') { const [a, j] = group(s, i); push(`√(${flat(a)})`, vert); i = j; continue; }
-        if (name === 'text' || name === 'mathrm' || name === 'mathit' || name === 'mathbf' || name === 'operatorname') { const [a, j] = group(s, i); walk(a, vert); i = j; continue; }
-        if (name === 'left' || name === 'right' || name === ',' || name === ';' || name === '!' || name === 'quad') { if (name === 'quad' || name === ',') push(' ', vert); continue; }
-        push(GREEK[name] ?? (name.length === 1 ? name : `\\${name}`), vert);
-        continue;
-      }
-      if (c === "'") { push('′', vert); i++; continue; }
-      push(c === '~' ? ' ' : c, vert); i++;
-    }
-  };
-  walk(tex.trim());
-  return out;
-}
 
 const runsText = (runs: Run[]) => runs.map((r) => r.text).join('');
 const tidy = (runs: Run[]): Run[] => {
@@ -63,7 +11,7 @@ const tidy = (runs: Run[]): Run[] => {
   for (const r of runs) {
     const t = r.text.replace(/\s+/g, ' ');
     const last = out[out.length - 1];
-    if (last && !last.vert && !r.vert && last.bold === r.bold && last.italic === r.italic && last.color === r.color) last.text += t; else out.push({ ...r, text: t });
+    if (last && !last.vert && !r.vert && last.bold === r.bold && last.italic === r.italic && last.color === r.color && last.mono === r.mono) last.text += t; else out.push({ ...r, text: t });
   }
   if (out[0]) out[0].text = out[0].text.trimStart();
   if (out.length) out[out.length - 1]!.text = out[out.length - 1]!.text.trimEnd();
@@ -139,9 +87,12 @@ export async function htmlToDocxBlocks(html: string, rasterize?: Rasterize, miss
       for (let s = spans.exec(body); s; s = spans.exec(body)) { depth += s[1] ? -1 : 1; if (depth === 0) { end = s.index + s[0].length; break; } }
       const markup = body.slice(m.index, end);
       re.lastIndex = end;
+      const math = /<math\b[\s\S]*<\/math>/.exec(markup)?.[0];
       const tex = /<annotation encoding="application\/x-tex">([\s\S]*?)<\/annotation>/.exec(markup)?.[1];
-      if (tex) addRuns(texRuns(decodeEntities(tex)).map((r) => ({ ...fmt(), ...r })));
-      else addText(markup.replace(/<span class="katex-mathml">[\s\S]*?<\/math><\/span>/, '').replace(/<[^>]+>/g, ''));
+      const fromMath = math ? mathmlRuns(math) : null;
+      if (fromMath) addRuns(fromMath.map((r) => ({ ...fmt(), ...r })));
+      else if (tex) addRuns([{ text: decodeEntities(tex), mono: true }]);
+      else addText(markup.replace(/<[^>]+>/g, ''));
       continue;
     }
     if (tag === 'img' && !close) {
@@ -173,7 +124,8 @@ export async function htmlToDocxBlocks(html: string, rasterize?: Rasterize, miss
           const headFirst = !!keep[0]!.h;
           const body = headFirst ? keep.slice(1) : keep;
           const align = Array.from({ length: width }, (_, j) => (body.length && body.every((x) => x.n[j] || !runsText(x.r[j] ?? []).trim()) && body.some((x) => x.n[j]) ? 'right' as const : 'left' as const));
-          out.push({ kind: 'table', head: headFirst ? text(keep[0]!.r) : Array(width).fill(''), rows: body.map((x) => text(x.r)), align, ...(headFirst ? { headRuns: keep[0]!.r.map(tidy) } : {}) });
+          const cells = (r: Run[][]) => [...r.map(tidy), ...Array.from({ length: width - r.length }, () => [] as Run[])];
+          out.push({ kind: 'table', head: headFirst ? text(keep[0]!.r) : Array(width).fill(''), rows: body.map((x) => text(x.r)), rowRuns: body.map((x) => cells(x.r)), align, ...(headFirst ? { headRuns: cells(keep[0]!.r) } : {}) });
         }
         table = null;
       }

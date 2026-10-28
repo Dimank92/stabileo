@@ -1,12 +1,13 @@
 import { strToU8, zipSync } from 'fflate';
 
-export interface Run { text: string; vert?: 'sub' | 'sup'; bold?: boolean; italic?: boolean; color?: string }
+export interface Run { text: string; vert?: 'sub' | 'sup'; bold?: boolean; italic?: boolean; color?: string; mono?: boolean }
 export type Tone = 'note' | 'info' | 'warn' | 'error';
 
 export type DocBlock =
   | { kind: 'heading'; text: string; level?: 1 | 2 | 3; runs?: Run[] }
   | { kind: 'paragraph'; text: string; muted?: boolean; runs?: Run[]; tone?: Tone; align?: 'center'; caption?: boolean }
-  | { kind: 'table'; head: string[]; rows: string[][]; align?: Array<'left' | 'right'>; headRuns?: Run[][] }
+  /** `headRuns` and `rowRuns`, when given, are what the cells print; `head` and `rows` stay their plain text. */
+  | { kind: 'table'; head: string[]; rows: string[][]; align?: Array<'left' | 'right'>; headRuns?: Run[][]; rowRuns?: Run[][][] }
   /** `width` and `height` are the size to print at, in CSS pixels (96 per inch); the PNG may hold more. */
   | { kind: 'image'; png: Uint8Array; width: number; height: number; alt: string; align?: 'center' }
   | { kind: 'pageBreak' };
@@ -38,6 +39,7 @@ const TONE_COLOR: Record<Tone, string> = { note: '555555', info: '1A5090', warn:
 
 function run(r: Run, base: { bold?: boolean; muted?: boolean; size?: number } = {}): string {
   const props = [
+    r.mono ? '<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:cs="Consolas"/>' : '',
     r.bold || base.bold ? '<w:b/>' : '',
     r.italic ? '<w:i/>' : '',
     r.color ? `<w:color w:val="${r.color}"/>` : base.muted ? '<w:color w:val="555555"/>' : '',
@@ -67,15 +69,16 @@ function table(t: Extract<DocBlock, { kind: 'table' }>, widthTw: number): string
   widthTw = Math.min(widthTw, Math.max(Math.round(widthTw * 0.45), total * 190));
   const w = weight.map((v) => Math.floor((widthTw * v) / total));
   const size = n > 6 ? 16 : 18;
-  const cell = (s: string, j: number, head: boolean) => {
-    const runs = head && t.headRuns?.[j]?.length ? t.headRuns[j]! : [{ text: s }];
+  const cell = (s: string, j: number, head: boolean, i = -1) => {
+    const rich = head ? t.headRuns?.[j] : t.rowRuns?.[i]?.[j];
+    const runs = rich?.length ? rich : [{ text: s }];
     return `<w:tc><w:tcPr><w:tcW w:w="${w[j] ?? Math.floor(widthTw / n)}" w:type="dxa"/>${head ? '<w:shd w:val="clear" w:color="auto" w:fill="E8E8E8"/>' : ''}</w:tcPr>${para(runs, head ? 'TableHeader' : 'TableText', { bold: head, align: head ? 'left' : t.align?.[j], size })}</w:tc>`;
   };
   const border = '<w:tblBorders>' + ['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map((b) => `<w:${b} w:val="single" w:sz="4" w:space="0" w:color="999999"/>`).join('') + '</w:tblBorders>';
   return `<w:tbl><w:tblPr><w:tblW w:w="${widthTw}" w:type="dxa"/>${border}<w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="60" w:type="dxa"/><w:right w:w="60" w:type="dxa"/></w:tblCellMar></w:tblPr>`
     + `<w:tblGrid>${t.head.map((_, j) => `<w:gridCol w:w="${w[j] ?? Math.floor(widthTw / n)}"/>`).join('')}</w:tblGrid>`
     + `<w:tr><w:trPr><w:tblHeader/><w:cantSplit/></w:trPr>${t.head.map((h, j) => cell(h, j, true)).join('')}</w:tr>`
-    + t.rows.map((r) => `<w:tr><w:trPr><w:cantSplit/></w:trPr>${t.head.map((_, j) => cell(r[j] ?? '', j, false)).join('')}</w:tr>`).join('')
+    + t.rows.map((r, i) => `<w:tr><w:trPr><w:cantSplit/></w:trPr>${t.head.map((_, j) => cell(r[j] ?? '', j, false, i)).join('')}</w:tr>`).join('')
     + `</w:tbl>${para('')}`;
 }
 

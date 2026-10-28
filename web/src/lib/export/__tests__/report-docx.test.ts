@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import katex from 'katex';
 import * as XLSX from 'xlsx';
 import { strFromU8, unzipSync } from 'fflate';
-import { htmlToDocxBlocks, texRuns, printColours } from '../report-docx';
+import { htmlToDocxBlocks, printColours } from '../report-docx';
+import { mathmlRuns } from '../mathml-runs';
 import { docxBytes, type DocBlock } from '../docx';
 import { htmlToBlocks, reportFile } from '../report-formats';
 
@@ -37,14 +38,48 @@ const REPORT = `<!DOCTYPE html><html><head><title>x</title><style>.a{}</style></
 <script type="application/json" id="stabileo-provenance">{}</script>
 </body></html>`;
 
-describe('symbols written as TeX, read for Word', () => {
-  it('keeps sub- and superscripts and writes greek and operators as characters', () => {
-    expect(texRuns('F_x')).toEqual([{ text: 'F' }, { text: 'x', vert: 'sub' }]);
-    expect(texRuns('\\sigma_{xx}')).toEqual([{ text: 'σ' }, { text: 'xx', vert: 'sub' }]);
-    expect(texRuns("f'_c / f_y")).toEqual([{ text: 'f′' }, { text: 'c', vert: 'sub' }, { text: ' / f' }, { text: 'y', vert: 'sub' }]);
-    expect(texRuns('A_{s,y}')).toEqual([{ text: 'A' }, { text: 's,y', vert: 'sub' }]);
-    expect(texRuns('m^4')).toEqual([{ text: 'm' }, { text: '4', vert: 'sup' }]);
-    expect(texRuns('\\frac{a+b}{2} \\leq \\gamma')).toEqual([{ text: '(a+b)/2 ≤ γ' }]);
+/** Each paragraph and table cell of the DOCX as text, sub- and superscripts as _{…} and ^{…}, TeX fallback as ⟦…⟧. */
+function written(docx: Uint8Array): { paragraphs: string[]; cells: string[][][] } {
+  const xml = strFromU8(unzipSync(docx)['word/document.xml']!);
+  const para = (p: string) => [...p.matchAll(/<w:r>([\s\S]*?)<\/w:r>/g)].map((r) => {
+    const t = [...r[1]!.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join('').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+    if (/w:val="subscript"/.test(r[1]!)) return `_{${t}}`;
+    if (/w:val="superscript"/.test(r[1]!)) return `^{${t}}`;
+    if (/Consolas/.test(r[1]!)) return `⟦${t}⟧`;
+    return t;
+  }).join('');
+  const cells = [...xml.matchAll(/<w:tbl>([\s\S]*?)<\/w:tbl>/g)].map((tb) => [...tb[1]!.matchAll(/<w:tr>([\s\S]*?)<\/w:tr>/g)].map((tr) => [...tr[1]!.matchAll(/<w:tc>([\s\S]*?)<\/w:tc>/g)].map((tc) => para(tc[1]!))));
+  const outside = xml.replace(/<w:tbl>[\s\S]*?<\/w:tbl>/g, '');
+  return { paragraphs: [...outside.matchAll(/<w:p>([\s\S]*?)<\/w:p>/g)].map((p) => para(p[1]!)).filter(Boolean), cells };
+}
+
+const MATH = `<html><body>
+<h2>Rigidez ${km('\\frac{L^2}{EI}')}</h2>
+<p>Flecha ${km('\\frac{5qL^4}{384EI}')}, radio ${km('\\sqrt{x^2+y^2}')}, cociente ${km('\\frac{a}{b/c}')}.</p>
+<p>Anidados: ${km('\\frac{1}{\\frac{1}{x}+1}')}; ${km('x_{a^2}')}; ${km('\\sqrt[3]{x}')}; ${km("f'_c")}; ${km('\\left(a+b\\right)^2')}; ${km('\\bar{x}')}.</p>
+<table><tr><th>Símbolo</th><th>${km('F_x')} (kN)</th><th>Límite</th></tr>
+<tr><td>x<sup>2</sup> + I<sub>y</sub></td><td class="num">-12,5</td><td>${km('\\frac{L}{250}')}</td></tr></table>
+</body></html>`;
+
+describe('expressions written to Word keep their meaning', () => {
+  it('in headings, paragraphs, table headers and table bodies, read from the final DOCX', async () => {
+    const f = (await reportFile('docx', { title: 'T', html: MATH, stem: 't', loadXlsx: async () => XLSX }))!;
+    const w = written(f.bytes as Uint8Array);
+    expect(w.paragraphs).toContain('Rigidez L^{2}/(EI)');
+    expect(w.paragraphs).toContain('Flecha (5qL^{4})/(384EI), radio √(x^{2}+y^{2}), cociente a/(b/c).');
+    expect(w.paragraphs).toContain('Anidados: 1/(1/x+1); x_{a^(2)}; ^{3}√(x); f_{c}^{′}; (a+b)^{2}; ⟦\\bar{x}⟧.');
+    expect(w.cells[0]).toEqual([['Símbolo', 'F_{x} (kN)', 'Límite'], ['x^{2} + I_{y}', '-12,5', 'L/250']]);
+  });
+
+  it('the parts KaTeX itself writes: fractions, roots, scripts at any depth; null for what has no plain form', () => {
+    const mm = (tex: string) => katex.renderToString(tex, { output: 'mathml' });
+    expect(mathmlRuns(mm('\\frac{L^2}{EI}'))).toEqual([{ text: 'L' }, { text: '2', vert: 'sup' }, { text: '/(EI)' }]);
+    expect(mathmlRuns(mm('\\sqrt{x^2+y^2}'))).toEqual([{ text: '√(x' }, { text: '2', vert: 'sup' }, { text: '+y' }, { text: '2', vert: 'sup' }, { text: ')' }]);
+    expect(mathmlRuns(mm('\\sigma_{xx} \\leq \\gamma'))).toEqual([{ text: 'σ' }, { text: 'xx', vert: 'sub' }, { text: '≤γ' }]);
+    expect(mathmlRuns(mm('\\sum_{i=1}^{n} x_i'))).toEqual([{ text: '∑' }, { text: 'i=1', vert: 'sub' }, { text: 'n', vert: 'sup' }, { text: 'x' }, { text: 'i', vert: 'sub' }]);
+    expect(mathmlRuns(mm('\\bar{x}'))).toBeNull();
+    expect(mathmlRuns(mm('\\begin{pmatrix}a\\\\b\\end{pmatrix}'))).toBeNull();
+    expect(mathmlRuns(mm('\\binom{n}{k}'))).toBeNull();
   });
 });
 
@@ -66,6 +101,7 @@ describe('a report read for Word', () => {
     expect(t.headRuns![1]).toEqual([{ text: 'F' }, { text: 'x', vert: 'sub' }, { text: ' (kN)' }]);
     expect(t.align).toEqual(['left', 'right', 'right']);
     expect(t.rows).toEqual([['N1', '-12,5', '3,0'], ['N2', '4,0', '']]);
+    expect(t.rowRuns![0]).toEqual([[{ text: 'N1' }], [{ text: '-12,5' }], [{ text: '3,0' }]]);
     const fig = blocks.findIndex((b) => b.kind === 'image' && b.alt === 'Momentos My');
     expect(blocks[fig + 1]).toMatchObject({ kind: 'paragraph', caption: true, text: 'Figura 1. Momentos My' });
     expect(blocks.find((b) => b.kind === 'paragraph' && b.text.startsWith('El nodo 7'))).toMatchObject({ tone: 'warn' });
