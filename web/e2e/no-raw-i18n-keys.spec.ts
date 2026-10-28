@@ -172,3 +172,25 @@ for (const locale of LOCALES) {
     });
   });
 }
+
+/*
+ * The check itself, on a page: a key put in the window title, a tooltip and the visible text is
+ * found in each, so a green run above means the screens had none, not that the reading missed them.
+ */
+test('@smoke the check finds a raw key in the title, a tooltip and the visible text', async ({ page }) => {
+  await bootBasic(page, 'en');
+  await page.evaluate(() => {
+    document.title = 'tabBar.newStructure';
+    const b = document.createElement('button');
+    b.textContent = 'design.banner.rerunCodeCheck';
+    b.setAttribute('title', 'ribbon.settings');
+    b.dataset.testid = 'planted-raw-key';
+    document.body.prepend(b);
+  });
+  const hits = (await shown(page)).flatMap(({ where, text }) => findRawKeys(text, INDEX).map((h) => `${h.text} @ ${where}`));
+  expect(hits).toEqual(expect.arrayContaining([
+    'tabBar.newStructure @ document.title',
+    'design.banner.rerunCodeCheck @ visible text',
+    'ribbon.settings @ <button data-testid="planted-raw-key"> title',
+  ]));
+});
