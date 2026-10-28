@@ -17,7 +17,7 @@
   import { Playback, SOURCE_LABEL } from '../shell/playback.svelte';
   import PlotXY, { type PlotSeries } from './PlotXY.svelte';
   import { loadSprings, solvePeriodic, solveStrip, type LatticeKind, type NetworkSpec, type PeriodicResult, type StripResult } from './springs';
-  import { openStripInStabileo } from './open-in-stabileo';
+  import { embeddedEditorUrl, fullEditorUrl, type StripLabel } from './open-in-stabileo';
 
   const SOURCE = `${REPO_URL}/tree/main/research/metamaterials/grossman-2026`;
   const DOI = 'https://doi.org/10.1103/17sg-gzhl';
@@ -274,18 +274,40 @@
   const passed = validation.checks.filter((c) => c.passed).length;
   const fmtSci = (v: number) => (v === 0 ? '0' : Math.abs(v) >= 0.01 && Math.abs(v) < 1000 ? v.toPrecision(3) : v.toExponential(1));
 
-  let opening = $state(false);
-  let openError = $state<string | null>(null);
-  async function openInStabileo() {
+  // ---- the Stabileo editor, embedded (loaded only when its tab is opened) -------------------
+  let tab = $state<'experiment' | 'edit'>('experiment');
+  let editorSrc = $state<string | null>(null);
+  let editorLoading = $state(false);
+  let editorStrip = $state.raw<StripResult | null>(null);
+  let editorError = $state<string | null>(null);
+  const labelParams = (): StripLabel => ({ family, eta, keep, seed, strain });
+  const e2e = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('e2e') === '1';
+
+  async function loadEditor() {
     if (!strip) return;
-    opening = true;
-    openError = null;
+    editorError = null;
+    editorLoading = true;
+    editorStrip = strip;
     try {
-      await openStripInStabileo(strip, { family, eta, keep, seed, theta: stripTheta, strain });
+      editorSrc = await embeddedEditorUrl(strip, labelParams(), e2e);
     } catch (e) {
-      openError = e instanceof Error ? e.message : String(e);
-      opening = false;
+      editorError = e instanceof Error ? e.message : String(e);
+      editorLoading = false;
     }
+  }
+  function showTab(t: 'experiment' | 'edit') {
+    touch();
+    tab = t;
+    if (t === 'edit' && !editorSrc) void loadEditor();
+  }
+  async function openFullEditor() {
+    if (!strip) return;
+    const w = window.open('about:blank', '_blank');
+    const url = await fullEditorUrl(strip, labelParams());
+    if (w) {
+      w.opener = null;
+      w.location.href = url;
+    } else window.location.assign(url);
   }
 </script>
 
@@ -308,7 +330,7 @@
 </section>
 
 <section class="sec sec--ink sp-body">
-  <div class="wrap sp-wide sp-panes">
+  <div class="wrap sp-wide sp-panes" class:editing={tab === 'edit'}>
     <article class="sp-article">
       <h2>What the paper shows</h2>
       <p>
@@ -436,6 +458,26 @@
 
     <aside class="sp-app" bind:this={pane} aria-label="The experiment">
       <div class="sp-sticky">
+        <div class="sp-tabs" role="tablist" aria-label="Experiment or editor">
+          <button role="tab" aria-selected={tab === 'experiment'} class:on={tab === 'experiment'} onclick={() => showTab('experiment')}>Experiment</button>
+          <button role="tab" aria-selected={tab === 'edit'} class:on={tab === 'edit'} onclick={() => showTab('edit')}>Edit in Stabileo</button>
+          <button class="sp-full" type="button" onclick={openFullEditor} disabled={!strip}>Open full editor ↗</button>
+        </div>
+          <div class="sp-editor" role="tabpanel" aria-label="Stabileo editor (production engine)" hidden={tab !== 'edit'}>
+            <p class="sp-source">
+              Stabileo editor (production engine): this strip as an ordinary truss, end rows pinned, the far end moved by the imposed strain. Edit and press Solve. Bar forces are
+              1000 × the experiment’s (E·A/L = 1000 k kN/m).{#if prestress > 0} Prestress is not carried over.{/if}
+              {#if editorStrip && strip !== editorStrip}<button class="link" type="button" onclick={loadEditor}>Load the experiment’s current network</button>{/if}
+            </p>
+            {#if editorError}<p class="warnt">{editorError}</p>{/if}
+            <div class="sp-frame">
+              {#if editorLoading}<div class="sp-frame-loading">Loading the Stabileo editor…</div>{/if}
+              {#if editorSrc}
+                <iframe src={editorSrc} title="Stabileo editor (production engine)" onload={() => (editorLoading = false)}></iframe>
+              {/if}
+            </div>
+          </div>
+        <div role="tabpanel" aria-label="Experiment" hidden={tab !== 'experiment'}>
         <p class="sp-source" aria-live="polite">
           {#if loadError}
             <span class="warnt">The simulation bundle is not part of this build ({loadError}). Build it with research/metamaterials/grossman-2026/wasm/build.sh.</span>
@@ -468,8 +510,7 @@
                 height="min(26rem, 55vh)"
                 ariaLabel="Stabileo viewer: the spring network coloured by axial force on its deformed shape"
                 status={[{ label: 'nodes', value: String(strip.nodes.length) }, { label: 'springs', value: String(strip.bonds.length) }]}
-                onOpenEditor={openInStabileo}
-                openEditorNote="Open this strip in the Stabileo editor"
+                editorButton={false}
               />
             {/await}
           {:else}
@@ -512,11 +553,7 @@
           <label>Deformation × <input type="range" min="0" max="60" step="1" bind:value={deform} aria-label="Deformation scale" /><span class="v">{deform}</span></label>
           <label>Seed <input type="number" min="0" max="999" step="1" bind:value={seed} aria-label="Random seed" /></label>
         </form>
-        <p class="sp-actions">
-          <button class="btn btn-sm" type="button" onclick={openInStabileo} disabled={!strip || opening}>Open in Stabileo</button>
-          <span class="sp-note">Loads this strip into the editor as a truss with prescribed displacements, labelled as research.{#if prestress > 0} Prestress is not carried over.{/if}</span>
-        </p>
-        {#if openError}<p class="warnt">{openError}</p>{/if}
+        </div>
       </div>
     </aside>
   </div>
@@ -731,11 +768,71 @@
     color: var(--fg-2);
     text-align: right;
   }
-  .sp-actions {
+  .sp-tabs {
     display: flex;
-    gap: 0.75rem;
+    gap: 0.25rem;
     align-items: center;
-    flex-wrap: wrap;
-    margin-top: 0.75rem;
+    border-bottom: 1px solid var(--hair);
+    margin-bottom: 0.6rem;
+  }
+  .sp-tabs [role='tab'] {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--fg-2);
+    padding: 0.45rem 0.75rem;
+    font: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+  .sp-tabs [role='tab'].on {
+    color: var(--fg);
+    border-bottom-color: var(--accent, #e8613c);
+  }
+  .sp-full {
+    margin-left: auto;
+    background: none;
+    border: 1px solid var(--hair);
+    border-radius: 3px;
+    color: var(--fg);
+    padding: 0.3rem 0.6rem;
+    font-size: 0.82rem;
+    cursor: pointer;
+  }
+  .sp-full:hover {
+    border-color: var(--fg-2);
+  }
+  .sp-frame {
+    position: relative;
+    height: min(46rem, 80vh);
+    border: 1px solid var(--hair);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .sp-frame iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+  }
+  .sp-frame-loading {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: var(--fg-2);
+    font: 13px var(--lp-mono);
+  }
+  @media (min-width: 60rem) {
+    .sp-panes.editing {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .sp-panes.editing .sp-app {
+      order: -1;
+    }
+    .sp-panes.editing .sp-sticky {
+      position: static;
+      max-height: none;
+    }
   }
 </style>

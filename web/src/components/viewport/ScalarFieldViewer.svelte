@@ -60,6 +60,8 @@
     /** What "Open in the editor" does; absent shows it as coming. */
     onOpenEditor?: (() => void) | null;
     openEditorNote?: string;
+    /** Show the status bar's "Open in the editor" button (false when the page offers its own editor). */
+    editorButton?: boolean;
   };
   let {
     xy,
@@ -84,6 +86,7 @@
     toolbar,
     onOpenEditor = null,
     openEditorNote = 'Opening experiments in the editor comes with research mode',
+    editorButton = true,
   }: Props = $props();
 
   let container: HTMLDivElement;
@@ -289,7 +292,7 @@
     {#each status as s (s.label)}
       <div class="status-item"><span class="status-label">{s.label}:</span><span class="status-value">{s.value}</span></div>
     {/each}
-    <button class="sfv-editor" disabled={!onOpenEditor} onclick={() => onOpenEditor?.()} title={onOpenEditor ? 'Open in the editor' : openEditorNote}>Open in the editor{onOpenEditor ? '' : ' (soon)'}</button>
+    {#if editorButton}<button class="sfv-editor" disabled={!onOpenEditor} onclick={() => onOpenEditor?.()} title={onOpenEditor ? 'Open in the editor' : openEditorNote}>Open in the editor{onOpenEditor ? '' : ' (soon)'}</button>{/if}
   </div>
 </div>
 

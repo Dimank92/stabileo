@@ -65,14 +65,27 @@ export function stripShareHash(strip: StripResult, label: string, stamp?: unknow
   return `#data=2.${base64url(deflateSync(bytes, { level: 9 }))}`;
 }
 
-export async function openStripInStabileo(
-  strip: StripResult,
-  p: { family: string; eta: number; keep: number; seed: number; theta: number; strain: number },
-): Promise<void> {
+export type StripLabel = { family: string; eta: number; keep: number; seed: number; strain: number };
+
+function label(p: StripLabel): string {
   const what = p.family === 'foam' ? `foam η = ${p.eta.toFixed(2)}` : p.family;
-  const label = `From Stabileo Research: spring network (${what}, bonds kept ${p.keep.toFixed(2)}, seed ${p.seed}, strain ${p.strain})`;
+  return `From Stabileo Research: spring network (${what}, bonds kept ${p.keep.toFixed(2)}, seed ${p.seed}, strain ${p.strain})`;
+}
+
+/** The share payload "2.<...>" of the strip, carrying the app's stamp for a fresh, unsolved project. */
+async function payload(strip: StripResult, p: StripLabel): Promise<string> {
   // A new project that this build has not solved yet (the app's own stamp for a fresh project),
   // so the editor does not treat it as results from an unknown older version.
   const { freshStamp } = await import('../../../lib/provenance/solve-stamp');
-  window.location.assign(`${import.meta.env.BASE_URL}app/basic${stripShareHash(strip, label, freshStamp())}`);
+  return stripShareHash(strip, label(p), freshStamp()).slice('#data='.length);
+}
+
+/** The app in embed mode (ribbon and viewport, no header or footer) with the strip loaded. */
+export async function embeddedEditorUrl(strip: StripResult, p: StripLabel, e2e = false): Promise<string> {
+  return `${import.meta.env.BASE_URL}app/basic${e2e ? '?e2e=1' : ''}#embed=${await payload(strip, p)}`;
+}
+
+/** The full editor with the strip loaded, as an ordinary shared model. */
+export async function fullEditorUrl(strip: StripResult, p: StripLabel): Promise<string> {
+  return `${import.meta.env.BASE_URL}app/basic#data=${await payload(strip, p)}`;
 }
