@@ -92,6 +92,17 @@
         const d = decodeReplay<Step>(buf);
         replay = { nodes: d.nodes, elements: d.elements, frames: d.frames };
         playback.setCount(d.frames.length);
+        // A link can open the page at a step, with or without the mesh (?step=57&mesh=0).
+        const q = new URLSearchParams(location.search);
+        if (q.get('mesh') === '0') showMesh = false;
+        if (q.get('mesh') === '1') showMesh = true;
+        const v = q.get('view');
+        if (v === 'plate' || v === 'band' || v === 'tip') view = v;
+        if (q.get('deformed') === '0') deformed = false;
+        if (q.has('step')) {
+          playback.seek(Number(q.get('step')));
+          return;
+        }
         playback.startAutoplay({
           reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
           narrow: window.innerWidth < 640,
@@ -119,12 +130,12 @@
   let field = $state<'damage' | 'disp' | 'syy'>('damage');
   let view = $state<'plate' | 'band' | 'tip'>('plate');
   let deformed = $state(true);
-  let deform = $state(20);
+  let deform = $state(10);
   let showMesh = $state(MESH_BY_DEFAULT && (typeof window === 'undefined' || window.innerWidth >= 640));
   let hideBroken = $state(true);
 
   const VIEWS: Record<'plate' | 'band' | 'tip', [number, number, number, number]> = {
-    plate: [-0.5, -0.5, 0.5, 0.5],
+    plate: [-0.55, -0.6, 0.55, 0.6],
     band: [-0.5, -0.12, 0.5, 0.12],
     tip: [-0.03, -0.0225, 0.03, 0.0225],
   };
@@ -154,7 +165,9 @@
     if (!hideBroken || !deformed || !frame || !elements) return null;
     const d = frame.damage;
     const el = elements;
-    return (c: number) => d[el[4 * c]] > 0.95 && d[el[4 * c + 1]] > 0.95 && d[el[4 * c + 2]] > 0.95 && d[el[4 * c + 3]] > 0.95;
+    // Two broken corners already put the element across the open crack; drawn, it becomes a
+    // stretched sliver from one face of the crack to the other.
+    return (c: number) => (d[el[4 * c]] > 0.95 ? 1 : 0) + (d[el[4 * c + 1]] > 0.95 ? 1 : 0) + (d[el[4 * c + 2]] > 0.95 ? 1 : 0) + (d[el[4 * c + 3]] > 0.95 ? 1 : 0) >= 2;
   });
 
   function start(force: boolean) {
@@ -357,7 +370,7 @@
                 <span class="rs-sep"></span>
                 <button class="diagram-btn" class:active={deformed} onclick={() => (deformed = !deformed)}>Deformed ×{deform}</button>
                 <button class="diagram-btn" class:active={showMesh} onclick={() => (showMesh = !showMesh)}>Mesh</button>
-                <button class="diagram-btn" class:active={hideBroken} onclick={() => (hideBroken = !hideBroken)} title="Hide elements whose four nodes have d > 0.95">Hide broken</button>
+                <button class="diagram-btn" class:active={hideBroken} onclick={() => (hideBroken = !hideBroken)} title="Hide elements with two or more corners at d > 0.95 (the open crack)">Hide broken</button>
                 <span class="rs-sep"></span>
                 <button class="diagram-btn" class:active={view === 'plate'} onclick={() => (view = 'plate')}>Plate</button>
                 <button class="diagram-btn" class:active={view === 'band'} onclick={() => (view = 'band')}>Crack band</button>

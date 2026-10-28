@@ -19,6 +19,9 @@ const STRINGS = {
     openInStabileo: 'Open in Stabileo',
     soon: 'coming with research mode',
     notDesign: 'Research, not a design tool',
+    checksPass: 'checks pass',
+    notCompared: 'Published figures not compared',
+    research: 'Research',
   },
   es: {
     sourceLabel: { 'crossref-abstract': 'a partir del resumen', 'publisher-abstract': 'a partir del resumen', 'repository-readme': 'a partir del README del código', 'full-text': 'a partir del artículo', 'reference-code': 'a partir del código de referencia' },
@@ -37,6 +40,9 @@ const STRINGS = {
     openInStabileo: 'Abrir en Stabileo',
     soon: 'llega con el modo investigación',
     notDesign: 'Investigación, no una herramienta de diseño',
+    checksPass: 'controles aprobados',
+    notCompared: 'Sin comparar con las figuras publicadas',
+    research: 'Investigación',
   },
   pt: {
     sourceLabel: { 'crossref-abstract': 'a partir do resumo', 'publisher-abstract': 'a partir do resumo', 'repository-readme': 'a partir do README do código', 'full-text': 'a partir do artigo', 'reference-code': 'a partir do código de referência' },
@@ -55,6 +61,9 @@ const STRINGS = {
     openInStabileo: 'Abrir no Stabileo',
     soon: 'chega com o modo pesquisa',
     notDesign: 'Pesquisa, não uma ferramenta de projeto',
+    checksPass: 'verificações aprovadas',
+    notCompared: 'Sem comparar com as figuras publicadas',
+    research: 'Pesquisa',
   },
 } as const;
 

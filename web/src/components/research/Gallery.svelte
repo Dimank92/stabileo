@@ -194,6 +194,10 @@
   }
   .rs-g-runbody h3 :global(a) {
     text-decoration: none;
+    color: var(--fg);
+  }
+  .rs-g-runbody h3 :global(a:hover) {
+    color: var(--lp-accent, #e5482a);
   }
   .rs-g-hook {
     font-size: 1rem;

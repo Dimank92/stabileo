@@ -37,15 +37,15 @@
 <section class="sec sec--ink rs-shell">
   <div class="wrap rs-shell-wrap">
     <header class="rs-shell-head">
-      <p class="rs-crumb"><PublicLink to="/research">Research</PublicLink> / {fieldName(paper.area)}</p>
+      <p class="rs-crumb"><PublicLink to="/research">{s.research}</PublicLink> / {fieldName(paper.area)}</p>
       <h1>{name}</h1>
       <p class="rs-cite">
         After {authors}, “{paper.crossref.title}”, <em>{paper.crossref.venue}</em> ({paper.crossref.year}),
         <a href="https://doi.org/{paper.doi}" rel="noreferrer" target="_blank">doi:{paper.doi}</a>.
       </p>
       <ul class="rs-badges">
-        <li class="ok">{statusName(paper.status)}{checks ? `: ${checks.passed}/${checks.total} checks pass` : ''}</li>
-        {#if !paper.reproduced_published_results}<li>Published figures not compared</li>{/if}
+        <li class="ok">{statusName(paper.status)}{checks ? `: ${checks.passed}/${checks.total} ${s.checksPass}` : ''}</li>
+        {#if !paper.reproduced_published_results}<li>{s.notCompared}</li>{/if}
         <li class="warn">{s.notDesign}</li>
       </ul>
       <p class="rs-lead">{lead}</p>
