@@ -1196,3 +1196,43 @@ fn csc_from_triplets_invariants() {
 // permutation of 3 did not finish in 10 minutes (7 GB): permute_symmetric
 // rebuilds through from_triplets, whose generic sort over symbolic keys is
 // costly. Covered by tests/index_exhaustive.rs (20 000 random cases).
+
+
+// ─── Design check phi and beta1 invariants (issue #378) ──────────────────────
+
+#[kani::proof]
+fn rc_compute_beta1_code_limits() {
+    let fc = any_in(10e6, 120e6);
+    let beta1 = crate::postprocess::rc_check::compute_beta1::<f64>(fc);
+    assert!(beta1 >= 0.65 && beta1 <= 0.85);
+}
+
+#[kani::proof]
+fn rc_compute_phi_code_limits() {
+    let eps_t = any_in(-0.05, 0.10);
+    let fy = any_in(200e6, 600e6);
+    let es = any_in(150e9, 250e9);
+    let phi = crate::postprocess::rc_check::compute_phi::<f64>(eps_t, fy, es);
+    assert!(phi >= 0.65 && phi <= 0.90);
+}
+
+#[kani::proof]
+fn cirsoc201_phi_flexure_code_limits() {
+    let eps_t = any_in(-0.05, 0.10);
+    let fy = any_in(200e6, 600e6);
+    let es = any_in(150e9, 250e9);
+    let phi_2005 = crate::postprocess::cirsoc201_check::phi_flexure(
+        crate::postprocess::cirsoc201_check::Cirsoc201Edition::E2005,
+        eps_t,
+        fy,
+        es,
+    );
+    let phi_2025 = crate::postprocess::cirsoc201_check::phi_flexure(
+        crate::postprocess::cirsoc201_check::Cirsoc201Edition::E2025,
+        eps_t,
+        fy,
+        es,
+    );
+    assert!(phi_2005 >= 0.65 && phi_2005 <= 0.90);
+    assert!(phi_2025 >= 0.65 && phi_2025 <= 0.90);
+}

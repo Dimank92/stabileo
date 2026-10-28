@@ -31,7 +31,7 @@ use crate::certify::real::Real;
 /// Section data for the flexural strength (SI: Pa, m, m²). For a rectangular
 /// section `bf = bw` and `hf = 0`.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct RcFlexureSection {
+pub struct RcFlexureSection {
     pub fc: f64,
     pub fy: f64,
     pub es: f64,
@@ -46,7 +46,7 @@ pub(crate) struct RcFlexureSection {
 
 /// Strain-compatibility flexural strength.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct RcFlexure<T> {
+pub struct RcFlexure<T> {
     /// Nominal moment Mn (N·m).
     pub mn: T,
     /// Stress block depth a = β1·c (m).

@@ -366,7 +366,7 @@ fn check_single_member(member: &SteelMemberData, forces: &ElementDesignForces) -
 ///
 /// Generic over `Real` so the certified check (`certify::design`) evaluates
 /// the very same formula in interval arithmetic.
-pub(crate) fn tension_capacity<T: Real>(m: &SteelMemberData) -> T {
+pub fn tension_capacity<T: Real>(m: &SteelMemberData) -> T {
     let yielding = T::lit(PHI_T) * T::exact(m.fy) * T::exact(m.ag);
 
     match m.fu {
@@ -385,7 +385,7 @@ pub(crate) fn tension_capacity<T: Real>(m: &SteelMemberData) -> T {
 ///
 /// Returns 0.0 when the web area is unknown — there is no shear check to
 /// report rather than a capacity to invent.
-pub(crate) fn shear_capacity<T: Real>(m: &SteelMemberData) -> T {
+pub fn shear_capacity<T: Real>(m: &SteelMemberData) -> T {
     match m.aw {
         Some(aw) if aw > 0.0 => {
             let cv1 = m.cv1.unwrap_or(1.0);
@@ -535,12 +535,12 @@ pub(crate) fn compression_ae<T: Real>(m: &SteelMemberData) -> T {
 
 /// AISC E3/E7: compression capacity φc·Fcr·Ae (Ae = Ag when no element is
 /// slender). NaN — refused — without `compression_elements`.
-pub(crate) fn compression_capacity<T: Real>(m: &SteelMemberData) -> T {
+pub fn compression_capacity<T: Real>(m: &SteelMemberData) -> T {
     T::lit(PHI_C) * compression_fcr::<T>(m) * compression_ae::<T>(m)
 }
 
 /// AISC F2: Lateral-torsional buckling for doubly-symmetric I-shapes (major axis).
-pub(crate) fn flexural_capacity_y<T: Real>(m: &SteelMemberData) -> T {
+pub fn flexural_capacity_y<T: Real>(m: &SteelMemberData) -> T {
     let (fy, e) = (T::exact(m.fy), T::exact(m.e));
     let mp = fy * T::exact(m.zy);
     let lb = T::exact(m.lb.unwrap_or(m.lby));
@@ -672,7 +672,7 @@ fn flange_local_buckling_major<T: Real>(m: &SteelMemberData, mp: T) -> T {
 
 /// AISC F6: Flexural capacity about minor axis (no LTB; F6.2 flange local
 /// buckling when `flange_slenderness` is given).
-pub(crate) fn flexural_capacity_z<T: Real>(m: &SteelMemberData) -> T {
+pub fn flexural_capacity_z<T: Real>(m: &SteelMemberData) -> T {
     let (fy, sy) = (T::exact(m.fy), T::exact(m.sz));
     let mp_z = fy * T::exact(m.zz);
     let mp = mp_z.min(T::lit(1.6) * fy * sy); // AISC F6-1
@@ -696,7 +696,7 @@ pub(crate) fn flexural_capacity_z<T: Real>(m: &SteelMemberData) -> T {
 }
 
 /// AISC H1-1: Combined axial and bending interaction.
-pub(crate) fn interaction_h1<T: Real>(pr_pc: T, mry_mcy: T, mrz_mcz: T) -> T {
+pub fn interaction_h1<T: Real>(pr_pc: T, mry_mcy: T, mrz_mcz: T) -> T {
     branch(
         T::lit(0.2).le(pr_pc),
         // H1-1a: Pr/Pc + (8/9)(Mry/Mcy + Mrz/Mcz) <= 1.0

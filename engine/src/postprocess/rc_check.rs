@@ -261,7 +261,7 @@ fn check_single_rc_member(m: &RCMemberData, f: &RCDesignForces) -> RCCheckResult
 
 /// ACI 318-19 22.4.2 / 22.4.3: (phi*Pn,max, phi*Pnt) for a tied section,
 /// phi*Pn,max = 0.80·0.65·[0.85·f'c·(Ag − Ast) + fy·Ast], phi*Pnt = 0.90·fy·Ast.
-pub(crate) fn axial_capacity<T: Real>(m: &RCMemberData) -> (T, T) {
+pub fn axial_capacity<T: Real>(m: &RCMemberData) -> (T, T) {
     let ast = T::exact(m.as_tension) + T::exact(m.as_compression.unwrap_or(0.0));
     let ag = match m.section_type {
         RCSectionType::Rectangular => T::exact(m.b) * T::exact(m.h),
@@ -309,7 +309,7 @@ pub(crate) fn flexure_section(m: &RCMemberData) -> RcFlexureSection {
 /// overstated when eps_t < eps_y, ~6% for an over-reinforced beam) and, for a
 /// doubly reinforced section, made one non-iterated pass at the compression
 /// steel stress. Generic over `Real` for the certified check.
-pub(crate) fn flexural_capacity<T: Real>(m: &RCMemberData) -> (T, RcFlexure<T>, T) {
+pub fn flexural_capacity<T: Real>(m: &RCMemberData) -> (T, RcFlexure<T>, T) {
     let es = m.es.unwrap_or(200e9);
     let f = flexure_section(m).strength(compute_beta1::<T>(m.fc), compute_beta1::<f64>(m.fc));
     let phi = compute_phi(f.epsilon_t, m.fy, es);
@@ -397,7 +397,7 @@ fn axial_flexure_capacity(m: &RCMemberData, es: f64, pu: f64) -> (f64, f64, f64,
 /// it is not, the size-effect factor lambda_s applies — and since it only bites
 /// for d > 250 mm, leaving it out was unconservative for essentially every beam.
 /// Generic over `Real` for the certified check.
-pub(crate) fn shear_capacity<T: Real>(m: &RCMemberData) -> T {
+pub fn shear_capacity<T: Real>(m: &RCMemberData) -> T {
     let lambda = T::exact(m.lambda.unwrap_or(1.0));
     let fc_mpa = T::exact(m.fc).dv(T::exact(1e6));
     let bw_mm = T::exact(m.b) * T::exact(1000.0);
@@ -455,7 +455,7 @@ fn cbrt<T: Real>(x: T) -> T {
 }
 
 /// ACI 318-19 Table 22.2.2.4.3: beta1 factor.
-pub(crate) fn compute_beta1<T: Real>(fc: f64) -> T {
+pub fn compute_beta1<T: Real>(fc: f64) -> T {
     let fc_mpa = T::exact(fc).dv(T::exact(1e6));
     let (lo, hi) = (T::exact(28.0), T::exact(56.0));
     branch(
@@ -466,7 +466,7 @@ pub(crate) fn compute_beta1<T: Real>(fc: f64) -> T {
 }
 
 /// ACI 318-19 Table 21.2.2: Strength reduction factor phi.
-pub(crate) fn compute_phi<T: Real>(epsilon_t: T, fy: f64, es: f64) -> T {
+pub fn compute_phi<T: Real>(epsilon_t: T, fy: f64, es: f64) -> T {
     let epsilon_y = T::exact(fy).dv(T::exact(es));
     let limit = T::lit(0.003);
     branch(
