@@ -41,8 +41,8 @@ Educational tool with step-by-step solver visualization for civil/structural eng
 - `npm run dev` — Start dev server (port 4000)
 - `npm run build` — Production build to `dist/`
 - `npm run test` — The full Vitest gate. Runs **three passes** and fails if any fails:
-  `unit` (everything, in a bounded parallel pool) and `build` (the tests that shell out to a
-  real `vite build`, serially). See `scripts/test-all.mjs` for the measurements behind the
+  `unit` (everything, in a bounded parallel pool), `build` (the tests that shell out to a
+  real `vite build`, serially) and `results` (the results snapshot gate). See `scripts/test-all.mjs` for the measurements behind the
   split — briefly: a nested production build does not occupy one worker slot, it occupies the
   machine, and Vitest's default worker count leaves the coordinator no core, which together
   made the suite exit 1 with `[vitest-worker]: Timeout calling "onTaskUpdate"` while every
