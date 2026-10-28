@@ -13,7 +13,7 @@ signed Nix closure, and swapped into place over SSH.
 
 | Workflow | Trigger |
 |---|---|
-| `deploy.yml` | every push to `main` deploys production; a manual run picks the environment (default staging) |
+| `deploy.yml` | push to `main` deploys to `staging`; tagged releases (`v*`) promote to `production` after safety gates pass; manual dispatch picks environment (default `staging`) |
 | `rollback.yml` | manual, picks the environment (typed `CONFIRM` for a migration rollback) |
 | `production-health.yml` | after every successful deploy or rollback, and hourly: checks production and staging from outside |
 
@@ -140,11 +140,50 @@ site opens one issue, `Production health check failing: <site>` (labels `ci-fail
     node scripts/production-health.mjs https://stabileo.com          # locally (web/ installed)
     gh workflow run production-health.yml -f sites=https://stabileo.com/no-such-site   # negative case
 
-## Rollback
+## Staging before production and promotion gates
 
-Actions -> **Rollback** (pick the environment) swaps `live/` for the newest entry in `releases/` and restarts
-the backend; one step back per run. Tick **rollback_db** and type `CONFIRM` only if the release
-being rolled back ran a bad migration.
+Roadmap: Release safety #385 (item 1):
+`main` deploys continuously to `staging.stabileo.com`. Production (`stabileo.com`) is only
+promoted from a tagged release (`v*`) or intentional production dispatch, after passing:
+1. `make check.engine.acceptance-models` (acceptance models suite).
+2. `make test.engine.gates` (named correctness gates).
+3. The full CI test suite and smoke checks (`make e2e.web.smoke`).
+
+## Rollback procedure
+
+When a deployed release contains an issue, follow this rollback procedure:
+
+### 1. Automatic rollback via GitHub Actions
+1. Navigate to **Actions** -> **Rollback** (`.github/workflows/rollback.yml`).
+2. Click **Run workflow**.
+3. Select the target environment (`staging` or `production`).
+4. **Database migrations:** If the bad release included a faulty database migration:
+   - Check **Also roll back database migrations**.
+   - In **confirm_rollback_db**, type `CONFIRM`.
+5. Click **Run workflow**. The runner connects via SSH and swaps `live/` to point to the newest entry in `/srv/stabileo/releases/`, rolls back migrations if requested, and restarts `stabileo-backend`.
+
+### 2. Emergency manual SSH rollback (fallback)
+If GitHub Actions is unreachable, an operator with SSH access can roll back immediately on the host:
+```bash
+ssh app@$DEPLOY_HOST
+
+# Inspect available previous releases (last 3 are retained):
+ls -lt /srv/stabileo/releases/
+
+# Atomically point the live symlink to the previous working release:
+PREV=$(ls -dt /srv/stabileo/releases/* | head -n 1)
+ln -sfn "$PREV" /srv/stabileo/live
+
+# Restart the backend service:
+sudo systemctl restart stabileo-backend
+
+# Verify health status:
+curl -sf http://127.0.0.1:4100/api/v1/health
+```
+
+### 3. DNS fallback
+If the server host itself is compromised or offline, point Cloudflare DNS back at GitHub Pages
+where the frozen fallback is maintained.
 
 ## Production cut-over
 

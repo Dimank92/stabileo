@@ -3,6 +3,7 @@ name: Deploy
 on:
   push:
     branches: [main]
+    tags: ['v*']
   workflow_dispatch:
     inputs:
       environment:
@@ -14,18 +15,45 @@ on:
 permissions: {}
 
 jobs:
+  production-gate:
+    name: Production Release Safety Gates
+    if: (inputs.environment == 'production') || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify tagged release or confirmed production dispatch
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && ! "${{ github.ref }}" =~ ^refs/tags/v ]]; then
+            echo "::error::Direct pushes to main cannot deploy directly to production. Main deploys to staging."
+            exit 1
+          fi
+          echo "Production promotion gate verified for ${{ github.ref }}"
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
+      - name: Cache Nix store
+        uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
+      - name: Acceptance suite gate
+        run: make check.engine.acceptance-models
+      - name: Named correctness gates
+        run: make test.engine.gates
+
   build:
-    name: Build (${{ inputs.environment || 'production' }})
+    name: Build (${{ inputs.environment || (startsWith(github.ref, 'refs/tags/v') && 'production') || 'staging' }})
+    needs: [production-gate]
+    if: always() && (needs.production-gate.result == 'success' || needs.production-gate.result == 'skipped')
     runs-on: ubicloud-standard-8
     timeout-minutes: 60
-    environment: ${{ inputs.environment || 'production' }}
+    environment: ${{ inputs.environment || (startsWith(github.ref, 'refs/tags/v') && 'production') || 'staging' }}
     concurrency:
-      group: deploy-${{ inputs.environment || 'production' }}-build
+      group: deploy-${{ inputs.environment || (startsWith(github.ref, 'refs/tags/v') && 'production') || 'staging' }}-build
       cancel-in-progress: true
     permissions:
       contents: read
     env:
-      TARGET: ${{ inputs.environment || 'production' }}
+      TARGET: ${{ inputs.environment || (startsWith(github.ref, 'refs/tags/v') && 'production') || 'staging' }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -147,14 +175,14 @@ jobs:
           if-no-files-found: error
 
   deploy:
-    name: Deploy (${{ inputs.environment || 'production' }})
+    name: Deploy (${{ inputs.environment || (startsWith(github.ref, 'refs/tags/v') && 'production') || 'staging' }})
     needs: [build]
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: ${{ inputs.environment || 'production' }}
+    environment: ${{ inputs.environment || (startsWith(github.ref, 'refs/tags/v') && 'production') || 'staging' }}
     # Shared with the rollback, so neither runs while the other holds the host.
     concurrency:
-      group: deploy-${{ inputs.environment || 'production' }}-host
+      group: deploy-${{ inputs.environment || (startsWith(github.ref, 'refs/tags/v') && 'production') || 'staging' }}-host
       cancel-in-progress: false
     permissions:
       contents: read
