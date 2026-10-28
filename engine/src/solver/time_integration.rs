@@ -13,6 +13,14 @@ use super::constraints::FreeConstraintSystem;
 /// The discrete system a time-history run integrated and the full state it
 /// computed, in the solver's reduced (free, constraint-independent) DOF space.
 /// Read by `certify::dynamics`; the matrices are the f64 ones the solver used.
+fn compute_mechanical_energy(k: &CscMatrix, m: &CscMatrix, u: &[f64], v: &[f64]) -> (f64, f64, f64) {
+    let ku = k.sym_mat_vec(u);
+    let mv = m.sym_mat_vec(v);
+    let e_strain = 0.5 * u.iter().zip(&ku).map(|(&a, &b)| a * b).sum::<f64>();
+    let e_kinetic = 0.5 * v.iter().zip(&mv).map(|(&a, &b)| a * b).sum::<f64>();
+    (e_kinetic, e_strain, e_kinetic + e_strain)
+}
+
 #[derive(Debug, Clone)]
 pub struct DynamicTrace {
     pub k: CscMatrix,
@@ -223,6 +231,13 @@ fn solve_time_history_2d_inner(
     // Store F_prev for HHT (in ns space)
     let mut f_prev = f_0;
 
+    // Energy tracking
+    let (_, _, e_0) = compute_mechanical_energy(&k_s, &m_s, &u, &v);
+    let mut max_total_energy = e_0;
+    let mut external_work = 0.0f64;
+    let mut damping_dissipation = 0.0f64;
+    let mut max_energy_drift = 0.0f64;
+
     // 10. Time stepping loop
     for step in 0..input.n_steps {
         let t_next = (step + 1) as f64 * dt;
@@ -255,7 +270,29 @@ fn solve_time_history_2d_inner(
             v_new[i] = v[i] + dt * ((1.0 - gamma) * a_vec[i] + gamma * a_new[i]);
         }
 
-        // Update state (ns space)
+        // Update state and track energy (ns space)
+        let du: Vec<f64> = u_new.iter().zip(&u).map(|(un1, un0)| un1 - un0).collect();
+        let dw: f64 = 0.5 * f_next.iter().zip(&f_prev).zip(&du).map(|((fn1, fn0), du_i)| (fn1 + fn0) * du_i).sum::<f64>();
+        external_work += dw;
+
+        if a0 > 0.0 || a1 > 0.0 {
+            let v_bar: Vec<f64> = v_new.iter().zip(&v).map(|(vn1, vn0)| 0.5 * (vn1 + vn0)).collect();
+            let mv_bar = m_s.sym_mat_vec(&v_bar);
+            let kv_bar = k_s.sym_mat_vec(&v_bar);
+            let cv_bar: Vec<f64> = (0..ns).map(|i| a0 * mv_bar[i] + a1 * kv_bar[i]).collect();
+            let diss: f64 = dt * v_bar.iter().zip(&cv_bar).map(|(vb, cv)| vb * cv).sum::<f64>();
+            damping_dissipation += diss;
+        }
+
+        let (_, _, e_cur) = compute_mechanical_energy(&k_s, &m_s, &u_new, &v_new);
+        max_total_energy = max_total_energy.max(e_cur);
+        let imb = (e_cur - e_0 + damping_dissipation - external_work).abs();
+        let ref_energy = max_total_energy.max(external_work.abs()).max(1.0);
+        let drift = imb / ref_energy;
+        if drift > max_energy_drift {
+            max_energy_drift = drift;
+        }
+
         u = u_new;
         v = v_new;
         a_vec = a_new;
@@ -309,6 +346,28 @@ fn solve_time_history_2d_inner(
         format!("Newmark (beta={:.4}, gamma={:.4})", beta, gamma)
     };
 
+    let (_, _, e_fin) = compute_mechanical_energy(&k_s, &m_s, &u, &v);
+    let energy_balance = DynamicEnergyBalance {
+        initial_energy: e_0,
+        final_energy: e_fin,
+        external_work,
+        damping_dissipation,
+        energy_imbalance: (e_fin - e_0 + damping_dissipation - external_work).abs(),
+        relative_drift: max_energy_drift,
+    };
+
+    let mut diagnostics = Vec::new();
+    if max_energy_drift > 0.05 {
+        diagnostics.push(SolverDiagnostic {
+            category: "energy_drift".into(),
+            message: format!(
+                "Energy drift of {:.2}% detected during time-history integration — consider reducing the time step size or using algorithmic damping (HHT-alpha)",
+                max_energy_drift * 100.0
+            ),
+            severity: "warning".into(),
+        });
+    }
+
     Ok(TimeHistoryResult {
         time_steps,
         node_histories,
@@ -316,6 +375,8 @@ fn solve_time_history_2d_inner(
         peak_reactions,
         n_steps: input.n_steps,
         method: method_name,
+        energy_balance: Some(energy_balance),
+        diagnostics,
     })
 }
 
@@ -1253,6 +1314,13 @@ fn solve_time_history_3d_inner(
     let mut u_at_peak = u_nf;
     let mut f_prev = f_0;
 
+    // Energy tracking (3D)
+    let (_, _, e_0) = compute_mechanical_energy(&k_s, &m_s, &u, &v);
+    let mut max_total_energy = e_0;
+    let mut external_work = 0.0f64;
+    let mut damping_dissipation = 0.0f64;
+    let mut max_energy_drift = 0.0f64;
+
     // 10. Time stepping loop
     for step in 0..input.n_steps {
         let t_next = (step + 1) as f64 * dt;
@@ -1279,6 +1347,29 @@ fn solve_time_history_3d_inner(
         let mut v_new = vec![0.0; ns];
         for i in 0..ns {
             v_new[i] = v[i] + dt * ((1.0 - gamma) * a_vec[i] + gamma * a_new[i]);
+        }
+
+        // Update state and track energy (3D)
+        let du: Vec<f64> = u_new.iter().zip(&u).map(|(un1, un0)| un1 - un0).collect();
+        let dw: f64 = 0.5 * f_next.iter().zip(&f_prev).zip(&du).map(|((fn1, fn0), du_i)| (fn1 + fn0) * du_i).sum::<f64>();
+        external_work += dw;
+
+        if a0 > 0.0 || a1 > 0.0 {
+            let v_bar: Vec<f64> = v_new.iter().zip(&v).map(|(vn1, vn0)| 0.5 * (vn1 + vn0)).collect();
+            let mv_bar = m_s.sym_mat_vec(&v_bar);
+            let kv_bar = k_s.sym_mat_vec(&v_bar);
+            let cv_bar: Vec<f64> = (0..ns).map(|i| a0 * mv_bar[i] + a1 * kv_bar[i]).collect();
+            let diss: f64 = dt * v_bar.iter().zip(&cv_bar).map(|(vb, cv)| vb * cv).sum::<f64>();
+            damping_dissipation += diss;
+        }
+
+        let (_, _, e_cur) = compute_mechanical_energy(&k_s, &m_s, &u_new, &v_new);
+        max_total_energy = max_total_energy.max(e_cur);
+        let imb = (e_cur - e_0 + damping_dissipation - external_work).abs();
+        let ref_energy = max_total_energy.max(external_work.abs()).max(1.0);
+        let drift = imb / ref_energy;
+        if drift > max_energy_drift {
+            max_energy_drift = drift;
         }
 
         u = u_new;
@@ -1329,6 +1420,28 @@ fn solve_time_history_3d_inner(
         format!("Newmark (beta={:.4}, gamma={:.4})", beta, gamma)
     };
 
+    let (_, _, e_fin) = compute_mechanical_energy(&k_s, &m_s, &u, &v);
+    let energy_balance = DynamicEnergyBalance {
+        initial_energy: e_0,
+        final_energy: e_fin,
+        external_work,
+        damping_dissipation,
+        energy_imbalance: (e_fin - e_0 + damping_dissipation - external_work).abs(),
+        relative_drift: max_energy_drift,
+    };
+
+    let mut diagnostics = Vec::new();
+    if max_energy_drift > 0.05 {
+        diagnostics.push(SolverDiagnostic {
+            category: "energy_drift".into(),
+            message: format!(
+                "Energy drift of {:.2}% detected during time-history integration — consider reducing the time step size or using algorithmic damping (HHT-alpha)",
+                max_energy_drift * 100.0
+            ),
+            severity: "warning".into(),
+        });
+    }
+
     Ok(TimeHistoryResult3D {
         time_steps,
         node_histories,
@@ -1336,6 +1449,8 @@ fn solve_time_history_3d_inner(
         peak_reactions,
         n_steps: input.n_steps,
         method: method_name,
+        energy_balance: Some(energy_balance),
+        diagnostics,
     })
 }
 

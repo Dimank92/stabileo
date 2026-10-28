@@ -51,3 +51,5 @@ mod cqc_1981;
 mod lee_frame;
 #[path = "../benchmarks/dadeppo_arch.rs"]
 mod dadeppo_arch;
+#[path = "../nonlinear_dynamic_robustness.rs"]
+mod nonlinear_dynamic_robustness;

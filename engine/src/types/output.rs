@@ -908,6 +908,17 @@ pub struct ElementPlasticStatus3D {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DynamicEnergyBalance {
+    pub initial_energy: f64,
+    pub final_energy: f64,
+    pub external_work: f64,
+    pub damping_dissipation: f64,
+    pub energy_imbalance: f64,
+    pub relative_drift: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TimeHistoryResult {
     pub time_steps: Vec<f64>,
     pub node_histories: Vec<NodeTimeHistory>,
@@ -915,6 +926,10 @@ pub struct TimeHistoryResult {
     pub peak_reactions: Vec<Reaction>,
     pub n_steps: usize,
     pub method: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub energy_balance: Option<DynamicEnergyBalance>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub diagnostics: Vec<SolverDiagnostic>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -943,6 +958,10 @@ pub struct TimeHistoryResult3D {
     pub peak_reactions: Vec<Reaction3D>,
     pub n_steps: usize,
     pub method: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub energy_balance: Option<DynamicEnergyBalance>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub diagnostics: Vec<SolverDiagnostic>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
