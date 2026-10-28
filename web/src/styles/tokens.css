@@ -271,6 +271,10 @@
      ──────────────────────────────────────────────────────────────────── */
 
   --st-accent: var(--st-vermillion);        /* primary action, brand */
+  /* A filled primary button: white text on the brand vermillion was 3.97:1 (fails AA below 18.7 px
+     bold); this darker fill gives 5.12:1, and 3.56:1 against ink as a control. Hover 6.13:1. */
+  --st-accent-fill: #c4401f;
+  --st-accent-fill-hover: #b0381b;
   --st-accent-hover: #f05a3c;
   --st-selected: var(--st-vermillion);      /* THIS object is selected */
   --st-selected-bg: var(--st-vermillion-dim);

@@ -341,12 +341,12 @@
 }
 
 .landing .btn-primary {
-  background: var(--lp-accent);
+  background: var(--st-accent-fill);
   color: #fff;
 }
 
 .landing .btn-primary:hover {
-  background: #cf3d21;
+  background: var(--st-accent-fill-hover);
 }
 
 .landing .btn-ghost {
