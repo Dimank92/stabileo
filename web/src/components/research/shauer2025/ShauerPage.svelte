@@ -14,6 +14,7 @@
   import type { PlateConfig, Series } from './protocol';
   import { REPO_URL } from '../../landing/landing-utils';
   import PublicLink from '../../landing/PublicLink.svelte';
+  import NumberField from './NumberField.svelte';
 
   const SOURCE = `${REPO_URL}/tree/main/research/fracture/shauer-2025`;
   const STABILEO = '#3987e5';
@@ -184,21 +185,21 @@
       <form class="rs-controls" onsubmit={(ev) => { ev.preventDefault(); start(); }}>
         <fieldset>
           <legend>Material (plane strain)</legend>
-          <label>E, Young’s modulus <span class="u">kN/mm²</span><input type="number" step="any" min={LIMITS.e[0]} max={LIMITS.e[1]} bind:value={e} /></label>
-          <label>ν, Poisson’s ratio<input type="number" step="any" min={LIMITS.nu[0]} max={LIMITS.nu[1]} bind:value={nu} /></label>
-          <label>G<sub>c</sub>, fracture toughness <span class="u">kN/mm</span><input type="number" step="any" min={LIMITS.gc[0]} max={LIMITS.gc[1]} bind:value={gc} /></label>
-          <label>ℓ, length scale <span class="u">mm</span><input type="number" step="any" min={LIMITS.l0[0]} max={LIMITS.l0[1]} bind:value={l0} /></label>
+          <label><span class="lbl"><i>E</i>, Young’s modulus</span><span class="u">kN/mm²</span><NumberField label="E, Young’s modulus, kN/mm²" min={LIMITS.e[0]} max={LIMITS.e[1]} bind:value={e} /></label>
+          <label><span class="lbl"><i>ν</i>, Poisson’s ratio</span><span class="u"></span><NumberField label="ν, Poisson’s ratio" min={LIMITS.nu[0]} max={LIMITS.nu[1]} bind:value={nu} /></label>
+          <label><span class="lbl"><i>G</i><sub>c</sub>, fracture toughness</span><span class="u">kN/mm</span><NumberField label="Gc, fracture toughness, kN/mm" min={LIMITS.gc[0]} max={LIMITS.gc[1]} bind:value={gc} /></label>
+          <label><span class="lbl"><i>ℓ</i>, length scale</span><span class="u">mm</span><NumberField label="ℓ, length scale, mm" min={LIMITS.l0[0]} max={LIMITS.l0[1]} bind:value={l0} /></label>
         </fieldset>
         <fieldset>
           <legend>Loading and discretisation</legend>
-          <label>Top displacement at t = 1 <span class="u">mm</span><input type="number" step="any" min={LIMITS.u[0]} max={LIMITS.u[1]} bind:value={u} /></label>
-          <label>Load step Δt
-            <select bind:value={dt}>
+          <label><span class="lbl">Top displacement at <i>t</i> = 1</span><span class="u">mm</span><NumberField label="Top displacement at t = 1, mm" min={LIMITS.u[0]} max={LIMITS.u[1]} bind:value={u} /></label>
+          <label><span class="lbl">Load step Δ<i>t</i></span>
+            <select bind:value={dt} aria-label="Load step">
               {#each [0.005, 0.01, 0.02, 0.03, 0.06] as v (v)}<option value={v}>{v} ({Math.floor(0.8 / v + 1e-9)} steps)</option>{/each}
             </select>
           </label>
-          <label>Mesh
-            <select bind:value={meshKey}>
+          <label><span class="lbl">Mesh</span>
+            <select bind:value={meshKey} aria-label="Mesh">
               {#each Object.entries(MESHES) as [k, m] (k)}<option value={k}>{m.label}</option>{/each}
             </select>
           </label>
@@ -215,9 +216,9 @@
         <div class="rs-buttons">
           <button class="btn btn-primary" type="submit" disabled={!valid || run?.status === 'running'}>Run</button>
           {#if run?.status === 'running'}<button class="btn" type="button" onclick={() => sim.stop()}>Stop</button>{/if}
-          <button class="btn" type="button" onclick={reset} disabled={isReference}>Reference parameters</button>
+          {#if !isReference}<button class="btn" type="button" onclick={reset}>Reference parameters</button>{/if}
         </div>
-        {#if isReference}<p class="rs-note">These are the reference script’s parameters: the run is compared step by step with its outputs.</p>{/if}
+        {#if isReference}<p class="rs-note">Using the reference script’s parameters: the run is compared step by step with its outputs.</p>{/if}
         <p class="rs-status" aria-live="polite">
           {#if sim.available === false}
             <span class="warnt">The simulation bundle is not part of this build ({sim.unavailableReason}). Build it with research/fracture/shauer-2025/wasm/build.sh.</span>
@@ -235,7 +236,7 @@
         </p>
       </form>
 
-      <div class="rs-out">
+      <div class="rs-out" data-steps={frames.length}>
         {#if run?.nodes && run?.elements}
           <div class="rs-viewbar">
             <label>Field <select bind:value={field}><option value="damage">Damage d</option><option value="syy">Opening stress σyy (degraded)</option></select></label>
@@ -251,6 +252,7 @@
               <input type="range" min="0" max={frames.length - 1} bind:value={shown} oninput={() => { follow = false; playing = false; }} aria-label="Load step shown" />
               <span class="mono">step {frame?.step.step} · u = {fmt(frame?.step.displacement ?? 0, 5)} mm · F = {fmt(frame?.step.reaction ?? 0)} kN · max d = {fmt(frame?.step.damage_max ?? 0, 3)}</span>
             </div>
+            <p class="rs-note">Unconstrained AT2, as in the reference code, can give d slightly above 1 (the reference reaches 1.0096 here); values are shown as computed and only the colour scale is clamped to [0, 1].</p>
           {/if}
         {:else}
           <div class="rs-placeholder">
@@ -306,7 +308,7 @@
   </div>
 </section>
 
-<section class="sec sec--paper rs-text">
+<section class="sec sec--ink rs-text">
   <div class="wrap rs-col">
     <h2>The model</h2>
     <p>Displacement <b>u</b> and damage d are both interpolated with bilinear quadrilaterals and integrated with 2×2 Gauss points; the plate is in plane strain and small strain, loaded quasi-statically.</p>
@@ -372,7 +374,7 @@
   .rs-wide {
     max-width: 80rem;
   }
-  .rs-head {
+  .sec.rs-head {
     padding-top: clamp(5rem, 9vw, 6.5rem);
     padding-bottom: 1.5rem;
   }
@@ -388,7 +390,7 @@
     color: var(--fg-2);
     font-size: 0.95rem;
   }
-  .rs-crumb a,
+  .rs-crumb :global(a),
   .rs-cite a,
   .rs-text a {
     color: inherit;
@@ -422,7 +424,7 @@
     color: var(--fg);
     font-size: 1.05rem;
   }
-  .rs-sim {
+  .sec.rs-sim {
     padding-top: 1rem;
     padding-bottom: 3rem;
   }
@@ -486,7 +488,8 @@
   .u {
     color: var(--fg-2);
     font-size: 0.8rem;
-    margin-left: auto;
+    flex: 0 0 3.5rem;
+    text-align: right;
   }
   .rs-derived,
   .rs-note,
@@ -588,9 +591,26 @@
     padding: 0.25rem 0.5rem;
     text-align: left;
   }
-  .rs-text {
+  .sec.rs-text {
+    padding-top: 0;
     padding-bottom: 4rem;
     color: var(--fg);
+  }
+  .rs-text h2:first-child {
+    margin-top: 0;
+  }
+  .rs-head :global(h1),
+  .rs-sim h2,
+  .rs-text h2,
+  .rs-sim :global([id]) {
+    scroll-margin-top: calc(var(--lp-nav-h, 3.6rem) + 1rem);
+  }
+  .lbl {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .lbl sub {
+    font-size: 0.75em;
   }
   .rs-text p,
   .rs-text li {
