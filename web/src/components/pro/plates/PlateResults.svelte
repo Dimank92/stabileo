@@ -13,6 +13,7 @@
   import { discretizationStore } from '../../../lib/store/discretization.svelte';
   import { fmtQ, unitQ } from '../../../lib/store/display-units.svelte';
   import type { Quantity } from '../../../lib/utils/units';
+  import VerificationMaturityBadge from '../../VerificationMaturityBadge.svelte';
 
   const id = $derived(uiStore.selectedPlates.size === 1 ? [...uiStore.selectedPlates][0]! : null);
   const entry = $derived.by(() => { void modelStore.model.groups; return id !== null ? plateEntry(id) : null; });
@@ -72,7 +73,10 @@
 {#if entry && summary}
   <section class="pr" data-testid="plate-results">
     <header>
-      <strong>{tp('plates.resultsTitle', { name: entry.name })}</strong>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <strong>{tp('plates.resultsTitle', { name: entry.name })}</strong>
+        <VerificationMaturityBadge category="elements" nameOrKey="Plate, DKT triangle" compact={true} />
+      </div>
       <span class="pr-dim">{sets.length > 1 ? tp('plates.resultsEnvelope', { n: sets.length }) : sets[0]!.name}</span>
     </header>
     {#if summary.s.elements === 0}

@@ -12,6 +12,7 @@
   import { certificateStore, formatBound } from '../lib/store/certificate.svelte';
   import { downloadText } from '../lib/store/file';
   import { errorText } from '../lib/utils/error-text';
+  import VerificationMaturityBadge from './VerificationMaturityBadge.svelte';
 
   const is3D = $derived(uiStore.is3DWorkspace);
   const shown = $derived(certificateStore.shown(is3D));
@@ -52,7 +53,8 @@
 {:else if shown.status === 'done'}
   {#if shown.certificate.status === 'certified'}
     <div class="cert ok" title={tooltip} data-testid="certificate-status">
-      {text(shown.certificate)}
+      <VerificationMaturityBadge category="analyses" nameOrKey="Linear static" perResultCertified={true} compact />
+      <span>{text(shown.certificate)}</span>
       {#if certificateStore.canExportBundle(is3D)}
         <button class="cert-dl" title={t('certificate.bundleTooltip')} disabled={exporting} onclick={download} data-testid="certificate-download">{t('certificate.download')}</button>
       {/if}
@@ -64,13 +66,14 @@
     {/if}
   {:else}
     <div class="cert no" title={tooltip} data-testid="certificate-status">
-      {t('certificate.notCertified').replace('{reason}', shown.certificate.reason)}
+      <VerificationMaturityBadge category="analyses" nameOrKey="Linear static" perResultCertified={false} compact />
+      <span>{t('certificate.notCertified').replace('{reason}', shown.certificate.reason)}</span>
     </div>
   {/if}
 {/if}
 
 <style>
-  .cert { margin: 4px 0; padding: 3px 7px; border: 1px solid var(--st-hair); border-radius: 4px; font-size: 0.66rem; line-height: 1.35; color: var(--st-text-2); cursor: help; }
+  .cert { margin: 4px 0; padding: 3px 7px; border: 1px solid var(--st-hair); border-radius: 4px; font-size: 0.66rem; line-height: 1.35; color: var(--st-text-2); cursor: help; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .cert.ok { border-color: var(--st-ok); }
   .cert.no { border-color: var(--st-warn); }
   .cert.pending { opacity: 0.7; cursor: default; }

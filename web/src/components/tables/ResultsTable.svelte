@@ -1,7 +1,9 @@
 <script lang="ts">
   import { resultCaseName } from '../../lib/engine/settlement-case';
   import { modelStore, uiStore, resultsStore } from '../../lib/store';
+  import { certificateStore } from '../../lib/store/certificate.svelte';
   import { t } from '../../lib/i18n';
+  import VerificationMaturityBadge from '../VerificationMaturityBadge.svelte';
   import { knownIssueMessage } from '../../lib/engine/known-issues';
   import { shellRef } from '../../lib/engine/model-findings';
   import { toDisplay, unitLabel } from '../../lib/utils/units';
@@ -59,6 +61,10 @@
 
   /** Individual load cases, in the order the solver produced them. */
   const caseKeys = $derived([...resultsStore.perCase.keys()]);
+  const isCertified = $derived(
+    certificateStore.shown(uiStore.is3DWorkspace).status === 'done' &&
+    certificateStore.shown(uiStore.is3DWorkspace).certificate.status === 'certified'
+  );
 </script>
 
 <!--
@@ -123,6 +129,13 @@
       {t('resultsTable.diagnostics')} ({allDiagnostics.length})
     </button>
   {/if}
+  <div class="results-subtabs-spacer"></div>
+  <VerificationMaturityBadge
+    category="analyses"
+    nameOrKey="Linear static"
+    perResultCertified={isCertified}
+    compact={false}
+  />
 </div>
 
 <div class="results-content">
@@ -333,6 +346,9 @@
     background: rgba(127, 212, 204, 0.05);
   }
 
+  .results-subtabs-spacer {
+    flex: 1;
+  }
   .results-sub-tabs {
     display: flex;
     gap: 0;

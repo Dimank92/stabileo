@@ -15,6 +15,7 @@
    * carries them all.
    */
   import { t, tp } from '../../lib/i18n';
+  import VerificationMaturityBadge from '../VerificationMaturityBadge.svelte';
     import { staticsRows, staticsCsv, BALANCED } from '../../lib/store/statics-rows';
   import type { StaticsCheckRow } from '../../lib/engine/statics-check';
 
@@ -48,7 +49,10 @@
 
 <div class="sc" data-testid="statics-check">
   <div class="sc-head">
-    <div class="sc-title">{t('pro.statics.title')}</div>
+    <div class="sc-title" style="display: flex; align-items: center; gap: 8px;">
+      <span>{t('pro.statics.title')}</span>
+      <VerificationMaturityBadge category="analyses" nameOrKey="Linear static" compact={true} />
+    </div>
     {#if rows}
       <label class="sc-full"><input type="checkbox" bind:checked={full} data-testid="statics-full" /> {t('pro.statics.sixComponents')}</label>
       <button class="pk-btn sc-csv" onclick={csv} data-testid="statics-csv">CSV</button>

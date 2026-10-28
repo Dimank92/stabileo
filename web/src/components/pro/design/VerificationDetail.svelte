@@ -13,6 +13,7 @@
   import { verificationColumnDiagram } from '../../../lib/engine/design/column-interaction';
   import ColumnInteraction from '../desk/column/ColumnInteraction.svelte';
   import OutcomeBadge from './OutcomeBadge.svelte';
+  import VerificationMaturityBadge from '../../VerificationMaturityBadge.svelte';
   import type { MemberContext } from '../../../lib/engine/design/member-context';
   import type { ProvidedRebarResult } from '../../../lib/engine/station-design-forces';
   import type { MemberDesignOutcome } from '../../../lib/engine/design/outcome';
@@ -169,7 +170,15 @@
       <tbody>
         {#each provided.checks as c, ci (`${c.category}-${ci}`)}
           <tr class="chk chk-{c.status}" data-testid={`check-${c.category.replace(/\W+/g, '-')}`}>
-            <td>{c.category}{c.missingReinforcement ? ' ⚠' : ''}</td>
+            <td>
+              <span class="chk-name">{c.category}{c.missingReinforcement ? ' ⚠' : ''}</span>
+              <VerificationMaturityBadge
+                category="design"
+                nameOrKey="cirsoc201"
+                perResultCertified={outcome?.outcome === 'VERIFIED' && Boolean(outcome?.certificate)}
+                compact={true}
+              />
+            </td>
             <td class="num">{c.demand !== undefined ? `${fmt(c.demand)} ${c.unit}` : fmt(c.required)}</td>
             <td class="num">{c.capacity !== undefined ? `${fmt(c.capacity)} ${c.unit}` : fmt(c.provided)}</td>
             <td class="num strong">{fmtUtil(c.ratio)}</td>

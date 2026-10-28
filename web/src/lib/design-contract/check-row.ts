@@ -7,6 +7,13 @@
  */
 import type { DesignStatus } from './status';
 
+export type VerificationMaturityLevel =
+  | 'Certified'
+  | 'Benchmarked'
+  | 'Differential'
+  | 'Tested'
+  | 'Unverified';
+
 export interface CheckInput {
   symbol: string;
   /** What the symbol is, as an i18n key or words. */
@@ -41,6 +48,11 @@ export interface CheckRow {
   location?: string;
   /** The working, line by line, as the check wrote it: the sheet of this check. */
   derivation?: string[];
+  /**
+   * Verification maturity level from docs/verification/dashboard.json.
+   * (Certified > Benchmarked > Differential > Tested > Unverified)
+   */
+  maturity?: VerificationMaturityLevel;
 }
 
 /** A condition worth saying that is not a check: an assumption, a limit of scope, a refusal. */

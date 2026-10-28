@@ -12,6 +12,7 @@
   import { downloadBlob } from '../../../lib/store/document-exports';
   import { currentResultProvenance } from '../../../lib/store/result-provenance';
   import type { Diagram3DKind } from '../../../lib/engine/diagrams-3d';
+  import VerificationMaturityBadge from '../../VerificationMaturityBadge.svelte';
 
   const p = $derived.by(() => { void modelStore.modelVersion; void uiStore.selectedElements; return selectedPiece(); });
   const forces = $derived(new Map((resultsStore.results3D?.elementForces ?? []).map((f) => [f.elementId, f])));
@@ -58,7 +59,10 @@
 {#if p}
   <section class="prs" data-testid="piece-results">
     <header>
-      <strong>{name}</strong>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <strong>{name}</strong>
+        <VerificationMaturityBadge category="elements" nameOrKey="Frame, Euler–Bernoulli (2D, 3D)" compact={true} />
+      </div>
       <div class="prs-kinds" role="group">
         {#each PIECE_KINDS as k (k)}<button class:on={kind === k} onclick={() => (kind = k)} data-testid="piece-kind-{k}">{LABEL[k]}</button>{/each}
       </div>

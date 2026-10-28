@@ -12,6 +12,7 @@ import {
 import type { ProvidedRebarResult } from '../station-design-forces';
 import type { SteelVerification } from '../codes/argentina/cirsoc301';
 import { CIRSOC201_DESIGN_EDITION } from '../codes/argentina/cirsoc201-basis';
+import { getDesignCheckMaturity } from '../../verification/maturity';
 
 /** The clause each concrete check category is written under, CIRSOC 201-2025. */
 function concreteClause(category: string): string | undefined {
@@ -94,6 +95,7 @@ export function concreteCheckRows(p: ProvidedRebarResult, edition: string = CIRS
       ...(c.comboName ? { combination: c.comboName } : {}),
       ...(c.stationX !== undefined ? { location: `x = ${c.stationX.toFixed(2)} m` } : {}),
       ...(c.description && spec ? { derivation: [c.description] } : {}),
+      maturity: getDesignCheckMaturity('cirsoc201')?.level ?? 'Certified',
     };
   });
 }

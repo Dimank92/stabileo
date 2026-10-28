@@ -8,11 +8,14 @@
   import { t } from '../../../lib/i18n';
   import type { DisplayStatus } from '../../../lib/store/verification.svelte';
   import type { DesignOutcomeKind } from '../../../lib/engine/design/outcome';
+  import type { VerificationMaturityLevel } from '../../../lib/verification/maturity';
+  import VerificationMaturityBadge from '../../VerificationMaturityBadge.svelte';
 
   interface Props {
     status?: DisplayStatus;
     outcome?: DesignOutcomeKind;
     flag?: 'edited' | 'auto' | 'provisional' | 'noRebar' | 'certified' | 'sloped';
+    maturity?: VerificationMaturityLevel;
     compact?: boolean;
     /**
      * `local`: the badge marks ONE check row of the section, and says so in its words ("local
@@ -20,7 +23,7 @@
      */
     scope?: 'member' | 'local';
   }
-  let { status, outcome, flag, compact = false, scope = 'member' }: Props = $props();
+  let { status, outcome, flag, maturity, compact = false, scope = 'member' }: Props = $props();
   const statusWord = (s: DisplayStatus) => t(scope === 'local' ? `verdict.local.${s}` : `design.status.${s}`);
 
   const STATUS_GLYPH: Record<DisplayStatus, string> = {
@@ -67,6 +70,10 @@
     <span aria-hidden="true">{FLAG_GLYPH[flag]}</span>
     <span class="badge-text">{t(`design.badge.${flag}`)}</span>
   </span>
+{/if}
+
+{#if maturity}
+  <VerificationMaturityBadge nameOrKey={maturity} {compact} />
 {/if}
 
 <style>

@@ -19,6 +19,7 @@
   import { membersFor } from '../../../lib/store/steel-optimise.svelte';
   import { checkSteelMember, steelInputCompleteness, steelInputGapKey } from '../../../lib/engine/verification-service';
   import type { EngineMessage } from '../../../lib/codes/message';
+  import VerificationMaturityBadge from '../../VerificationMaturityBadge.svelte';
 
   let { steelIds }: { steelIds: ReadonlySet<number> } = $props();
 
@@ -96,7 +97,14 @@
 </script>
 
 <div class="sr" data-testid="steel-results">
-  <h5 class="sr-title">{t('steel.results.title')}</h5>
+  <div class="sr-header-bar" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+    <h5 class="sr-title" style="margin: 0;">{t('steel.results.title')}</h5>
+    <VerificationMaturityBadge
+      category="design"
+      nameOrKey="CIRSOC 301 steel, engine (`cirsoc301_check`)"
+      showIssues={true}
+    />
+  </div>
   <p class="line">{t('steel.results.hint')}</p>
   <p class="line warn">{t('steel.tc.results.experimental')}</p>
   {#if rowsError}
@@ -140,7 +148,14 @@
                 <tbody>
                   {#each r.checks as c (c.key)}
                     <tr data-testid="steel-check-{r.id}-{c.key}" data-status={c.status}>
-                      <td>{t(`steel.results.check.${c.key}`)}</td>
+                      <td>
+                        <span style="margin-right: 6px;">{t(`steel.results.check.${c.key}`)}</span>
+                        <VerificationMaturityBadge
+                          category="design"
+                          nameOrKey="cirsoc301"
+                          compact={true}
+                        />
+                      </td>
                       <td>{c.clause}</td>
                       <td class="num">{c.demand}</td>
                       <td class="num">{c.status === 'notEvaluated' ? '—' : c.capacity}</td>
