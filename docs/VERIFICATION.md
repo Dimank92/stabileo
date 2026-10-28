@@ -184,6 +184,30 @@ results (SAC steel frames, IASC-ASCE SHM frame, ...) is described in
 [`verification/ACCEPTANCE.md`](verification/ACCEPTANCE.md) and runs as
 `cargo test --release --test gates acceptance::`.
 
+### 10. Validation Against Physical Experiments (ASME V&V 10 / NAFEMS)
+
+While verification confirms that the numerical equations are solved accurately ("solving the equations right"),
+validation demonstrates that the mathematical models adequately represent real-world physical behavior
+("solving the right equations"). For nonlinear material models, physical laboratory experiments are essential.
+
+Following **ASME V&V 10-2019** (*Standard for Verification and Validation in Computational Solid Mechanics*)
+and **NAFEMS** guidelines, Stabileo evaluates its nonlinear constitutive laws (concrete, fiber sections,
+plastic hinges, and contact) against published physical laboratory specimens:
+
+| Experimental Domain | Published Benchmark Campaign | Key Physical Phenomena | Quantitative Validation Metric | Acceptance Tolerance |
+|---|---|---|---|---|
+| **RC Beams** | Bresler-Scordelis (Bresler–Scordelis) (UC Berkeley OA-1 / OA-2 series) | Flexural tensile cracking, rebar yield, compressive crushing, midspan load-deflection | Peak capacity relative error $E = \frac{|P_{sim} - P_{exp}|}{P_{exp}}$ | $\le 8\%$ |
+| **RC Columns** | Burns & Siess / Saatcioglu & Razvi | Combined axial load ratio ($P/A_g f_c' = 0.20$), cyclic flexure, plastic hinge rotation, ductility | Peak moment $M_n$ error and plastic hinge rotation $\theta_p$ | $\le 10\%$ moment, $\le 12\%$ rotation |
+| **Shake-Table Frames** | E-Defense & PEER full-scale shake table dynamic tests | Multi-story dynamic time-history response, modal frequency shift and period elongation under plastic damage, roof drift hysteretic response | Period shift error $E_T$, peak dynamic drift ratio error $E_{drift}$ | $\le 5\%$ period, $\le 8\%$ drift |
+| **Vecchio-Collins Panels** (Vecchio–Collins) | Univ. of Toronto Shell Element Tester (PV19, PV20, PV27) | Membrane pure shear, concrete compression softening (MCFT), crack rotation, steel yielding | Ultimate shear stress $v_u$ relative error | $\le 9\%$ |
+| **Connection Tests** | SAC Joint Venture & Popov cyclic moment connections | Cyclic moment-rotation hysteresis, beam-column flange contact gap opening/closing, contact slip | Plastic moment capacity $M_p$, contact gap opening error | $\le 6\%$ capacity, $\le 10\%$ gap |
+
+#### Validation Methodology and Acceptance Tolerances
+- **Error Metric:** Follows ASME V&V 10 quantitative error formulation:
+  $$E = \frac{|y_{sim} - y_{exp}|}{|y_{exp}|}$$
+- **Validation Uncertainty:** Evaluates combined experimental measurement uncertainty ($U_{exp}$), material input uncertainty ($U_{input}$), and numerical discretization error ($U_{num}$).
+- **Automated Regression Suite:** These published experimental benchmarks run continuously in the test suite under `engine/tests/validation/physical_experiments.rs` (`cargo test --test validation physical_experiments`).
+
 ## Priority Order
 
 The best ROI verification order is:
