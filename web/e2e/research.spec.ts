@@ -58,4 +58,33 @@ test.describe('@smoke research', () => {
     await page.waitForLoadState('networkidle');
     expect(research).toEqual([]);
   });
+
+  for (const width of [390, 1120, 1280]) {
+    test(`the experiment page reflows at ${width} px: nothing is cut off`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto('/en/research/fracture/shauer-2025/');
+      await expect(page.locator('.rs-app')).toHaveAttribute('data-source', 'replay');
+      await page.waitForTimeout(1000);
+      const m = await page.evaluate(() => {
+        const landing = document.querySelector('.landing') as HTMLElement;
+        const pane = document.querySelector('.rs-shell-app') as HTMLElement;
+        const article = document.querySelector('.rs-shell-article') as HTMLElement;
+        return { lw: landing.scrollWidth, lc: landing.clientWidth, pw: pane.scrollWidth, pc: pane.clientWidth, ar: article.getBoundingClientRect().right, iw: innerWidth };
+      });
+      expect(m.lw).toBeLessThanOrEqual(m.lc + 1);
+      expect(m.pw).toBeLessThanOrEqual(m.pc + 1);
+      expect(m.ar).toBeLessThanOrEqual(m.iw + 1);
+    });
+  }
+
+  test('the research page uses Plex Sans for Latin text and its Greek and maths subset', async ({ page }) => {
+    await page.goto('/en/research/fracture/shauer-2025/');
+    await page.waitForLoadState('networkidle');
+    const loaded = await page.evaluate(async () => {
+      await document.fonts.ready;
+      return [...document.fonts].filter((f) => f.family.includes('IBM Plex Sans') && f.status === 'loaded').map((f) => f.unicodeRange);
+    });
+    expect(loaded.some((r) => r.includes('U+20-7E'))).toBe(true);
+    expect(loaded.some((r) => r.includes('U+370-3FF'))).toBe(true);
+  });
 });

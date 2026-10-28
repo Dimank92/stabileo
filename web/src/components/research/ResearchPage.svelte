@@ -13,6 +13,7 @@
   import SpringsPage from './grossman2026/SpringsPage.svelte';
   import '../landing/landing.css';
   import '../blog/blog.css';
+  import './research.css';
 
   let { path }: { path: string } = $props();
   const route = $derived(path.replace(/\/+$/, '') || '/research');
@@ -64,5 +65,14 @@
 <style>
   .research :global(.nav) {
     background: var(--lp-ink);
+  }
+  .research {
+    font-synthesis: none;
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+  .research :global(sub),
+  .research :global(sup) {
+    font-size: 0.75em;
+    line-height: 0;
   }
 </style>

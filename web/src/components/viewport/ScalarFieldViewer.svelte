@@ -258,8 +258,8 @@
 
 <div class="sfv-wrap">
   {#if toolbar}<div class="sfv-toolbar">{@render toolbar()}</div>{/if}
-  <div class="sfv viewport-container" style:height role="img" aria-label={ariaLabel}>
-    <div class="sfv-canvas" bind:this={container}></div>
+  <div class="sfv viewport-container" style:height>
+    <div class="sfv-canvas" bind:this={container} role="img" aria-label={ariaLabel}></div>
     <canvas bind:this={gizmo} class="axis-gizmo" width="80" height="80"></canvas>
     <div class="camera-controls" style="top: 10px">
       <div class="cam-menu-wrap">
@@ -318,6 +318,7 @@
   }
   .sfv-canvas :global(canvas) {
     display: block;
+    max-width: 100%;
     touch-action: none;
   }
   .sfv :global(.shell-legend) {
@@ -346,6 +347,14 @@
     text-transform: uppercase;
     color: var(--st-text-3);
     pointer-events: none;
+  }
+  .sfv-status :global(.status-value) {
+    font-family: var(--st-sans);
+    font-variant-numeric: tabular-nums;
+  }
+  .sfv-status :global(.status-label) {
+    color: var(--st-text-2);
+    font-size: 0.75rem;
   }
   .sfv-status {
     flex-wrap: wrap;

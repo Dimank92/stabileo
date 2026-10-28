@@ -234,7 +234,9 @@
     display: flex;
     justify-content: space-between;
     gap: 1rem;
-    font: 12px var(--lp-mono);
+    font: 500 var(--rs-micro) var(--lp-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     color: var(--fg-2);
   }
   .rs-g-status {
@@ -270,7 +272,7 @@
   .rs-g-tag {
     white-space: nowrap;
     display: inline-block;
-    font: 11px var(--lp-mono);
+    font: 500 0.8125rem var(--st-sans);
     color: #d9a441;
     border: 1px solid #d9a441;
     border-radius: 3px;
@@ -288,7 +290,7 @@
     align-items: center;
   }
   .rs-g-flabel {
-    font: 12px var(--lp-mono);
+    font: var(--rs-ui) var(--st-sans);
     color: var(--fg-2);
     min-width: 4rem;
   }
