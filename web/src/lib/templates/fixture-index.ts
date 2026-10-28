@@ -162,6 +162,10 @@ export function fixtureNames2D(): string[] {
   return Object.keys(fixtures2D);
 }
 
+export function fixtureNames3D(): string[] {
+  return Object.keys(fixtures3D);
+}
+
 export function is2DFixture(name: string): boolean {
   return name in fixtures2D;
 }

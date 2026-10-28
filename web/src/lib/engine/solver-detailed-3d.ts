@@ -23,6 +23,7 @@ import type {
 
 import { computeLocalAxes3D } from './local-axes-3d';
 import { loadAlpha, loadDepth } from './thermal-alpha';
+import { assertStepByStepScope } from './step-by-step-scope';
 
 // ─── Inlined stiffness/transformation primitives (pedagogical tool) ──
 
@@ -304,6 +305,12 @@ function dofLabel3D(nodeId: number, localDof: number, dofsPerNode: number): stri
 // ─── Main detailed 3D solver ────────────────────────────────────
 
 export function solveDetailed3D(input: SolverInput3D): DSMStepData {
+  assertStepByStepScope(input, true);
+  for (const elem of input.elements.values()) {
+    if (elem.type !== 'frame' && elem.type !== 'truss') {
+      throw new Error(`Unsupported element type in 3D detailed solver: ${elem.type}`);
+    }
+  }
   // ─── Step 1: DOF Numbering ────────────────────────────────────
   const hasFrames = Array.from(input.elements.values()).some(e => e.type === 'frame');
   const dofsPerNode = hasFrames ? 6 : 3;

@@ -33,7 +33,8 @@ Classes:
 
 Of the 61 duplicates, 18 are the step-by-step teaching solvers (`steps/*`, `force-method/*`,
 `solver-detailed*.ts`). They re-derive a solve the student sees next to the engine's own and
-never feed a design. The safety-relevant duplicates are the CIRSOC 201 family
+never feed a design. Every model of the corpus they support is checked against the engine in CI,
+and models outside their scope are refused explicitly (`StepByStepScopeError`). The safety-relevant duplicates are the CIRSOC 201 family
 (`cirsoc201*.ts`, `interaction-diagram.ts`, `station-design-forces.ts`), `cirsoc301.ts`,
 `serviceability.ts`, the footing family (`foundation-check.ts`, `footing-actions.ts`,
 `punching-shear.ts`), the result post-processing with a silent TypeScript fallback
@@ -242,6 +243,23 @@ production import; `concrete-oracles-are-test-only.test.ts` enforces it).
 | Legacy column check: "As for M + ½ As for N", straight-line interaction, Nu as a magnitude | light in some of 300 random demands; a column in 1 000 kN of tension "passed" as compressed | TypeScript, unconservative |
 | Station verifier biaxial: Bresler with φPnx = Nu·φMn/Mu | not Bresler's capacity at the eccentricity | TypeScript; replaced by the load contour |
 | Slabs: ρmax substituted for a slab too thin for its moment; capacity with fy and the φ of the required steel | a 12 cm slab under 200 kN·m/m was "designed" | TypeScript; the engine refuses it |
+
+**Teaching solvers (`steps/*`, `solver-detailed*`)**.
+The step-by-step teaching solvers show students how internal calculations and intermediate matrices arise.
+They are tested against the engine on every model of the corpus they support:
+- `solver-detailed.ts` (2D DSM) is tested against `wasm.solve` across all 2D fixtures (`fixtureNames2D()`)
+  in `__tests__/solver-detailed-vs-wasm.test.ts`. Nodal displacements and reactions agree to 1e-5.
+- `solver-detailed-3d.ts` (3D DSM) is tested against `wasm.solve3D` across all 3D fixtures (`fixtureNames3D()`)
+  in `__tests__/solver-detailed-3d-audit.test.ts`. Displacements and reactions agree to 1e-8.
+- `steps/*` (explained hand methods: `threeMoments`, `crossBeams`, `crossNoSway`, `crossSway`, `slopeDeflection`,
+  `joints`, `sections`, `compatibility`, `doubleIntegration`, `momentArea`, `virtualWork`, `castigliano`, `cuts`) are
+  checked on every 2D example and on generated continuous beams, frames and trusses against `solveReference`
+  in `steps/__tests__/sweep.test.ts`.
+- **Explicit refusal**: models they do not support (shells, constraints, connectors, models exceeding 360 DOFs,
+  or empty models) are refused explicitly:
+  - `stepByStepScope` returns the exact refusal reason.
+  - `solveDetailed` and `solveDetailed3D` call `assertStepByStepScope` and throw `StepByStepScopeError`.
+  - Every `steps/*` method defines `applies(ctx)` returning `{ ok: false, reason }` with localized explanation.
 
 ### 3. Engine re-check gate
 

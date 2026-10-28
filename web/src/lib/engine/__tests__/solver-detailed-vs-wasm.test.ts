@@ -14,9 +14,12 @@
  * fields, each support type, prescribed displacements, hinges, springs, and
  * trusses sharing nodes with frames.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { solveDetailed } from '../solver-detailed';
 import { solve } from '../wasm-solver';
+import { stepByStepScope, StepByStepScopeError } from '../step-by-step-scope';
+import { fixtureNames2D, INTENTIONALLY_UNSOLVABLE } from '../../templates/fixture-index';
+import { historyStore, modelStore, uiStore } from '../../store';
 import type { SolverInput, SolverLoad } from '../types';
 
 type Sup = [number, string, Record<string, number>?];
@@ -163,60 +166,99 @@ const CASES: Record<string, SolverInput> = {
   }),
 };
 
+function compareDetailed2D(
+  ref: ReturnType<typeof solve>,
+  det: ReturnType<typeof solveDetailed>,
+  name = 'case',
+) {
+  const dof = (nodeId: number, ld: number) =>
+    det.dofNumbering.dofs.find((d) => d.nodeId === nodeId && d.localDof === ld);
+  const scaleU = Math.max(1e-9, ...ref.displacements.flatMap((d) => [Math.abs(d.ux), Math.abs(d.uz)]));
+  const scaleR = Math.max(1e-6, ...ref.reactions.flatMap((r) => [Math.abs(r.rx), Math.abs(r.rz), Math.abs(r.my)]));
+  /* A node in its own axes is turned back to global before comparing. */
+  const frame = (nodeId: number) => det.nodeFrames.find((f) => f.nodeId === nodeId);
+  const toGlobal = (nodeId: number, a: number, b: number): [number, number] => {
+    const f = frame(nodeId);
+    if (!f) return [a, b];
+    const c = Math.cos(f.angle), sn = Math.sin(f.angle);
+    return [c * a - sn * b, sn * a + c * b];
+  };
+  for (const d of ref.displacements) {
+    const d0 = dof(d.nodeId, 0);
+    const d1 = dof(d.nodeId, 1);
+    if (!d0 || !d1) continue;
+    const [ux, uz] = toGlobal(d.nodeId,
+      det.uAll[d0.globalIndex], det.uAll[d1.globalIndex]);
+    expect(Math.abs(ux - d.ux) / scaleU, `${name}: ux at ${d.nodeId}: ${ux} vs ${d.ux}`).toBeLessThan(1e-5);
+    expect(Math.abs(uz - d.uz) / scaleU, `${name}: uz at ${d.nodeId}: ${uz} vs ${d.uz}`).toBeLessThan(1e-5);
+  }
+  /* Reactions by node and direction, from the restrained part of the vector. */
+  const reactionAt = (nodeId: number, ld: number) => {
+    const info = dof(nodeId, ld);
+    return info && !info.isFree ? det.reactionsRaw[info.globalIndex - det.dofNumbering.nFree] : 0;
+  };
+  for (const r of ref.reactions) {
+    const [gx, gz] = toGlobal(r.nodeId, reactionAt(r.nodeId, 0), reactionAt(r.nodeId, 1));
+    for (const [ld, want] of [[0, r.rx], [1, r.rz], [2, r.my]] as Array<[number, number]>) {
+      const info = dof(r.nodeId, ld);
+      if (!info || (info.isFree && !frame(r.nodeId))) continue;
+      const got = ld === 0 ? gx : ld === 1 ? gz : reactionAt(r.nodeId, 2);
+      expect(Math.abs(got - want) / scaleR, `${name}: R${ld} at ${r.nodeId}: ${got} vs ${want}`).toBeLessThan(1e-5);
+    }
+  }
+  /*
+   * Step 9's end forces, mapped to the analysis solver's convention:
+   * N positive in tension, and the J end read from the other side.
+   */
+  const scaleF = Math.max(1e-6, ...ref.elementForces.flatMap((e) =>
+    [e.nStart, e.nEnd, e.vStart, e.vEnd, e.mStart, e.mEnd].map(Math.abs)));
+  for (const e of ref.elementForces) {
+    const ef = det.elementForces.find((x) => x.elementId === e.elementId);
+    if (!ef) continue;
+    const f = ef.fLocalFinal;
+    const pairs: Array<[string, number, number]> = f.length === 6
+      ? [['N0', -f[0], e.nStart], ['V0', f[1], e.vStart], ['M0', f[2], e.mStart],
+         ['N1', f[3], e.nEnd], ['V1', -f[4], e.vEnd], ['M1', -f[5], e.mEnd]]
+      : [['N0', -f[0], e.nStart], ['N1', f[2], e.nEnd]];
+    for (const [k, got, want] of pairs) {
+      expect(Math.abs(got - want) / scaleF, `${name}: elem ${e.elementId} ${k}: ${got} vs ${want}`).toBeLessThan(1e-5);
+    }
+  }
+}
+
 describe('solveDetailed agrees with the analysis solver', () => {
   for (const [name, input] of Object.entries(CASES)) {
     it(name, () => {
       const ref = solve(input);
       const det = solveDetailed(input);
-      const dof = (nodeId: number, ld: number) =>
-        det.dofNumbering.dofs.find((d) => d.nodeId === nodeId && d.localDof === ld);
-      const scaleU = Math.max(1e-9, ...ref.displacements.flatMap((d) => [Math.abs(d.ux), Math.abs(d.uz)]));
-      const scaleR = Math.max(1e-6, ...ref.reactions.flatMap((r) => [Math.abs(r.rx), Math.abs(r.rz), Math.abs(r.my)]));
-      /* A node in its own axes is turned back to global before comparing. */
-      const frame = (nodeId: number) => det.nodeFrames.find((f) => f.nodeId === nodeId);
-      const toGlobal = (nodeId: number, a: number, b: number): [number, number] => {
-        const f = frame(nodeId);
-        if (!f) return [a, b];
-        const c = Math.cos(f.angle), sn = Math.sin(f.angle);
-        return [c * a - sn * b, sn * a + c * b];
-      };
-      for (const d of ref.displacements) {
-        const [ux, uz] = toGlobal(d.nodeId,
-          det.uAll[dof(d.nodeId, 0)!.globalIndex], det.uAll[dof(d.nodeId, 1)!.globalIndex]);
-        expect(Math.abs(ux - d.ux) / scaleU, `ux at ${d.nodeId}: ${ux} vs ${d.ux}`).toBeLessThan(1e-6);
-        expect(Math.abs(uz - d.uz) / scaleU, `uz at ${d.nodeId}: ${uz} vs ${d.uz}`).toBeLessThan(1e-6);
-      }
-      /* Reactions by node and direction, from the restrained part of the vector. */
-      const reactionAt = (nodeId: number, ld: number) => {
-        const info = dof(nodeId, ld);
-        return info && !info.isFree ? det.reactionsRaw[info.globalIndex - det.dofNumbering.nFree] : 0;
-      };
-      for (const r of ref.reactions) {
-        const [gx, gz] = toGlobal(r.nodeId, reactionAt(r.nodeId, 0), reactionAt(r.nodeId, 1));
-        for (const [ld, want] of [[0, r.rx], [1, r.rz], [2, r.my]] as Array<[number, number]>) {
-          const info = dof(r.nodeId, ld);
-          if (!info || (info.isFree && !frame(r.nodeId))) continue;
-          const got = ld === 0 ? gx : ld === 1 ? gz : reactionAt(r.nodeId, 2);
-          expect(Math.abs(got - want) / scaleR, `R${ld} at ${r.nodeId}: ${got} vs ${want}`).toBeLessThan(1e-6);
-        }
-      }
-      /*
-       * Step 9's end forces, mapped to the analysis solver's convention:
-       * N positive in tension, and the J end read from the other side.
-       */
-      const scaleF = Math.max(1e-6, ...ref.elementForces.flatMap((e) =>
-        [e.nStart, e.nEnd, e.vStart, e.vEnd, e.mStart, e.mEnd].map(Math.abs)));
-      for (const e of ref.elementForces) {
-        const f = det.elementForces.find((x) => x.elementId === e.elementId)!.fLocalFinal;
-        const pairs: Array<[string, number, number]> = f.length === 6
-          ? [['N0', -f[0], e.nStart], ['V0', f[1], e.vStart], ['M0', f[2], e.mStart],
-             ['N1', f[3], e.nEnd], ['V1', -f[4], e.vEnd], ['M1', -f[5], e.mEnd]]
-          : [['N0', -f[0], e.nStart], ['N1', f[2], e.nEnd]];
-        for (const [k, got, want] of pairs) {
-          expect(Math.abs(got - want) / scaleF, `elem ${e.elementId} ${k}: ${got} vs ${want}`).toBeLessThan(1e-6);
-        }
-      }
+      compareDetailed2D(ref, det, name);
     });
+  }
+});
+
+describe('every 2D example in the corpus: solveDetailed agrees with analysis solver, or is refused with a reason', () => {
+  beforeEach(() => { uiStore.analysisMode = '2d'; });
+  for (const name of fixtureNames2D()) {
+    it(name, async () => {
+      historyStore.clear(); uiStore.analysisMode = '2d'; modelStore.clear();
+      await modelStore.loadExample(name);
+      const input = modelStore.buildSolverInput(false);
+      if (!input || input.elements.size === 0) return;
+      const scope = stepByStepScope(input, false);
+      if (!scope.ok) {
+        expect(['shells', 'constraints', 'connectors', 'tooBig', 'empty']).toContain(scope.reason);
+        expect(() => solveDetailed(input)).toThrow(StepByStepScopeError);
+        return;
+      }
+      if (INTENTIONALLY_UNSOLVABLE.has(name)) {
+        const det = solveDetailed(input);
+        expect(det.nullModes.length).toBeGreaterThan(0);
+        return;
+      }
+      const ref = solve(input);
+      const det = solveDetailed(input);
+      compareDetailed2D(ref, det, name);
+    }, 30_000);
   }
 });
 

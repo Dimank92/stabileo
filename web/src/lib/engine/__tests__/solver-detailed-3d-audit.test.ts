@@ -10,7 +10,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { solve3D } from '../wasm-solver';
 import { solveDetailed3D } from '../solver-detailed-3d';
-import { stepByStepScope } from '../step-by-step-scope';
+import { stepByStepScope, StepByStepScopeError } from '../step-by-step-scope';
+import { fixtureNames3D } from '../../templates/fixture-index';
 import { historyStore, modelStore, uiStore } from '../../store';
 import type { SolverInput3D, SolverSupport3D } from '../types-3d';
 
@@ -107,20 +108,6 @@ function expectEquilibrium(input: SolverInput3D) {
 }
 
 describe('rotations nothing resists: the analysis solver and the wizard agree', () => {
-  /*
-   * A node reached only by truss bars, in a model that also has frames, has
-   * three rotations nothing resists; so does, about the axes they release, a
-   * node where every member releases both bending moments. The structure is
-   * not a mechanism. The analysis solver used to refuse these inputs raw
-   * ("singular — mechanism") while the wizard solved them; the app never fed
-   * them raw (`buildSolverInput3D` adds vanishing springs — see
-   * orphan-rotations-3d.test.ts). Since PR #307 the analysis solver gives
-   * such a rotation the same vanishing stiffness itself (it did so for
-   * warping already; the plane solver always has), so both now solve, and the
-   * answer is checked by equilibrium, the one referee both accept, and
-   * against each other. A nodal moment about a rotation nothing resists would
-   * never reach the structure: the analysis solver refuses it, by node.
-   */
   it('a pinned node reached only by truss bars', () => {
     const nodes: Array<[number, number, number, number]> = [...PORTAL, [6, 0, 2, 0]];
     const els = () => [...PORTAL_EL(), el(5, 6, 2, 'truss'), el(6, 6, 4, 'truss')];
@@ -139,7 +126,6 @@ describe('rotations nothing resists: the analysis solver and the wizard agree', 
     const d = expectEquilibrium(input);
     expect(d.nullModes).toEqual([]);
     compare('a node where every member releases both bending moments', input);
-    /* Node 2: the column's torsion holds θz and the beam's θx; nothing holds θy. */
     expect(() => solve3D(model(PORTAL, els(), sups(), [P(2, 3, 2, -5, 0, 1)]))).toThrow(/moment at node 2/i);
   });
 });
@@ -148,21 +134,10 @@ describe('an infinitesimal mechanism the loads do not excite', () => {
   it('is solved, named, and its reactions are the analysis solver\'s', async () => {
     historyStore.clear(); uiStore.analysisMode = '3d'; modelStore.clear();
     await modelStore.loadExample('3d-space-truss');
-    /*
-     * The example as it was before its webs across the two rows (54–61) were
-     * added: without them the top chord sways, and that is the case here.
-     */
     for (let id = 54; id <= 61; id++) modelStore.removeElement(id);
     const input = modelStore.buildSolverInput3D(false, false, { expandMemberOffsets: false })!;
     const d = expectEquilibrium(input);
-    /* The top chord can sway in y without straining a bar: v11 … v18. */
     expect(d.nullModes).toEqual(expect.arrayContaining(['v11', 'v18']));
-    /*
-     * Displacements are NOT compared: the analysis solver returns a sway of
-     * −0,43 mm along the mode with no lateral load at all — round-off,
-     * amplified through a pivot of 7e-17. Reactions carry no mode, and those
-     * must agree.
-     */
     const r = solve3D(input) as never as { reactions: Array<Record<string, number>> };
     const keys = ['fx', 'fy', 'fz'];
     const scale = Math.max(...r.reactions.flatMap((x) => keys.map((k) => Math.abs(x[k]))));
@@ -177,24 +152,17 @@ describe('an infinitesimal mechanism the loads do not excite', () => {
   });
 });
 
-const EXAMPLES_3D = [
-  '3d-portal-frame', '3d-space-truss', '3d-cantilever-load', '3d-grid-slab', '3d-tower', '3d-torsion-beam',
-  'torsion-tube', 'rc-beam-flexure', '3d-nave-industrial', '3d-building', 'pro-edificio-7p', 'rc-qa-diagnostic',
-  'rc-qa-diagnostic-shells', 'torre-irregular-con-retiros', 'rc-design-frame', 'rc-design-qa-8', 'rc-design-qa-row2',
-  'pipe-rack', 'mat-foundation', 'cable-stayed-bridge', 'offshore-platform', 'geodesic-dome', 'space-frame',
-  'grid-beams', 'tower-3d-2', 'tower-3d-4', 'hinged-arch-3d', 'cable-stayed-bridge-small', 'stadium-canopy',
-];
-
 describe('every 3D example: shown faithfully, or refused with a reason', () => {
   beforeEach(() => { uiStore.analysisMode = '3d'; });
-  for (const name of EXAMPLES_3D) {
+  for (const name of fixtureNames3D()) {
     it(name, async () => {
       historyStore.clear(); uiStore.analysisMode = '3d'; modelStore.clear();
       await modelStore.loadExample(name);
       const input = modelStore.buildSolverInput3D(false, false, { expandMemberOffsets: false })!;
       const scope = stepByStepScope(input, true);
       if (!scope.ok) {
-        expect(['shells', 'constraints', 'connectors', 'tooBig']).toContain(scope.reason);
+        expect(['shells', 'constraints', 'connectors', 'tooBig', 'empty']).toContain(scope.reason);
+        expect(() => solveDetailed3D(input)).toThrow(StepByStepScopeError);
         return;
       }
       compare(name, input);

@@ -11,6 +11,7 @@ import { t } from '../i18n';
 import { solveAllowingNullModes } from './dense-solve';
 import { loadAlpha, loadDepth } from './thermal-alpha';
 import { axialEquivalentLoads } from './axial-span-2d';
+import { assertStepByStepScope } from './step-by-step-scope';
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -381,6 +382,12 @@ function dofLabel(nodeId: number, localDof: number, dofsPerNode: number): string
 // ─── Main detailed solver ───────────────────────────────────────
 
 export function solveDetailed(input: SolverInput): DSMStepData {
+  assertStepByStepScope(input, false);
+  for (const elem of input.elements.values()) {
+    if (elem.type !== 'frame' && elem.type !== 'truss') {
+      throw new Error(`Unsupported element type in 2D detailed solver: ${elem.type}`);
+    }
+  }
   // ─── Step 1: DOF Numbering ────────────────────────────────────
   const hasFrames = Array.from(input.elements.values()).some(e => e.type === 'frame');
   const dofsPerNode = hasFrames ? 3 : 2;
