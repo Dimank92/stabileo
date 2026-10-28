@@ -621,3 +621,91 @@ fn test_parity_3d_combination_superposition() {
         );
     }
 }
+
+#[test]
+fn test_reanalysis_session_3d_parity_and_multi_rhs() {
+    use dedaliano_engine::solver::reanalysis::ReAnalysisSession3D;
+
+    let mut nodes = HashMap::new();
+    nodes.insert("1".to_string(), SolverNode3D { id: 1, x: 0.0, y: 0.0, z: 0.0 });
+    nodes.insert("2".to_string(), SolverNode3D { id: 2, x: 5.0, y: 0.0, z: 0.0 });
+    nodes.insert("3".to_string(), SolverNode3D { id: 3, x: 10.0, y: 0.0, z: 0.0 });
+
+    let mut materials = HashMap::new();
+    materials.insert("1".to_string(), SolverMaterial { id: 1, e: 200e6, nu: 0.3 });
+
+    let mut sections = HashMap::new();
+    sections.insert("1".to_string(), SolverSection3D {
+        id: 1, name: None, a: 0.01, iy: 0.0001, iz: 0.0001, j: 0.0002, cw: None,
+        as_y: None, as_z: None, shear_center_y: None, shear_center_z: None,
+    });
+    sections.insert("2".to_string(), SolverSection3D {
+        id: 2, name: None, a: 0.02, iy: 0.0003, iz: 0.0003, j: 0.0005, cw: None,
+        as_y: None, as_z: None, shear_center_y: None, shear_center_z: None,
+    });
+
+    let mut elements = HashMap::new();
+    elements.insert("1".to_string(), SolverElement3D {
+        id: 1, elem_type: "frame".to_string(), node_i: 1, node_j: 2,
+        material_id: 1, section_id: 1,
+        release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+        local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
+    });
+    elements.insert("2".to_string(), SolverElement3D {
+        id: 2, elem_type: "frame".to_string(), node_i: 2, node_j: 3,
+        material_id: 1, section_id: 1,
+        release_my_start: false, release_my_end: false, release_mz_start: false, release_mz_end: false, release_t_start: false, release_t_end: false,
+        local_yx: None, local_yy: None, local_yz: None, roll_angle: None,
+    });
+
+    let mut supports = HashMap::new();
+    supports.insert("1".to_string(), SolverSupport3D {
+        node_id: 1, rx: true, ry: true, rz: true, rrx: true, rry: true, rrz: true,
+        kx: None, ky: None, kz: None, krx: None, kry: None, krz: None,
+        dx: None, dy: None, dz: None, drx: None, dry: None, drz: None,
+        normal_x: None, normal_y: None, normal_z: None, is_inclined: None, rw: None, kw: None,
+    });
+
+    let base_loads = vec![SolverLoad3D::Nodal(SolverNodalLoad3D {
+        node_id: 2, fx: 0.0, fy: -10.0, fz: 0.0, mx: 0.0, my: 0.0, mz: 0.0, bw: None,
+    })];
+
+    let input = SolverInput3D {
+        solver_options: None, masses: Default::default(),
+        nodes, materials, sections, elements, supports,
+        loads: base_loads,
+        constraints: vec![], left_hand: None, plates: HashMap::new(), quads: HashMap::new(),
+        quad9s: HashMap::new(), solid_shells: HashMap::new(), curved_beams: vec![],
+        curved_shells: HashMap::new(), connectors: HashMap::new(),
+    };
+
+    // 1. Initialize ReAnalysisSession3D
+    let mut session = ReAnalysisSession3D::new(input.clone()).expect("Session creation failed");
+    assert_eq!(session.modification_count, 0);
+
+    // 2. Solve multi-RHS
+    let case1 = vec![SolverLoad3D::Nodal(SolverNodalLoad3D {
+        node_id: 2, fx: 0.0, fy: -25.0, fz: 0.0, mx: 0.0, my: 0.0, mz: 0.0, bw: None,
+    })];
+    let case2 = vec![SolverLoad3D::Nodal(SolverNodalLoad3D {
+        node_id: 3, fx: 0.0, fy: 0.0, fz: -15.0, mx: 0.0, my: 0.0, mz: 0.0, bw: None,
+    })];
+    let multi_res = session.solve_multi_rhs(&[case1.clone(), case2.clone()]).expect("Multi-RHS failed");
+    assert_eq!(multi_res.len(), 2);
+
+    let mut direct_input1 = input.clone();
+    direct_input1.loads = case1;
+    let direct_res1 = solve_3d(&direct_input1).unwrap();
+    assert!((multi_res[0].displacements[1].uy - direct_res1.displacements[1].uy).abs() < 1e-9);
+
+    // 3. Modify element section and verify parity with direct solve
+    let re_res = session.modify_element_section(1, 2).expect("Element modify failed");
+    let mut direct_mod_input = input.clone();
+    direct_mod_input.elements.get_mut("1").unwrap().section_id = 2;
+    let direct_mod_res = solve_3d(&direct_mod_input).unwrap();
+
+    for (d_re, d_dir) in re_res.displacements.iter().zip(direct_mod_res.displacements.iter()) {
+        assert_eq!(d_re.node_id, d_dir.node_id);
+        assert!((d_re.uy - d_dir.uy).abs() < 1e-9, "Displacement uy mismatch on node {}", d_re.node_id);
+    }
+}
