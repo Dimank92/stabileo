@@ -5,7 +5,7 @@
 
 `check` validates the schema and the evidence behind each status; without --offline it fetches
 every DOI from Crossref and fails unless title, authors, year and venue match exactly; --links
-also fetches each GitHub code link and fails unless its detected license matches the catalog.
+also fetches each GitHub code link (set GITHUB_TOKEN to avoid the anonymous rate limit) and fails unless its detected license matches the catalog.
 `show` prints the Crossref block for a DOI, to paste into a new entry.
 """
 import html
@@ -21,7 +21,7 @@ import urllib.request
 import yaml
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CATALOG = os.path.join(ROOT, "papers.yaml")
+CATALOG = os.environ.get("RESEARCH_CATALOG", os.path.join(ROOT, "papers.yaml"))
 UA = "stabileo-research-catalog (https://github.com/lambdaclass/stabileo)"
 
 AREAS = {
@@ -47,7 +47,11 @@ def norm(s):
 def get_json(url):
     for attempt in range(4):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": UA})
+            headers = {"User-Agent": UA}
+            token = os.environ.get("GITHUB_TOKEN")
+            if token and url.startswith("https://api.github.com/"):
+                headers["Authorization"] = f"Bearer {token}"
+            req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=30) as r:
                 return json.load(r)
         except urllib.error.HTTPError as e:
