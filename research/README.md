@@ -33,5 +33,5 @@ Statuses in `papers.yaml` are assigned from evidence in the repository, not by h
 | `proposed` | Catalogued; metadata verified against Crossref |
 | `reference-reproduced` | The authors' code ran here; its outputs are committed with the exact environment |
 | `implementation-in-progress` | A Stabileo implementation exists but its validation tests do not yet pass |
-| `numerically-validated` | Tests compare our implementation with the reproduced reference within documented tolerances, and pass in CI |
+| `numerically-validated` | Tests compare our implementation with the reproduced reference within documented tolerances, and pass in CI. This is agreement with the reference code; whether published numbers were reproduced is the separate `reproduced_published_results` field |
 | `interactive` | Validated, and runnable on stabileo.com/research |
