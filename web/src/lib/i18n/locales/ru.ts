@@ -582,10 +582,7 @@ const ru: Translations = {
 
   // ─── Extra tooltips (ToolbarProject, ToolbarConfig) ───
   'project.exportExcelTooltip': 'Экспорт отчёта Excel со всеми листами (модель + результаты)',
-  'project.exportPdfTooltip': 'Создать печатный PDF-отчёт',
   'project.exportDxfTooltip': 'Экспорт в AutoCAD DXF с эпюрами',
-  'project.exportSvgTooltip': 'Экспорт векторного SVG',
-  'project.exportPngTooltip': 'Экспорт скриншота PNG',
   'project.exportCsvTooltip': 'Экспорт таблицы результатов в CSV',
   'project.openDedTooltip': 'Открыть файл проекта (.ded / .json)',
   'project.openDxfTooltip': 'Импорт геометрии из файла AutoCAD DXF',

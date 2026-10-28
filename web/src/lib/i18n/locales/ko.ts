@@ -588,10 +588,7 @@ const ko: Translations = {
 
   // ─── Extra tooltips (ToolbarProject, ToolbarConfig) ───
   'project.exportExcelTooltip': '모든 시트가 포함된 Excel 보고서 내보내기 (모델 + 결과)',
-  'project.exportPdfTooltip': '인쇄 가능한 PDF 보고서 생성',
   'project.exportDxfTooltip': '다이어그램이 포함된 AutoCAD DXF로 내보내기',
-  'project.exportSvgTooltip': 'SVG 벡터 그래픽 내보내기',
-  'project.exportPngTooltip': 'PNG 스크린샷 내보내기',
   'project.exportCsvTooltip': '결과 표를 CSV로 내보내기',
   'project.openDedTooltip': '프로젝트 파일 열기 (.ded / .json)',
   'project.openDxfTooltip': 'AutoCAD DXF 파일에서 형상 가져오기',

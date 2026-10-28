@@ -390,7 +390,7 @@
     <span class="pp-sub">{t('project.importLabel')}</span>
     <div class="pp-group">
       <span class="pp-group-label">{t('project.importSpreadsheet')}</span>
-      <div class="pp-grid">
+      <div class="pp-grid pp-io">
         <HelpTip text={t('xls.ui.importTooltip')}>
           <button class="pp-btn" onclick={() => xlsInput?.click()} data-testid="pp-xls-import"
           >{t('xls.ui.import')}</button>
@@ -406,7 +406,7 @@
     </div>
     <div class="pp-group">
       <span class="pp-group-label">{t('project.importDrawing')}</span>
-      <div class="pp-grid">
+      <div class="pp-grid pp-io">
         <HelpTip text={t('proProject.dxfHelp')}>
           <button class="pp-btn"
                   onclick={() => window.dispatchEvent(new Event('stabileo-import-dxf'))}
@@ -421,24 +421,26 @@
     </div>
 
     <span class="pp-sub">{t('project.export')}</span>
-    <div class="pp-grid pp-export">
-      <HelpTip text={t('proExport.resultsTip')}>
-        <button class="pp-btn" data-testid="pp-export-results" onclick={() => (dataOpen = true)} disabled={!hasModel}>{t('proExport.resultsBtn')}</button>
-      </HelpTip>
-      <HelpTip text={t('proExport.reportTip')}>
-        <button class="pp-btn" data-testid="pp-export-report" disabled={!hasModel}
-                onclick={() => window.dispatchEvent(new Event('stabileo-open-report'))}
-        >{t('proExport.reportBtn')}</button>
-      </HelpTip>
-      <HelpTip text={t('proExport.drawingsTip')}>
-        <button class="pp-btn" data-testid="pp-export-drawings" onclick={openDrawings} disabled={!hasModel}>{t('proExport.drawingsBtn')}</button>
-      </HelpTip>
-      <HelpTip text={t('proExport.ifcTip')}>
-        <button class="pp-btn" data-testid="pp-export-ifc" onclick={exportIfc} disabled={!hasModel}>{t('proExport.ifcBtn')}</button>
-      </HelpTip>
+    <div class="pp-group">
+      <div class="pp-grid pp-io">
+        <HelpTip text={t('proExport.resultsTip')}>
+          <button class="pp-btn" data-testid="pp-export-results" onclick={() => (dataOpen = true)} disabled={!hasModel}>{t('proExport.resultsBtn')}</button>
+        </HelpTip>
+        <HelpTip text={t('proExport.reportTip')}>
+          <button class="pp-btn" data-testid="pp-export-report" disabled={!hasModel}
+                  onclick={() => window.dispatchEvent(new Event('stabileo-open-report'))}
+          >{t('proExport.reportBtn')}</button>
+        </HelpTip>
+        <HelpTip text={t('proExport.drawingsTip')}>
+          <button class="pp-btn" data-testid="pp-export-drawings" onclick={openDrawings} disabled={!hasModel}>{t('proExport.drawingsBtn')}</button>
+        </HelpTip>
+        <HelpTip text={t('proExport.ifcTip')}>
+          <button class="pp-btn" data-testid="pp-export-ifc" onclick={exportIfc} disabled={!hasModel}>{t('proExport.ifcBtn')}</button>
+        </HelpTip>
+      </div>
+      <button class="pp-link" title={t('provenance.reproduce.intro')} onclick={() => window.dispatchEvent(new Event('stabileo-reproduce'))}
+              data-testid="pp-reproduce">{t('provenance.reproduce.link')}</button>
     </div>
-    <button class="pp-link" title={t('provenance.reproduce.intro')} onclick={() => window.dispatchEvent(new Event('stabileo-reproduce'))}
-            data-testid="pp-reproduce">{t('provenance.reproduce.link')}</button>
   </section>
 
   <!--
@@ -825,6 +827,8 @@
   .pp-row :global(.ht-wrap > button) { width: 100%; }
   .pp-grid :global(.ht-wrap) { width: 100%; }
   .pp-grid :global(.ht-wrap > button) { width: 100%; }
+  .pp-io { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pp-io :global(.ht-wrap > button) { display: block; height: 32px; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
 
   .pp-disclose { justify-content: space-between; margin-top: 0.3rem; }
   .pp-caret { font-size: 0.6rem; color: var(--st-text-3); }

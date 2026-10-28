@@ -588,10 +588,7 @@ const ar: Translations = {
 
   // ─── Extra tooltips (ToolbarProject, ToolbarConfig) ───
   'project.exportExcelTooltip': 'تصدير تقرير Excel بجميع الأوراق (النموذج + النتائج)',
-  'project.exportPdfTooltip': 'إنشاء تقرير PDF قابل للطباعة',
   'project.exportDxfTooltip': 'تصدير إلى AutoCAD DXF مع المخططات',
-  'project.exportSvgTooltip': 'تصدير رسم متجه SVG',
-  'project.exportPngTooltip': 'تصدير لقطة شاشة PNG',
   'project.exportCsvTooltip': 'تصدير جدول النتائج بصيغة CSV',
   'project.openDedTooltip': 'فتح ملف مشروع (.ded / .json)',
   'project.openDxfTooltip': 'استيراد الهندسة من ملف AutoCAD DXF',

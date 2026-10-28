@@ -1,5 +1,5 @@
 ### Changed
-#### PRO exports by what comes out, with the format chosen in the dialog (2026-10-28)
+#### Exports by what comes out, with the format chosen in the dialog, in PRO and Basic (2026-10-28)
 
 Project → Export had a button per format (Excel, CSV, PDF report, DXF, IFC, SVG, PNG, JPG). It now
 has one per content: Results… (Excel or CSV), Calculation report… (PDF, Word or HTML), Drawings…
@@ -7,3 +7,8 @@ has one per content: Results… (Excel or CSV), Calculation report… (PDF, Word
 own options) and BIM model (IFC). Each dialog shows its format first. The calculation report no
 longer offers a workbook or CSV of its tables: the results as data are the Results export. The
 dialogs, their contents and the files they write are otherwise unchanged.
+
+Basic does the same: Results… (Excel or CSV, in a small dialog where it used to download at once),
+Calculation report… (PDF, Word or HTML; Word and HTML were not offered before) and Drawings… (SVG,
+PNG or JPG; JPG is new). In both modes the import and export buttons share one grid of two equal
+columns, one line high, instead of buttons sized by their text.

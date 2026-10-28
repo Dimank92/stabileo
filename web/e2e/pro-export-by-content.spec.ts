@@ -36,3 +36,35 @@ test.describe('@smoke exporting by what comes out', () => {
     await expect(page.getByTestId('pro-dxf-export-dialog').getByTestId('pro-dxf-units-mm')).toHaveClass(/on/);
   });
 });
+
+test.describe('@smoke exporting by what comes out, in Basic', () => {
+  test('three buttons by content; Excel or CSV, PDF, Word or HTML, and SVG, PNG or JPG chosen inside', async ({ page }) => {
+    await page.goto('/app/basic?e2e=1');
+    await page.waitForFunction(() => !!window.__stabileo, null, { timeout: 60_000 });
+    const panel = page.locator('[data-testid="basic-panel"][data-panel="project"]');
+    if (await panel.count() === 0) await page.getByTestId('hdr-project').click();
+    await page.evaluate(() => window.__stabileoActions.loadExample('portal-frame'));
+    for (const gone of ['export-excel', 'export-csv', 'export-svg', 'export-png']) await expect(page.getByTestId(gone)).toHaveCount(0);
+
+    await page.getByTestId('export-results').click();
+    const results = page.getByTestId('results-export-dialog');
+    await results.getByTestId('results-format-csv').click();
+    const [csv] = await Promise.all([page.waitForEvent('download'), results.getByTestId('results-export-download').click()]);
+    expect(csv.suggestedFilename()).toMatch(/\.csv$/);
+
+    await page.getByTestId('export-report').click();
+    const report = page.getByTestId('calc-report-dialog');
+    for (const f of ['pdf', 'docx', 'html']) await expect(report.getByTestId(`calc-report-format-${f}`)).toBeVisible();
+    await report.getByTestId('calc-report-format-docx').click();
+    await expect(report.getByTestId('calc-report-generate')).toHaveText(/Word/);
+    const [docx] = await Promise.all([page.waitForEvent('download'), report.getByTestId('calc-report-generate').click()]);
+    expect(docx.suggestedFilename()).toMatch(/\.docx$/);
+
+    await page.getByTestId('export-drawings').click();
+    const drawings = page.getByTestId('view-export-dialog');
+    for (const f of ['svg', 'png', 'jpg']) await expect(drawings.getByTestId(`view-export-format-${f}`)).toBeVisible();
+    await drawings.getByTestId('view-export-format-jpg').click();
+    const [jpg] = await Promise.all([page.waitForEvent('download'), drawings.getByTestId('view-export-download').click()]);
+    expect(jpg.suggestedFilename()).toMatch(/\.jpe?g$/);
+  });
+});

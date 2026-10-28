@@ -581,10 +581,7 @@ const it: Translations = {
 
   // ─── Extra tooltips (ToolbarProject, ToolbarConfig) ───
   'project.exportExcelTooltip': 'Esporta relazione Excel con tutti i fogli (modello + risultati)',
-  'project.exportPdfTooltip': 'Genera relazione PDF stampabile',
   'project.exportDxfTooltip': 'Esporta in AutoCAD DXF con diagrammi',
-  'project.exportSvgTooltip': 'Esporta grafico vettoriale SVG',
-  'project.exportPngTooltip': 'Esporta screenshot PNG',
   'project.exportCsvTooltip': 'Esporta tabella risultati come CSV',
   'project.openDedTooltip': 'Apri file progetto (.ded / .json)',
   'project.openDxfTooltip': 'Importa geometria da file AutoCAD DXF',

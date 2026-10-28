@@ -802,12 +802,9 @@ const es: Record<string, string> = {
   'project.fileSection': 'Archivo',
   'project.export': 'Exportar',
   'project.importHelp': 'Reemplaza el modelo con el de una planilla. Descargá primero la plantilla: trae las hojas, las columnas y ejemplos de cada una, y es el único formato de Excel que este importador lee. Para abrir un .ded usá Abrir, acá arriba. DXF e IFC están en el modo PRO.',
-  'project.exportViewHelp': 'Figuras para un informe o un parcial: la estructura, sus diagramas y el DCL equilibrado, dibujados en limpio sobre fondo blanco. SVG: vectorial, para editar o imprimir (2D). PNG: imagen común. También se pueden copiar y pegar directo en un documento.',
-  'project.exportView': 'Vista',
-  'project.exportReportHelp': 'El documento que se entrega. Elegís qué lleva: los datos del modelo, las cargas, el análisis cinemático, el DCL equilibrado y cada resultado como tabla, como diagrama o ambos. Se abre listo para imprimir o guardar en PDF.',
-  'project.exportReport': 'Memoria de cálculo',
+  "project.exportViewHelp": "Figuras para un informe o un parcial: la estructura, sus diagramas y el DCL equilibrado, dibujados en limpio sobre fondo blanco. En el cuadro elegís el formato: SVG (vectorial, para editar o imprimir), PNG o JPG. También se pueden copiar y pegar directo en un documento.",
+  "project.exportReportHelp": "El documento que se entrega. Elegís qué lleva: los datos del modelo, las cargas, el análisis cinemático, el DCL equilibrado y cada resultado como tabla, como diagrama o ambos; y si sale en PDF, Word o HTML.",
   'project.exportResultsHelp': 'Números para seguir trabajando. Excel: un libro con el modelo y los resultados (resumen, barras, nodos, reacciones, materiales, secciones, placas y combinaciones), una hoja cada uno. CSV: solo la tabla de resultados. Si el modelo no está calculado, se calcula al exportar. Ninguno de los dos se vuelve a importar acá: para eso está la plantilla, que usa otras hojas.',
-  'project.exportResults': 'Resultados',
   'project.importSpreadsheet': 'Desde una planilla',
   'project.importDrawing': 'Desde un dibujo',
   'proProject.autosaveRefreshHelp': 'Vuelve a leer el almacenamiento del navegador, que importa si otra pestaña guardó desde que abriste este panel. No cambia nada del modelo.',
@@ -1348,7 +1345,6 @@ const es: Record<string, string> = {
 
   // ─── Extra tooltips (ToolbarProject, ToolbarConfig) ───
   'project.exportExcelTooltip': 'Exportar reporte Excel con todas las hojas (modelo + resultados)',
-  'project.exportPdfTooltip': 'Generar reporte PDF imprimible',
 
   // ─── CalcReportDialog ───
   'calcReport.title': 'Generar memoria de cálculo',
@@ -1362,8 +1358,6 @@ const es: Record<string, string> = {
   'calcReport.noResults': 'Ejecutá el análisis primero — no hay resultados disponibles para reportar.',
 
   'project.exportDxfTooltip': 'Exportar a AutoCAD DXF con diagramas',
-  'project.exportSvgTooltip': 'Figuras vectoriales SVG: estructura, diagramas y DCL',
-  'project.exportPngTooltip': 'Figuras en PNG: estructura, diagramas y DCL',
   'project.exportReportTooltip': 'El reporte completo, como documento imprimible — los mismos resultados que llevan Excel y CSV.',
   'project.exportCsvTooltip': 'Exportar tabla de resultados en CSV',
   'project.openDedTooltip': 'Abrir archivo de proyecto (.ded / .json)',
@@ -12428,7 +12422,6 @@ const es: Record<string, string> = {
   'config.tip.nodeStyle': 'Cómo se dibujan los nodos en 3D. Los puntos ocupan unos pocos píxeles y dejan ver la estructura y los resultados. Las esferas son más fáciles de apuntar. Con la primera opción, los nodos se ven como esferas mientras hacés algo que se apunta a un nodo (dibujar nodos, barras, apoyos, cargas o placas, o colocar una estructura generada) y como puntos el resto del tiempo. El tamaño en pantalla no cambia con el zoom.',
   'config.panelScrollbars': 'Barras de desplazamiento siempre visibles en el panel',
   'config.tip.panelScrollbars': 'Cuando una tabla o un panel no entra a lo ancho o a lo alto, muestra sus barras de desplazamiento todo el tiempo, para recorrerlo con el mouse aunque no tenga desplazamiento lateral.',
-  'viewExport.title': 'Exportar vista',
   'viewExport.sectionContent': 'Qué incluir',
   'viewExport.sectionDrawing': 'Dibujo',
   'viewExport.sectionOutput': 'Salida',
@@ -14207,5 +14200,10 @@ const es: Record<string, string> = {
   "proReport.formatNote.pdf": "Se abre listo para imprimir o guardar en PDF.",
   "proReport.formatNote.docx": "Documento editable de Word, con figuras, portada y numeración de páginas.",
   "proReport.formatNote.html": "Página web con todo el reporte; es la copia que se puede verificar con «Verificar un reporte exportado».",
+  "export.resultsBtn": "Resultados…",
+  "export.reportBtn": "Reporte de cálculo…",
+  "export.drawingsBtn": "Dibujos…",
+  "export.resultsTitle": "Exportar resultados",
+  "export.drawingsTitle": "Exportar dibujos",
 };
 export default es;

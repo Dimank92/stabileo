@@ -12,7 +12,8 @@
   import { copyView, exportView, type ViewFormat } from '../../lib/export/view-export';
   import type { InkStyle } from '../../lib/export/paper-ink';
 
-  let { open = $bindable(false), format }: { open: boolean; format: ViewFormat } = $props();
+  let { open = $bindable(false), format = $bindable('svg') }: { open: boolean; format: ViewFormat } = $props();
+  const FORMATS: ViewFormat[] = ['svg', 'png', 'jpg'];
 
   const KEY = 'stabileo-view-export';
   interface Prefs { contents: FigureContent[]; options: FigureOptions; sheet: boolean }
@@ -39,7 +40,6 @@
     try { localStorage.setItem(KEY, JSON.stringify({ contents, options, sheet })); } catch { /* the choices last this session */ }
   }
 
-  const is3D = $derived(uiStore.is3DWorkspace);
   const LABEL: Record<FigureContent, string> = {
     model: 'figures.model', reactions: 'figures.reactions', despiece: 'figures.despiece',
     moment: 'figures.moment', shear: 'figures.shear', axial: 'figures.axial', deformed: 'figures.deformed',
@@ -90,7 +90,13 @@
   }
 </script>
 
-<ExportDialog bind:open title={`${t('viewExport.title')} — ${format.toUpperCase()}`} testid="view-export-dialog">
+<ExportDialog bind:open title={`${t('export.drawingsTitle')} — ${format.toUpperCase()}`} testid="view-export-dialog">
+  <ExportSection title={t('export.formats')} summary={format.toUpperCase()} open testid="view-export-format">
+    <div class="xs-seg vx-formats">
+      {#each FORMATS as f (f)}<button type="button" class:on={format === f} aria-pressed={format === f} onclick={() => (format = f)} data-testid={`view-export-format-${f}`}>{f.toUpperCase()}</button>{/each}
+    </div>
+    <p class="xs-note">{t(`proExport.drawingFormatNote.${format}`)}</p>
+  </ExportSection>
   <ExportSection title={t('viewExport.sectionContent')} summary={contentSummary} testid="view-export-content">
     <div class="xs-grid">
       {#each FIGURE_CONTENTS as c (c)}
@@ -143,3 +149,7 @@
     <button type="button" class="primary" onclick={() => run('download')} disabled={busy || contents.length === 0} data-testid="view-export-download">{t('viewExport.download')}</button>
   {/snippet}
 </ExportDialog>
+
+<style>
+  .vx-formats { align-self: flex-start; }
+</style>

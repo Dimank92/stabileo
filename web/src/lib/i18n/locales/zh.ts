@@ -582,10 +582,7 @@ const zh: Translations = {
 
   // ─── Extra tooltips (ToolbarProject, ToolbarConfig) ───
   'project.exportExcelTooltip': '导出包含所有工作表的 Excel 报告（模型 + 结果）',
-  'project.exportPdfTooltip': '生成可打印的 PDF 报告',
   'project.exportDxfTooltip': '导出含内力图的 AutoCAD DXF',
-  'project.exportSvgTooltip': '导出 SVG 矢量图',
-  'project.exportPngTooltip': '导出 PNG 截图',
   'project.exportCsvTooltip': '导出 CSV 结果表',
   'project.openDedTooltip': '打开项目文件 (.ded / .json)',
   'project.openDxfTooltip': '从 AutoCAD DXF 文件导入几何',

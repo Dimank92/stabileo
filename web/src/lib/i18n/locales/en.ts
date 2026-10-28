@@ -809,12 +809,9 @@ const en: Record<string, string> = {
   'project.fileSection': 'File',
   'project.export': 'Export',
   'project.importHelp': 'Replaces the model with a spreadsheet’s. Download the template first: it carries the sheets, the columns and an example of each, and it is the only Excel layout this importer reads. To open a .ded use Open, above. DXF and IFC live in PRO.',
-  'project.exportViewHelp': 'Figures for a report or an exam: the structure, its diagrams and the equilibrated free body, drawn clean on white. SVG: vector, to edit or print (2D). PNG: a plain image. They can also be copied and pasted straight into a document.',
-  'project.exportView': 'View',
-  'project.exportReportHelp': 'The document you hand in. You choose what it holds: the model data, the loads, the kinematic analysis, the equilibrated free body and each result as a table, a diagram or both. It opens ready to print or save as PDF.',
-  'project.exportReport': 'Calculation report',
+  "project.exportViewHelp": "Figures for a report or an exam: the structure, its diagrams and the equilibrated free body, drawn clean on white. The format is chosen in the dialog: SVG (vector, to edit or print), PNG or JPG. They can also be copied and pasted straight into a document.",
+  "project.exportReportHelp": "The document you hand in. You choose what it holds: the model data, the loads, the kinematic analysis, the equilibrated free body and each result as a table, a diagram or both; and PDF, Word or HTML.",
   'project.exportResultsHelp': 'Numbers to keep working with. Excel: a workbook holding the model and the results (summary, members, nodes, reactions, materials, sections, shells and combinations), one sheet each. CSV: the results table alone. If the model has not been solved, exporting solves it. Neither can be imported back here: the template is for that, and it uses different sheets.',
-  'project.exportResults': 'Results',
   'project.importSpreadsheet': 'From a spreadsheet',
   'project.importDrawing': 'From a drawing',
   'proProject.autosaveRefreshHelp': 'Re-reads the browser store, which matters when another tab has saved since this panel was opened. It changes nothing about the model.',
@@ -1355,7 +1352,6 @@ const en: Record<string, string> = {
 
   // ─── Extra tooltips (ToolbarProject, ToolbarConfig) ───
   'project.exportExcelTooltip': 'Export Excel report with all sheets (model + results)',
-  'project.exportPdfTooltip': 'Generate printable PDF report',
 
   // ─── CalcReportDialog ───
   'calcReport.title': 'Generate Calculation Report',
@@ -1369,8 +1365,6 @@ const en: Record<string, string> = {
   'calcReport.noResults': 'Run the analysis first — no results are available to report.',
 
   'project.exportDxfTooltip': 'Export to AutoCAD DXF with diagrams',
-  'project.exportSvgTooltip': 'Vector SVG figures: structure, diagrams and free body',
-  'project.exportPngTooltip': 'PNG figures: structure, diagrams and free body',
   'project.exportReportTooltip': 'The full report, as a printable document — the same results Excel and CSV carry.',
   'project.exportCsvTooltip': 'Export results table as CSV',
   'project.openDedTooltip': 'Open project file (.ded / .json)',
@@ -12439,7 +12433,6 @@ const en: Record<string, string> = {
   'config.tip.nodeStyle': 'How nodes are drawn in 3D. Dots take a few pixels and leave the structure and the results in view. Balls are easier to aim at. With the first option, nodes are drawn as balls while you do something aimed at a node (drawing nodes, members, supports, loads or plates, or placing a generated structure) and as dots the rest of the time. Their size on screen does not change with zoom.',
   'config.panelScrollbars': 'Always show the panel\'s scrollbars',
   'config.tip.panelScrollbars': 'When a table or panel does not fit across or down, its scrollbars stay on screen, so it can be moved with any mouse, including one that cannot scroll sideways.',
-  'viewExport.title': 'Export view',
   'viewExport.sectionContent': 'What to include',
   'viewExport.sectionDrawing': 'Drawing',
   'viewExport.sectionOutput': 'Output',
@@ -14218,5 +14211,10 @@ const en: Record<string, string> = {
   "proReport.formatNote.pdf": "Opens ready to print or save as PDF.",
   "proReport.formatNote.docx": "An editable Word document, with figures, a cover and page numbers.",
   "proReport.formatNote.html": "A web page with the whole report; it is the copy «Check an exported report» can verify.",
+  "export.resultsBtn": "Results…",
+  "export.reportBtn": "Calculation report…",
+  "export.drawingsBtn": "Drawings…",
+  "export.resultsTitle": "Export results",
+  "export.drawingsTitle": "Export drawings",
 };
 export default en;

@@ -581,10 +581,7 @@ const tr: Translations = {
 
   // ─── Extra tooltips (ToolbarProject, ToolbarConfig) ───
   'project.exportExcelTooltip': 'Tüm sayfaları içeren Excel raporu dışa aktar (model + sonuçlar)',
-  'project.exportPdfTooltip': 'Yazdırılabilir PDF raporu oluştur',
   'project.exportDxfTooltip': 'Diyagramlarla AutoCAD DXF\'e dışa aktar',
-  'project.exportSvgTooltip': 'Vektörel SVG grafiği dışa aktar',
-  'project.exportPngTooltip': 'PNG ekran görüntüsü dışa aktar',
   'project.exportCsvTooltip': 'Sonuç tablosunu CSV olarak dışa aktar',
   'project.openDedTooltip': 'Proje dosyasını aç (.ded / .json)',
   'project.openDxfTooltip': 'AutoCAD DXF dosyasından geometri içe aktar',

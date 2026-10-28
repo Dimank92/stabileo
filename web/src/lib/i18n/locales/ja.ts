@@ -588,10 +588,7 @@ const ja: Translations = {
 
   // ─── Extra tooltips (ToolbarProject, ToolbarConfig) ───
   'project.exportExcelTooltip': '全シート（モデル+結果）のExcelレポートをエクスポート',
-  'project.exportPdfTooltip': '印刷可能なPDFレポートを生成',
   'project.exportDxfTooltip': '図付きAutoCAD DXFにエクスポート',
-  'project.exportSvgTooltip': 'SVGベクター画像をエクスポート',
-  'project.exportPngTooltip': 'PNGスクリーンショットをエクスポート',
   'project.exportCsvTooltip': '結果テーブルをCSVでエクスポート',
   'project.openDedTooltip': 'プロジェクトファイル（.ded / .json）を開く',
   'project.openDxfTooltip': 'AutoCAD DXFファイルからジオメトリをインポート',

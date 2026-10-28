@@ -588,10 +588,7 @@ const id: Translations = {
 
   // ─── Extra tooltips (ToolbarProject, ToolbarConfig) ───
   'project.exportExcelTooltip': 'Ekspor laporan Excel dengan semua lembar (model + hasil)',
-  'project.exportPdfTooltip': 'Buat laporan PDF untuk dicetak',
   'project.exportDxfTooltip': 'Ekspor ke AutoCAD DXF dengan diagram',
-  'project.exportSvgTooltip': 'Ekspor grafik vektor SVG',
-  'project.exportPngTooltip': 'Ekspor tangkapan layar PNG',
   'project.exportCsvTooltip': 'Ekspor tabel hasil dalam CSV',
   'project.openDedTooltip': 'Buka file proyek (.ded / .json)',
   'project.openDxfTooltip': 'Impor geometri dari file AutoCAD DXF',
