@@ -16,6 +16,8 @@
   import ExperimentLink from '../shell/ExperimentLink.svelte';
   import { Playback, SOURCE_LABEL, type Source } from '../shell/playback.svelte';
   import { fetchReplay } from '../shell/replay';
+  import { num, qty } from '../shell/format';
+  import Sci from '../shell/Sci.svelte';
   import StabileoViewer from '../shell/StabileoViewer.svelte';
   import PaneTabs from '../shell/PaneTabs.svelte';
   import Segmented from '../shell/Segmented.svelte';
@@ -287,14 +289,14 @@
     return { peak, worstPre, worstAll, sameIterations };
   });
 
-  const fmt = (v: number, d = 4) => (Math.abs(v) >= 1e-3 || v === 0 ? v.toFixed(d) : v.toExponential(2));
+  const fmt = (v: number, d = 4) => (Math.abs(v) >= 1e-3 || v === 0 ? num(v, { dp: d }) : num(v, { sig: 3 }));
   const statusItems = $derived(
     frame
       ? [
-          { label: 'step', value: `${frame.step.step} / ${Math.max(expectedSteps, frames.length) - 1}` },
-          { label: 'u', value: `${fmt(frame.step.displacement, 5)} mm` },
-          { label: 'F', value: `${fmt(frame.step.reaction)} kN` },
-          { label: 'max d', value: frame.step.damage_max.toFixed(4) },
+          { label: 'step', value: `${frame.step.step} of ${Math.max(expectedSteps, frames.length) - 1}` },
+          { label: 'u', value: qty(frame.step.displacement, 'mm', { dp: 5 }) },
+          { label: 'F', value: qty(frame.step.reaction, 'kN', { sig: 4 }) },
+          { label: 'max d', value: num(frame.step.damage_max, { dp: 4 }) },
         ]
       : [],
   );
@@ -351,10 +353,11 @@
     <h2 id="checks">Comparison with the reference</h2>
     <div class="rs-table-scroll" role="region" aria-label="Validation checks" tabindex="0">
     <table class="rs-checks">
-      <thead><tr><th>Check</th><th>Observed</th><th>Tolerance</th><th></th></tr></thead>
+      <caption>{validation.checks.length} validation checks run in CI, each with its tolerance</caption>
+      <thead><tr><th scope="col">Check</th><th scope="col" class="num">Observed</th><th scope="col" class="num">Tolerance</th><th scope="col">Result</th></tr></thead>
       <tbody>
         {#each validation.checks as c (c.name)}
-          <tr><td>{c.name}</td><td>{c.metric === 'exact' ? (c.passed ? 'equal' : 'differs') : c.observed.toExponential(1)}</td><td>{c.metric === 'exact' ? '—' : c.tolerance.toExponential(0)}</td><td>{c.passed ? 'pass' : 'FAIL'}</td></tr>
+          <tr><td>{c.name}</td><td class="num">{#if c.metric === 'exact'}{c.passed ? 'equal' : 'differs'}{:else}<Sci value={c.observed} />{/if}</td><td class="num">{#if c.metric === 'exact'}—{:else}<Sci value={c.tolerance} sig={1} />{/if}</td><td class={c.passed ? 'pass' : 'fail'}>{c.passed ? '✓ pass' : '✗ fail'}</td></tr>
         {/each}
       </tbody>
     </table>
@@ -372,7 +375,7 @@
           <thead><tr><th>step</th><th>u, mm</th><th>F, kN</th><th>iterations</th><th>residual</th><th>max d</th>{#if showsReference}<th>reference F, kN</th>{/if}</tr></thead>
           <tbody>
             {#each frames as f, i (i)}
-              <tr><td>{f.step.step}</td><td>{f.step.displacement.toFixed(5)}</td><td>{f.step.reaction.toExponential(6)}</td><td>{f.step.iterations}</td><td>{f.step.residual.toExponential(2)}</td><td>{f.step.damage_max.toFixed(4)}</td>{#if showsReference}<td>{reference[i]?.reaction.toExponential(6)}</td>{/if}</tr>
+              <tr><td class="num">{f.step.step}</td><td class="num">{num(f.step.displacement, { dp: 5 })}</td><td class="num">{num(f.step.reaction, { sig: 7 })}</td><td class="num">{f.step.iterations}</td><td class="num"><Sci value={f.step.residual} /></td><td class="num">{num(f.step.damage_max, { dp: 4 })}</td>{#if showsReference}<td class="num">{num(reference[i]?.reaction ?? NaN, { sig: 7 })}</td>{/if}</tr>
             {/each}
           </tbody>
         </table>
@@ -404,7 +407,7 @@
       {#if comparison}
         <p class="rs-compare-line" role="status">
           <span class="ok" aria-hidden="true">✓</span>
-          {source === 'replay' ? 'This replay' : 'This run'} matches the reference code: peak {comparison.peak.step.reaction.toFixed(6)} kN at step {comparison.peak.step.step}, identical iterations at {comparison.sameIterations} of {reference.length} steps.
+          {source === 'replay' ? 'This replay' : 'This run'} matches the reference code: peak {qty(comparison.peak.step.reaction, 'kN', { dp: 6 })} at step {comparison.peak.step.step}, identical iterations at {comparison.sameIterations} of {reference.length} steps.
           <button type="button" class="rs-textbtn" onclick={() => (tab = 'convergence')}>Details</button>
         </p>
       {/if}
@@ -438,6 +441,7 @@
               cells={elements}
               values={fieldValues}
               perCell={field === 'syy'}
+            colourMap={field === 'syy' ? 'diverging' : 'sequential'}
               range={fieldRange}
               title={field === 'damage' ? 'Damage d' : field === 'disp' ? '|u|' : 'σyy (degraded)'}
               unit={field === 'damage' ? '' : field === 'disp' ? 'mm' : 'kN/mm²'}
@@ -751,6 +755,26 @@
     border-bottom: 1px solid var(--hair);
     padding: 0.25rem 0.5rem;
     text-align: left;
+  }
+  :global(.rs-checks caption) {
+    text-align: left;
+    color: var(--fg-2);
+    font-size: var(--rs-small);
+    padding-bottom: 0.4rem;
+  }
+  :global(.rs-checks td.num),
+  :global(.rs-checks th.num),
+  .rs-table :global(td.num) {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  :global(.rs-checks td.pass) {
+    color: var(--st-ok);
+    white-space: nowrap;
+  }
+  :global(.rs-checks td.fail) {
+    color: var(--st-danger);
   }
   :global(.rs-table-scroll) {
     overflow-x: auto;

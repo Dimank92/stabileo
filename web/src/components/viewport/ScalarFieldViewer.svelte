@@ -23,6 +23,7 @@
   import { createFrameCoalescer } from '../../lib/viewport3d/frame-coalesce';
   import { drawAxisGizmoOn } from '../../lib/viewport3d/axis-gizmo';
   import { createScalarFieldMesh, type ScalarFieldMesh } from '../../lib/three/scalar-field-mesh';
+  import type { ColourMap } from '../../lib/three/colour-maps';
   import Icon from '../ribbon/Icon.svelte';
   import ContourLegend from './ContourLegend.svelte';
 
@@ -43,6 +44,8 @@
     unit?: string;
     legendFooter?: string;
     bands?: number;
+    /** 'shell' (the app's contours), 'sequential' (viridis) or 'diverging' (symmetric about 0). */
+    colourMap?: ColourMap;
     /** Nodal displacements [ux0, uy0, ...] drawn at `deformScale`; null for the undeformed mesh. */
     displacement?: ArrayLike<number> | null;
     deformScale?: number;
@@ -73,6 +76,7 @@
     unit = '',
     legendFooter = '',
     bands = 0,
+    colourMap = 'shell',
     displacement = null,
     deformScale = 1,
     showMesh = true,
@@ -226,7 +230,7 @@
 
   $effect(() => {
     if (!field) return;
-    if (values) field.setField(values, range, { perCell, bands });
+    if (values) field.setField(values, range, { perCell, bands, colourMap });
     invalidate();
   });
   $effect(() => {
@@ -278,7 +282,7 @@
       <button class="sfv-mode" onclick={() => fit()} title="Zoom to extents" aria-label="Zoom to extents">⤢</button>
     </div>
     {#if values}
-      <ContourLegend {title} {unit} min={range.min} max={range.max} {bands} footer={legendFooter} />
+      <ContourLegend {title} {unit} min={range.min} max={range.max} {bands} footer={legendFooter} {colourMap} />
     {/if}
     <span class="sfv-mark">Stabileo viewer</span>
   </div>
