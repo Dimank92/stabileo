@@ -9,8 +9,9 @@
   import type { Snippet } from 'svelte';
   import catalog from '../../../../../research/papers.json';
   import PublicLink from '../../landing/PublicLink.svelte';
-  import { fieldName, statusName, rs } from '../i18n';
-  import { provideExperiment, type ExperimentActions } from './context';
+  import { fieldName, rs } from '../i18n';
+  import { provideExperiment, type ExperimentActions, type Check } from './context';
+  import VerificationSummary from './VerificationSummary.svelte';
   import { BUILD_COMMIT } from '../../../lib/build-info';
   import { publicI18n } from '../../../lib/i18n/store.svelte';
 
@@ -20,13 +21,15 @@
     lead: string;
     /** Passed / total of the validation checks, when the experiment has them. */
     checks?: { passed: number; total: number } | null;
+    /** What the experiment is checked against; defaults from `checks` and the catalogue. */
+    verification?: { reference: Check; published: Check } | null;
     actions: ExperimentActions;
     /** Where the implementation lives, for Cite this and the source link. */
     sourcePath: string;
     article: Snippet;
     app: Snippet;
   };
-  let { paperId, name, lead, checks = null, actions, sourcePath, article, app }: Props = $props();
+  let { paperId, name, lead, checks = null, verification = null, actions, sourcePath, article, app }: Props = $props();
   provideExperiment(actions);
 
   const paper = catalog.papers.find((p) => p.id === paperId)!;
@@ -45,11 +48,10 @@
         After {authors}, “{paper.crossref.title}”, <em>{paper.crossref.venue}</em> ({paper.crossref.year}),
         <a href="https://doi.org/{paper.doi}" rel="noreferrer" target="_blank">doi:{paper.doi}</a>.
       </p>
-      <ul class="rs-badges">
-        <li class="ok">{statusName(paper.status)}{checks ? `: ${checks.passed}/${checks.total} ${s.checksPass}` : ''}</li>
-        {#if !paper.reproduced_published_results}<li>{s.notCompared}</li>{/if}
-        <li class="warn">{s.notDesign}</li>
-      </ul>
+      <VerificationSummary
+        reference={verification?.reference ?? (checks ? { kind: 'checks', passed: checks.passed, total: checks.total, href: '#checks' } : { kind: 'none', why: '' })}
+        published={verification?.published ?? (paper.reproduced_published_results ? { kind: 'checks', passed: 0, total: 0 } : { kind: 'none', why: s.notComparedWhy })}
+      />
       <p class="rs-lead" lang="en">{lead}</p>
     </header>
     <div class="rs-shell-grid">
@@ -101,29 +103,6 @@
     color: inherit;
     text-decoration: underline;
     text-underline-offset: 2px;
-  }
-  .rs-badges {
-    list-style: none;
-    padding: 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin: 1rem 0;
-  }
-  .rs-badges li {
-    font: var(--rs-ui) var(--st-sans);
-    border: 1px solid var(--hair);
-    border-radius: 3px;
-    padding: 0.25rem 0.5rem;
-    color: var(--fg-2);
-  }
-  .rs-badges li.ok {
-    color: var(--ok);
-    border-color: var(--ok);
-  }
-  .rs-badges li.warn {
-    color: #d9a441;
-    border-color: #d9a441;
   }
   .rs-lead {
     color: var(--fg);

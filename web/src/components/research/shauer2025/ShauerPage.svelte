@@ -326,7 +326,7 @@
       <li>{validation.checks.length} named checks compare the two, each with a stated tolerance, in continuous integration. The browser bundle and the replay on this page are checked separately against the native build.</li>
     </ol>
 
-    <h2>Comparison with the reference</h2>
+    <h2 id="checks">Comparison with the reference</h2>
     <div class="rs-table-scroll" role="region" aria-label="Validation checks" tabindex="0">
     <table class="rs-checks">
       <thead><tr><th>Check</th><th>Observed</th><th>Tolerance</th><th></th></tr></thead>

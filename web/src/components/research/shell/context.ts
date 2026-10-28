@@ -11,3 +11,6 @@ export type ExperimentActions = {
 const KEY = Symbol('research-experiment');
 export const provideExperiment = (a: ExperimentActions) => setContext(KEY, a);
 export const useExperiment = () => getContext<ExperimentActions | undefined>(KEY);
+
+/** One line of "checked against": a number of passing checks, or none and why. */
+export type Check = { kind: 'checks'; passed: number; total: number; href?: string } | { kind: 'none'; why: string };
