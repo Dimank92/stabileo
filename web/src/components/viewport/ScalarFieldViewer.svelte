@@ -1,15 +1,17 @@
 <script lang="ts">
   /**
-   * The 3D viewport's look and navigation (shared scene setup) showing one scalar field on a 2D
-   * mesh, with the contour legend. For views that are not the editor's model: research
-   * experiments, and anything else that has a mesh and a field but no Stabileo model.
+   * The 3D viewport's look and navigation showing one scalar field on a 2D mesh, for views that
+   * have a mesh and a field but no editor model (research experiments). Shares the app's scene
+   * setup, orbit controls, shell contour colours and legend, axis triad, camera menu and status
+   * bar styles.
    *
-   * Navigation as in the app: left drag orbits, right drag pans, the wheel zooms to the pointer.
-   * The camera starts looking straight down at the XY plane, fitted to `view` (or the mesh).
+   * Navigation as in the app: left drag orbits (in 3D), right drag pans, the wheel zooms to the
+   * pointer. "2D" is the app's plan view: looking down at the XY plane, orbit locked.
    */
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, type Snippet } from 'svelte';
   import * as THREE from 'three';
   import type { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+  import '../../styles/viewer-chrome.css';
   import {
     addViewerLights,
     applyDefaultNavigation,
@@ -19,8 +21,9 @@
     createViewerScene,
   } from '../../lib/viewport3d/scene-setup';
   import { createFrameCoalescer } from '../../lib/viewport3d/frame-coalesce';
+  import { drawAxisGizmoOn } from '../../lib/viewport3d/axis-gizmo';
   import { createScalarFieldMesh, type ScalarFieldMesh } from '../../lib/three/scalar-field-mesh';
-  import { TOP_VIEW_UP_VECTOR } from '../../lib/geometry/coordinate-system';
+  import Icon from '../ribbon/Icon.svelte';
   import ContourLegend from './ContourLegend.svelte';
 
   type Props = {
@@ -50,6 +53,13 @@
     view?: [number, number, number, number] | null;
     height?: string;
     ariaLabel?: string;
+    /** Items for the status bar under the canvas, after position and zoom. */
+    status?: { label: string; value: string }[];
+    /** A control row above the canvas (the experiment's results buttons). */
+    toolbar?: Snippet;
+    /** What "Open in the editor" does; absent shows it as coming. */
+    onOpenEditor?: (() => void) | null;
+    openEditorNote?: string;
   };
   let {
     xy,
@@ -70,9 +80,14 @@
     view = null,
     height = '28rem',
     ariaLabel = title,
+    status = [],
+    toolbar,
+    onOpenEditor = null,
+    openEditorNote = 'Opening experiments in the editor comes with research mode',
   }: Props = $props();
 
   let container: HTMLDivElement;
+  let gizmo: HTMLCanvasElement;
   let renderer: THREE.WebGLRenderer | null = null;
   let camera: THREE.PerspectiveCamera;
   let controls: OrbitControls;
@@ -80,12 +95,17 @@
   let field: ScalarFieldMesh | null = null;
   let ro: ResizeObserver | null = null;
   let damping = 0;
+  let mode = $state<'2d' | '3d'>('2d');
+  let menuOpen = $state(false);
+  let pointer = $state<string>('—');
+  let zoomText = $state<string>('—');
   const frame = createFrameCoalescer<void>(() => render());
 
   function render() {
     if (!renderer) return;
     controls.update();
     renderer.render(scene, camera);
+    drawAxisGizmoOn(gizmo, camera);
     if (damping > 0) {
       damping -= 1;
       frame.schedule();
@@ -108,7 +128,7 @@
     return [x0, y0, x1, y1];
   }
 
-  /** Look straight down at the region, fitting it to the canvas. */
+  /** Fit the region: in 2D the app's plan view (tipped 1° so Z stays the orbit axis), in 3D an oblique view. */
   export function fit() {
     if (!renderer) return;
     const [x0, y0, x1, y1] = bounds();
@@ -119,14 +139,25 @@
     const aspect = container.clientWidth / Math.max(1, container.clientHeight);
     const fov = THREE.MathUtils.degToRad(camera.fov);
     const dist = (1.08 * Math.max(h, w / aspect)) / 2 / Math.tan(fov / 2);
-    camera.up.copy(TOP_VIEW_UP_VECTOR);
-    camera.position.set(cx, cy, dist);
+    if (mode === '2d') {
+      const tip = 0.018;
+      camera.position.set(cx, cy - dist * Math.sin(tip), dist * Math.cos(tip));
+    } else {
+      camera.position.set(cx + dist * 0.45, cy - dist * 0.75, dist * 0.6);
+    }
     camera.near = dist / 1000;
     camera.far = dist * 100;
     camera.updateProjectionMatrix();
     controls.target.set(cx, cy, 0);
+    controls.enableRotate = mode === '3d';
     camera.lookAt(cx, cy, 0);
     invalidate();
+  }
+
+  function setMode(m: '2d' | '3d') {
+    mode = m;
+    menuOpen = false;
+    fit();
   }
 
   function resize() {
@@ -141,6 +172,23 @@
     invalidate();
   }
 
+  const ray = new THREE.Raycaster();
+  const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+  function onPointerMove(e: PointerEvent) {
+    if (!renderer) return;
+    const r = renderer.domElement.getBoundingClientRect();
+    ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
+    const p = new THREE.Vector3();
+    if (ray.ray.intersectPlane(plane, p)) pointer = `(${p.x.toFixed(4)}, ${p.y.toFixed(4)})`;
+  }
+
+  function updateZoom() {
+    if (!renderer) return;
+    const d = camera.position.distanceTo(controls.target);
+    const visible = 2 * d * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+    zoomText = `${(container.clientHeight / visible).toPrecision(3)} px/unit`;
+  }
+
   onMount(() => {
     scene = createViewerScene();
     addViewerLights(scene);
@@ -153,15 +201,18 @@
       camera.near = Math.max(1e-9, d / 1000);
       camera.far = d * 100;
       camera.updateProjectionMatrix();
+      updateZoom();
       frame.schedule();
     });
     controls.addEventListener('start', invalidate);
+    renderer.domElement.addEventListener('pointermove', onPointerMove);
     field = createScalarFieldMesh(xy, cells, cellSize, lineWidth);
     scene.add(field.group);
     ro = new ResizeObserver(resize);
     ro.observe(container);
     resize();
     fit();
+    updateZoom();
   });
 
   onDestroy(() => {
@@ -197,23 +248,66 @@
     void view;
     fit();
   });
+
+  const nodeCount = $derived(xy.length / 2);
+  const cellCount = $derived(cells.length / cellSize);
 </script>
 
-<div class="sfv" style:height role="img" aria-label={ariaLabel}>
-  <div class="sfv-canvas" bind:this={container}></div>
-  {#if values}
-    <ContourLegend {title} {unit} min={range.min} max={range.max} {bands} footer={legendFooter} />
-  {/if}
-  <button class="sfv-fit" type="button" onclick={() => fit()} title="Fit the view">Fit</button>
+<div class="sfv-wrap">
+  {#if toolbar}<div class="sfv-toolbar">{@render toolbar()}</div>{/if}
+  <div class="sfv viewport-container" style:height role="img" aria-label={ariaLabel}>
+    <div class="sfv-canvas" bind:this={container}></div>
+    <canvas bind:this={gizmo} class="axis-gizmo" width="80" height="80"></canvas>
+    <div class="camera-controls" style="top: 10px">
+      <div class="cam-menu-wrap">
+        <button class="cam-btn cam-cube" class:on={menuOpen} onclick={() => (menuOpen = !menuOpen)} title="View" aria-label="View options" aria-expanded={menuOpen}>
+          <Icon name="viewCube" size={17} />
+          <span class="cam-caret" aria-hidden="true"></span>
+        </button>
+        {#if menuOpen}
+          <button class="cam-backdrop" onclick={() => (menuOpen = false)} aria-label="Close" tabindex="-1"></button>
+          <div class="cam-menu">
+            <button class="cam-item" onclick={() => { menuOpen = false; fit(); }}><span class="cam-glyph">⤢</span><span>Zoom to extents</span></button>
+            <div class="cam-sep"></div>
+            <button class="cam-item" class:on={mode === '2d'} onclick={() => setMode('2d')}><span class="cam-glyph">⊤</span><span>2D (plan, orbit locked)</span></button>
+            <button class="cam-item" class:on={mode === '3d'} onclick={() => setMode('3d')}><span class="cam-glyph">◇</span><span>3D (orbit)</span></button>
+          </div>
+        {/if}
+      </div>
+      <button class="sfv-mode" onclick={() => setMode(mode === '2d' ? '3d' : '2d')} title="Switch between 2D and 3D">{mode === '2d' ? '2D' : '3D'}</button>
+      <button class="sfv-mode" onclick={() => fit()} title="Zoom to extents" aria-label="Zoom to extents">⤢</button>
+    </div>
+    {#if values}
+      <ContourLegend {title} {unit} min={range.min} max={range.max} {bands} footer={legendFooter} />
+    {/if}
+    <span class="sfv-mark">Stabileo viewer</span>
+  </div>
+  <div class="status-bar sfv-status">
+    <div class="status-item"><span class="status-label">pos:</span><span class="status-value">{pointer}</span></div>
+    <div class="status-item"><span class="status-label">zoom:</span><span class="status-value">{zoomText}</span></div>
+    <div class="status-item"><span class="status-label">model:</span><span class="status-value">{nodeCount} nodes, {cellCount} {cellSize === 2 ? 'bars' : 'elements'}</span></div>
+    {#each status as s (s.label)}
+      <div class="status-item"><span class="status-label">{s.label}:</span><span class="status-value">{s.value}</span></div>
+    {/each}
+    <button class="sfv-editor" disabled={!onOpenEditor} onclick={() => onOpenEditor?.()} title={onOpenEditor ? 'Open in the editor' : openEditorNote}>Open in the editor{onOpenEditor ? '' : ' (soon)'}</button>
+  </div>
 </div>
 
 <style>
+  .sfv-wrap {
+    width: 100%;
+    background: var(--st-surface, #0f1e2b);
+    border: 1px solid var(--st-hair-strong, rgba(143, 163, 179, 0.38));
+    border-radius: var(--st-radius-lg, 6px);
+    overflow: hidden;
+  }
+  .sfv-toolbar {
+    padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid var(--st-hair, rgba(143, 163, 179, 0.22));
+  }
   .sfv {
     position: relative;
     width: 100%;
-    border-radius: 3px;
-    overflow: hidden;
-    border: 1px solid rgba(143, 163, 179, 0.22);
   }
   .sfv-canvas {
     position: absolute;
@@ -226,16 +320,49 @@
   .sfv :global(.shell-legend) {
     bottom: 12px;
   }
-  .sfv-fit {
-    position: absolute;
-    left: 10px;
-    top: 10px;
-    background: rgba(20, 24, 38, 0.82);
-    color: #e6e9f0;
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: 4px;
-    font: 11px var(--lp-sans, sans-serif);
-    padding: 3px 8px;
+  .sfv-mode {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--st-hair-strong);
+    border-radius: var(--st-radius);
+    background: color-mix(in srgb, var(--st-surface) 90%, transparent);
+    color: var(--st-text-2);
+    font: 600 11px var(--st-sans);
     cursor: pointer;
+  }
+  .sfv-mode:hover {
+    background: var(--st-surface-3);
+    color: var(--st-text);
+  }
+  .sfv-mark {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    font: 600 10px var(--st-sans);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--st-text-3);
+    pointer-events: none;
+  }
+  .sfv-status {
+    flex-wrap: wrap;
+    row-gap: 0.2rem;
+    border-top: 1px solid var(--st-hair, rgba(143, 163, 179, 0.22));
+    color: var(--st-text-2);
+  }
+  .sfv-editor {
+    margin-left: auto;
+    background: none;
+    border: 1px solid var(--st-hair-strong);
+    border-radius: 4px;
+    color: var(--st-text-2);
+    font: 0.7rem var(--st-sans);
+    padding: 0.1rem 0.5rem;
+    cursor: pointer;
+  }
+  .sfv-editor:disabled {
+    cursor: not-allowed;
+    opacity: 0.85;
+    color: var(--st-text-3);
   }
 </style>
