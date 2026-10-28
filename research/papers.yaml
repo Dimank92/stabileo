@@ -44,7 +44,7 @@ papers:
   complexity: low
   relevance: Small enough to reproduce exactly and re-implement independently; the first Stabileo Research
     entry and the pattern for the rest.
-  status: proposed
+  status: reference-reproduced
   reproduced_published_results: false
   benchmarks:
   - bar under tension vs 1D AT2 analytical stress
