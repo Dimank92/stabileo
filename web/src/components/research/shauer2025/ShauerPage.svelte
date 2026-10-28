@@ -18,6 +18,9 @@
   import { fetchReplay } from '../shell/replay';
   import StabileoViewer from '../shell/StabileoViewer.svelte';
   import PaneTabs from '../shell/PaneTabs.svelte';
+  import Segmented from '../shell/Segmented.svelte';
+  import Toggles from '../shell/Toggles.svelte';
+  import ParamRow from '../shell/ParamRow.svelte';
 
   const STABILEO = 'var(--rs-plot-ours)';
   const REFERENCE = 'var(--rs-plot-ref)';
@@ -38,7 +41,7 @@
   const refPeak = reference.reduce((a, r) => (r.reaction > a.reaction ? r : a), reference[0]);
 
   const MESHES = {
-    coarse: { label: 'Coarse: h = 0.0025 mm in the refined box', mesh: { nx: 40, ny: 40, nx_fine: 16, ny_fine: 8, h_fine: 0.0025 } },
+    coarse: { label: 'Coarse: h = 0.0025 mm', mesh: { nx: 40, ny: 40, nx_fine: 16, ny_fine: 8, h_fine: 0.0025 } },
     medium: { label: 'Medium: h = 0.00167 mm', mesh: { nx: 50, ny: 60, nx_fine: 24, ny_fine: 12, h_fine: 1 / 600 } },
     reference: { label: 'Reference: 5 600 elements, h = 0.00125 mm', mesh: { nx: 70, ny: 80, nx_fine: 32, ny_fine: 16, h_fine: 0.00125 } },
   } as const;
@@ -409,18 +412,25 @@
 
       <div class="rs-panel rs-panel-viewer" id="rs-panel-viewer" role="tabpanel" aria-labelledby="rs-tab-viewer" hidden={tab !== 'viewer'}>
         {#if nodes && elements}
-          <div class="rs-ribbon" role="group" aria-label="Result shown" onclickcapture={() => playback.interact()}>
-            <button class="diagram-btn" class:active={field === 'damage'} onclick={() => (field = 'damage')}>Damage d</button>
-            <button class="diagram-btn" class:active={field === 'disp'} onclick={() => (field = 'disp')}>Displacement</button>
-            <button class="diagram-btn" class:active={field === 'syy'} disabled={!frame?.syy} title={frame?.syy ? '' : 'Stress is available after a live run'} onclick={() => (field = 'syy')}>σyy</button>
-            <span class="rs-sep"></span>
-            <button class="diagram-btn" class:active={deformed} onclick={() => (deformed = !deformed)}>Deformed ×{deform}</button>
-            <button class="diagram-btn" class:active={showMesh} onclick={() => (showMesh = !showMesh)}>Mesh</button>
-            <button class="diagram-btn" class:active={hideBroken} onclick={() => (hideBroken = !hideBroken)} title="Hide elements with two or more corners at d > 0.95 (the open crack)">Hide broken</button>
-            <span class="rs-sep"></span>
-            <button class="diagram-btn" class:active={view === 'plate'} onclick={() => (view = 'plate')}>Plate</button>
-            <button class="diagram-btn" class:active={view === 'band'} onclick={() => (view = 'band')}>Crack band</button>
-            <button class="diagram-btn" class:active={view === 'tip'} onclick={() => (view = 'tip')}>Notch tip</button>
+          <div class="rs-ribbon" onclickcapture={() => playback.interact()}>
+            <Segmented
+              label="Show"
+              bind:value={field}
+              options={[
+                { id: 'damage', label: 'Damage d' },
+                { id: 'disp', label: 'Displacement' },
+                { id: 'syy', label: 'σyy', disabled: !frame?.syy, title: frame?.syy ? '' : 'Stress is available after a run in this browser' },
+              ]}
+            />
+            <Toggles
+              label="Display"
+              items={[
+                { label: `Deformed ×${deform}`, on: deformed, toggle: () => (deformed = !deformed) },
+                { label: 'Mesh', on: showMesh, toggle: () => (showMesh = !showMesh) },
+                { label: 'Hide broken', on: hideBroken, toggle: () => (hideBroken = !hideBroken), title: 'Hide elements with two or more corners at d > 0.95 (the open crack)' },
+              ]}
+            />
+            <Segmented label="View" bind:value={view} options={[{ id: 'plate', label: 'Plate' }, { id: 'band', label: 'Crack band' }, { id: 'tip', label: 'Notch tip' }]} />
           </div>
           <div class="rs-viewer-slot">
             <StabileoViewer
@@ -483,40 +493,37 @@
       </div>
 
       <div class="rs-panel rs-params" id="rs-panel-parameters" role="tabpanel" aria-labelledby="rs-tab-parameters" hidden={tab !== 'parameters'} oninputcapture={() => playback.interact()}>
-        <div class="rs-grid2">
-          <label><span class="lbl"><i>E</i></span><NumberField label="E, Young’s modulus, kN/mm²" min={LIMITS.e[0]} max={LIMITS.e[1]} bind:value={e} /><span class="u">kN/mm²</span></label>
-          <label><span class="lbl"><i>ν</i></span><NumberField label="ν, Poisson’s ratio" min={LIMITS.nu[0]} max={LIMITS.nu[1]} bind:value={nu} /><span class="u"></span></label>
-          <label><span class="lbl"><i>G</i><sub>c</sub></span><NumberField label="Gc, fracture toughness, kN/mm" min={LIMITS.gc[0]} max={LIMITS.gc[1]} bind:value={gc} /><span class="u">kN/mm</span></label>
-          <label><span class="lbl"><i>ℓ</i></span><NumberField label="ℓ, length scale, mm" min={LIMITS.l0[0]} max={LIMITS.l0[1]} bind:value={l0} /><span class="u">mm</span></label>
-          <label><span class="lbl">top <i>u</i> at <i>t</i> = 1</span><NumberField label="Top displacement at t = 1, mm" min={LIMITS.u[0]} max={LIMITS.u[1]} bind:value={u} /><span class="u">mm</span></label>
-          <label><span class="lbl">Δ<i>t</i></span>
-            <select bind:value={dt} aria-label="Load step">
+        <div class="rs-params-list">
+          <ParamRow id="p-e" name="Young’s modulus" unit="kN/mm²" hint="10–400" invalid={!inRange(e, LIMITS.e)}>{#snippet symbol()}<var>E</var>{/snippet}<NumberField id="p-e" label="Young’s modulus E, kN/mm²" min={LIMITS.e[0]} max={LIMITS.e[1]} bind:value={e} /></ParamRow>
+          <ParamRow id="p-nu" name="Poisson’s ratio" hint="0–0.45" invalid={!inRange(nu, LIMITS.nu)}>{#snippet symbol()}<var>ν</var>{/snippet}<NumberField id="p-nu" label="Poisson’s ratio ν" min={LIMITS.nu[0]} max={LIMITS.nu[1]} bind:value={nu} /></ParamRow>
+          <ParamRow id="p-gc" name="Fracture toughness" unit="kN/mm" hint="0.0001–0.01" invalid={!inRange(gc, LIMITS.gc)}>{#snippet symbol()}<var>G</var><sub>c</sub>{/snippet}<NumberField id="p-gc" label="Fracture toughness Gc, kN/mm" min={LIMITS.gc[0]} max={LIMITS.gc[1]} bind:value={gc} /></ParamRow>
+          <ParamRow id="p-l0" name="Length scale" unit="mm" hint="0.003–0.03" invalid={!inRange(l0, LIMITS.l0)}>{#snippet symbol()}<var>ℓ</var>{/snippet}<NumberField id="p-l0" label="Length scale ℓ, mm" min={LIMITS.l0[0]} max={LIMITS.l0[1]} bind:value={l0} /></ParamRow>
+          <ParamRow id="p-u" name="Top displacement at t = 1" unit="mm" hint="0.004–0.02" invalid={!inRange(u, LIMITS.u)}>{#snippet symbol()}<var>u</var>{/snippet}<NumberField id="p-u" label="Top displacement u at t = 1, mm" min={LIMITS.u[0]} max={LIMITS.u[1]} bind:value={u} /></ParamRow>
+          <ParamRow id="p-dt" name="Load step">{#snippet symbol()}Δ<var>t</var>{/snippet}
+            <select id="p-dt" bind:value={dt}>
               {#each [0.005, 0.01, 0.02, 0.03, 0.06] as v (v)}<option value={v}>{v} ({Math.floor(0.8 / v + 1e-9)} steps)</option>{/each}
-            </select><span class="u"></span>
-          </label>
-          <label class="wide"><span class="lbl">Mesh</span>
-            <select bind:value={meshKey} aria-label="Mesh">
+            </select>
+          </ParamRow>
+          <ParamRow id="p-mesh" name="Mesh">
+            <select id="p-mesh" bind:value={meshKey}>
               {#each Object.entries(MESHES) as [k, m] (k)}<option value={k}>{m.label}</option>{/each}
             </select>
-          </label>
-          <label class="wide rs-check"><input type="checkbox" bind:checked={history} /> History field (irreversibility; not in the reference)</label>
+          </ParamRow>
+          <label class="rs-check"><input type="checkbox" bind:checked={history} /> History field (irreversibility; not in the reference)</label>
         </div>
         <p class="rs-derived">
           Plane strain, loaded to t = 0.8 ({fmt(0.8 * u)} mm). σ<sub>c</sub> = {fmt(sigmaC, 3)} kN/mm². h/ℓ in the refined box = {hOverL.toFixed(2)}{#if hOverL > 0.5}<strong class="warnt"> — under-resolved (h &gt; ℓ/2)</strong>{/if}.
         </p>
-        {#if !valid}
-          <p class="warnt">Outside the browser limits: E {LIMITS.e.join('–')}, ν {LIMITS.nu.join('–')}, Gc {LIMITS.gc.join('–')}, ℓ {LIMITS.l0.join('–')}, u {LIMITS.u.join('–')}.</p>
-        {/if}
         <div class="rs-buttons">
           {#if run?.status === 'running'}
-            <button class="btn" type="button" onclick={() => sim.stop()}>Stop</button>
-            <button class="btn" type="button" onclick={restart}>Restart</button>
+            <button class="btn btn-ghost btn-sm" type="button" onclick={() => sim.stop()}>Stop</button>
+            <button class="btn btn-ghost btn-sm" type="button" onclick={restart}>Restart</button>
           {:else}
-            <button class="btn btn-primary" type="button" disabled={!valid} onclick={() => start(false)}>Run</button>
-            <button class="btn" type="button" disabled={!valid} onclick={() => start(true)}>Recompute live</button>
+            <button class="btn btn-primary btn-sm" type="button" disabled={!valid} onclick={() => start(false)}>Run</button>
+            <button class="btn btn-ghost btn-sm" type="button" disabled={!valid} onclick={() => start(true)}>Solve again in this browser</button>
           {/if}
-          {#if !isReference}<button class="btn" type="button" onclick={reset}>Reference parameters</button>{/if}
-          {#if run}<button class="btn" type="button" onclick={backToReplay}>Back to the replay</button>{/if}
+          {#if !isReference}<button class="btn btn-ghost btn-sm" type="button" onclick={reset}>Reset to the paper’s parameters</button>{/if}
+          {#if run}<button class="btn btn-ghost btn-sm" type="button" onclick={backToReplay}>Back to the replay</button>{/if}
         </div>
         <p class="rs-status" aria-live="polite">
           {#if sim.available === false}
@@ -530,7 +537,7 @@
           {:else if run?.status === 'error'}
             <span class="warnt">The solver refused the input: {run.error}</span>
           {:else if isReference}
-            Run shows this replay’s parameters from memory or computes them; Recompute live always solves again (about 15–30 s).
+            Run reuses a result already computed for these parameters, if there is one; Solve again recomputes it here (about 15–30 s).
           {:else}
             Run computes these parameters in your browser.
           {/if}
@@ -539,7 +546,7 @@
 
       {#if frames.length}
         <div class="rs-scrub">
-          <button class="btn btn-sm" type="button" onclick={() => (playback.playing ? playback.pause() : playback.play())}>{playback.playing ? 'Pause' : 'Play'}</button>
+          <button class="btn btn-ghost btn-sm" type="button" onclick={() => (playback.playing ? playback.pause() : playback.play())}>{playback.playing ? 'Pause' : 'Play'}</button>
           <input type="range" min="0" max={frames.length - 1} value={playback.shown} oninput={(ev) => playback.seek(Number((ev.currentTarget as HTMLInputElement).value))} aria-label="Load step shown" />
           <span class="rs-stepread">step {frame?.step.step ?? 0} of {frames.length - 1}</span>
         </div>
@@ -626,25 +633,6 @@
   .dot-cached {
     background: #4a8fd4;
   }
-  .rs-ribbon {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-    align-items: center;
-  }
-  .rs-ribbon :global(.diagram-btn) {
-    padding: 0.25rem 0.5rem;
-  }
-  .rs-ribbon :global(.diagram-btn:disabled) {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
-  .rs-sep {
-    width: 1px;
-    align-self: stretch;
-    background: var(--hair);
-    margin: 0 0.2rem;
-  }
   .rs-scrub {
     display: flex;
     align-items: center;
@@ -652,6 +640,36 @@
   }
   .rs-scrub input[type='range'] {
     flex: 1 1 auto;
+    height: 1.5rem;
+    accent-color: var(--st-accent);
+  }
+  .rs-ribbon {
+    display: grid;
+    gap: 0.35rem;
+  }
+  .rs-params-list {
+    display: grid;
+    gap: 0.15rem;
+  }
+  .rs-params-list :global(select) {
+    height: var(--rs-control-h);
+    background: var(--st-surface-3);
+    color: var(--fg);
+    border: 1px solid var(--rs-control-border);
+    border-radius: var(--st-radius, 3px);
+    font: 0.9375rem var(--st-sans);
+  }
+  .rs-check input {
+    accent-color: var(--st-accent);
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+  .rs-check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2rem;
+    font-size: var(--rs-ui);
   }
   .rs-placeholder {
     border: 1px dashed var(--hair);
@@ -668,47 +686,6 @@
     cursor: pointer;
     color: var(--fg);
     font-size: 0.95rem;
-  }
-  .rs-grid2 {
-    display: grid;
-    gap: 0.35rem 1.25rem;
-    margin-top: 0.6rem;
-  }
-  @media (min-width: 34rem) {
-    .rs-grid2 {
-      grid-template-columns: 1fr 1fr;
-    }
-    .rs-grid2 .wide {
-      grid-column: 1 / -1;
-    }
-  }
-  .rs-grid2 label {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.9rem;
-  }
-  .lbl {
-    flex: 0 0 5.5rem;
-    white-space: nowrap;
-  }
-  .lbl sub {
-    font-size: 0.75em;
-  }
-  .u {
-    color: var(--fg-2);
-    font-size: 0.78rem;
-    flex: 0 0 3.5rem;
-  }
-  .rs-grid2 select {
-    background: var(--card);
-    color: var(--fg);
-    border: 1px solid var(--rs-control-border);
-    border-radius: 3px;
-    padding: 0.3rem 0.4rem;
-    font: var(--rs-ui) var(--st-sans);
-    min-width: 0;
-    flex: 1 1 auto;
   }
   .rs-check {
     justify-content: flex-start;

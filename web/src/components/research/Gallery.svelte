@@ -58,9 +58,8 @@
             <p class="rs-g-by">{p.crossref.title}. {authors(p.crossref.authors)}, <em>{p.crossref.venue}</em>, {p.crossref.year}.</p>
             <div class="rs-g-actions">
               <PublicLink to={e.path} class="btn btn-primary btn-sm">{s.readRun}</PublicLink>
-              <a class="btn btn-sm" href="https://doi.org/{p.doi}" rel="noreferrer" target="_blank">{s.paper}</a>
-              <a class="btn btn-sm" href={e.code} rel="noreferrer" target="_blank">{s.code}</a>
-              <span class="rs-g-soon" title={s.soon}>{s.openInStabileo}: {s.soon}</span>
+              <a class="btn btn-ghost btn-sm" href="https://doi.org/{p.doi}" rel="noreferrer" target="_blank">{s.paper} ↗</a>
+              <a class="btn btn-ghost btn-sm" href={e.code} rel="noreferrer" target="_blank">{s.code} ↗</a>
             </div>
           </div>
         </li>

@@ -40,7 +40,8 @@ test.describe('@smoke research', () => {
     await expect(page.locator('.sfv canvas').first()).toBeVisible();
     expect(wasm, 'the solver WASM loads only when a live run starts').toHaveLength(0);
 
-    await page.getByLabel('Mesh').selectOption('coarse');
+    await page.locator('#rs-tab-parameters').click();
+    await page.locator('#p-mesh').selectOption('coarse');
     await page.getByRole('button', { name: 'Run', exact: true }).click();
     await expect(app).toHaveAttribute('data-source', 'live');
     await expect.poll(async () => Number(await app.getAttribute('data-steps')), { timeout: 60_000 }).toBeGreaterThanOrEqual(5);
