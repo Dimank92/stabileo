@@ -596,3 +596,37 @@ fn plastic_3d_frame3d_2_is_a_lower_bound_of_its_certificate() {
     assert!(r.warnings.iter().any(|w| w.contains("no consistent set of active hinges") && w.contains("lower bound")), "{:?}", r.warnings);
     assert!(!r.warnings.iter().any(|w| w.contains("exceeds the yield surface")), "{:?}", r.warnings);
 }
+
+
+/// #757: Solid shell stresses and von Mises are taken in the element's local
+/// mid-surface frame, so they are invariant under rigid 3D rotations.
+#[test]
+fn solid_shell_stresses_are_invariant_under_rigid_rotation() {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/metamorphic_corpus/feature_matrix/3d-solid-shell-strip-cantilever------0-with.json"
+    );
+    let bytes = std::fs::read(path).expect("read 3d-solid-shell-strip-cantilever");
+    let s: SolverInput3D = serde_json::from_slice(&bytes).expect("deserialize 3d-solid-shell-strip-cantilever");
+    let r_base = linear::solve_3d(&s).expect("solve unrotated");
+    assert!(!r_base.quad_stresses.is_empty(), "must have quad_stresses for solid shells");
+    let vm_base = r_base.quad_stresses[0].von_mises;
+    let sx_base = r_base.quad_stresses[0].sigma_xx;
+
+    // Rotate 90 degrees about Y axis: shell now lies in the Y-Z plane instead of X-Y plane
+    let iso = Iso3::from_euler(0.0, std::f64::consts::FRAC_PI_2, 0.0);
+    let s_rot = dedaliano_engine::metamorphic::transform::transform_3d(&s, &iso).expect("rotate model");
+    let r_rot = linear::solve_3d(&s_rot).expect("solve rotated");
+    assert!(!r_rot.quad_stresses.is_empty(), "must have quad_stresses for rotated solid shells");
+    let vm_rot = r_rot.quad_stresses[0].von_mises;
+    let sx_rot = r_rot.quad_stresses[0].sigma_xx;
+
+    assert!(
+        (vm_rot - vm_base).abs() < 1e-3 * vm_base,
+        "solid shell von Mises must be invariant under rotation: unrotated {vm_base} vs rotated {vm_rot}"
+    );
+    assert!(
+        (sx_rot - sx_base).abs() < 1e-3 * sx_base.abs(),
+        "solid shell in-plane sigma_xx must be invariant under rotation: unrotated {sx_base} vs rotated {sx_rot}"
+    );
+}

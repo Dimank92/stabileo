@@ -619,9 +619,54 @@ pub fn solid_shell_stresses(
     // Evaluate at the centroid (0, 0, 0), with the element's own (ANS + EAS) strain.
     let stress = solid_shell_avg_stress(coords, u, e, nu);
 
-    let sigma_xx = stress[0];
-    let sigma_yy = stress[1];
-    let tau_xy = stress[3];
+    // Build the mid-surface local coordinate frame (e1, e2, e3) at the centroid (0, 0, 0):
+    // e3 along ∂x/∂ζ (normal to mid-surface), e1 along ∂x/∂ξ projected onto mid-surface,
+    // e2 = e3 × e1 (#757).
+    let dn = shape_derivatives_hex8(0.0, 0.0, 0.0);
+    let (j, _ji, det_j) = jacobian_3d(coords, &dn);
+    let (e1, e2) = if det_j.abs() > 1e-30 {
+        let norm = |v: [f64; 3]| {
+            let l = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+            if l > 1e-30 { [v[0] / l, v[1] / l, v[2] / l] } else { [0.0, 0.0, 0.0] }
+        };
+        let e3 = norm(j[2]);
+        let d = j[0][0] * e3[0] + j[0][1] * e3[1] + j[0][2] * e3[2];
+        let p = [j[0][0] - d * e3[0], j[0][1] - d * e3[1], j[0][2] - d * e3[2]];
+        let l1 = (p[0] * p[0] + p[1] * p[1] + p[2] * p[2]).sqrt();
+        let e1 = if l1 > 1e-30 {
+            [p[0] / l1, p[1] / l1, p[2] / l1]
+        } else {
+            [1.0, 0.0, 0.0]
+        };
+        let e2 = [
+            e3[1] * e1[2] - e3[2] * e1[1],
+            e3[2] * e1[0] - e3[0] * e1[2],
+            e3[0] * e1[1] - e3[1] * e1[0],
+        ];
+        (e1, e2)
+    } else {
+        ([1.0, 0.0, 0.0], [0.0, 1.0, 0.0])
+    };
+
+    // Global stress tensor from Voigt [σxx, σyy, σzz, τxy, τyz, τxz]
+    let s = [
+        [stress[0], stress[3], stress[5]],
+        [stress[3], stress[1], stress[4]],
+        [stress[5], stress[4], stress[2]],
+    ];
+    let proj = |a: &[f64; 3], b: &[f64; 3]| -> f64 {
+        let mut acc = 0.0;
+        for p in 0..3 {
+            for q in 0..3 {
+                acc += a[p] * s[p][q] * b[q];
+            }
+        }
+        acc
+    };
+
+    let sigma_xx = proj(&e1, &e1);
+    let sigma_yy = proj(&e2, &e2);
+    let tau_xy = proj(&e1, &e2);
     let von_mises = (sigma_xx * sigma_xx - sigma_xx * sigma_yy + sigma_yy * sigma_yy
         + 3.0 * tau_xy * tau_xy).sqrt();
 
