@@ -28,7 +28,10 @@
     xy: ArrayLike<number>;
     /** Cell connectivity, `cellSize` nodes per cell (counter-clockwise). */
     cells: ArrayLike<number>;
-    cellSize?: 3 | 4;
+    /** 4 quads, 3 triangles, 2 line elements (bars, springs). */
+    cellSize?: 2 | 3 | 4;
+    /** Width in pixels of line elements. */
+    lineWidth?: number;
     /** The field: one value per node, or per cell with `perCell`. */
     values: ArrayLike<number> | null;
     perCell?: boolean;
@@ -52,6 +55,7 @@
     xy,
     cells,
     cellSize = 4,
+    lineWidth = 3,
     values,
     perCell = false,
     range,
@@ -131,6 +135,7 @@
     const h = container.clientHeight;
     if (!w || !h) return;
     renderer.setSize(w, h);
+    field?.setResolution(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     invalidate();
@@ -151,7 +156,7 @@
       frame.schedule();
     });
     controls.addEventListener('start', invalidate);
-    field = createScalarFieldMesh(xy, cells, cellSize);
+    field = createScalarFieldMesh(xy, cells, cellSize, lineWidth);
     scene.add(field.group);
     ro = new ResizeObserver(resize);
     ro.observe(container);

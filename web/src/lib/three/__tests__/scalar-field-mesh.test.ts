@@ -59,4 +59,17 @@ describe('createScalarFieldMesh', () => {
     const m = createScalarFieldMesh([0, 0, 1, 0, 0, 1], [0, 1, 2], 3);
     expect((m.group.children[0] as THREE.Mesh).geometry.drawRange.count).toBe(3);
   });
+
+  it('draws line cells (bars, springs) coloured per cell, deformed, with hidden cells left out', () => {
+    // A triangle of three bars.
+    const m = createScalarFieldMesh([0, 0, 1, 0, 0, 1], [0, 1, 1, 2, 2, 0], 2);
+    m.setField([-1, 0, 1], { min: -1, max: 1 }, { perCell: true });
+    const geo = (m.group.children[0] as THREE.Mesh).geometry;
+    const colours = geo.getAttribute('instanceColorStart');
+    expect(new THREE.Color(colours.getX(2), colours.getY(2), colours.getZ(2)).getHex()).toBe(shellContourColor(1, -1, 1));
+    m.setDisplacement([0, 0, 0.1, 0, 0, 0], 10);
+    expect(geo.getAttribute('instanceEnd').getX(0)).toBeCloseTo(2);
+    m.setHidden((c) => c === 0);
+    expect((m.group.children[0] as THREE.Mesh).geometry.getAttribute('instanceStart').count).toBe(2);
+  });
 });
