@@ -288,6 +288,9 @@
     editorError = null;
     editorLoading = true;
     editorStrip = strip;
+    // Test builds with ?e2e=1: the strip handed to the editor, so a spec can compare the
+    // production engine's bar forces with ours.
+    if (e2e) (window as unknown as { __springsEditorStrip?: StripResult }).__springsEditorStrip = strip;
     try {
       editorSrc = await embeddedEditorUrl(strip, labelParams(), e2e);
     } catch (e) {
