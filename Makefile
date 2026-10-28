@@ -231,6 +231,9 @@ bench.engine:
 	cd engine && $(NIX_RUN) cargo bench --no-run
 	cd engine && $(NIX_RUN) cargo bench --bench solver_bench --bench assembly_bench --bench workflow_bench -- --sample-size 10 --warm-up-time 1 --measurement-time 3
 
+profile.solver:
+	$(NIX_RUN) python3 scripts/solver-profile.py --report docs/performance/SOLVER_PROFILING.md
+
 web.deps:
 	$(NIX_RUN) bash -c "cd web && npm ci"
 

@@ -1124,6 +1124,43 @@ def snapshot_value(m: dict) -> str:
     return m["display"] + (" (retained)" if m.get("status") == "retained" else "")
 
 
+def solver_profile(gh: GH, max_runs: int, path_override: Optional[str] = None):
+    if path_override and os.path.isfile(path_override):
+        try:
+            with open(path_override, encoding="utf-8") as f:
+                d = json.load(f)
+            return {"dominant": d.get("dominant_cost", "Factorization"), "time_ms": d.get("total_time_ms", 0.0),
+                    "memory_mb": d.get("total_memory_peak_mb", 0.0), "source": "local run"}
+        except Exception as ex:
+            warn(f"profile json {path_override}: {ex}")
+    local_default = os.path.join(ROOT, "solver-profile-summary.json")
+    if os.path.isfile(local_default):
+        try:
+            with open(local_default, encoding="utf-8") as f:
+                d = json.load(f)
+            return {"dominant": d.get("dominant_cost", "Factorization"), "time_ms": d.get("total_time_ms", 0.0),
+                    "memory_mb": d.get("total_memory_peak_mb", 0.0), "source": "local run"}
+        except Exception:
+            pass
+    if gh.ok:
+        hit = find_artifacts(gh, "verification-dashboard.yml", r"solver-profile-summary", max_runs)
+        if not hit:
+            hit = find_artifacts(gh, "nightly.yml", r"solver-profile-summary", max_runs)
+        if hit:
+            d = gh.download(hit[0][0]["databaseId"], hit[0][1])
+            p = d and next(iter(glob.glob(os.path.join(d, "**", "*.json"), recursive=True)), None)
+            if p:
+                try:
+                    with open(p, encoding="utf-8") as f:
+                        data = json.load(f)
+                    return {"dominant": data.get("dominant_cost", "Factorization"), "time_ms": data.get("total_time_ms", 0.0),
+                            "memory_mb": data.get("total_memory_peak_mb", 0.0),
+                            "source": f"CI [run {hit[0][0]['databaseId']}]({hit[0][0]['html_url']})"}
+                except Exception as ex:
+                    warn(f"solver profile artifact {p}: {ex}")
+    return None
+
+
 def count_metrics() -> dict:
     out = {}
     for key, label, pat, paths, src in (
@@ -1254,6 +1291,7 @@ def main():
                     help="allow --record when HEAD is not the tag's commit (the row records HEAD)")
     ap.add_argument("--max-runs", type=int, default=15, help="CI runs to look back per workflow")
     ap.add_argument("--coverage-json", help="local `cargo llvm-cov --json --summary-only` output")
+    ap.add_argument("--profile-json", help="local solver profile summary JSON")
     a = ap.parse_args()
     if a.record:  # fail before spending minutes on GitHub calls
         head = subprocess.run(["git", "rev-parse", "--short=10", "HEAD"], cwd=ROOT, capture_output=True,
@@ -1361,6 +1399,11 @@ def main():
         M.update(ci)
         details.update(ci_details)
     head_sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
+    sp = solver_profile(gh, a.max_runs, a.profile_json)
+    if sp:
+        M["solver_profile"] = metric("Solver profiling (dominant cost & memory)", sp["dominant"],
+                                     display=f"{sp['dominant'].capitalize()} (solve {sp['time_ms']:.1f} ms, peak {sp['memory_mb']:.1f} MB)",
+                                     section=S_PROOF, source=sp["source"])
     cov = coverage(gh, a.max_runs, a.coverage_json, require_sha=head_sha if a.record else None)
     if cov:
         cs = [cov["sha"]] if cov.get("sha") else []
@@ -1384,6 +1427,8 @@ def main():
         ("coverage_lines", "Engine line coverage (llvm-cov)", S_PROOF, "no llvm-cov run yet (artifact llvm-cov-summary)"),
         ("coverage_branches", "Engine branch coverage (llvm-cov)", S_PROOF,
          "no llvm-cov run with branch coverage yet"),
+        ("solver_profile", "Solver profiling (dominant cost & memory)", S_PROOF,
+         "no solver profile run yet (artifact solver-profile-summary)"),
     ):
         if key not in M:
             M[key] = keep_prev(key, label, sec, why) if a.offline else metric(label, status="not_measured",
@@ -1399,7 +1444,7 @@ def main():
 
     order = ["safety_open", "advisories", "rust_share", "ts_high_safety", "ts_engineering_lines", "certified_analyses",
              "certified_design", "acceptance_cases", "acceptance_refs", "mutation_rust", "mutation_ts",
-             "coverage_lines", "coverage_branches", "differential_compared", "fuzz_execs", "fm_cells", "fm_bad",
+             "coverage_lines", "coverage_branches", "solver_profile", "differential_compared", "fuzz_execs", "fm_cells", "fm_bad",
              "engine_tests", "kani_harnesses", "lean_theorems"]
     order += [k for k in M if k not in order]
     metrics = {k: M[k] for k in order if k in M}

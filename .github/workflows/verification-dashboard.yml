@@ -90,8 +90,23 @@ jobs:
           path: llvm-cov-summary.json
           if-no-files-found: error
 
+  profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Run solver profiling harness and regression gate
+        run: python3 scripts/solver-profile.py --synthetic --scale medium --max-time-ms 30000 --output solver-profile-summary.json --report docs/performance/SOLVER_PROFILING.md
+      - uses: actions/upload-artifact@v7
+        with:
+          name: solver-profile-summary
+          path: solver-profile-summary.json
+
   dashboard:
-    needs: [script-tests, coverage]
+    needs: [script-tests, coverage, profile]
     if: always() && github.event_name != 'pull_request' && needs.script-tests.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 60
