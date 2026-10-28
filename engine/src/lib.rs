@@ -132,6 +132,25 @@ pub fn certify_linear_3d(input: JsValue) -> Result<JsValue, JsValue> {
     to_js_value(&out)
 }
 
+/// Check a user's 2D model after solve: global equilibrium from model loads,
+/// rotated and renumbered metamorphic twin, and dual re-assembly of K and f (#498).
+#[wasm_bindgen]
+pub fn check_user_model_2d(input: JsValue, results: JsValue) -> Result<JsValue, JsValue> {
+    let input: types::SolverInput = from_js_value(input)?;
+    let results: types::AnalysisResults = from_js_value(results)?;
+    let report = certify::user_model_check::check_user_model_2d(&input, &results);
+    to_js_value(&report)
+}
+
+/// 3D twin of `check_user_model_2d`.
+#[wasm_bindgen]
+pub fn check_user_model_3d(input: JsValue, results: JsValue) -> Result<JsValue, JsValue> {
+    let input: types::SolverInput3D = from_js_value(input)?;
+    let results: types::AnalysisResults3D = from_js_value(results)?;
+    let report = certify::user_model_check::check_user_model_3d(&input, &results);
+    to_js_value(&report)
+}
+
 /// Solve a 3D linear static model and export its certificate bundle
 /// (docs/verification/CERTIFY.md, "Independent checking: certificate bundles"):
 /// JSON in → bundle JSON out, checkable with `lake exe certcheck`.

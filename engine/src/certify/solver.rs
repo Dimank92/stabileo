@@ -60,6 +60,9 @@ pub struct CertifiedResults2D {
     /// re-assembly (`certify::reassembly`), and its bound.
     #[serde(default)]
     pub end_to_end: EndToEnd,
+    /// Background check of the user's own model on solve (independent equilibrium, metamorphic twin, dual assembly).
+    #[serde(default)]
+    pub user_model_check: super::user_model_check::UserModelCheckReport,
     /// "endToEnd" when `end_to_end` is certified, "assembled" when only the
     /// solve of the assembled system is, "none" otherwise.
     #[serde(default)]
@@ -139,6 +142,9 @@ pub struct CertifiedResults3D {
     pub shown: ShownBounds<StationBound3D, ReactionBound3D>,
     #[serde(default)]
     pub end_to_end: EndToEnd,
+    /// Background check of the user's own model on solve (independent equilibrium, metamorphic twin, dual assembly).
+    #[serde(default)]
+    pub user_model_check: super::user_model_check::UserModelCheckReport,
     #[serde(default)]
     pub certificate_level: CertificateLevel,
 }
@@ -157,8 +163,8 @@ pub enum CertificateLevel {
 }
 
 impl CertificateLevel {
-    pub fn of(assembled: &Certificate, e2e: &EndToEnd) -> Self {
-        if !assembled.is_certified() {
+    pub fn of(assembled: &Certificate, e2e: &EndToEnd, user_check: &super::user_model_check::UserModelCheckReport) -> Self {
+        if !assembled.is_certified() || !user_check.passed {
             CertificateLevel::None
         } else if e2e.is_certified() {
             CertificateLevel::EndToEnd
@@ -181,9 +187,16 @@ fn guard_end_to_end(e2e: &mut EndToEnd) {
 
 impl CertifiedResults2D {
     /// Withdraw the certificate and every bound derived from it when any of
-    /// them is not finite (outside the documented +∞ fields).
+    /// them is not finite (outside the documented +∞ fields) or if user model check failed.
     fn guard(&mut self) {
         guard_end_to_end(&mut self.end_to_end);
+        if !self.user_model_check.passed {
+            let reason = self.user_model_check.failure_reason.clone().unwrap_or_else(|| "user model verification failed".into());
+            self.certificate.downgrade(reason);
+            self.force_bounds.clear();
+            self.shown = ShownBounds::default();
+            return;
+        }
         if !self.certificate.is_certified() {
             return;
         }
@@ -200,6 +213,14 @@ impl CertifiedResults3D {
     /// As `CertifiedResults2D::guard`.
     fn guard(&mut self) {
         guard_end_to_end(&mut self.end_to_end);
+        if !self.user_model_check.passed {
+            let reason = self.user_model_check.failure_reason.clone().unwrap_or_else(|| "user model verification failed".into());
+            self.certificate.downgrade(reason);
+            self.force_bounds.clear();
+            self.shell_bounds.clear();
+            self.shown = ShownBounds::default();
+            return;
+        }
         if !self.certificate.is_certified() {
             return;
         }
@@ -220,9 +241,10 @@ pub fn certify_linear_2d_full(input: &SolverInput) -> Result<CertifiedResults2D,
     let force_bounds = certificate.abs_bound().map(|b| force_bounds_2d(input, b)).unwrap_or_default();
     let shown = certificate.abs_bound().map(|b| shown_bounds_2d(input, &input.loads, &results, b)).unwrap_or_default();
     let end_to_end = end_to_end_2d(input, &input.loads, &results);
-    let mut out = CertifiedResults2D { results, certificate, force_bounds, shown, end_to_end, certificate_level: CertificateLevel::None };
+    let user_model_check = super::user_model_check::check_user_model_2d(input, &results);
+    let mut out = CertifiedResults2D { results, certificate, force_bounds, shown, end_to_end, user_model_check, certificate_level: CertificateLevel::None };
     out.guard();
-    out.certificate_level = CertificateLevel::of(&out.certificate, &out.end_to_end);
+    out.certificate_level = CertificateLevel::of(&out.certificate, &out.end_to_end, &out.user_model_check);
     Ok(out)
 }
 
@@ -236,9 +258,10 @@ pub fn certify_linear_3d_full(input: &SolverInput3D) -> Result<CertifiedResults3
     };
     let shown = certificate.abs_bound().map(|b| shown_bounds_3d(input, &input.loads, &results, b)).unwrap_or_default();
     let end_to_end = end_to_end_3d(input, &input.loads, &results);
-    let mut out = CertifiedResults3D { results, certificate, force_bounds, shell_bounds, shown, end_to_end, certificate_level: CertificateLevel::None };
+    let user_model_check = super::user_model_check::check_user_model_3d(input, &results);
+    let mut out = CertifiedResults3D { results, certificate, force_bounds, shell_bounds, shown, end_to_end, user_model_check, certificate_level: CertificateLevel::None };
     out.guard();
-    out.certificate_level = CertificateLevel::of(&out.certificate, &out.end_to_end);
+    out.certificate_level = CertificateLevel::of(&out.certificate, &out.end_to_end, &out.user_model_check);
     Ok(out)
 }
 

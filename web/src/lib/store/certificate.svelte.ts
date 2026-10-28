@@ -57,6 +57,8 @@ interface Certified {
   reactionBounds: Map<number, ReactionBound>;
   /** The check against an independent re-assembly of the model (base solve only). */
   endToEnd?: EndToEnd;
+  /** Background check of user model on solve (#498). */
+  userModelCheck?: import('../engine/wasm-solver').UserModelCheckReport;
 }
 
 export type CertificateState =
@@ -88,6 +90,7 @@ function fromLinear(out: LinearCertificateOnly): Certified {
   return {
     certificate: out.certificate,
     endToEnd: out.endToEnd,
+    userModelCheck: out.userModelCheck,
     forceBounds: new Map((out.forceBounds ?? []).map((b) => [b.elementId, b])),
     shellBounds: new Map((out.shellBounds ?? []).map((b) => [shellKey(b.kind, b.elementId), b])),
     ...shownMaps(out),

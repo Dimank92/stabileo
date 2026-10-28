@@ -27,6 +27,7 @@ pub mod solver;
 pub mod spectral;
 pub mod stations;
 pub mod sparse;
+pub mod user_model_check;
 
 pub use linear::{
     certify_linear_system, certify_linear_system_auto, Certificate, MAX_CERTIFY_N,
@@ -36,3 +37,4 @@ pub use solver::{
     certify_results_3d, certify_load_cases_2d, certify_load_cases_3d, solver_assembly_2d, solver_assembly_3d, CertificateLevel,
     CertifiedResults2D, CertifiedResults3D, SolverAssembly,
 };
+pub use user_model_check::{check_user_model_2d, check_user_model_3d, UserModelCheckReport};

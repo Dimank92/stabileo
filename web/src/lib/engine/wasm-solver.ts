@@ -902,8 +902,16 @@ export type EndToEnd =
   | { status: 'notChecked' };
 /** How much of model → K → result a certified linear result covers. */
 export type CertificateLevel = 'endToEnd' | 'assembled' | 'none';
+export interface UserModelCheckReport {
+  passed: boolean;
+  failureReason?: string;
+  equilibrium: { passed: boolean; residualForce: number; residualMoment: number; detail?: string };
+  metamorphicTwin: { passed: boolean; worstRatio: number; detail?: string };
+  dualAssembly: { passed: boolean; kDiscrepancy: number; fDiscrepancy: number; detail?: string };
+}
+
 /** The end-to-end fields of a certified linear answer (absent from older WASM builds). */
-export interface EndToEndFields { endToEnd?: EndToEnd; certificateLevel?: CertificateLevel }
+export interface EndToEndFields { endToEnd?: EndToEnd; userModelCheck?: UserModelCheckReport; certificateLevel?: CertificateLevel }
 
 export interface CertifiedLinear2D extends ShownBounds<StationBound2D, ReactionBound2D>, EndToEndFields { results: AnalysisResults; certificate: LinearCertificate; forceBounds: ForceBound2D[] }
 export interface CertifiedLinear3D extends ShownBounds<StationBound3D, ReactionBound3D>, EndToEndFields { results: AnalysisResults3D; certificate: LinearCertificate; forceBounds: ForceBound3D[]; shellBounds?: ShellBound[] }
@@ -972,8 +980,8 @@ export interface LinearCertificateOnly extends ShownBounds, EndToEndFields {
 
 /** A certify answer without its results (what a worker posts back). */
 export function certificateOnly(out: LinearCertificateOnly & { results?: unknown }): LinearCertificateOnly {
-  const { certificate, forceBounds, shellBounds, stationBounds, deflectionBounds, reactionBounds, reactionReason, endToEnd, certificateLevel } = out;
-  return { certificate, forceBounds, shellBounds: shellBounds ?? [], stationBounds, deflectionBounds, reactionBounds, reactionReason, endToEnd, certificateLevel };
+  const { certificate, forceBounds, shellBounds, stationBounds, deflectionBounds, reactionBounds, reactionReason, endToEnd, userModelCheck, certificateLevel } = out;
+  return { certificate, forceBounds, shellBounds: shellBounds ?? [], stationBounds, deflectionBounds, reactionBounds, reactionReason, endToEnd, userModelCheck, certificateLevel };
 }
 
 /**

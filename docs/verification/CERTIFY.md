@@ -242,6 +242,16 @@ Besides the bound, the result must be the engine's answer to *this* model:
 assembled-level and the end-to-end certificates hold, `assembled` when only the former
 does, `none` otherwise. Wasm `certify_linear_2d` / `certify_linear_3d` return both.
 
+### User model verification on every solve (#498)
+
+Soundness multipliers: verification on the test corpus catches regressions in known model patterns, but the bugs that hurt live in users' models. After each linear static solve, three independent verification checks run in the background (`engine/src/certify/user_model_check.rs`):
+
+1. **Independent global equilibrium**: Recomputed directly from the model's loads (nodal loads, distributed member spans, element point loads, axial spans) at their exact geometric coordinates in space, independent of `K` or `f`. Checked against the sum of support reactions reported by the solver.
+2. **Metamorphic twin solve**: A rotated and renumbered twin model is constructed (`metamorphic::transform` + `metamorphic::relabel`), solved independently, and compared against the original results under physical transformation and model conditioning bounds (`metamorphic::compare::compare_floored`).
+3. **Dual re-assembly**: An independent re-assembly of `K` and `f` in interval arithmetic (`certify::reassembly::{end_to_end_2d, end_to_end_3d}`) compared entry by entry within tolerance `1e-10`.
+
+**Any disagreement**: The result is not shown as verified, and the specific failure reason is reported: `certificate.status` is downgraded to `uncertified`, `certificateLevel` drops to `none`, and the reason is surfaced in the results panel.
+
 **Scope.** 2D and 3D frames (Euler–Bernoulli and Timoshenko), trusses and cables
 (linear), hinges and releases, local axes with reference vectors, roll angles and
 left-handed axes, supports with springs and settlements, inclined supports, rigid links,
