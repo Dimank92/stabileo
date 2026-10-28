@@ -118,12 +118,12 @@ pub fn solve_modal_2d(
             let k_solve = cs.reduce_matrix_sparse(&k_ff);
             let m_solve = cs.reduce_matrix_sparse(&m_csc);
             let result = lanczos_generalized_eigen_sparse(&k_solve, &m_solve, num_modes, 0.0)
-                .ok_or_else(|| "Eigenvalue decomposition failed".to_string())?;
+                .ok_or_else(|| "Singular stiffness matrix — structure is a mechanism".to_string())?;
             m_csc_opt = Some(m_solve);
             (result, cs.n_free_indep, Vec::new())
         } else {
             let result = lanczos_generalized_eigen_sparse(&k_ff, &m_csc, num_modes, 0.0)
-                .ok_or_else(|| "Eigenvalue decomposition failed".to_string())?;
+                .ok_or_else(|| "Singular stiffness matrix — structure is a mechanism".to_string())?;
             m_csc_opt = Some(m_csc);
             (result, nf, Vec::new())
         }
@@ -154,7 +154,7 @@ pub fn solve_modal_2d(
             (k_ff.clone(), m_ff.clone(), nf)
         };
         let result = lanczos_generalized_eigen(&k_solve, &m_solve, ns, num_modes, 0.0)
-            .ok_or_else(|| "Eigenvalue decomposition failed".to_string())?;
+            .ok_or_else(|| "Singular stiffness matrix — structure is a mechanism".to_string())?;
         (result, ns, m_solve)
     };
 
@@ -179,8 +179,11 @@ pub fn solve_modal_2d(
     let n_converged = result.values.len();
     for idx in 0..n_converged {
         let eigenvalue = result.values[idx];
+        if eigenvalue.is_finite() && eigenvalue <= 1e-7 {
+            return Err("Singular stiffness matrix — structure is a mechanism".to_string());
+        }
         // ∞: a massless direction (lumped-mass rotations), not a mode.
-        if eigenvalue <= 1e-10 || !eigenvalue.is_finite() || modes.len() >= num_modes {
+        if !eigenvalue.is_finite() || modes.len() >= num_modes {
             continue;
         }
 
@@ -382,7 +385,7 @@ pub fn solve_modal_3d(
         (&sasm.k_ff, &m_sparse_ff)
     };
     let result = lanczos_generalized_eigen_sparse(k_solve, m_solve, num_modes, 0.0)
-        .ok_or_else(|| "Eigenvalue decomposition failed".to_string())?;
+        .ok_or_else(|| "Singular stiffness matrix — structure is a mechanism".to_string())?;
 
     let num_modes = num_modes.min(ns);
 
@@ -408,8 +411,11 @@ pub fn solve_modal_3d(
     let n_converged = result.values.len();
     for idx in 0..n_converged {
         let eigenvalue = result.values[idx];
+        if eigenvalue.is_finite() && eigenvalue <= 1e-7 {
+            return Err("Singular stiffness matrix — structure is a mechanism".to_string());
+        }
         // ∞: a massless direction (lumped-mass rotations), not a mode.
-        if eigenvalue <= 1e-10 || !eigenvalue.is_finite() || modes.len() >= num_modes { continue; }
+        if !eigenvalue.is_finite() || modes.len() >= num_modes { continue; }
 
         let omega = eigenvalue.sqrt();
         let freq = omega / (2.0 * std::f64::consts::PI);

@@ -268,3 +268,87 @@ fn rayleigh_delivers_the_requested_ratio_at_the_real_fundamental() {
          xi_eff={xi_eff:.4} ({ratio:.1}x). a0={a0:.4e} a1={a1:.4e}"
     );
 }
+
+// ─── Issue #338: Modal analysis on mechanism must refuse ─────────────────
+
+#[test]
+fn modal_3d_refuses_mystran_744196_mechanism_338() {
+    use dedaliano_engine::types::SolverInput3D;
+    let json_str = include_str!("../fixtures/model_744196.json");
+    let input: SolverInput3D = serde_json::from_str(json_str).unwrap();
+    let densities = make_densities();
+    let res = modal::solve_modal_3d(&input, &densities, 12);
+    assert!(
+        res.is_err(),
+        "Modal 3D analysis on model 744196 must refuse, but returned Ok with {} modes",
+        res.as_ref().unwrap().modes.len()
+    );
+    let err = res.err().unwrap();
+    assert!(
+        err.contains("Singular stiffness matrix — structure is a mechanism"),
+        "Expected mechanism refusal error, got: {}",
+        err
+    );
+}
+
+#[test]
+fn modal_3d_refuses_hinged_tip_mechanism_338() {
+    let mut input = make_3d_input(
+        vec![(1, 0.0, 0.0, 0.0), (2, 1.0, 0.0, 0.0), (3, 2.0, 0.0, 0.0)],
+        vec![(1, 200_000.0, 0.3)],
+        vec![(1, 0.01, 1e-4, 1e-4, 2e-4)],
+        vec![
+            (1, "frame", 1, 2, 1, 1),
+            (2, "frame", 2, 3, 1, 1),
+        ],
+        vec![(1, vec![true, true, true, true, true, true])],
+        vec![],
+    );
+    // Set release_my_start on element 2 (hinged at node 2, free tip at node 3)
+    if let Some(e2) = input.elements.get_mut("2") {
+        e2.release_my_start = true;
+    }
+
+    let densities = make_densities();
+    let res = modal::solve_modal_3d(&input, &densities, 6);
+    assert!(
+        res.is_err(),
+        "Modal 3D analysis on a mechanism must refuse, but returned Ok with {} modes",
+        res.as_ref().unwrap().modes.len()
+    );
+    let err = res.err().unwrap();
+    assert!(
+        err.contains("Singular stiffness matrix — structure is a mechanism"),
+        "Expected mechanism refusal error, got: {}",
+        err
+    );
+}
+
+#[test]
+fn modal_2d_refuses_hinged_tip_mechanism_338() {
+    let input = make_input(
+        vec![(1, 0.0, 0.0), (2, 1.0, 0.0), (3, 2.0, 0.0)],
+        vec![(1, 200_000.0, 0.3)],
+        vec![(1, 0.01, 1e-4)],
+        vec![
+            (1, "frame", 1, 2, 1, 1, false, false),
+            (2, "frame", 2, 3, 1, 1, true, false), // hinge_start = true
+        ],
+        vec![(1, 1, "fixed")],
+        vec![],
+    );
+
+    let densities = make_densities();
+    let res = modal::solve_modal_2d(&input, &densities, 4);
+    assert!(
+        res.is_err(),
+        "Modal 2D analysis on a mechanism must refuse, but returned Ok with {} modes",
+        res.as_ref().unwrap().modes.len()
+    );
+    let err = res.err().unwrap();
+    assert!(
+        err.contains("Singular stiffness matrix — structure is a mechanism"),
+        "Expected mechanism refusal error, got: {}",
+        err
+    );
+}
