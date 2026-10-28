@@ -58,6 +58,10 @@ proptest = "1"
 # tests inject them into typed inputs (tests/certify_nonfinite.rs).
 ciborium = "0.2"
 
+[[bin]]
+name = "stabileo-engine"
+path = "src/bin/stabileo_engine.rs"
+
 [[test]]
 name = "core"
 path = "tests/core/main.rs"

@@ -149,6 +149,8 @@ jobs:
           shared-key: engine-lint
       - name: Clippy
         run: make lint.engine
+      - name: Build native and server engine binary (stabileo-engine)
+        run: cd engine && cargo build --release --bin stabileo-engine
 
   # Named correctness gates. Every gate's tests are EXCLUDED from the suite
   # job below — each test must run exactly once per CI run. The make targets

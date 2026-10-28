@@ -206,7 +206,7 @@ SUITE_FILTER = all() - test(harmonic_phase_breakdown) - test(harmonic_modal_vs_d
 NEXTEST = cd engine && $(NIX_RUN) cargo nextest run --profile ci
 
 lint.engine:
-	cd engine && $(NIX_RUN) cargo clippy --lib -- -W clippy::all -A clippy::erasing_op
+	cd engine && $(NIX_RUN) cargo clippy --lib --bin stabileo-engine -- -W clippy::all -A clippy::erasing_op
 
 # The acceptance models are generated (docs/verification/ACCEPTANCE.md); a hand edit fails here.
 check.engine.acceptance-models:

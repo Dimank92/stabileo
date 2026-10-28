@@ -14,6 +14,8 @@ mod fuzz_models;
 mod codeaster_regressions;
 #[path = "../determinism.rs"]
 mod determinism;
+#[path = "../cross_platform_determinism.rs"]
+mod cross_platform_determinism;
 #[path = "../differential_regressions.rs"]
 mod differential_regressions;
 #[path = "../entry_point_validation.rs"]
