@@ -194,7 +194,7 @@ const de: Translations = {
   'landing.figDeformedNorm': 'VERFORMUNGSFIGUR · NORMIERT',
   'landing.shot2dAlt': 'Momentenlinie eines Durchlaufträgers im 2D-Editor.',
   'landing.shot2dTitle': 'Schnittgrößenverläufe, 2D',
-  'landing.shotStress2dAlt': 'Bereich der Querschnittsanalyse mit Mohrschem Spannungskreis und Schubfluss.',
+  'landing.shotStress2dAlt': 'Bereich der Querschnittsanalyse mit Mohr-Spannungskreis und Schubfluss.',
   'landing.shotStress2dTitle': 'Spannungsanalyse für 2D-Stäbe',
   'landing.shot3dAlt': 'Berechnetes räumliches Stabwerk im 3D-Ansichtsfenster.',
   'landing.shot3dTitle': 'Schnittgrößenverläufe, 3D',
