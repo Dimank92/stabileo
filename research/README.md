@@ -15,6 +15,7 @@ The plan every page and contribution follows is [DESIGN.md](DESIGN.md).
 |------|------|
 | `papers.yaml` | Curated catalog. Bibliographic fields are checked against Crossref by `tools/catalog.py` |
 | `fracture/shauer-2025/` | Phase-field fracture (AT2), after Shauer (2025), reference code and Rust implementation |
+| `metamaterials/grossman-2026/` | Spring networks after Grossman & Boudaoud (2026): moduli, auxetic foam, honeycomb, against the paper's published values |
 | `templates/` | Starting point for a new paper entry |
 | `tools/` | Catalog checker and other research-only tooling |
 
@@ -35,5 +36,5 @@ Statuses in `papers.yaml` are assigned from evidence in the repository, not by h
 | `proposed` | Catalogued; metadata verified against Crossref |
 | `reference-reproduced` | The authors' code ran here; its outputs are committed with the exact environment |
 | `implementation-in-progress` | A Stabileo implementation exists but its validation tests do not yet pass |
-| `numerically-validated` | Tests compare our implementation with the reproduced reference within documented tolerances, and pass in CI. This is agreement with the reference code; whether published numbers were reproduced is the separate `reproduced_published_results` field |
+| `numerically-validated` | Tests compare our implementation with the reproduced reference within documented tolerances, and pass in CI. When the authors publish no code, the reference is the paper's published values plus exact results (see that experiment's README). Whether published numbers were reproduced is the separate `reproduced_published_results` field |
 | `interactive` | Validated, and runnable on stabileo.com/research |
