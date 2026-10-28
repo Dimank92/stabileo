@@ -43,10 +43,9 @@ pub fn check_conditioning(k: &[f64], n: usize) -> ConditioningReport {
         let d = k[i * n + i].abs();
         if d <= threshold {
             near_zero_dofs.push(i);
-        } else {
-            if d < min_nonzero_diag {
-                min_nonzero_diag = d;
-            }
+        }
+        if d > 1e-30 && d < min_nonzero_diag {
+            min_nonzero_diag = d;
         }
     }
 

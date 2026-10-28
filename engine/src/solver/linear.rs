@@ -581,7 +581,8 @@ fn sparse_conditioning_2d(k_ff: &CscMatrix, nf: usize) -> super::conditioning::C
         let d = dv.abs();
         if d <= threshold {
             near_zero_dofs.push(i);
-        } else if d < min_nonzero_diag {
+        }
+        if d > 1e-30 && d < min_nonzero_diag {
             min_nonzero_diag = d;
         }
     }
@@ -767,6 +768,12 @@ fn prepare_static_2d_impl(input: &SolverInput, force_dense: bool) -> Result<Prep
 
         // Conditioning report from the CSC diagonal (same thresholds as dense)
         let cond_report = sparse_conditioning_2d(&stiff.k_ff, nf);
+        if cond_report.diagonal_ratio > 1e16 {
+            return Err(format!(
+                "Stiffness matrix is ill-conditioned beyond numerical accuracy limits: diagonal ratio {:.2e} exceeds maximum allowable threshold (1e16)",
+                cond_report.diagonal_ratio
+            ));
+        }
 
         // Solver options (PCG dispatch): explicit "pcg" or Auto above the
         // iterative threshold. The first solve factors unshifted K_ff to
@@ -862,6 +869,12 @@ fn prepare_static_2d_impl(input: &SolverInput, force_dense: bool) -> Result<Prep
                 let k_rr = extract_submatrix(&stiff_d.k, n, &rest_idx, &rest_idx);
                 let k_rr_ur = mat_vec_rect(&k_rr, &u_r, nr, nr);
                 let cond_report = super::conditioning::check_conditioning(&k_ff, nf);
+                if cond_report.diagonal_ratio > 1e16 {
+                    return Err(format!(
+                        "Stiffness matrix is ill-conditioned beyond numerical accuracy limits: diagonal ratio {:.2e} exceeds maximum allowable threshold (1e16)",
+                        cond_report.diagonal_ratio
+                    ));
+                }
                 let mut lu = k_ff.clone();
                 let piv = lu_factor(&mut lu, nf)
                     .ok_or_else(|| "Singular stiffness matrix — structure is a mechanism".to_string())?;
@@ -905,6 +918,12 @@ fn prepare_static_2d_impl(input: &SolverInput, force_dense: bool) -> Result<Prep
 
     // Dense conditioning check
     let cond_report = super::conditioning::check_conditioning(&k_ff, nf);
+    if cond_report.diagonal_ratio > 1e16 {
+        return Err(format!(
+            "Stiffness matrix is ill-conditioned beyond numerical accuracy limits: diagonal ratio {:.2e} exceeds maximum allowable threshold (1e16)",
+            cond_report.diagonal_ratio
+        ));
+    }
 
     // Factor K_ff once. The Cholesky/LU success decisions depend only on K,
     // so the path chosen here is the one each per-case solve would take.
@@ -2240,6 +2259,12 @@ pub fn prepare_static_3d(input: &SolverInput3D) -> Result<PreparedStatic3D, Stri
         // Sparse diagonal conditioning check
         let t0 = now_micros();
         let cond = sparse_diagonal_conditioning(&stiff.k_ff);
+        if cond > 1e16 {
+            return Err(format!(
+                "Stiffness matrix is ill-conditioned beyond numerical accuracy limits: diagonal ratio {:.2e} exceeds maximum allowable threshold (1e16)",
+                cond
+            ));
+        }
         if cond > 1e12 {
             solver_diags_base.push(SolverDiagnostic {
                 category: "conditioning".into(),
@@ -2458,6 +2483,12 @@ pub fn prepare_static_3d(input: &SolverInput3D) -> Result<PreparedStatic3D, Stri
 
         // Dense conditioning check
         let cond_report = super::conditioning::check_conditioning(&k_ff, nf);
+        if cond_report.diagonal_ratio > 1e16 {
+            return Err(format!(
+                "Stiffness matrix is ill-conditioned beyond numerical accuracy limits: diagonal ratio {:.2e} exceeds maximum allowable threshold (1e16)",
+                cond_report.diagonal_ratio
+            ));
+        }
         let mut solver_diags_base: Vec<SolverDiagnostic> = Vec::new();
         for w in &cond_report.warnings {
             solver_diags_base.push(SolverDiagnostic {
