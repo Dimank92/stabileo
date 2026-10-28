@@ -19,7 +19,7 @@
  * shell around the same bundle) and text drawn on the canvas (node and member labels, diagram
  * values), which is not in the DOM.
  */
-import { test, expect, bootPro, loadModel, PRO_URL } from './fixtures';
+import { test, expect, bootPro, loadModel, alSection, PRO_URL } from './fixtures';
 import type { Page } from '@playwright/test';
 import es from '../src/lib/i18n/locales/es';
 import en from '../src/lib/i18n/locales/en';
@@ -117,10 +117,10 @@ for (const locale of LOCALES) {
       await expectNoRawKeys(page, `Basic project panel (${locale})`);
 
       await loadModel(page, 'frame-cirsoc-dl');
-      const before = await page.evaluate(() => window.__stabileo.solveCount());
       await page.getByTestId('rb-cmd-solve').click();
-      await solved(page, before);
       await expect(page.locator('[data-testid="basic-panel"][data-panel="results"]')).toBeVisible();
+      // The result commands come on with results.
+      await expect(page.getByTestId('rb-cmd-deformed')).toBeEnabled({ timeout: 60_000 });
       await expectNoRawKeys(page, `Basic results (${locale})`);
 
       // A dialog: switching a 3D model to 2D.
@@ -152,6 +152,7 @@ for (const locale of LOCALES) {
       await page.getByTestId('pr-stage-model').click();
       await page.getByTestId('pr-cmd-loads').click();
       await page.getByTestId('pro-auto-loads-btn').click();
+      await alSection(page, 'regulations');
       await expect(page.getByTestId('al-regulations')).toBeVisible();
       await expectNoRawKeys(page, `the automatic loads dialog (${locale})`);
     });
