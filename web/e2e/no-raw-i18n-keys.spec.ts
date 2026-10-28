@@ -38,6 +38,22 @@ const INDEX = rawKeyIndex([
 
 const LOCALES = ['es', 'en', 'pt'] as const;
 
+/**
+ * A fresh project's name, in each language, from the dictionaries: «New structure», «Nueva
+ * estructura», «Nova estrutura». The tab shows it in its name field, where the key once stood.
+ */
+const NEW_STRUCTURE: Record<(typeof LOCALES)[number], string> = {
+  es: (es as Record<string, string>)['tabBar.newStructure'],
+  en: (en as Record<string, string>)['tabBar.newStructure'],
+  pt: (pt as Record<string, string>)['tabBar.newStructure'],
+};
+
+/** The project tab names a fresh project in the reader's language. */
+async function expectNewProjectName(page: Page, locale: (typeof LOCALES)[number]): Promise<void> {
+  expect(NEW_STRUCTURE[locale], `the ${locale} dictionary names a new structure`).toBeTruthy();
+  await expect(page.locator('input.tab-name').first()).toHaveValue(NEW_STRUCTURE[locale]);
+}
+
 /** Everything a person is shown, with where: visible text, tooltips, labels, the window title. */
 function shown(page: Page): Promise<Array<{ where: string; text: string }>> {
   return page.evaluate(() => {
@@ -117,6 +133,7 @@ for (const locale of LOCALES) {
     test(`Basic: empty, settings, project, a solved model, a dialog (${locale})`, async ({ page }) => {
       await bootBasic(page, locale);
       await expect(page.getByTestId('ribbon')).toBeVisible();
+      await expectNewProjectName(page, locale);
       await expectNoRawKeys(page, `Basic, empty (${locale})`);
 
       await page.getByTestId('rb-settings').click();
@@ -145,6 +162,7 @@ for (const locale of LOCALES) {
     test(`PRO, design off: empty, settings, a solved model, the automatic loads dialog (${locale})`, async ({ page }) => {
       await bootProDesignOff(page, locale);
       await expect(page.getByTestId('pr-stage-model')).toBeVisible();
+      await expectNewProjectName(page, locale);
       await expectNoRawKeys(page, `PRO, empty (${locale})`);
 
       await page.getByTestId('pro-settings').click();
