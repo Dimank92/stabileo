@@ -17,6 +17,7 @@
     view = 'plate',
     deform = 0,
     showMesh = false,
+    hideBroken = false,
   }: {
     nodes: Float64Array;
     elements: Uint32Array;
@@ -25,6 +26,8 @@
     view?: View;
     deform?: number;
     showMesh?: boolean;
+    /** Leave out elements whose four nodes all have d > 0.95 (the open crack). */
+    hideBroken?: boolean;
   } = $props();
 
   const VIEWS: Record<View, [number, number, number, number]> = {
@@ -97,6 +100,7 @@
     const ne = elements.length / 4;
     ctx.lineWidth = Math.max(0.5, 0.5 * dpr);
     for (let e = 0; e < ne; e++) {
+      if (hideBroken && frame && [0, 1, 2, 3].every((a) => frame.damage[elements[4 * e + a]] > 0.95)) continue;
       ctx.beginPath();
       for (let a = 0; a < 4; a++) {
         const [x, y] = pos(elements[4 * e + a]);

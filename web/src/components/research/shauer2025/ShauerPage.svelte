@@ -99,6 +99,7 @@
   let view = $state<'plate' | 'band' | 'tip'>('plate');
   let deform = $state(20);
   let showMesh = $state(false);
+  let hideBroken = $state(true);
 
   function start() {
     if (!valid) return;
@@ -241,8 +242,9 @@
             <label>View <select bind:value={view}><option value="plate">Whole plate</option><option value="band">Crack band</option><option value="tip">Notch tip</option></select></label>
             <label>Deformation ×<input type="number" min="0" max="200" step="5" bind:value={deform} /></label>
             <label class="rs-check"><input type="checkbox" bind:checked={showMesh} /> Mesh</label>
+            <label class="rs-check"><input type="checkbox" bind:checked={hideBroken} /> Hide broken elements (d &gt; 0.95)</label>
           </div>
-          <FieldView nodes={run.nodes} elements={run.elements} {frame} {field} {view} {deform} {showMesh} />
+          <FieldView nodes={run.nodes} elements={run.elements} {frame} {field} {view} {deform} {showMesh} {hideBroken} />
           {#if frames.length}
             <div class="rs-scrub">
               <button class="btn btn-sm" type="button" onclick={() => { follow = false; if (shown >= frames.length - 1) shown = 0; playing = !playing; }}>{playing ? 'Pause' : 'Play'}</button>

@@ -37,7 +37,7 @@
 </script>
 
 <div class="landing blog research">
-  <BlogNav />
+  <BlogNav inResearch={route !== '/research'} />
   {#if route === '/research'}
     <Gallery />
   {:else if route === '/research/fracture/shauer-2025'}
