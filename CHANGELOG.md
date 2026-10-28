@@ -11,7 +11,7 @@ It should capture what changed, not what should be built next.
 
 One file per change in [`changelog.d/`](changelog.d/README.md); `scripts/changelog.py --release` moves them here.
 
-## 0.4.0 (2026-10-27)
+## 0.4.0 (2026-10-28)
 
 Release notes: [`docs/releases/v0.4.0.md`](docs/releases/v0.4.0.md) (also in
 [Spanish](docs/releases/v0.4.0.es.md) and [Portuguese](docs/releases/v0.4.0.pt.md)). Safety advisories
@@ -121,6 +121,52 @@ the unstressed length, as before. A cable given no pretension whose self-weight 
 (T₀³ = EA·(w·l_h)²/24) is over a quarter of its reported tension is warned, in en/es/pt: a heavy
 member typed as a cable is usually a truss member (#527, #582).
 
+#### PRO curved members as whole pieces, loads along the arc, plates with curved sides, IFC export in Project (2026-10-27)
+
+An arc is picked whole (or one segment at a time), shows one local-axis triad, and has a panel with
+its radius, angle, arc length, the chord error of its segments and Remake with another count,
+keeping its id, section, material and end releases. Loads along the arc are given per metre of arc
+in a global direction and spread on the segments keeping the total force. Results read N, V, T and
+M against the length along the piece, and export as CSV. A plate side can follow an arc and share
+the curved member's nodes. Project → Export offers IFC with design on or off.
+
+#### PRO DXF templates over several levels, CAD-style snaps, assisted conversion, and per-floor plans in the CAD wizard (2026-10-27)
+
+A DXF with several plans is prepared as templates: its regions found, each laid on a level by a
+point, locked, aligned by two pairs of points (a scale mismatch is reported, never applied), its
+layers shown or hidden and snapped or not. Object snaps on templates (endpoint, midpoint, center,
+quadrant, intersection, perpendicular, nearest) are turned on one by one from the draw bar and
+remembered per browser; F3 turns them off and on. Part of a template converts to members, arcs and
+columns after a plan that reports duplicates, joins, T joints and loose ends. The CAD draft wizard
+finds the separate plans of a drawing, lays each on the one below by its columns, and gives every
+floor its plan and height in a table; the provenance records each floor's plan and the point each
+plan was laid by. The DXF and IFC import dialogs use the application's palette.
+
+#### PRO plates as physical objects, meshed on demand, with Diagnostics on the Analyse row (2026-10-27)
+
+A plate is drawn as an outline of any number of nodes, with holes, material, thickness and area
+loads kept on the plate, and holds no shells until it is meshed: from its panel or in a batch, as
+free quadrilaterals or triangles or as a grid of rectangles or squares of chosen sides, after a
+plan that lists what changes. Meshing before the analysis (on by default) meshes only plates with
+no mesh or an out-of-date one, once per solve; a plate whose old mesh carries loads put on its
+elements is never remeshed there, the analysis names it instead. A plate is picked whole or by
+element, shows one local-axis triad when picked whole, and has per-plate extremes of its moments,
+membrane forces and deflection in its own axes. Diagnostics now has its own command on the
+Analyse row. Only objects drawn this way are plates: existing shells and the slabs of the building
+generators are unchanged, and no saved result moves.
+
+#### PRO use zones per floor, their live loads from the CIRSOC 101 table, and finishes (2026-10-27)
+
+Use zones are drawn per floor or taken from a template's closed outlines, independent of the mesh.
+Each zone takes an occupancy from the CIRSOC 101 table already in the application or a stated
+value; names found in the drawing are offered as suggestions to confirm, never applied on their
+own. "No load" is a decision of its own, shown apart from a zone with no use yet. The zones' live
+loads, and finishes as a dead load of their own, are written as load definitions after a plan
+that shows what is added, changed and removed, and running it again adds nothing; loads entered
+by hand are never touched. Zones are copied between floors with their exceptions. A zone over a
+plate not yet meshed loads the slab once it is meshed; finishes in a model with no dead-load case
+are named in the plan and in Diagnostics.
+
 ### Changed
 
 #### E2E runs in ten duration-balanced shards, and flaky tests have a quarantine (2026-10-23)
@@ -164,6 +210,14 @@ changed. It prints every command it runs and everything it skipped, and why; CI 
 `make hooks` points git at the versioned hooks in scripts/hooks. The pre-push hook runs the web
 typecheck and the unit tests related to the pushed commits (usually 20 to 40 s, longer when a
 widely imported module changed); `git push --no-verify` skips it.
+
+#### IFC import keeps every straight piece of a curved edge on its own points (2026-10-27)
+
+The analytical model of an imported building joined consecutive members that were offset from
+each other, which turned the short pieces of a curved slab edge into fewer chords off the edge.
+Pieces are now joined only when they point the same way (within 0.5°). A building imported from
+now on can have more analytical members along curved edges, with the same total length; projects
+already imported are not touched.
 
 ### Fixed
 
@@ -249,6 +303,17 @@ fails, and `docs/verification/PROVENANCE.md` states the rule. The committed `.de
 restamped at version 2. (Version 2 was taken on main first, by #582 and #597; these entries share
 it — a build stamping 2 already carries the five fixes, so it is never shown them, and a project
 stamped 1 is shown every entry that followed.)
+
+#### A member cut by a mesh keeps its loads on its pieces (2026-10-27)
+
+Meshing a region with "split members" (the quick quadrilateral mesher, slabs meshed at the
+analysis, and now physical plates) cut the members after the loads had been committed: the pieces
+came without their loads, and the loads kept naming the member that was gone. The analysis then
+refused the model ("Load N is on member M, which the model does not have"), so no result was ever
+computed on the wrong loads and none needs re-checking. Meshes made from now on keep each load on
+the pieces of its member, with its total. A project saved after hitting the defect still carries
+those loads on a member it no longer has, and still says so when solved: delete them and put them
+on the pieces.
 
 ### Performance
 

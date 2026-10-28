@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Severity | Critical |
-| Status | Published 2026-10-27 (fixed in 0.4.0; live on stabileo.com since 2026-10-25) |
+| Status | Published 2026-10-28 (fixed in 0.4.0; live on stabileo.com since 2026-10-25) |
 | Issue | — (D4-01 in the 2026-10 audit) |
 | Fix | PR [#590](https://github.com/lambdaclass/stabileo/pull/590), merged with the integration PR [#629](https://github.com/lambdaclass/stabileo/pull/629) of #589, #590, #588 and #487 (2026-10-25) |
 | Affected versions | the verification of provided column bars from 2026-04-19 (5ba936310, by source history; not bisected by running), 0.2.0 and 0.3.0; the column designer's own sizing from 0.3.0 (PR #402, 2026-10-21); `main` until the fix |

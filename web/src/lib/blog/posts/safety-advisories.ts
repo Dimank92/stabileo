@@ -19,7 +19,7 @@ const REPO = 'https://github.com/lambdaclass/stabileo/blob/main/docs/advisories'
 export const safetyAdvisories: Post = {
   slug: 'safety-advisories',
   date: '2026-10-20',
-  updated: '2026-10-27',
+  updated: '2026-10-28',
   order: 6,
   authors: ['Federico Carrone'],
   tagKeys: ['blog.tag.safety', 'blog.tag.verification'],
@@ -31,7 +31,7 @@ export const safetyAdvisories: Post = {
       blocks: [
         { k: 'p', t: 'Los resultados de Stabileo se usan para dimensionar estructuras reales. Cuando encontramos un error que pudo dar un resultado equivocado, y en particular uno del lado inseguro, lo publicamos como aviso de seguridad: qué estaba mal, qué modelos afecta, cómo reconocerlos, qué hacer hasta que la corrección esté publicada y qué revisar en los resultados que ya se usaron.' },
         { k: 'p', t: 'Casi todos estos errores los encontró nuestro propio programa de verificación: comparación contra otros siete programas de elementos finitos, ejemplos resueltos publicados, pruebas de invariantes físicos y revisión de las derivaciones de cada elemento. Publicarlos es parte de ese trabajo: un error que no se informa sigue en los cálculos que ya se entregaron.' },
-        { k: 'note', t: 'Estado al 27 de octubre de 2026: los avisos SA-2026-001 a 020 están corregidos en la versión 0.3.0 y SA-2026-021 a 024 en la versión 0.4.0 (en stabileo.com, SA-2026-021 y 022 desde el 22 de octubre y SA-2026-023 y 024 desde el 25 y el 26). Publicarlos es parte de cómo verificamos los resultados, no una señal de que sigan abiertos. Un aviso cuenta como corregido cuando la corrección está publicada en stabileo.com, no cuando existe el cambio. Mientras un aviso esté abierto, usá la alternativa que indica y revisá a mano el resultado afectado antes de firmar.' },
+        { k: 'note', t: 'Estado al 28 de octubre de 2026: los avisos SA-2026-001 a 020 están corregidos en la versión 0.3.0 y SA-2026-021 a 024 en la versión 0.4.0 (en stabileo.com, SA-2026-021 y 022 desde el 22 de octubre y SA-2026-023 y 024 desde el 25 y el 26). Publicarlos es parte de cómo verificamos los resultados, no una señal de que sigan abiertos. Un aviso cuenta como corregido cuando la corrección está publicada en stabileo.com, no cuando existe el cambio. Mientras un aviso esté abierto, usá la alternativa que indica y revisá a mano el resultado afectado antes de firmar.' },
 
         { k: 'h', t: 'Resumen' },
         {
@@ -249,7 +249,7 @@ export const safetyAdvisories: Post = {
       blocks: [
         { k: 'p', t: 'Stabileo’s results are used to design real structures. When we find a defect that could have produced a wrong result, and especially an unconservative one, we publish it as a safety advisory: what was wrong, which models it affects, how to recognise them, what to do until the fix is live, and what to re-check in results that were already used.' },
         { k: 'p', t: 'Almost all of these defects were found by our own verification programme: comparison against seven other finite-element programs, published worked examples, physical-invariant tests and a review of every element’s derivation. Publishing them is part of that work: a defect that is not reported stays in the calculations that were already delivered.' },
-        { k: 'note', t: 'Status as of 27 October 2026: SA-2026-001 to 020 are fixed in version 0.3.0 and SA-2026-021 to 024 in version 0.4.0 (live on stabileo.com, SA-2026-021 and 022 since 22 October and SA-2026-023 and 024 since 25 and 26 October). Publishing them is part of how we verify the results, not a sign that they are still open. An advisory counts as fixed when the fix is live on stabileo.com, not when the change exists. While an advisory is open, use its workaround and check the affected result by hand before signing.' },
+        { k: 'note', t: 'Status as of 28 October 2026: SA-2026-001 to 020 are fixed in version 0.3.0 and SA-2026-021 to 024 in version 0.4.0 (live on stabileo.com, SA-2026-021 and 022 since 22 October and SA-2026-023 and 024 since 25 and 26 October). Publishing them is part of how we verify the results, not a sign that they are still open. An advisory counts as fixed when the fix is live on stabileo.com, not when the change exists. While an advisory is open, use its workaround and check the affected result by hand before signing.' },
 
         { k: 'h', t: 'Summary' },
         {
@@ -467,7 +467,7 @@ export const safetyAdvisories: Post = {
       blocks: [
         { k: 'p', t: 'Os resultados do Stabileo são usados para dimensionar estruturas reais. Quando encontramos um defeito que pode ter produzido um resultado errado, e em especial um contra a segurança, publicamos um aviso de segurança: o que estava errado, quais modelos afeta, como reconhecê-los, o que fazer até a correção estar publicada e o que revisar nos resultados que já foram usados.' },
         { k: 'p', t: 'Quase todos esses defeitos foram encontrados pelo nosso próprio programa de verificação: comparação com outros sete programas de elementos finitos, exemplos resolvidos publicados, testes de invariantes físicos e revisão da derivação de cada elemento. Publicá-los faz parte desse trabalho: um defeito que não é informado continua nos cálculos já entregues.' },
-        { k: 'note', t: 'Situação em 27 de outubro de 2026: os avisos SA-2026-001 a 020 estão corrigidos na versão 0.3.0 e SA-2026-021 a 024 na versão 0.4.0 (em stabileo.com, SA-2026-021 e 022 desde 22 de outubro e SA-2026-023 e 024 desde 25 e 26). Publicá-los faz parte de como verificamos os resultados, não um sinal de que continuam abertos. Um aviso conta como corrigido quando a correção está publicada em stabileo.com, não quando a mudança existe. Enquanto um aviso estiver aberto, use a alternativa indicada e confira à mão o resultado afetado antes de assinar.' },
+        { k: 'note', t: 'Situação em 28 de outubro de 2026: os avisos SA-2026-001 a 020 estão corrigidos na versão 0.3.0 e SA-2026-021 a 024 na versão 0.4.0 (em stabileo.com, SA-2026-021 e 022 desde 22 de outubro e SA-2026-023 e 024 desde 25 e 26). Publicá-los faz parte de como verificamos os resultados, não um sinal de que continuam abertos. Um aviso conta como corrigido quando a correção está publicada em stabileo.com, não quando a mudança existe. Enquanto um aviso estiver aberto, use a alternativa indicada e confira à mão o resultado afetado antes de assinar.' },
 
         { k: 'h', t: 'Resumo' },
         {

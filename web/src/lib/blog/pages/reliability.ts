@@ -15,7 +15,7 @@ const REPO = 'https://github.com/lambdaclass/stabileo/blob/main';
 
 export const reliabilityPage: StandingPage = {
   path: '/reliability',
-  updated: '2026-10-27',
+  updated: '2026-10-28',
   i18n: {
     es: {
       title: '¿Qué tan confiable es Stabileo? Cómo se verifican sus resultados',

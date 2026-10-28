@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Severity | High |
-| Status | Published 2026-10-27 (fixed in 0.4.0; live on stabileo.com since 2026-10-25 for footings and joints, 2026-10-26 for the rest) |
+| Status | Published 2026-10-28 (fixed in 0.4.0; live on stabileo.com since 2026-10-25 for footings and joints, 2026-10-26 for the rest) |
 | Issue | — (W2-01 in the 2026-10 audit) |
 | Fix | PR [#588](https://github.com/lambdaclass/stabileo/pull/588) (footings and joints), merged with the integration PR [#629](https://github.com/lambdaclass/stabileo/pull/629) of #589, #590, #588 and #487 (2026-10-25); the follow-up PR [#649](https://github.com/lambdaclass/stabileo/pull/649) (slabs, walls, the steel optimiser, an empty active list; 2026-10-26) |
 | Affected versions | 0.2.0 and 0.3.0 (the single result set design falls back to, `activeResultSet3D`, is in both); earlier deployments not yet bisected |
