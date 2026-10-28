@@ -38,6 +38,7 @@ pub mod sparse_assembly;
 pub(crate) mod sparse_tangent;
 pub mod pre_solve_gates;
 pub mod feature_gates;
+pub mod webgpu;
 
 pub use dof::*;
 pub use assembly::*;
@@ -56,3 +57,5 @@ pub use cable::*;
 pub use harmonic::*;
 pub use load_cases::*;
 pub use winkler::*;
+
+pub use webgpu::*;

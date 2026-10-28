@@ -44,3 +44,6 @@ mod sparse_solver_paths;
 mod stiffness_definiteness_warning;
 #[path = "../tower_fixture_test.rs"]
 mod tower_fixture_test;
+
+#[path = "../solver_webgpu_iterative.rs"]
+mod solver_webgpu_iterative;
