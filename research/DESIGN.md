@@ -132,7 +132,7 @@ route.
 3. **Research mode in the app** (plugin contract), spring networks first.
 4. **Outreach** to the first authors; record their reviews.
 5. Next papers by the effort-vs-impact rule.
-6. The long-term direction (§11), starting with one benchmark, many methods.
+6. The long-term direction (§11), starting with one benchmark, many methods; then the platform (§12).
 
 ## 11. Long-term direction: from a gallery we fill to the place the field publishes
 
@@ -163,7 +163,47 @@ Order: finish the first three experiments; then 1 (cheap, unique); then 2 (credi
 to Shauer and DTU); then 3 once the template has proven itself; 4 follows from §5; 5 and 6 with
 academic partners.
 
-## 12. Risks
+## 12. The platform: GitHub for computational mechanics, safely
+
+**Build on GitHub, not instead of it.** Researchers keep their code on GitHub. A repo adds one
+small file, `stabileo.yaml` (model, solver, parameters, reference outputs, article — the
+structure `research/` already uses, published as an open format), and connects to Stabileo.
+On every push Stabileo builds it and gives a live page (Stabileo's viewer, two panes, autoplay),
+a permanent link per version (§5), and **verification badges computed by us** ("reproduces the
+reference", "validated against these published numbers", "runs on the standard benchmark",
+"compared with lab data"): the trust layer GitHub does not have. Then a social layer (profiles,
+forks, stars, comments, reviews; accounts exist in the backend) and embeds for courses, blogs and
+HTML papers. Order: our curated content first; then open the format; seed with partners (Shauer,
+DTU, UBA courses); profiles and social once there is enough to browse.
+
+**Security: outside code is hostile until proven otherwise.** The same walls GitHub and Hugging
+Face use, plus ours:
+
+| Wall | How |
+|---|---|
+| Separate domain | Community experiments are served from their own domain, one isolated subdomain each (`<experiment>.<usercontent domain>`), registered on the Public Suffix List (like `github.io`, `hf.space`); never from stabileo.com |
+| Sandboxed frames | On stabileo.com a community experiment appears only in a sandboxed iframe, no same-origin access |
+| Narrow channel | Their code sends data (mesh, fields) through a checked message channel; **our** viewer draws it |
+| Data, not code | Results and reference outputs in a pure-data format (the `safetensors` idea): viewing never runs anyone's code |
+| Explicit opt-in | Running a community solver is an explicit click under "Community · not reviewed" (the `trust_remote_code` idea) |
+| Disposable builds | Builds in throwaway sandboxes: no secrets, no network, time/CPU limits; never on our CI runners or on servers shared with other projects |
+| Unforgeable badges | Badges are computed by our isolated system and signed; a repo cannot claim one |
+| Product stays clean | Community code never enters this repository or the engine; curated `research/` goes through full review |
+| Abuse | Account to publish, rate and size limits, report button, scanning, takedowns, a copyright process |
+
+Rollout: invite-only for partners → security review or external penetration test → open with
+moderation.
+
+**Compute.** The browser (WASM) stays the default and is free. Server runs only for what the
+browser cannot do (long runs, 3D meshes, GPUs, authors' Python reference codes), each in its own
+disposable **micro-VM (Firecracker) or gVisor-sandboxed container** — plain containers share the
+host kernel and are not enough for untrusted code: no secrets, no network by default, CPU/memory/
+time limits, destroyed after the run, results returned as pure data. On dedicated machines only
+(never on hosts shared with other projects or on CI runners); GPUs as a paid or sponsored tier.
+Heavy results are cached with permanent links, so a run is computed once and replayed for every
+visitor.
+
+## 13. Risks
 
 - Scope creep into a framework: build only what the next paper needs.
 - Confusing research with design results: the walls in §4, labels everywhere.
