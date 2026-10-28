@@ -57,4 +57,13 @@
   .research :global(.nav) {
     background: var(--lp-ink);
   }
+  .research {
+    font-synthesis: none;
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+  .research :global(sub),
+  .research :global(sup) {
+    font-size: 0.75em;
+    line-height: 0;
+  }
 </style>

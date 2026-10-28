@@ -293,8 +293,8 @@
     <ul>
       <li><b>Elasticity</b> at fixed d: div(g(d) <b>C</b> : <b>ε</b>(<b>u</b>)) = 0 with g(d) = (1 − d)², applied to the whole stress.</li>
       <li><b>Damage (AT2)</b> at fixed <b>u</b>: (G<sub>c</sub>/ℓ + 2H) d − G<sub>c</sub> ℓ Δd = 2H.</li>
-      <li><b>Driving energy</b>: H = ψ⁺ = ½ Σ σ<sub>i</sub> ε<sub>i</sub> over the positive principal strains, with σ<sub>i</sub> the undamaged principal stresses: elasticity is degraded fully while damage is driven by tension only, a “hybrid” formulation.</li>
-      <li><b>Alternating solution</b> per load step: solve <b>u</b> with the current d, then d with the new <b>u</b>, until the elasticity residual ‖K(d)u − f‖ falls below 10⁻⁵.</li>
+      <li><b>Driving energy</b>: H = ψ<sup>+</sup> = ½ Σ σ<sub>i</sub> ε<sub>i</sub> over the positive principal strains, with σ<sub>i</sub> the undamaged principal stresses: elasticity is degraded fully while damage is driven by tension only, a “hybrid” formulation.</li>
+      <li><b>Alternating solution</b> per load step: solve <b>u</b> with the current d, then d with the new <b>u</b>, until the elasticity residual ‖K(d)u − f‖ falls below 10<sup>−5</sup>.</li>
       <li><b>Irreversibility</b>: none in the reference code; damage is recomputed from the current energy and is not bounded by 1. <ExperimentLink params={{ history: true, run: true }}>Turn on the history field</ExperimentLink> to keep it on unloading (not in the reference).</li>
     </ul>
     <p>
@@ -325,7 +325,7 @@
     <p>
       One finding: the plate is symmetric about the notch plane, and the crack runs along the row of elements just above it in one code and
       just below it in the other. Which row is chosen is decided by floating-point round-off; against the mirror image the final damage
-      fields agree to 3·10⁻¹⁰.
+      fields agree to 3 × 10<sup>−10</sup>.
     </p>
 
     <h2>Comparison with the paper</h2>
