@@ -20,7 +20,7 @@
  * CI runs: `node scripts/results-snapshot/gate.mjs --base <sha>`.
  */
 import { pathToFileURL } from 'node:url';
-import { compareValues, formatCaseReport } from './compare.mjs';
+import { compareValues, formatCaseReport, parseSnapshot } from './compare.mjs';
 
 export const SNAPSHOT_DIR = 'web/results-snapshots';
 export const REGISTRY = 'web/src/lib/provenance/result-changes.json';
@@ -99,10 +99,11 @@ async function main(argv) {
     try { return git('-C', root, 'show', `${rev}:${path}`); } catch { return null; }
   };
   const json = (text) => (text === null ? null : JSON.parse(text));
+  const snapshot = (text) => (text === null ? null : parseSnapshot(text));
   const touched = git('-C', root, 'diff', '--name-status', '--no-renames', base, 'HEAD', '--', SNAPSHOT_DIR, FRAGMENT_DIR)
     .split('\n').filter(Boolean).map((l) => { const [status, file] = l.split('\t'); return { status, file }; });
   const snapshots = touched.filter((t) => t.file.startsWith(`${SNAPSHOT_DIR}/`) && t.file.endsWith('.json'))
-    .map((t) => ({ file: t.file, base: json(at(base, t.file)), head: json(at('HEAD', t.file)) }));
+    .map((t) => ({ file: t.file, base: snapshot(at(base, t.file)), head: snapshot(at('HEAD', t.file)) }));
   const fragments = touched.filter((t) => t.file.startsWith(`${FRAGMENT_DIR}/`) && t.status !== 'D' && t.file.endsWith('.md'))
     .map((t) => ({ file: t.file, text: at('HEAD', t.file) ?? '' }));
   const r = decide({ snapshots, baseRegistry: json(at(base, REGISTRY)), headRegistry: json(at('HEAD', REGISTRY)), fragments });

@@ -147,10 +147,23 @@ export function flatten(value, prefix, out, skip = DEFAULT_SKIP) {
   return out;
 }
 
-/** Keys that are not results: timings, the loads a result echoes back for its diagrams. */
+/**
+ * Keys that are not results: timings and the build that ran (`solverRunMeta`); the model data a
+ * result echoes back for its diagrams (loads, lengths, end releases); round-off measures (`maxImbalance`, `relativeResidual`:
+ * 1e-14 one build, 3e-14 the next — their pass/fail flags are kept); and the id at which an
+ * extreme occurs (`minId`, `maxId`), which on a symmetric model is a tie the last bit decides
+ * (the extreme's value is kept); a record's id, which is its key.
+ */
 export const DEFAULT_SKIP = new Set([
-  'timings', 'elapsedMs', 'elapsed', 'solveTimeMs',
-  'qI', 'qJ', 'qYI', 'qYJ', 'qZI', 'qZJ',
+  'timings', 'elapsedMs', 'elapsed', 'solveTimeMs', 'solverRunMeta',
+  'maxImbalance', 'relativeResidual', 'minId', 'maxId',
+  // The worked explanation a check prints (its sentences, with their numbers formatted to
+  // the shown decimals): the numbers it formats are recorded as numbers beside it.
+  'messages', 'steps',
+  // A record's own id: already its key (`keyOf`).
+  'nodeId', 'elementId', 'quadId', 'plateId',
+  'qI', 'qJ', 'qYI', 'qYJ', 'qZI', 'qZJ', 'length',
+  'releaseMyStart', 'releaseMyEnd', 'releaseMzStart', 'releaseMzEnd', 'releaseTStart', 'releaseTEnd',
   'pointLoads', 'pointLoadsY', 'pointLoadsZ', 'distributedLoads', 'distributedLoadsX', 'distributedLoadsY', 'distributedLoadsZ',
 ]);
 
@@ -199,3 +212,48 @@ export const HOW_TO_REGISTER = [
   '  3. add a changelog.d/ fragment whose first line is "### BREAKING (results)".',
   'If it is not deliberate, it is a regression: fix the code, not the snapshot.',
 ].join('\n');
+
+// ── The committed file ───────────────────────────────────────────
+
+/**
+ * The row a path belongs to and its field in it: `base.elementForces[e3]` and `myStart` for
+ * `base.elementForces[e3].myStart`; `design.steel[e3]` and `compression.Fcr` for
+ * `design.steel[e3].compression.Fcr`.
+ */
+function rowOf(path) {
+  const m = /^(.*\])\.([A-Za-z0-9_.]+)$/.exec(path);
+  return m ? [m[1], m[2]] : null;
+}
+
+/**
+ * A snapshot as committed: one line per record (a node's displacements, a member's forces), its
+ * fields in one object, and one line per other value; keys sorted. A git diff of a snapshot is
+ * the list of records that moved, and the file is a third of its flat size.
+ */
+export function serialiseSnapshot(s) {
+  const rows = new Map();
+  for (const path of Object.keys(s.values).sort()) {
+    const r = rowOf(path);
+    const key = r ? r[0] : path;
+    if (r) {
+      const row = rows.get(key);
+      if (row && typeof row === 'object') { row[r[1]] = s.values[path]; continue; }
+      if (row === undefined) { rows.set(key, { [r[1]]: s.values[path] }); continue; }
+    }
+    rows.set(path, s.values[path]);
+  }
+  const lines = [...rows.keys()].sort().map((k) => `    ${JSON.stringify(k)}: ${JSON.stringify(rows.get(k))}`);
+  return `{\n  "case": ${JSON.stringify(s.case)},\n  "covers": ${JSON.stringify(s.covers)},\n  "format": ${s.format},\n  "values": {\n${lines.join(',\n')}\n  }\n}\n`;
+}
+
+/** The flat snapshot back from its committed text. */
+export function parseSnapshot(text) {
+  const raw = JSON.parse(text);
+  const values = {};
+  for (const [k, v] of Object.entries(raw.values ?? {})) {
+    if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+      for (const [f, x] of Object.entries(v)) values[`${k}.${f}`] = x;
+    } else values[k] = v;
+  }
+  return { ...raw, values };
+}
