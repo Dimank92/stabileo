@@ -233,9 +233,106 @@ fn part_a(c: &mut Checks) {
     c.at_most("equilateral strips 26 x 104 and 52 x 208: Richardson extrapolation of nu = 1/3", "absolute difference", (2.0 * n52 - n26 - 1.0 / 3.0).abs(), 0.005);
 }
 
+
+fn read_json(rel: &str) -> serde_json::Value {
+    serde_json::from_str(&std::fs::read_to_string(dir().join(rel)).unwrap()).unwrap()
+}
+
+fn part_b(c: &mut Checks) {
+    // B1. Supplemental Eq. (9) is the affine result with equal-weight bonds (k_e = k / l_e^2).
+    let mut worst: f64 = 0.0;
+    for (phi, psi) in [(2.0, 2.0), (3.0, 0.9), (1.0, 1.0), (1.5, 1.0), (1.0, 0.5), (2.0, 0.5), (0.6, 1.4)] {
+        let mut s = spec(tri(phi, psi));
+        s.spring_law = SpringLaw::EqualWeight;
+        let r = periodic(s, 4);
+        for i in 0..=36 {
+            let t = PI * i as f64 / 36.0;
+            let ours = moduli::uniaxial(&r.c, PI / 2.0 - t).unwrap().1;
+            worst = worst.max((ours - paper::ordered_poisson(phi, psi, t)).abs());
+        }
+    }
+    c.at_most("Supplemental Eq. (9) = periodic network with equal-weight springs (7 lattices x 37 angles)", "max |nu difference|", worst, 1e-9);
+
+    // B2. For equal Hookean springs (Eq. 3) the exact value differs: lattice (1, 0.5), theta = 0
+    // gives nu = 1/6, Eq. (9) gives 8/27.
+    let r = periodic(spec(tri(1.0, 0.5)), 4);
+    let hook = moduli::uniaxial(&r.c, PI / 2.0).unwrap().1;
+    c.at_most("lattice (1, 0.5), theta = 0, equal Hookean springs: exact nu = 1/6", "absolute difference", (hook - 1.0 / 6.0).abs(), 1e-12);
+    c.at_most("lattice (1, 0.5), theta = 0: Supplemental Eq. (9) gives 8/27, not 1/6", "absolute difference", (paper::ordered_poisson(1.0, 0.5, 0.0) - 8.0 / 27.0).abs(), 1e-12);
+
+    // B3. Fig. 7 (vector data): the calculation line is the equal-weight Young's modulus times
+    // the area of one triangle. Tolerance: line width plus axis calibration, about 0.5 % of the axis.
+    let v = read_json("reference-results/paper_figures_vector.json");
+    let mut s = spec(tri(3.0, 2.0));
+    s.spring_law = SpringLaw::EqualWeight;
+    let r = periodic(s, 4);
+    let tri_area = 3f64.sqrt() / 2.0;
+    let mut worst: f64 = 0.0;
+    for p in v["fig7"]["calculation_line"].as_array().unwrap() {
+        let (t, y) = (p[0].as_f64().unwrap(), p[1].as_f64().unwrap());
+        let ours = moduli::uniaxial(&r.c, PI / 2.0 - t).unwrap().0 * tri_area;
+        worst = worst.max((ours - y).abs());
+    }
+    c.at_most("Fig. 7 calculation line (741 points) = equal-weight Young's modulus x triangle area", "max |Y difference|", worst, 0.01);
+
+    // B4. Eq. (23): honeycomb with soft centre springs. The error is O(k_radial).
+    for (kr, tol) in [(1e-3, 5e-3), (1e-6, 1e-5)] {
+        let mut worst: f64 = 0.0;
+        for i in 1..20 {
+            let l = 0.05 * i as f64;
+            let r = periodic(spec(LatticeKind::Honeycomb { l, k_radial: kr }), 4);
+            worst = worst.max((r.uniaxial_x.unwrap().1 - paper::honeycomb_poisson(l)).abs());
+        }
+        c.at_most(&format!("Eq. (23) honeycomb, k_radial = {kr:e} (l = 0.05 ... 0.95)"), "max |nu difference|", worst, tol);
+    }
+
+    // B5. Fig. 9 at eta = 0 (vector data) against the exact triangular lattice.
+    let b0 = v["fig9"]["B"]["mean_line"][0][1].as_f64().unwrap();
+    let g0 = v["fig9"]["G"]["mean_line"][0][1].as_f64().unwrap();
+    c.at_most("Fig. 9 at eta = 0: B = sqrt(3)/2, G = sqrt(3)/4", "max absolute difference", (b0 - 3f64.sqrt() / 2.0).abs().max((g0 - 3f64.sqrt() / 4.0).abs()), 5e-3);
+
+    // B6. Foam: exact periodic moduli, 10 samples of 26 x 26 cells per eta, against the paper's
+    // simulations (Fig. 5, digitised markers and error bars) and statements (p. 6).
+    let text = std::fs::read_to_string(dir().join("reference-results/fig5_simulation_digitized.csv")).unwrap();
+    let mut outside = 0;
+    let mut means = Vec::new();
+    for line in text.lines().skip(1) {
+        let f: Vec<&str> = line.split(',').collect();
+        let eta: f64 = f[0].parse().unwrap();
+        let mut nus = Vec::new();
+        for seed in 0..10 {
+            let mut s = spec(tri(1.0, 1.0));
+            s.eta = eta;
+            s.seed = seed;
+            nus.push(periodic(s, 26).isotropic.poisson);
+        }
+        let m = nus.iter().sum::<f64>() / nus.len() as f64;
+        means.push((eta, m));
+        if f[4] == "up" {
+            let (lo, hi): (f64, f64) = (f[2].parse().unwrap(), f[3].parse().unwrap());
+            if m < lo - 0.003 || m > hi + 0.003 {
+                outside += 1;
+            }
+        }
+    }
+    c.at_most("foam: mean periodic nu inside every error bar of Fig. 5's simulations (eta 0 ... 0.45, 10 markers)", "markers outside", outside as f64, 0.0);
+    let cross = means.windows(2).find(|w| w[0].1 > 0.0 && w[1].1 <= 0.0).map(|w| w[0].0 + (w[1].0 - w[0].0) * w[0].1 / (w[0].1 - w[1].1)).unwrap_or(f64::NAN);
+    c.at_most("foam: nu crosses zero near eta = 0.46 (text p. 6)", "|eta_0 - 0.46|", (cross - 0.46).abs(), 0.02);
+    let mut nus = Vec::new();
+    for seed in 0..10 {
+        let mut s = spec(tri(1.0, 1.0));
+        s.eta = 0.5;
+        s.seed = seed;
+        nus.push(periodic(s, 26).isotropic.poisson);
+    }
+    let m5 = nus.iter().sum::<f64>() / nus.len() as f64;
+    c.at_most("foam: auxetic as eta -> 0.5 (text: nu = -0.1); ours at most -0.05", "mean nu(0.5)", m5, -0.05);
+}
+
 fn main_checks() -> Checks {
     let mut c = Checks::default();
     part_a(&mut c);
+    part_b(&mut c);
     c
 }
 
@@ -250,5 +347,10 @@ fn validation() {
         println!("{} {} [{}: {:.3e} <= {:.1e}]", if ch.passed { "ok  " } else { "FAIL" }, ch.name, ch.metric, ch.observed, ch.tolerance);
     }
     assert!(c.0.iter().all(|ch| ch.passed), "a validation check failed");
-    let _ = PI;
+    let committed: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(dir().join("VALIDATION.json")).unwrap_or_else(|_| "{}".into())).unwrap();
+    let names = |v: &serde_json::Value| -> Vec<(String, String, bool)> {
+        v["checks"].as_array().map(|a| a.iter().map(|c| (c["name"].as_str().unwrap().to_string(), c["tolerance"].to_string(), c["passed"].as_bool().unwrap())).collect()).unwrap_or_default()
+    };
+    let now: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(names(&committed), names(&now), "VALIDATION.json is stale: copy target/VALIDATION.json over it");
 }

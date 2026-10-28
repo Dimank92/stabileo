@@ -33,7 +33,7 @@ pub fn invert(m: &[[f64; 3]; 3]) -> Option<[[f64; 3]; 3]> {
     let det = m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
         + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
     let scale = m.iter().flatten().map(|v| v.abs()).fold(0.0, f64::max);
-    if !(det.abs() > 1e-12 * scale * scale * scale) {
+    if !(det.abs() > 1e-20 * scale * scale * scale) {
         return None;
     }
     let mut r = [[0.0; 3]; 3];
