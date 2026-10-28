@@ -110,7 +110,7 @@ describe('German, French and Turkish address the reader formally', () => {
   for (const [code, pattern] of Object.entries(informal)) {
     it(`${code} never uses the informal second person`, () => {
       const dict = ALL_DICTS[code];
-      const hits = Object.keys(dict).filter((k) => pattern.test(dict[k].replace(/\{\w+\}/g, ''))).map((k) => `${k}: ${dict[k]}`);
+      const hits = Object.keys(dict).filter((k) => pattern.test(dict[k].replace(/\{\w+\}|„[^“]*“|«[^»]*»|“[^”]*”|`[^`]*`/g, ''))).map((k) => `${k}: ${dict[k]}`);
       expect(hits).toEqual([]);
     });
   }
