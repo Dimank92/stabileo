@@ -132,8 +132,38 @@ route.
 3. **Research mode in the app** (plugin contract), spring networks first.
 4. **Outreach** to the first authors; record their reviews.
 5. Next papers by the effort-vs-impact rule.
+6. The long-term direction (§11), starting with one benchmark, many methods.
 
-## 11. Risks
+## 11. Long-term direction: from a gallery we fill to the place the field publishes
+
+Doing every paper ourselves stays small. The goal is that researchers, students and labs do most
+of the work because it is worth it to them. In order of leverage:
+
+1. **One benchmark, many methods** (next after the first three experiments). Standard problems
+   (the notched plate, the MBB beam, …) with fixed geometry, meshes and metrics; every method on
+   the same problem, side by side, with comparison tables of accuracy against cost. A new paper
+   in an area lands on its area's benchmark. Nobody offers this for computational mechanics.
+2. **Authors publish their own runnable papers.** The contribution template and CI make it easy;
+   academic credit makes it worth it: a citable DOI per experiment version (Zenodo), the author's
+   review recorded on the page, and later journal partnerships accepting a Stabileo experiment as
+   supplementary material. Our cost per paper becomes review, not implementation.
+3. **AI-assisted reproduction.** A pipeline that reads a paper and its code, drafts the Rust
+   implementation and its validation against the reference, and hands it to a human reviewer;
+   a "Reproduce this paper" entry point taking a DOI. The integrity rules (evidence-based status,
+   verified citations, summaries only from real sources) are what make it trustworthy at scale.
+4. **Fork and share.** Anyone changes an experiment's parameters, geometry or material law and
+   gets a permanent link (§5), so students fork a professor's experiment and researchers fork each
+   other's.
+5. **Teaching.** Experiments as course material: assignments run in the browser with nothing to
+   install. Students who learn on Stabileo become engineers who use it.
+6. **Real experiments.** Laboratory test data next to the simulations (UBA, INTI as first partners):
+   validation against physics, not only agreement with another code.
+
+Order: finish the first three experiments; then 1 (cheap, unique); then 2 (credit, DOIs, outreach
+to Shauer and DTU); then 3 once the template has proven itself; 4 follows from §5; 5 and 6 with
+academic partners.
+
+## 12. Risks
 
 - Scope creep into a framework: build only what the next paper needs.
 - Confusing research with design results: the walls in §4, labels everywhere.
