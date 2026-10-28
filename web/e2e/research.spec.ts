@@ -91,3 +91,97 @@ test.describe('@smoke research', () => {
     expect(loaded.some((r) => r.includes('U+370-3FF'))).toBe(true);
   });
 });
+
+test.describe('@smoke research review regressions', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      class WorkerStub {
+        onmessage: ((e: { data: unknown }) => void) | null = null;
+        terminate() {}
+        postMessage(message: { type: string; runId: number; config: string }) {
+          if (message.type !== 'run') return;
+          (window as unknown as { sentConfig: string }).sentConfig = message.config;
+          queueMicrotask(() => {
+            const runId = message.runId;
+            this.onmessage?.({ data: { type: 'mesh', runId, nodes: new Float64Array([0, 0, 1, 0, 1, 1, 0, 1]), elements: new Uint32Array([0, 1, 2, 3]) } });
+            this.onmessage?.({ data: { type: 'step', runId,
+              step: { step: 0, pseudotime: 0.01, displacement: 0.001, reaction: 1, iterations: 1, converged: true, residual: 0, damage_max: 0.1, damage_min: 0, elastic_energy: 1, fracture_energy: 0.1 },
+              damage: new Float32Array(4), displacement: new Float32Array(8), syy: new Float32Array([1]) } });
+            this.onmessage?.({ data: { type: 'done', runId, seconds: 0.1 } });
+          });
+        }
+      }
+      window.Worker = WorkerStub as unknown as typeof Worker;
+    });
+    await page.goto('/en/research/fracture/shauer-2025/?step=0');
+    await expect.poll(async () => Number(await page.locator('.rs-app').getAttribute('data-steps'))).toBeGreaterThan(0);
+    await page.locator('#rs-tab-parameters').click();
+  });
+
+  test('replacing a material parameter sends the new configuration and malformed input disables Run', async ({ page }) => {
+    const input = page.locator('#p-e');
+    const run = page.getByRole('button', { name: 'Run', exact: true });
+    await input.fill('123.5');
+    await input.blur();
+    await run.click();
+    const config = await page.evaluate(() => JSON.parse((window as unknown as { sentConfig: string }).sentConfig));
+    expect(config.material).toEqual({ e: 123.5, nu: 0.3, gc: 0.0027, l0: 0.0075, plane: 'strain' });
+    await input.fill('oops');
+    await input.blur();
+    await expect(input).toHaveAttribute('aria-invalid', 'true');
+    await expect(input).toHaveValue('oops');
+    await expect(run).toBeDisabled();
+    await input.fill('200');
+    await input.blur();
+    await expect(run).toBeEnabled();
+  });
+
+  test('live stress falls back to damage on returning to replay, including controls and legend', async ({ page }) => {
+    await page.getByRole('button', { name: 'Run', exact: true }).click();
+    await page.locator('#rs-tab-viewer').click();
+    const stress = page.getByRole('radio', { name: 'σyy', exact: true });
+    await stress.click();
+    await expect(stress).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('.shell-legend')).toContainText('σyy');
+    await page.locator('#rs-tab-parameters').click();
+    await page.getByRole('button', { name: 'Back to the replay' }).click();
+    await page.locator('#rs-tab-viewer').click();
+    await expect(stress).toBeDisabled();
+    await expect(page.getByRole('radio', { name: 'Damage d', exact: true })).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('.shell-legend')).toBeVisible();
+    await expect(page.locator('.shell-legend')).toContainText('Damage d');
+    await expect(page.locator('.shell-legend')).not.toContainText('σyy');
+  });
+});
+
+test('@smoke destroying the research page aborts its replay fetch and ignores a late resolution', async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = window.fetch;
+    const state = window as unknown as { replaySignal: AbortSignal; releaseReplay: () => void; replayTicks: number };
+    state.replayTicks = 0;
+    const timeout = window.setTimeout;
+    window.setTimeout = ((handler: TimerHandler, delay?: number, ...args: unknown[]) => {
+      if (delay === 110) state.replayTicks++;
+      return timeout(handler, delay, ...args);
+    }) as typeof window.setTimeout;
+    window.fetch = async (url, init) => {
+      const response = await original(url, init);
+      if (String(url).includes('replay.srpl')) {
+        state.replaySignal = init!.signal!;
+        const body = await response.arrayBuffer();
+        await new Promise<void>((resolve) => { state.releaseReplay = resolve; });
+        // Deliberately resolve successfully even after abort, exercising the continuation guard.
+        return new Response(body);
+      }
+      return response;
+    };
+  });
+  await page.goto('/en/research/fracture/shauer-2025/');
+  await page.waitForFunction(() => !!(window as unknown as { releaseReplay: unknown }).releaseReplay);
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('stabileo-navigate', { detail: '/' })));
+  await expect(page.locator('.rs-app')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { replaySignal: AbortSignal }).replaySignal.aborted)).toBe(true);
+  await page.evaluate(() => (window as unknown as { releaseReplay: () => void }).releaseReplay());
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => (window as unknown as { replayTicks: number }).replayTicks)).toBe(0);
+});
