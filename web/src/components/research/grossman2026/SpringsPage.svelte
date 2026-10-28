@@ -117,10 +117,22 @@
 
   let pane: HTMLElement;
   onMount(() => {
+    // Deep links: #edit opens the editor tab; ?eta=… (foam) sets the disorder and skips the sweep
+    // (also how the gallery thumbnail is rendered, see scripts/research-thumbs-grossman.mjs).
+    const q = new URLSearchParams(window.location.search);
+    const qEta = Number(q.get('eta'));
+    const deepLinked = q.has('eta') && Number.isFinite(qEta) && qEta >= 0 && qEta <= 0.5;
+    if (deepLinked) eta = qEta;
+    thumbMode = q.has('thumb');
     loadSprings()
       .then((g) => {
         glue = g;
         playback.setCount(SWEEP.length);
+        if (window.location.hash === '#edit') {
+          showTab('edit');
+          return;
+        }
+        if (deepLinked) return;
         const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
         const narrow = window.innerWidth < 640;
         if (reducedMotion) return;
@@ -227,7 +239,9 @@
     const m = Math.max(1e-12, ...forces.map(Math.abs));
     return { min: -m, max: m };
   });
-  const VIEW = $derived<[number, number, number, number]>([-1, -9, 53 * (1 + Math.max(0, deform * strain)) + 1, 14]);
+  // Room under the strip for the legend, except when rendering the gallery thumbnail (?thumb).
+  let thumbMode = $state(false);
+  const VIEW = $derived<[number, number, number, number]>([-1, thumbMode ? -5 : -9, 53 * (1 + Math.max(0, deform * strain)) + 1, thumbMode ? 18 : 14]);
   // The paper's convention for the pulled direction, in the periodic cell's frame.
   const pullAngle = $derived(family === 'honeycomb' ? 0 : Math.PI / 2 - stripTheta);
   const cellAlong = $derived(cell ? uniaxial(cell.c, pullAngle) : null);
@@ -301,8 +315,11 @@
   function showTab(t: 'experiment' | 'edit') {
     touch();
     tab = t;
-    if (t === 'edit' && !editorSrc) void loadEditor();
   }
+  // The editor loads the first time its tab is shown (once a strip exists).
+  $effect(() => {
+    if (tab === 'edit' && strip && !editorSrc && !editorLoading) void loadEditor();
+  });
   async function openFullEditor() {
     if (!strip) return;
     const w = window.open('about:blank', '_blank');

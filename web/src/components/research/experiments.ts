@@ -9,7 +9,11 @@ export type Experiment = {
   hook: string;
   /** Rendered at build time from our own run (prerender), absent until it has been generated. */
   thumbnail: string;
+  /** What the thumbnail shows (its alt text). */
+  thumbnailAlt: string;
   code: string;
+  /** The page embeds the Stabileo editor with the experiment's model (opened by `#edit`). */
+  editor?: boolean;
 };
 
 export const EXPERIMENTS: Experiment[] = [
@@ -19,6 +23,7 @@ export const EXPERIMENTS: Experiment[] = [
     name: 'Phase-field fracture of a notched plate',
     hook: 'Pull a notched plate apart and watch an AT2 phase-field crack form and run, solved in your browser and checked step by step against the author’s code.',
     thumbnail: 'research-thumbs/shauer-2025.webp',
+    thumbnailAlt: 'Damage field from our run of the experiment',
     code: 'https://github.com/lambdaclass/stabileo/tree/main/research/fracture/shauer-2025',
   },
   {
@@ -27,6 +32,8 @@ export const EXPERIMENTS: Experiment[] = [
     name: 'Auxetic spring networks',
     hook: 'Shake the nodes of a triangular lattice of springs until it widens when pulled: a truss network solved in your browser, against the paper’s published numbers.',
     thumbnail: 'research-thumbs/grossman-2026.webp',
+    thumbnailAlt: 'The auxetic spring network (eta = 0.5) from our run, bars coloured by axial force on the deformed strip',
+    editor: true,
     code: 'https://github.com/lambdaclass/stabileo/tree/main/research/metamaterials/grossman-2026',
   },
 ];

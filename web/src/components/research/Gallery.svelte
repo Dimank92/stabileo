@@ -46,7 +46,7 @@
         <li class="rs-g-runcard">
           <PublicLink to={e.path} class="rs-g-thumb" aria-label={e.name}>
             {#if !thumbFailed[e.paperId]}
-              <img src="{base}{e.thumbnail}" width="640" height="400" loading="lazy" decoding="async" alt="Damage field from our run of the experiment" onerror={() => (thumbFailed = { ...thumbFailed, [e.paperId]: true })} />
+              <img src="{base}{e.thumbnail}" width="640" height="400" loading="lazy" decoding="async" alt={e.thumbnailAlt} onerror={() => (thumbFailed = { ...thumbFailed, [e.paperId]: true })} />
             {:else}
               <span class="rs-g-thumb-icon"><FieldIcon field={p.area} size={96} /></span>
             {/if}
@@ -60,7 +60,7 @@
               <PublicLink to={e.path} class="btn btn-primary btn-sm">{s.readRun}</PublicLink>
               <a class="btn btn-sm" href="https://doi.org/{p.doi}" rel="noreferrer" target="_blank">{s.paper}</a>
               <a class="btn btn-sm" href={e.code} rel="noreferrer" target="_blank">{s.code}</a>
-              <span class="rs-g-soon" title={s.soon}>{s.openInStabileo}: {s.soon}</span>
+              {#if e.editor}<PublicLink to="{e.path}#edit" class="btn btn-ghost btn-sm">{s.editInStabileo}</PublicLink>{:else}<span class="rs-g-soon" title={s.soon}>{s.openInStabileo}: {s.soon}</span>{/if}
             </div>
           </div>
         </li>
@@ -193,7 +193,12 @@
     margin: 0.4rem 0 0.6rem;
   }
   .rs-g-runbody h3 :global(a) {
+    color: var(--fg);
     text-decoration: none;
+  }
+  .rs-g-runbody h3 :global(a:hover) {
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
   .rs-g-hook {
     font-size: 1rem;
