@@ -57,7 +57,7 @@ export function stripCompact(strip: StripResult, label: string, stamp?: unknown)
 }
 
 /** Raw DEFLATE, as fflate's deflateSync in the app (the browser's own compressor, no shared code). */
-async function deflateRaw(bytes: Uint8Array): Promise<Uint8Array> {
+async function deflateRaw(bytes: Uint8Array<ArrayBuffer>): Promise<Uint8Array> {
   const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'));
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }
