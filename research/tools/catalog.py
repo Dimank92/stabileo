@@ -2,6 +2,9 @@
 
   python3 -I research/tools/catalog.py check [--offline] [--links]
   python3 -I research/tools/catalog.py show <doi>
+  python3 -I research/tools/catalog.py export
+
+`export` writes papers.json (what the /research gallery reads); `check` fails if it is stale.
 
 `check` validates the schema and the evidence behind each status; without --offline it fetches
 every DOI from Crossref and fails unless title, authors, year and venue match exactly; --links
@@ -22,6 +25,7 @@ import yaml
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CATALOG = os.environ.get("RESEARCH_CATALOG", os.path.join(ROOT, "papers.yaml"))
+EXPORT = os.path.join(ROOT, "papers.json")
 UA = "stabileo-research-catalog (https://github.com/lambdaclass/stabileo)"
 
 AREAS = {
@@ -151,9 +155,19 @@ def check_links(p, errors):
             errors.append(f"{p['id']}: {c['url']} license is {spdx}, catalog says {c['license']}")
 
 
+def export_text(papers):
+    return json.dumps({"generated_from": "research/papers.yaml", "papers": papers}, indent=1, ensure_ascii=False) + "\n"
+
+
 def main(argv):
     if len(argv) >= 2 and argv[0] == "show":
         print(yaml.safe_dump({"crossref": crossref_block(argv[1])}, sort_keys=False, allow_unicode=True))
+        return 0
+    if argv and argv[0] == "export":
+        with open(CATALOG) as f:
+            papers = yaml.safe_load(f)["papers"]
+        with open(EXPORT, "w") as f:
+            f.write(export_text(papers))
         return 0
     if not argv or argv[0] != "check":
         print(__doc__)
@@ -170,6 +184,10 @@ def main(argv):
             check_crossref(p, errors)
         if "--links" in argv:
             check_links(p, errors)
+    if "RESEARCH_CATALOG" not in os.environ:
+        current = open(EXPORT).read() if os.path.exists(EXPORT) else ""
+        if current != export_text(papers):
+            errors.append("papers.json is stale: run `catalog.py export`")
     for e in errors:
         print("FAIL", e)
     print(f"{len(papers)} papers, {len(errors)} problems")
