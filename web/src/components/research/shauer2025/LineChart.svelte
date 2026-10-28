@@ -162,7 +162,8 @@
   }
   .tick {
     fill: var(--fg-2);
-    font: 11px var(--lp-mono);
+    font: var(--rs-micro) var(--st-sans);
+    font-variant-numeric: tabular-nums;
   }
   .label {
     fill: var(--fg-2);
@@ -175,7 +176,8 @@
     background: var(--lp-ink, #0c1620);
     border: 1px solid var(--hair);
     color: var(--fg);
-    font: 12px/1.5 var(--lp-mono);
+    font: var(--rs-micro)/1.5 var(--st-sans);
+    font-variant-numeric: tabular-nums;
     padding: 0.35rem 0.55rem;
     border-radius: 3px;
     white-space: nowrap;

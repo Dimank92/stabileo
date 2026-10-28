@@ -582,7 +582,7 @@
   }
   .rs-mode {
     margin: 0;
-    font: 12px var(--lp-mono);
+    font: var(--rs-ui) var(--st-sans);
     color: var(--fg-2);
     display: flex;
     flex-wrap: wrap;
@@ -684,7 +684,7 @@
     border: 1px solid var(--rs-control-border);
     border-radius: 3px;
     padding: 0.3rem 0.4rem;
-    font: 13px var(--lp-mono);
+    font: var(--rs-ui) var(--st-sans);
     min-width: 0;
     flex: 1 1 auto;
   }
@@ -741,7 +741,8 @@
   .rs-table table,
   :global(.rs-checks) {
     border-collapse: collapse;
-    font: 12px var(--lp-mono);
+    font: var(--rs-small) var(--st-sans);
+    font-variant-numeric: tabular-nums;
     width: 100%;
   }
   .rs-table th,

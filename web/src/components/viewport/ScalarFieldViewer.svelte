@@ -345,6 +345,14 @@
     color: var(--st-text-3);
     pointer-events: none;
   }
+  .sfv-status :global(.status-value) {
+    font-family: var(--st-sans);
+    font-variant-numeric: tabular-nums;
+  }
+  .sfv-status :global(.status-label) {
+    color: var(--st-text-2);
+    font-size: 0.75rem;
+  }
   .sfv-status {
     flex-wrap: wrap;
     row-gap: 0.2rem;

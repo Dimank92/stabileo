@@ -12,6 +12,7 @@
   import ShauerPage from './shauer2025/ShauerPage.svelte';
   import '../landing/landing.css';
   import '../blog/blog.css';
+  import './research.css';
 
   let { path }: { path: string } = $props();
   const route = $derived(path.replace(/\/+$/, '') || '/research');

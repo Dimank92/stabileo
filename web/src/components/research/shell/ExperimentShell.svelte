@@ -53,7 +53,7 @@
       <p class="rs-lead" lang="en">{lead}</p>
     </header>
     <div class="rs-shell-grid">
-      <article class="rs-shell-article" lang="en">
+      <article class="rs-shell-article rs-prose" lang="en">
         {#if publicI18n.locale !== 'en'}<p class="rs-only-en" lang={publicI18n.locale}>{s.onlyEnglish}</p>{/if}
         {@render article()}
         <h2 id="cite">Cite this</h2>
@@ -111,7 +111,7 @@
     margin: 1rem 0;
   }
   .rs-badges li {
-    font: 12px var(--lp-mono);
+    font: var(--rs-ui) var(--st-sans);
     border: 1px solid var(--hair);
     border-radius: 3px;
     padding: 0.25rem 0.5rem;
@@ -163,22 +163,7 @@
     display: none;
   }
   .rs-shell-article {
-    color: var(--fg);
-    max-width: 46rem;
-  }
-  .rs-shell-article :global(h2) {
-    font-family: var(--lp-display);
-    color: var(--fg);
-    font-size: 1.4rem;
-    margin: 2rem 0 0.75rem;
-    scroll-margin-top: calc(var(--lp-nav-h, 3.6rem) + 1rem);
-  }
-  .rs-shell-article :global(h2:first-child) {
-    margin-top: 0;
-  }
-  .rs-shell-article :global(p),
-  .rs-shell-article :global(li) {
-    line-height: 1.65;
+    max-width: var(--rs-measure);
   }
   .rs-shell-article :global(a) {
     color: inherit;
@@ -192,7 +177,7 @@
     padding-left: 0.75rem;
   }
   .rs-citebox {
-    font: 13px/1.6 var(--lp-mono);
+    font: var(--rs-small)/1.6 var(--st-sans);
     color: var(--fg-2);
     border: 1px solid var(--hair);
     border-radius: 4px;
