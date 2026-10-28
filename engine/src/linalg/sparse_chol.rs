@@ -67,6 +67,8 @@ pub enum CholOrdering {
     Amd,
     /// Reverse Cuthill-McKee — good for structured 2D/3D meshes.
     Rcm,
+    /// Nested Dissection / METIS-quality recursive graph bisection.
+    MetisNestedDissection,
 }
 
 /// Compute symbolic Cholesky factorization (AMD ordering + structure of L).
@@ -79,6 +81,7 @@ pub fn symbolic_cholesky_with(a: &CscMatrix, ordering: CholOrdering) -> Symbolic
     let perm = match ordering {
         CholOrdering::Amd => amd_order(a.n, &a.col_ptr, &a.row_idx),
         CholOrdering::Rcm => rcm_order(a.n, &a.col_ptr, &a.row_idx),
+        CholOrdering::MetisNestedDissection => super::nested_dissection::nested_dissection_order(a),
     };
     symbolic_cholesky_with_perm(a, &perm)
 }
@@ -607,6 +610,46 @@ pub fn sparse_cholesky_solve(factor: &NumericCholesky, b: &[f64]) -> Vec<f64> {
         result[sym.perm[new]] = x[new];
     }
     result
+}
+
+/// Solve A x = b using sparse Cholesky factorization with Wilkinson iterative refinement.
+///
+/// Computes initial solution x₀ = L⁻ᵀ L⁻¹ P b, then applies iterative refinement
+/// (r = b - A x, solve L Lᵀ Δx = r, x ← x + Δx) to eliminate precision loss on
+/// ill-conditioned systems (such as thin-shell meshes) without falling back to dense LU.
+pub fn sparse_cholesky_solve_with_refinement(
+    factor: &NumericCholesky,
+    a: &CscMatrix,
+    b: &[f64],
+    max_refinement_steps: usize,
+) -> Vec<f64> {
+    let n = factor.symbolic.n;
+    assert_eq!(b.len(), n);
+    let mut x = sparse_cholesky_solve(factor, b);
+    let b_norm: f64 = b.iter().map(|v| v * v).sum::<f64>().sqrt();
+    if b_norm == 0.0 {
+        return x;
+    }
+
+    for _ in 0..max_refinement_steps {
+        let ax = a.sym_mat_vec(&x);
+        let mut r = vec![0.0; n];
+        let mut r_norm_sq = 0.0;
+        for i in 0..n {
+            r[i] = b[i] - ax[i];
+            r_norm_sq += r[i] * r[i];
+        }
+        let rel_res = r_norm_sq.sqrt() / b_norm;
+        if rel_res <= 1e-11 {
+            break;
+        }
+
+        let dx = sparse_cholesky_solve(factor, &r);
+        for i in 0..n {
+            x[i] += dx[i];
+        }
+    }
+    x
 }
 
 /// Convenience: full sparse solve A*x = b. Returns None if not SPD.

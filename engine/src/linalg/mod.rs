@@ -9,6 +9,8 @@ pub mod sparse_chol;
 pub mod lanczos;
 pub mod preconditioner;
 pub mod pcg;
+pub mod nested_dissection;
+pub mod amg;
 
 pub use dense::*;
 pub use cholesky::*;
@@ -21,6 +23,7 @@ pub use sparse_chol::{
     numeric_cholesky,
     sparse_cholesky_solve, sparse_cholesky_solve_full,
     sparse_condition_estimate,
+    sparse_cholesky_solve_with_refinement,
 };
 pub use lanczos::{lanczos_eigen, lanczos_generalized_eigen, lanczos_generalized_eigen_sparse, lanczos_buckling_eigen_sparse};
 pub use preconditioner::{
@@ -28,3 +31,5 @@ pub use preconditioner::{
     Ic0Preconditioner, ShiftedIcPreconditioner, MicPreconditioner,
 };
 pub use pcg::{pcg_solve, PcgResult};
+pub use nested_dissection::{nested_dissection_order};
+pub use amg::*;

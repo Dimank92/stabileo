@@ -29,7 +29,7 @@ def fragments():
 
 
 def parse(path):
-    text = path.read_text().strip() + "\n"
+    text = path.read_text(encoding="utf-8").strip() + "\n"
     first, _, rest = text.partition("\n")
     m = re.fullmatch(r"### (.+)", first.strip())
     problems = []
