@@ -24,6 +24,15 @@ const REQUIRED = completeLocales() as PublicLocale[];
 const written = (post: { i18n: Partial<Record<PublicLocale, PostBody>> }) =>
   (Object.keys(post.i18n) as PublicLocale[]).filter((l) => post.i18n[l]);
 
+// Thousands may be grouped with a comma, a point or a (non-breaking) space depending on the
+// language: "15,833", "15.833" and "15 833" are one number, while "0,976" is a decimal.
+function normalizeNumber(cell: string): string | null {
+  const c = cell.trim();
+  if (/^-?[1-9]\d{0,2}(?:[.,\s\u00a0\u202f]\d{3})+$/.test(c)) return c.replace(/[.,\s\u00a0\u202f]/g, '');
+  const n = c.replace(',', '.');
+  return /^-?\d+(\.\d+)?$/.test(n) ? n : null;
+}
+
 /** The numbers in a table, decimal comma normalised away. */
 function numericCells(blocks: Block[]): string[] {
   const out: string[] = [];
@@ -31,8 +40,8 @@ function numericCells(blocks: Block[]): string[] {
     if (b.k !== 'table') continue;
     for (const row of b.rows) {
       for (const cell of row) {
-        const n = cell.replace(',', '.');
-        if (/^-?\d+(\.\d+)?$/.test(n)) out.push(n);
+        const n = normalizeNumber(cell);
+        if (n !== null) out.push(n);
       }
     }
   }
