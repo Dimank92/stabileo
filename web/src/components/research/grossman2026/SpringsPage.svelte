@@ -256,7 +256,7 @@
   });
   // Room under the strip for the legend, except when rendering the gallery thumbnail (?thumb).
   let thumbMode = $state(false);
-  const VIEW = $derived<[number, number, number, number]>([-1, thumbMode ? -5 : -9, 53 * (1 + Math.max(0, deform * strain)) + 1, thumbMode ? 18 : 14]);
+  const VIEW = $derived<[number, number, number, number]>(thumbMode ? [-8, -16, 61, 30] : [-1, -9, 53 * (1 + Math.max(0, deform * strain)) + 1, 14]);
   // The paper's convention for the pulled direction, in the periodic cell's frame.
   const pullAngle = $derived(family === 'honeycomb' ? 0 : Math.PI / 2 - stripTheta);
   const cellAlong = $derived(cell ? uniaxial(cell.c, pullAngle) : null);
