@@ -1,18 +1,20 @@
 /**
  * Run the plastic collapse analysis on the model as it stands.
  *
+ * Delegated to the Rust WASM engine (`engine/src/solver/plastic.rs` -> `solvePlastic`).
  * Mp of each frame member from its section's own plastic modulus
  * (plastic-moments.ts); Np = fy·A for a truss bar, with fy from its material
  * (250 MPa if it has none, and said so by `plasticMoments`).
  */
 import { modelStore, uiStore } from '../store';
 import { plasticMoments, DEFAULT_FY, type SectionMp } from '../engine/plastic-moments';
-import { plasticCollapse2D, type PlasticCollapseResult } from '../engine/plastic-collapse';
 import { advancedRefusal2D, variableRefusal2D } from '../engine/solver-service';
 import { t } from '../i18n';
-import { input2DToWireObject } from '../engine/wasm-solver';
+import { solvePlastic, isWasmReady, input2DToWireObject } from '../engine/wasm-solver';
+import { EngineUnavailableError } from '../engine/engine-unavailable';
 import { tagCertifyJob } from '../engine/certify-tags';
 import type { SolverInput } from '../engine/types';
+import type { PlasticCollapseResult, PlasticCollapseHinge } from '../engine/result-types';
 
 export interface PlasticRun {
   result: PlasticCollapseResult;
@@ -30,18 +32,90 @@ export function runPlasticCollapse(): PlasticRun | null {
   if (!input) return null;
   const refusal = variableRefusal2D(modelStore.model) ?? advancedRefusal2D(input);
   if (refusal) throw new Error(refusal);
+
+  if (!isWasmReady()) {
+    throw new EngineUnavailableError('plastic collapse');
+  }
+
   const mps = plasticMoments(modelStore.sections, modelStore.materials, modelStore.elements);
   const mpOfSection = new Map(mps.map((m) => [m.sectionId, m.mp]));
-  const result = plasticCollapse2D(input, {
-    mp: (id) => mpOfSection.get(input.elements.get(id)!.sectionId) ?? Infinity,
-    np: (id) => {
-      const e = input.elements.get(id)!;
-      const fy = modelStore.materials.get(e.materialId)?.fy || DEFAULT_FY;
-      const a = input.sections.get(e.sectionId)?.a ?? 0;
-      return fy * 1000 * a;
-    },
-  });
-  if (result.unloaded) throw new Error(t('advanced.plasticNoLoads'));
+
+  const sections = new Map<number, { a: number; iz: number; materialId: number }>();
+  const mpOverrides = new Map<number, number>();
+  for (const e of input.elements.values()) {
+    const s = input.sections.get(e.sectionId);
+    if (!s || sections.has(e.sectionId)) continue;
+    const mp = mpOfSection.get(e.sectionId);
+    if (mp !== undefined && Number.isFinite(mp) && mp > 0) {
+      sections.set(e.sectionId, { a: s.a, iz: s.iz, materialId: e.materialId });
+      mpOverrides.set(e.sectionId, mp);
+    }
+  }
+  const materials = new Map<number, { fy?: number }>();
+  for (const id of input.materials.keys()) {
+    materials.set(id, { fy: modelStore.materials.get(id)?.fy || DEFAULT_FY });
+  }
+
+  let engineRes: any;
+  try {
+    engineRes = solvePlastic({
+      solver: input,
+      sections,
+      materials,
+      mpOverrides,
+    });
+  } catch (err: any) {
+    if (err && typeof err.message === 'string' && err.message.includes('No mechanical load')) {
+      throw new Error(t('advanced.plasticNoLoads'));
+    }
+    throw err;
+  }
+
+  // Map engine hinges to include x coordinate along member
+  const mapHinge = (h: any): PlasticCollapseHinge => {
+    const elem = input.elements.get(h.elementId);
+    let l = 0;
+    if (elem) {
+      const ni = input.nodes.get(elem.nodeI);
+      const nj = input.nodes.get(elem.nodeJ);
+      if (ni && nj) {
+        const dx = nj.x - ni.x;
+        const dz = nj.z - ni.z;
+        l = Math.sqrt(dx * dx + dz * dz);
+      }
+    }
+    const pos = h.position !== undefined ? h.position : (h.end === 'end' ? 1 : 0);
+    return {
+      elementId: h.elementId,
+      end: h.end,
+      moment: h.moment,
+      loadFactor: h.loadFactor,
+      step: h.step,
+      position: h.position,
+      unloadedAt: h.unloadedAt,
+      x: pos * l,
+      kind: 'moment',
+    };
+  };
+
+  const hinges: PlasticCollapseHinge[] = (engineRes.hinges || []).map(mapHinge);
+  const steps = (engineRes.steps || []).map((st: any) => ({
+    loadFactor: st.loadFactor,
+    hingesFormed: (st.hingesFormed || []).map(mapHinge),
+    results: st.results,
+  }));
+
+  const result: PlasticCollapseResult = {
+    collapseFactor: engineRes.collapseFactor,
+    steps,
+    hinges,
+    isMechanism: engineRes.isMechanism,
+    redundancy: engineRes.redundancy,
+    degree: engineRes.redundancy,
+    unloaded: false,
+    warnings: engineRes.warnings,
+  };
+
   tagPlasticCertificate(result, input, mpOfSection);
   return { result, mps };
 }

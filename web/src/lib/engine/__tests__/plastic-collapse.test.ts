@@ -5,7 +5,7 @@
  * one. Each also has to form its hinges where the theory puts them.
  */
 import { describe, it, expect } from 'vitest';
-import { plasticCollapse2D } from '../plastic-collapse';
+import { plasticCollapse2D } from './differential/oracle/plastic-collapse-oracle';
 import type { SolverInput, SolverLoad } from '../types';
 
 const MP = 100;

@@ -9,7 +9,7 @@
  *   collapse.
  */
 import { describe, it, expect } from 'vitest';
-import { plasticCollapse2D } from '../plastic-collapse';
+import { plasticCollapse2D } from './differential/oracle/plastic-collapse-oracle';
 import type { SolverInput, SolverLoad } from '../types';
 
 function model(L: number, elementIds: number[], type: 'truss' | 'frame', supports: Array<[number, string]>, loads: SolverLoad[]): SolverInput {

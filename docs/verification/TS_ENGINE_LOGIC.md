@@ -85,9 +85,10 @@ under "What is left".
     `section-stress-3d.ts` switch to a full TypeScript implementation when WASM is not
     ready. `shell-combos.ts` recombines shells in TypeScript when the kernel is not
     registered. Neither says so.
-12. **`plastic-collapse.ts` reads a solver error as a mechanism.** Any exception from
-    `solve()` or the kinematic check is recorded as collapse, so an error comes out as a
-    collapse factor.
+12. **`plastic-collapse.ts` reads a solver error as a mechanism.** Moved to test
+    oracle (`plastic-collapse-oracle.ts`) in #392; production now delegates directly to
+    the Rust engine's `solvePlastic` (`engine/src/solver/plastic.rs`), which distinguishes
+    validation failures and unloaded models from actual mechanism collapse.
 13. **The PRO report designs slab steel from invented loads.** `pro-report.ts` calls
     `designSlabReinforcement` (`reinforcement-svg.ts`) with q = 10 kN/m², Mu = qL²/10 and
     0,8·Mu for the other direction, whatever the analysis says.
@@ -640,7 +641,7 @@ In rough order of safety value:
 | `orphan-rotations-3d.ts` | 320 | d | solver/assembly.rs (orphan rotation guard) | medium | Adds vanishing springs/restraints for unresisted 3D rotations; unheld nodal moment check; axes catch->null |
 | `pdelta-forces.ts` | 123 | b | solver/pdelta.rs + geometric_stiffness.rs | high | Rewrites WASM P-Delta member forces adding Kg(N)*u in TS (engine reports K*u only); B2 amplification; TS replaces Rust force output by design |
 | `pdelta-result.ts` | 5 | d | - | low | Formats B2 factor (null = infinite) |
-| `plastic-collapse.ts` | 413 | b | solver/plastic.rs solve_plastic_2d | high | TS event-to-event plastic collapse with WASM linear solves; any solve()/kinematics throw is recorded as mechanism (collapse) rather than error |
+| `plastic-collapse.ts` | - | a | solver/plastic.rs solve_plastic_2d | high | Moved to oracle (plastic-collapse-oracle.ts); production calls WASM solvePlastic (#392). Guarded by analysis-oracles-are-test-only.test.ts |
 | `plastic-moments.ts` | 198 | a | section analyze_section_plastic | high | Mp=fy*Zp with Zp from WASM section engine; on throw falls back to declared/estimated Zp (source tagged 'rectangle'/'estimated'); DEFAULT_FY=250 |
 | `prestress.ts` | 87 | b | solver/prestress.rs prestress_fef_3d | high | Parabolic tendon equivalent loads (8Pe/L^2, end forces) computed in TS and sent as ordinary loads |
 | `pro-report-inputs.ts` | 593 | d | - | medium | Gathers report data: joints, frame lines, envelope, bar marks, quantities, drifts, crack width via other modules |

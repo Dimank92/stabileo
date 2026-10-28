@@ -6,7 +6,7 @@
   import { t } from '../../lib/i18n';
   import { resultsStore } from '../../lib/store';
   import { DEFAULT_FY, type SectionMp } from '../../lib/engine/plastic-moments';
-  import type { PlasticCollapseResult } from '../../lib/engine/plastic-collapse';
+  import type { PlasticCollapseResult } from '../../lib/engine/result-types';
   import { fmtQ, fmtCoord, unitQ, toQ, sigQ } from '../../lib/store/display-units.svelte';
   import { plainNumber } from '../../lib/utils/units';
   import PlasticCertificate from './PlasticCertificate.svelte';

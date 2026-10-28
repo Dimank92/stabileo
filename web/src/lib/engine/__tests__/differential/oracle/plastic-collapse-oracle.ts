@@ -1,4 +1,10 @@
 /**
+ * Differential test oracle: legacy TypeScript event-to-event plastic collapse solver.
+ *
+ * Replaced in production by the Rust engine (`engine/src/solver/plastic.rs` -> WASM `solvePlastic`).
+ * Kept only as an oracle for differential tests to verify agreement on collapse factors and hinge sequences.
+ */
+/**
  * Plastic collapse of a plane frame, step by step.
  *
  * ── What it simulates ───────────────────────────────────────────────
@@ -42,13 +48,13 @@
  * the uniqueness theorem names: the largest statically admissible load, which
  * equals the smallest kinematic one.
  */
-import type { SolverInput, SolverLoad, SolverElement, AnalysisResults, ElementForces } from './types';
-import type { PlasticHinge, PlasticResult, PlasticStep } from './result-types';
-import { solve } from './wasm-solver';
+import type { SolverInput, SolverLoad, SolverElement, AnalysisResults, ElementForces } from '../../../types';
+import type { PlasticHinge, PlasticResult, PlasticStep } from '../../../result-types';
+import { solve } from '../../../wasm-solver';
 // The normalized reading: the diagnosis in the active language and the app's axis names.
-import { analyzeKinematics } from './kinematic-2d';
-import { computeDiagramValueAt } from './diagrams';
-import { axialSpanToNodal2D, axialEquivalentLoads } from './axial-span-2d';
+import { analyzeKinematics } from '../../../kinematic-2d';
+import { computeDiagramValueAt } from '../../../diagrams';
+import { axialSpanToNodal2D, axialEquivalentLoads } from '../../../axial-span-2d';
 
 export interface PlasticCollapseOptions {
   /** Plastic moment of an original frame member, kN·m. */
@@ -526,3 +532,5 @@ export function plasticCollapse2D(original: SolverInput, opts: PlasticCollapseOp
     unloaded,
   };
 }
+
+export { plasticCollapse2D as plasticCollapse2DOracle };

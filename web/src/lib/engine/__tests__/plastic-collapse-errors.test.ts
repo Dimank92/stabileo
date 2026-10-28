@@ -11,7 +11,7 @@ vi.mock('../wasm-solver', async (orig) => {
   return { ...real, solve: (input: never) => { if (++calls > 1) throw new Error('engine failure'); return real.solve(input); } };
 });
 
-import { plasticCollapse2D } from '../plastic-collapse';
+import { plasticCollapse2D } from './differential/oracle/plastic-collapse-oracle';
 import type { SolverInput } from '../types';
 
 describe('plastic collapse with a failing engine', () => {

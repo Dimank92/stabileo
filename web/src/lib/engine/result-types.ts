@@ -38,6 +38,18 @@ export interface PlasticResult {
   warnings?: string[];
 }
 
+export interface PlasticCollapseHinge extends PlasticHinge {
+  x: number;
+  kind?: 'moment' | 'axial';
+}
+
+export interface PlasticCollapseResult extends PlasticResult {
+  hinges: PlasticCollapseHinge[];
+  steps: Array<PlasticStep & { hingesFormed: PlasticCollapseHinge[] }>;
+  degree: number;
+  unloaded: boolean;
+}
+
 export interface PlasticHinge3D {
   elementId: number;
   end: 'start' | 'end';

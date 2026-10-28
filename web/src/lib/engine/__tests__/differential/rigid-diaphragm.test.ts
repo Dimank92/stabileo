@@ -64,7 +64,7 @@ describe('rigid diaphragm: oracle penalty beams vs geometry', () => {
       { type: 'nodal' as const, data: { nodeId: 5, fx: 50, fy: 0, fz: 0, mx: 0, my: 0, mz: 0 } },
     ];
 
-    return { nodes, elements, materials, sections, supports, loads };
+    return { nodes, elements, materials, sections, supports, loads } as unknown as SolverInput3D;
   };
 
   it('detectFloorLevels accurately detects floor elevations', () => {
