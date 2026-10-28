@@ -209,6 +209,9 @@ lint.engine:
 	cd engine && $(NIX_RUN) cargo clippy --lib -- -W clippy::all -A clippy::erasing_op
 
 # The acceptance models are generated (docs/verification/ACCEPTANCE.md); a hand edit fails here.
+check.engine.hygiene:
+	python3 scripts/check-engine-hygiene.py
+
 check.engine.acceptance-models:
 	$(NIX_RUN) bash -c 'for g in engine/tests/acceptance/generators/*.py; do python3 -I "$$g"; done'
 	git diff --exit-code -- engine/tests/acceptance/models
