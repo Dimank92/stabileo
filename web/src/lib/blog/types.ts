@@ -16,7 +16,7 @@
  * stops. A post that wants something else is a reason to add a block kind
  * here, with a renderer and a test, not a reason to reach for raw HTML.
  */
-import type { PublicLocale } from '../i18n/store.svelte';
+import { PUBLIC_LOCALES, type PublicLocale } from '../i18n/store.svelte';
 
 export type Block =
   | { k: 'h'; t: string }
@@ -56,6 +56,10 @@ export type Localized<T> = Record<'en' | 'es' | 'pt', T> & Partial<Record<Public
 
 export function inLocale<T>(texts: Localized<T>, locale: PublicLocale): T {
   return texts[locale] ?? texts.en;
+}
+
+export function writtenIn(texts: Localized<unknown>): PublicLocale[] {
+  return PUBLIC_LOCALES.filter((l) => texts[l]);
 }
 
 /** Attaches `translations/<locale>/<id>.ts` bodies to the items they name, so a language arrives as files only. */

@@ -12,7 +12,7 @@
   import { tPublic as t, tpPublic as tp, publicI18n } from '../../lib/i18n/store.svelte';
   import { applyPageMeta, restorePageMeta, postImageUrl, ERGODIC_GROUP, LAMBDA_CLASS } from '../../lib/page-meta';
   import { publicUrl } from '../../lib/i18n/public-routes';
-  import { POSTS, POSTS_NEWEST_FIRST, findPost, formatPostDate, postReadingMinutes, inLocale } from '../../lib/blog';
+  import { POSTS, POSTS_NEWEST_FIRST, findPost, formatPostDate, postReadingMinutes, inLocale, writtenIn } from '../../lib/blog';
   import { enterApp } from '../landing/landing-utils';
   import BlogNav from './BlogNav.svelte';
   import PublicLink from '../landing/PublicLink.svelte';
@@ -73,6 +73,7 @@
         description: standingBody.description,
         locale: publicI18n.locale,
         path: standing.path,
+        written: writtenIn(standing.i18n),
         // The page states what it is (a page about the app's CIRSOC checks), the app it is about,
         // and its questions and answers with the same text the reader sees.
         graph: [
@@ -126,6 +127,7 @@
       description: body ? body.excerpt : t('blog.lead'),
       locale: publicI18n.locale,
       path: post ? `/blog/${post.slug}` : '/blog',
+      written: post ? writtenIn(post.i18n) : undefined,
       article:
         post && body
           ? {

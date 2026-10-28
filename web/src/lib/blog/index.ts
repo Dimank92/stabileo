@@ -75,4 +75,4 @@ export function formatPostDate(iso: string, locale: string): string {
 }
 
 export type { Post, PostBody, Block, Localized } from './types';
-export { inLocale } from './types';
+export { inLocale, writtenIn } from './types';

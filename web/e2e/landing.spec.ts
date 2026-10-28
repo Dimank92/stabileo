@@ -493,7 +493,7 @@ test.describe('@landing landing page', () => {
       expect(one(h, 'og:site_name')).toBe('Stabileo');
       expect(one(h, 'og:locale')).toBe('en_US');
       // One tag per alternate language, which is how Open Graph reads them.
-      expect(h.meta['og:locale:alternate']).toEqual(['es_AR', 'pt_BR']);
+      expect(h.meta['og:locale:alternate']).toEqual(['es_AR', 'pt_BR', 'de_DE', 'fr_FR', 'tr_TR']);
       expect(one(h, 'og:title')).toBe(EN_TITLE);
       expect(one(h, 'twitter:card')).toBe('summary_large_image');
       expect(one(h, 'twitter:title')).toBe(EN_TITLE);
@@ -557,7 +557,7 @@ test.describe('@landing landing page', () => {
       expect(h.title).toBe('Stabileo — Software de cálculo estructural gratis, en el navegador');
       expect(one(h, 'og:title')).toBe(h.title);
       expect(one(h, 'og:locale')).toBe('es_AR');
-      expect(h.meta['og:locale:alternate']).toEqual(['en_US', 'pt_BR']);
+      expect(h.meta['og:locale:alternate']).toEqual(['en_US', 'pt_BR', 'de_DE', 'fr_FR', 'tr_TR']);
       expect(h.canonicals).toEqual(['https://stabileo.com/es/']);
       // The description is the hero lead, which now carries the positioning:
       // a free, open platform with three modes, rather than live re-solving.
@@ -580,7 +580,7 @@ test.describe('@landing landing page', () => {
       expect(h.title).toBe('Stabileo — Software de cálculo estrutural grátis, no navegador');
       expect(one(h, 'og:title')).toBe(h.title);
       expect(one(h, 'og:locale')).toBe('pt_BR');
-      expect(h.meta['og:locale:alternate']).toEqual(['en_US', 'es_AR']);
+      expect(h.meta['og:locale:alternate']).toEqual(['en_US', 'es_AR', 'de_DE', 'fr_FR', 'tr_TR']);
       expect(h.canonicals).toEqual(['https://stabileo.com/pt/']);
       expect(one(h, 'twitter:description')).toBe(one(h, 'description'));
     });
@@ -594,7 +594,7 @@ test.describe('@landing landing page', () => {
       await expect(page.locator('.landing')).toHaveCount(0);
 
       const h = await readHead(page);
-      expect(h.meta['og:locale:alternate']).toEqual(['es_AR', 'pt_BR']);
+      expect(h.meta['og:locale:alternate']).toEqual(['es_AR', 'pt_BR', 'de_DE', 'fr_FR', 'tr_TR']);
       expect(one(h, 'og:locale')).toBe('en_US');
     });
 
