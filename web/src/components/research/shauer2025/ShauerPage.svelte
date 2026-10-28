@@ -86,8 +86,8 @@
   let pane: HTMLElement | undefined = $state();
 
   onMount(() => {
-    fetch(`${BASE}replay.bin`)
-      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`replay: HTTP ${r.status}`))))
+    fetch(`${BASE}replay.bin.gz`)
+      .then((r) => (r.ok && r.body ? new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer() : Promise.reject(new Error(`replay: HTTP ${r.status}`))))
       .then((buf) => {
         const d = decodeReplay<Step>(buf);
         replay = { nodes: d.nodes, elements: d.elements, frames: d.frames };
