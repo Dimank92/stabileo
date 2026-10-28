@@ -1,5 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { pickLanguage } from './fixtures';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 /**
  * The blog at /blog.
@@ -477,10 +479,11 @@ test.describe('@smoke blog', () => {
     const alts = await page
       .locator('link[rel="alternate"][hreflang]')
       .evaluateAll((els) => els.map((e) => `${e.getAttribute('hreflang')} ${e.getAttribute('href')}`).sort());
+    // The languages the post is written in: the three it is published in, and any whose translation file exists.
+    const written = ['en', 'es', 'pt', ...['de', 'fr', 'tr'].filter((l) =>
+      existsSync(fileURLToPath(new URL(`../src/lib/blog/translations/${l}/${SLUG}.ts`, import.meta.url))))];
     expect(alts).toEqual([
-      `en https://stabileo.com/en/blog/${SLUG}/`,
-      `es https://stabileo.com/es/blog/${SLUG}/`,
-      `pt https://stabileo.com/pt/blog/${SLUG}/`,
+      ...['de', 'en', 'es', 'fr', 'pt', 'tr'].filter((l) => written.includes(l)).map((l) => `${l} https://stabileo.com/${l}/blog/${SLUG}/`),
       // x-default names the English version of THIS POST. English because the
       // root declares /en as its canonical, so pointing the default at the
       // root would name a URL that is not canonical for itself — and this
