@@ -19,6 +19,9 @@ es/en/pt (article text in English first; Spanish next, given the audience).
   slider and play, result plots. Links in the article drive it ("watch the crack initiate at step
   54", "try ℓ = 0.015").
 - Phones: the panes stack; the experiment stays usable.
+- **Every geometric view of a model or result uses Stabileo's own viewer** (the app's viewport
+  with the generic scalar-field-on-mesh support), never a custom canvas or WebGL context; charts
+  may stay charts. A research CI check enforces it.
 - Every page says **"Research, not a design tool."**
 
 **Open in Stabileo.** The full app in *research mode* (`/app/research/<id>`) with the experiment's
@@ -116,7 +119,7 @@ inputs: run in isolated environments.
 
 ## 9. Quality bar for every page
 
-Works on phones; loads fast (research bundles small; the viewer lazy); accessible (keyboard,
+Model and result views only through the shared Stabileo viewer (CI check); works on phones; loads fast (research bundles small; the viewer lazy); accessible (keyboard,
 contrast, labels); es/en/pt UI with locale-aware numbers; no raw i18n keys; numbers parsed
 safely; plot axes fit the data; a small e2e smoke per page in CI; a Lighthouse budget per research
 route.

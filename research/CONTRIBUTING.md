@@ -25,7 +25,11 @@ Copy `templates/paper/` to `research/<area>/<id>/` and fill it in.
 4. **A test that reproduces a published or reference number**, with its tolerance stated and
    justified, that runs in the research CI workflow. A status of `numerically-validated` requires a
    `VALIDATION.json` written by those tests in which every check passed.
-5. **A README** covering what was reproduced, how to run it, what agrees and by how much, what
+5. **Views through the Stabileo viewer.** Every geometric view of the model or its results uses
+   the shared viewer component (the app's viewport with scalar-field-on-mesh support); a page that
+   creates its own canvas or WebGL context for a model view fails `tools/check_viewer.sh`. Plots
+   (force–displacement, convergence) may be charts.
+6. **A README** covering what was reproduced, how to run it, what agrees and by how much, what
    does not, and the limitations.
 
 ## Rules
