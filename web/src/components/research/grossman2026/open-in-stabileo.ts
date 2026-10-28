@@ -49,7 +49,7 @@ export function stripCompact(strip: StripResult, label: string, stamp?: unknown)
     s,
     l: [],
     ni: [n.length + 1, 2, sections.length + 1, e.length + 1, s.length + 1, 1],
-    _: { autoSolve: true, diagramType: 'axial' },
+    _: { autoSolve: true, diagramType: 'axialColor', showDiagramValues: false },
     ...(stamp ? { sw: stamp } : {}),
   };
 }
