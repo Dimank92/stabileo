@@ -93,7 +93,7 @@ async function main(argv) {
   const baseAt = argv.indexOf('--base');
   const base = baseAt >= 0 ? argv[baseAt + 1] : undefined;
   if (!base) { console.error('usage: node web/scripts/results-snapshot/gate.mjs --base <rev>'); return 2; }
-  const git = (...a) => execFileSync('git', a, { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
+  const git = (...a) => execFileSync('git', a, { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
   const root = git('rev-parse', '--show-toplevel').trim();
   const at = (rev, path) => {
     try { return git('-C', root, 'show', `${rev}:${path}`); } catch { return null; }
