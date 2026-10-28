@@ -2762,7 +2762,6 @@ const ja: Translations = {
   'pro.noSlabs': 'モデルに応力結果を持つスラブ（クワッド）がありません。',
   'pro.driftTitle': '層間変位 — CIRSOC 103 §5.2.8',
   'pro.driftLimit': '許容限界',
-  'pro.solveFirst': '先に構造を解いてください',
   'pro.noVerifiableElems': '検定可能な部材が見つかりません。材料のf\'c ≤ 80 MPa（コンクリート）またはfy > 80 MPa（鋼材）と断面特性が定義されていることを確認してください。',
   'pro.verifyPrompt': '「部材を検定」を押してCIRSOC 201 / 301検定を実行',
   'pro.wasmNotice': 'WASMの再コンパイルが必要 — ネイティブエンジンでコンパイルすると{code}検定が有効になります。',

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { strFromU8, unzipSync } from 'fflate';
 import { test, expect, loadModel } from './fixtures';
 
 test.describe('@smoke exporting by what comes out', () => {
@@ -59,6 +61,8 @@ test.describe('@smoke exporting by what comes out, in Basic', () => {
     await expect(report.getByTestId('calc-report-generate')).toHaveText(/Word/);
     const [docx] = await Promise.all([page.waitForEvent('download'), report.getByTestId('calc-report-generate').click()]);
     expect(docx.suggestedFilename()).toMatch(/\.docx$/);
+    const doc = strFromU8(unzipSync(new Uint8Array(readFileSync((await docx.path())!)))['word/document.xml']!);
+    expect(doc.match(/<w:t xml:space="preserve">(Procedencia|Provenance)<\/w:t>/g) ?? [], 'the provenance block, once').toHaveLength(1);
 
     await page.getByTestId('export-drawings').click();
     const drawings = page.getByTestId('view-export-dialog');

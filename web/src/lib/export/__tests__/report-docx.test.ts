@@ -77,6 +77,10 @@ describe('expressions written to Word keep their meaning', () => {
     expect(mathmlRuns(mm('\\sqrt{x^2+y^2}'))).toEqual([{ text: '√(x' }, { text: '2', vert: 'sup' }, { text: '+y' }, { text: '2', vert: 'sup' }, { text: ')' }]);
     expect(mathmlRuns(mm('\\sigma_{xx} \\leq \\gamma'))).toEqual([{ text: 'σ' }, { text: 'xx', vert: 'sub' }, { text: '≤γ' }]);
     expect(mathmlRuns(mm('\\sum_{i=1}^{n} x_i'))).toEqual([{ text: '∑' }, { text: 'i=1', vert: 'sub' }, { text: 'n', vert: 'sup' }, { text: 'x' }, { text: 'i', vert: 'sub' }]);
+    expect(mathmlRuns(mm('\\frac{1}{2} q L^2'))).toEqual([{ text: '(1/2)qL' }, { text: '2', vert: 'sup' }]);
+    expect(mathmlRuns(mm('x/\\frac{a}{b}'))).toEqual([{ text: 'x/(a/b)' }]);
+    expect(mathmlRuns(mm('\\frac{a}{b}(c+d)'))).toEqual([{ text: '(a/b)(c+d)' }]);
+    expect(mathmlRuns(mm('\\frac{a}{b} + c = d'))).toEqual([{ text: 'a/b+c=d' }]);
     expect(mathmlRuns(mm('\\bar{x}'))).toBeNull();
     expect(mathmlRuns(mm('\\begin{pmatrix}a\\\\b\\end{pmatrix}'))).toBeNull();
     expect(mathmlRuns(mm('\\binom{n}{k}'))).toBeNull();

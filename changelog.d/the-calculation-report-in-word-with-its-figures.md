@@ -8,10 +8,10 @@ letterhead on a cover page without header or footer, the page breaks, the notes 
 (stale or incomplete results among them) as styled paragraphs, a header with the program and
 version, and a footer with the report, its date and "page n of m". Symbols and expressions keep
 their meaning as text in headings, paragraphs and every table cell: sub- and superscripts at any
-depth, fractions as num/den with parentheses around compound parts, roots as √(…); a construct
-with no unambiguous plain form (an accent, a matrix) is written as its TeX. They are text, not
-editable equations. Number columns are
-right-aligned and narrow tables take only the width they need. The provenance table is no longer
+depth, fractions as num/den with parentheses around compound parts (and around the fraction
+itself when a factor follows it or a division precedes it: (1/2)qL², x/(a/b)), roots as √(…); a
+construct with no unambiguous plain form (an accent, a matrix) is written as its TeX. They are
+text, not editable equations. Number columns are right-aligned and narrow tables take only the width they need. The provenance table is no longer
 written twice. The same improvements reach every report exported to Word through the shared
 writer (the design report and the detailing report when design is on). The calculation report's
 cover no longer says "Verification per CIRSOC 201": it carries no code check.

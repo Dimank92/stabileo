@@ -2913,7 +2913,6 @@ const fr: Translations = {
   'pro.noSlabs': 'Aucune dalle (quads) avec résultats de contraintes dans le modèle.',
   'pro.driftTitle': 'Drift inter-étages — CIRSOC 103 §5.2.8',
   'pro.driftLimit': 'Limite',
-  'pro.solveFirst': 'Calculez la structure d\'abord',
   'pro.noVerifiableElems': 'Aucun élément vérifiable trouvé. Assurez-vous que les matériaux ont f\'c <= 80 MPa (béton) ou fy > 80 MPa (acier) et que les sections ont des propriétés définies.',
   'pro.verifyPrompt': 'Appuyez sur « Vérifier les éléments » pour exécuter la vérification CIRSOC 201 / 301',
   'pro.wasmNotice': 'Nécessite une recompilation WASM — les vérifications {code} seront activées lors de la compilation dans le moteur natif.',

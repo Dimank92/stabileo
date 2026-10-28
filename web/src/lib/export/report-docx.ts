@@ -143,7 +143,9 @@ export async function htmlToDocxBlocks(html: string, rasterize?: Rasterize, miss
   }
   paragraph();
 
-  const rasters = await Promise.all(pending.map((p) => (rasterize ? rasterize(p.src, p.size).catch(() => null) : Promise.resolve(null))));
+  // One at a time: each print raster is a canvas of up to 4000 px a side.
+  const rasters: Array<Raster | null> = [];
+  for (const p of pending) rasters.push(rasterize ? await rasterize(p.src, p.size).catch(() => null) : null);
   for (let k = pending.length - 1; k >= 0; k--) {
     const p = pending[k]!, r = rasters[k];
     const block: DocBlock = r

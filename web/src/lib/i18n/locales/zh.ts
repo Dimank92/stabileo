@@ -2904,7 +2904,6 @@ const zh: Translations = {
   'pro.noSlabs': '模型中无带应力结果的楼板（四边形）。',
   'pro.driftTitle': '层间位移角 — CIRSOC 103 §5.2.8',
   'pro.driftLimit': '限值',
-  'pro.solveFirst': '请先求解结构',
   'pro.noVerifiableElems': '未找到可验算的单元。确保材料具有 f\'c ≤ 80 MPa（混凝土）或 fy > 80 MPa（钢材），且截面属性已定义。',
   'pro.verifyPrompt': '按"验算单元"运行 CIRSOC 201 / 301 验算',
   'pro.wasmNotice': '需要 WASM 重新编译 — {code} 验算将在原生引擎编译后启用。',

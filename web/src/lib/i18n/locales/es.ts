@@ -5230,7 +5230,6 @@ const es: Record<string, string> = {
   'pro.noSlabs': 'No hay losas (quads) con resultados de tensiones en el modelo.',
   'pro.driftTitle': 'Drift de entrepiso — CIRSOC 103 §5.2.8',
   'pro.driftLimit': 'Límite',
-  'pro.solveFirst': 'Calculá la estructura primero.',
   'pro.codeTimber': 'NDS (Madera)',
   'pro.codeMasonry': 'Mampostería',
   'pro.codeCfs': 'CFS (Conformado en frío)',

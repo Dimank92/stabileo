@@ -5039,7 +5039,6 @@ const pt: Translations = {
   'axesBasis.dominant-moment': "eixo do maior momento",
   'axesBasis.no-demand': "sem flexão: orientação padrão",
   'pro.solveCable': 'Resolver Cabo',
-  'pro.solveFirst': 'Calcule a estrutura primeiro (aba Resultados)',
   'pro.solveSsi': 'Resolver SSI',
   'pro.solveStaged': 'Resolver por etapas',
   'pro.solveWinkler': 'Resolver Winkler',

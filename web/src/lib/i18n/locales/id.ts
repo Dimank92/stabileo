@@ -2901,7 +2901,6 @@ const id: Translations = {
   'pro.noSlabs': 'Tidak ada pelat (quad) dengan hasil tegangan dalam model.',
   'pro.driftTitle': 'Simpangan antar lantai — CIRSOC 103 §5.2.8',
   'pro.driftLimit': 'Batas',
-  'pro.solveFirst': 'Hitung struktur terlebih dahulu',
   'pro.noVerifiableElems': 'Tidak ditemukan elemen yang dapat diverifikasi. Pastikan material memiliki f\'c ≤ 80 MPa (beton) atau fy > 80 MPa (baja) dan penampang memiliki properti yang didefinisikan.',
   'pro.verifyPrompt': 'Tekan "Verifikasi elemen" untuk menjalankan verifikasi CIRSOC 201 / 301',
   'pro.wasmNotice': 'Memerlukan rekompilasi WASM — pemeriksaan {code} akan diaktifkan saat dikompilasi di mesin native.',

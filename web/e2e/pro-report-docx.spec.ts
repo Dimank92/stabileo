@@ -52,6 +52,8 @@ test.describe('@smoke the calculation report in Word', () => {
     expect(footer).toContain(' PAGE ');
     expect(footer).toContain(' NUMPAGES ');
     expect(doc).toContain('<w:titlePg/>');
-    expect(doc).toMatch(/Procedencia|Provenance/);
+    expect(doc.match(/<w:t xml:space="preserve">(Procedencia|Provenance)<\/w:t>/g) ?? [], 'the provenance block, once').toHaveLength(1);
+    // Design is off: the cover does not claim a design check the report does not carry.
+    expect(doc).not.toMatch(/Verificación según CIRSOC|Verification per CIRSOC/);
   });
 });

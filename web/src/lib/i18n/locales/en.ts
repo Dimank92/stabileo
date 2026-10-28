@@ -5237,7 +5237,6 @@ const en: Record<string, string> = {
   'pro.noSlabs': 'No slabs (quads) with stress results in the model.',
   'pro.driftTitle': 'Story drift — CIRSOC 103 §5.2.8',
   'pro.driftLimit': 'Limit',
-  'pro.solveFirst': 'Solve the structure first.',
   'pro.codeTimber': 'NDS (Timber)',
   'pro.codeMasonry': 'Masonry',
   'pro.codeCfs': 'CFS (Cold-formed steel)',

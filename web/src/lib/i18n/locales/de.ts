@@ -2923,7 +2923,6 @@ const de: Translations = {
   'pro.noSlabs': 'Keine Decken (Quads) mit Spannungsergebnissen im Modell.',
   'pro.driftTitle': 'Stockwerksdrift — CIRSOC 103 §5.2.8',
   'pro.driftLimit': 'Grenzwert',
-  'pro.solveFirst': 'Berechne zuerst die Struktur',
   'pro.noVerifiableElems': 'Keine nachweisbaren Elemente gefunden. Stelle sicher, dass die Materialien f\'c <= 80 MPa (Beton) oder fy > 80 MPa (Stahl) haben und die Querschnitte Eigenschaften besitzen.',
   'pro.verifyPrompt': 'Klicke "Elemente nachweisen" um den Nachweis CIRSOC 201 / 301 auszuführen',
   'pro.wasmNotice': 'Erfordert WASM-Neukompilierung — die Nachweise {code} werden aktiviert, sobald die Prüfungen im nativen Motor kompiliert sind.',

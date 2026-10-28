@@ -2902,7 +2902,6 @@ const ko: Translations = {
   'pro.noSlabs': '모델에 응력 결과가 있는 슬래브(사각형)가 없습니다.',
   'pro.driftTitle': '층간 변위 — CIRSOC 103 §5.2.8',
   'pro.driftLimit': '한계',
-  'pro.solveFirst': '먼저 구조물을 풀이하세요',
   'pro.noVerifiableElems': '검증 가능한 요소를 찾을 수 없습니다. 재료에 f\'c ≤ 80 MPa (콘크리트) 또는 fy > 80 MPa (강재)가 있고 단면이 정의되었는지 확인하세요.',
   'pro.verifyPrompt': '"요소 검증"을 눌러 CIRSOC 201 / 301 검증을 실행하세요',
   'pro.wasmNotice': 'WASM 재컴파일 필요 — 네이티브 엔진에서 컴파일하면 {code} 검증이 활성화됩니다.',

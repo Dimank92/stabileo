@@ -2916,7 +2916,6 @@ const it: Translations = {
   'pro.noSlabs': 'Nessun solaio (quad) con risultati di tensione nel modello.',
   'pro.driftTitle': 'Drift di interpiano — CIRSOC 103 §5.2.8',
   'pro.driftLimit': 'Limite',
-  'pro.solveFirst': 'Calcola prima la struttura',
   'pro.noVerifiableElems': 'Nessun elemento verificabile trovato. Assicurati che i materiali abbiano f\'c <= 80 MPa (calcestruzzo) o fy > 80 MPa (acciaio) e le sezioni abbiano proprietà definite.',
   'pro.verifyPrompt': 'Premi "Verifica elementi" per eseguire la verifica CIRSOC 201 / 301',
   'pro.wasmNotice': 'Richiede ricompilazione WASM — le verifiche {code} saranno abilitate quando i controlli saranno compilati nel motore nativo.',

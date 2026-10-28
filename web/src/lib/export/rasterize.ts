@@ -30,6 +30,7 @@ export async function rasterizeForPrint(src: string, size: { width?: number; hei
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
   const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'));
+  canvas.width = canvas.height = 0;
   if (!blob) return null;
   return { png: new Uint8Array(await blob.arrayBuffer()), width, height };
 }

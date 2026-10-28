@@ -45,7 +45,7 @@ function runs(e: El): Run[] {
     case 'mspace': return [{ text: ' ' }];
     case 'mphantom': case 'annotation': case 'annotation-xml': return [];
     case 'math': case 'mrow': case 'mstyle': case 'mpadded': case '#root':
-      return elems(e).flatMap(runs);
+      return row(elems(e));
     case 'semantics': return elems(e).slice(0, 1).flatMap(runs);
     case 'msub': case 'msup': case 'msubsup': case 'munder': case 'mover': case 'munderover': {
       const [base, a, b] = elems(e);
@@ -68,6 +68,24 @@ function runs(e: El): Run[] {
     }
     default: throw new Unsupported();
   }
+}
+
+const LOOSER = /^[+\-−±∓=≠≈≡∼<>≤≥,;:→⇒)\]}|]$/;
+const isOp = (e: El | undefined, re: RegExp) => !!e && (e.tag === 'mo' || e.tag === 'mi') && re.test(text(e).trim());
+
+/**
+ * Side-by-side terms. A fraction written as a/b binds looser than what is set beside it, so it is
+ * fenced when a factor follows it ("(1/2)qL", not "1/2qL") or a division precedes it.
+ */
+function row(kids: El[]): Run[] {
+  const shown = kids.filter((k) => k.tag !== 'mspace');
+  return kids.flatMap((k) => {
+    if (k.tag !== 'mfrac') return runs(k);
+    const i = shown.indexOf(k), prev = shown[i - 1], next = shown[i + 1];
+    const fence = isOp(prev, /^[/÷]$/) || (!!next && !isOp(next, LOOSER));
+    const r = runs(k);
+    return fence ? [{ text: '(' }, ...r, { text: ')' }] : r;
+  });
 }
 
 /** A fraction's numerator or denominator, in parentheses when it shows more than one term. */

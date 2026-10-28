@@ -2865,7 +2865,6 @@ const tr: Translations = {
   'pro.noSlabs': 'Modelde gerilme sonuçları olan döşeme (dörtgen) yok.',
   'pro.driftTitle': 'Katlar arası öteleme — CIRSOC 103 §5.2.8',
   'pro.driftLimit': 'Sınır',
-  'pro.solveFirst': 'Önce yapıyı çözün',
   'pro.noVerifiableElems': 'Doğrulanabilir eleman bulunamadı. Malzemelerin f\'c <= 80 MPa (beton) veya fy > 80 MPa (çelik) olduğundan ve kesitlerin tanımlı özelliklere sahip olduğundan emin olun.',
   'pro.verifyPrompt': 'CIRSOC 201 / 301 doğrulamasını çalıştırmak için "Elemanları doğrula" düğmesine basın',
   'pro.wasmNotice': 'WASM yeniden derleme gerekli — {code} doğrulamaları yerel motorda derlendiğinde etkinleştirilecek.',
