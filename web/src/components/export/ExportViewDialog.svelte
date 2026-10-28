@@ -8,6 +8,8 @@
   import { uiStore } from '../../lib/store';
   import ExportDialog from './ExportDialog.svelte';
   import ExportSection from './ExportSection.svelte';
+  import DrawingPresets, { type Preset } from './DrawingPresets.svelte';
+  import DrawingLayout from './DrawingLayout.svelte';
   import { DEFAULT_FIGURE_OPTIONS, FIGURE_CONTENTS, NEEDS_RESULTS, type FigureContent, type FigureOptions } from '../../lib/export/view-figure';
   import { copyView, exportView, type ViewFormat } from '../../lib/export/view-export';
   import type { InkStyle } from '../../lib/export/paper-ink';
@@ -56,12 +58,24 @@
     { id: 'screen', key: 'viewExport.styleScreen' },
   ];
 
+  const PRESETS: Preset[] = [
+    { id: 'model', label: t('viewExport.presetModel'), ids: ['model'] },
+    { id: 'diagrams', label: t('viewExport.presetDiagrams'), ids: ['model', 'moment', 'shear', 'axial'] },
+    { id: 'all', label: t('viewExport.presetAll'), ids: FIGURE_CONTENTS },
+  ];
+  function preset(ids: readonly string[]) {
+    contents = FIGURE_CONTENTS.filter((c) => ids.includes(c));
+    save();
+  }
+
   function toggle(c: FigureContent) {
     contents = contents.includes(c) ? contents.filter((x) => x !== c) : FIGURE_CONTENTS.filter((x) => x === c || contents.includes(x));
     save();
   }
 
-  const contentSummary = $derived(contents.length ? contents.map((c) => t(LABEL[c])).join(', ') : t('viewExport.nothing'));
+  const contentSummary = $derived(contents.length
+    ? [contents.map((c) => t(LABEL[c])).join(', '), contents.length > 1 ? t(sheet ? 'viewExport.layoutSheet' : 'viewExport.layoutSeparate') : null].filter(Boolean).join(' · ')
+    : t('viewExport.nothing'));
   const drawingSummary = $derived([
     options.loads ? t('viewExport.optLoads') : null,
     options.numbering ? t('viewExport.optNumbering') : null,
@@ -69,10 +83,7 @@
     options.values ? t('viewExport.optValues') : null,
     options.titles ? t('viewExport.optTitles') : null,
   ].filter(Boolean).join(' · ') || '—');
-  const outputSummary = $derived([
-    t(STYLES.find((s) => s.id === options.style)!.key),
-    contents.length > 1 ? t(sheet ? 'viewExport.layoutSheet' : 'viewExport.layoutSeparate') : null,
-  ].filter(Boolean).join(' · ') || 'PNG');
+  const outputSummary = $derived(t(STYLES.find((s) => s.id === options.style)!.key));
 
   const needsSolve = $derived(contents.some((c) => NEEDS_RESULTS.has(c)));
 
@@ -97,7 +108,8 @@
     </div>
     <p class="xs-note">{t(`proExport.drawingFormatNote.${format}`)}</p>
   </ExportSection>
-  <ExportSection title={t('viewExport.sectionContent')} summary={contentSummary} testid="view-export-content">
+  <ExportSection title={t('viewExport.sectionContent')} summary={contentSummary} open testid="view-export-content">
+    <DrawingPresets presets={PRESETS} chosen={contents} onpick={preset} testid="view-export" />
     <div class="xs-grid">
       {#each FIGURE_CONTENTS as c (c)}
         <label class="xs-check"><input type="checkbox" checked={contents.includes(c)} onchange={() => toggle(c)} data-testid={`view-export-${c}`} />{t(LABEL[c])}</label>
@@ -105,6 +117,11 @@
     </div>
     {#if needsSolve}<p class="xs-note">{t('viewExport.needsSolve')}</p>{/if}
     {#if contents.includes('despiece')}<p class="xs-note">{t('viewExport.despieceNote')}</p>{/if}
+    {#if contents.length > 1}
+      <DrawingLayout together={sheet} labels={[t('viewExport.layoutSheet'), t('viewExport.layoutSeparate')]}
+        notes={[t('viewExport.layoutSheetNote'), t('viewExport.layoutSeparateNote')]}
+        onpick={(v) => { sheet = v; save(); }} testid="view-export-layout" />
+    {/if}
   </ExportSection>
 
   <ExportSection title={t('viewExport.sectionDrawing')} summary={drawingSummary}>
@@ -126,19 +143,12 @@
   </ExportSection>
 
   <ExportSection title={t('viewExport.sectionOutput')} summary={outputSummary}>
-      <div class="xs-field">
-        <span>{t('viewExport.style')}</span>
-        <div class="xs-seg">
-          {#each STYLES as s (s.id)}
-            <button type="button" class:on={options.style === s.id} onclick={() => { options.style = s.id; save(); }}>{t(s.key)}</button>
-          {/each}
-        </div>
-      </div>
     <div class="xs-field">
-      <span>{t('viewExport.layout')}</span>
+      <span>{t('viewExport.style')}</span>
       <div class="xs-seg">
-        <button type="button" class:on={sheet} onclick={() => { sheet = true; save(); }}>{t('viewExport.layoutSheet')}</button>
-        <button type="button" class:on={!sheet} onclick={() => { sheet = false; save(); }}>{t('viewExport.layoutSeparate')}</button>
+        {#each STYLES as s (s.id)}
+          <button type="button" class:on={options.style === s.id} onclick={() => { options.style = s.id; save(); }}>{t(s.key)}</button>
+        {/each}
       </div>
     </div>
   </ExportSection>

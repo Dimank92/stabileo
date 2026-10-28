@@ -14205,5 +14205,17 @@ const es: Record<string, string> = {
   "export.drawingsBtn": "Dibujos…",
   "export.resultsTitle": "Exportar resultados",
   "export.drawingsTitle": "Exportar dibujos",
+  "export.emptyModel": "El modelo está vacío todavía.",
+  "export.emptyModelNote": "El modelo está vacío todavía: el archivo va a salir sin datos.",
+  "export.emptyModelDone": "Exportado sin datos: el modelo está vacío todavía.",
+  "viewExport.presetModel": "Sólo el modelo",
+  "viewExport.presetDiagrams": "Modelo y diagramas",
+  "viewExport.presetAll": "Todo",
+  "viewExport.layoutSheetNote": "Una sola imagen con todos los dibujos, uno al lado del otro.",
+  "viewExport.layoutSeparateNote": "Un archivo por dibujo, juntos en un .zip.",
+  "proExport.dxfLayoutLayers": "Un plano con capas",
+  "proExport.dxfLayoutSeparate": "Un plano por dibujo",
+  "proExport.dxfLayoutLayersNote": "Todo en un DXF; cada contenido en su capa.",
+  "proExport.dxfLayoutSeparateNote": "Un DXF del modelo y uno por cada resultado (con el modelo de base), juntos en un .zip.",
 };
 export default es;

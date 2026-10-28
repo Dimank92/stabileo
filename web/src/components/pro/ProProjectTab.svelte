@@ -11,6 +11,7 @@
   import { exportProjectIfc } from '../../lib/store/ifc-export';
   import { prepareExportProvenance } from '../../lib/export/provenance-attach';
   import { downloadBlob } from '../../lib/store/document-exports';
+  import { tellIfEmpty } from '../../lib/export/empty-model';
   import { uiStore, modelStore } from '../../lib/store';
   import {
     loadFile,
@@ -204,6 +205,7 @@
     if (!record) return;
     const name = modelStore.model.name || 'stabileo';
     downloadBlob(`${name.replace(/\s+/g, '-')}.ifc`, 'application/x-step', exportProjectIfc(t, i18n.locale, name, record));
+    tellIfEmpty();
   }
 
   async function handleLoad(e: Event) {
@@ -424,18 +426,18 @@
     <div class="pp-group">
       <div class="pp-grid pp-io pp-io-stack">
         <HelpTip text={t('proExport.resultsTip')}>
-          <button class="pp-btn" data-testid="pp-export-results" onclick={() => (dataOpen = true)} disabled={!hasModel}>{t('proExport.resultsBtn')}</button>
+          <button class="pp-btn" data-testid="pp-export-results" onclick={() => (dataOpen = true)}>{t('proExport.resultsBtn')}</button>
         </HelpTip>
         <HelpTip text={t('proExport.reportTip')}>
-          <button class="pp-btn" data-testid="pp-export-report" disabled={!hasModel}
+          <button class="pp-btn" data-testid="pp-export-report"
                   onclick={() => window.dispatchEvent(new Event('stabileo-open-report'))}
           >{t('proExport.reportBtn')}</button>
         </HelpTip>
         <HelpTip text={t('proExport.drawingsTip')}>
-          <button class="pp-btn" data-testid="pp-export-drawings" onclick={openDrawings} disabled={!hasModel}>{t('proExport.drawingsBtn')}</button>
+          <button class="pp-btn" data-testid="pp-export-drawings" onclick={openDrawings}>{t('proExport.drawingsBtn')}</button>
         </HelpTip>
         <HelpTip text={t('proExport.ifcTip')}>
-          <button class="pp-btn" data-testid="pp-export-ifc" onclick={exportIfc} disabled={!hasModel}>{t('proExport.ifcBtn')}</button>
+          <button class="pp-btn" data-testid="pp-export-ifc" onclick={exportIfc}>{t('proExport.ifcBtn')}</button>
         </HelpTip>
       </div>
       <button class="pp-link" title={t('provenance.reproduce.intro')} onclick={() => window.dispatchEvent(new Event('stabileo-reproduce'))}

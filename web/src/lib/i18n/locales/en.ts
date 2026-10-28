@@ -14216,5 +14216,17 @@ const en: Record<string, string> = {
   "export.drawingsBtn": "Drawings…",
   "export.resultsTitle": "Export results",
   "export.drawingsTitle": "Export drawings",
+  "export.emptyModel": "The model is still empty.",
+  "export.emptyModelNote": "The model is still empty: the file will come out with no data.",
+  "export.emptyModelDone": "Exported with no data: the model is still empty.",
+  "viewExport.presetModel": "Model only",
+  "viewExport.presetDiagrams": "Model and diagrams",
+  "viewExport.presetAll": "Everything",
+  "viewExport.layoutSheetNote": "One picture with every drawing, side by side.",
+  "viewExport.layoutSeparateNote": "One file per drawing, together in a .zip.",
+  "proExport.dxfLayoutLayers": "One drawing with layers",
+  "proExport.dxfLayoutSeparate": "One drawing per file",
+  "proExport.dxfLayoutLayersNote": "Everything in one DXF; each content on its own layer.",
+  "proExport.dxfLayoutSeparateNote": "One DXF of the model and one per result (with the model underneath), together in a .zip.",
 };
 export default en;

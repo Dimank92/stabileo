@@ -13856,5 +13856,17 @@ const pt: Translations = {
   "export.drawingsBtn": "Desenhos…",
   "export.resultsTitle": "Exportar resultados",
   "export.drawingsTitle": "Exportar desenhos",
+  "export.emptyModel": "O modelo ainda está vazio.",
+  "export.emptyModelNote": "O modelo ainda está vazio: o arquivo vai sair sem dados.",
+  "export.emptyModelDone": "Exportado sem dados: o modelo ainda está vazio.",
+  "viewExport.presetModel": "Só o modelo",
+  "viewExport.presetDiagrams": "Modelo e diagramas",
+  "viewExport.presetAll": "Tudo",
+  "viewExport.layoutSheetNote": "Uma só imagem com todos os desenhos, lado a lado.",
+  "viewExport.layoutSeparateNote": "Um arquivo por desenho, juntos em um .zip.",
+  "proExport.dxfLayoutLayers": "Um desenho com camadas",
+  "proExport.dxfLayoutSeparate": "Um desenho por arquivo",
+  "proExport.dxfLayoutLayersNote": "Tudo em um DXF; cada conteúdo na sua camada.",
+  "proExport.dxfLayoutSeparateNote": "Um DXF do modelo e um por resultado (com o modelo de base), juntos em um .zip.",
 };
 export default pt;

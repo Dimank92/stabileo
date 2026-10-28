@@ -110,7 +110,6 @@ test.describe('Básico exports', () => {
     await page.getByTestId('view-export-format-svg').click();
     const dialog = page.getByTestId('view-export-dialog');
     await expect(dialog).toBeVisible();
-    await page.getByTestId('view-export-content').locator('summary').click();
     await page.getByTestId('view-export-despiece').check();
     await page.getByTestId('view-export-moment').check();
     const svg = await download(page, () => page.getByTestId('view-export-download').click());

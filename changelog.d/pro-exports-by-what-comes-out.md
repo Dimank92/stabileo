@@ -10,5 +10,5 @@ dialogs, their contents and the files they write are otherwise unchanged.
 
 Basic does the same: Results… (Excel or CSV, in a small dialog where it used to download at once),
 Calculation report… (PDF, Word or HTML; Word and HTML were not offered before) and Drawings… (SVG,
-PNG or JPG; JPG is new). In both modes the import and export buttons share one grid of two equal
-columns, one line high, instead of buttons sized by their text.
+PNG or JPG; JPG is new). In both modes the export buttons sit one per row, one line high, and the
+spreadsheet import is a wide button with its template beside it.

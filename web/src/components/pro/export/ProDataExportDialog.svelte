@@ -19,6 +19,7 @@
   import { downloadProjectCsv, downloadProjectWorkbook } from '../../../lib/store/project-workbook';
   import type { StationSpec } from '../../../lib/engine/station-forces';
   import { ensureProResults, hasShells } from '../../../lib/pro/export-results';
+  import { modelIsEmpty, tellIfEmpty } from '../../../lib/export/empty-model';
   import CheckGroup from './CheckGroup.svelte';
   import OutdatedNotice from '../design/OutdatedNotice.svelte';
 
@@ -113,7 +114,7 @@
       let results = wantsResults;
       if (results && !(await ensureProResults())) {
         results = false;
-        uiStore.toast(t('proExport.dataNoResults'), 'info');
+        if (!modelIsEmpty()) uiStore.toast(t('proExport.dataNoResults'), 'info');
       }
       // Design's sheets only where design is on in PRO's settings (`uiStore.designInPro`).
       const sheets = new Set([...modelShown, ...(results ? resultsShown : [])].filter(on).filter((n) => uiStore.designInPro || !DESIGN_SHEETS.includes(n)));
@@ -126,6 +127,7 @@
       };
       if (format === 'xlsx') await downloadProjectWorkbook(stations, opts);
       else await downloadProjectCsv(stations, opts);
+      tellIfEmpty();
       open = false;
     } finally {
       busy = false;

@@ -9,6 +9,8 @@
   import { uiStore } from '../../../lib/store';
   import ExportDialog from '../../export/ExportDialog.svelte';
   import ExportSection from '../../export/ExportSection.svelte';
+  import DrawingPresets, { type Preset } from '../../export/DrawingPresets.svelte';
+  import DrawingLayout from '../../export/DrawingLayout.svelte';
   import {
     DEFAULT_FIGURE_OPTIONS, NEEDS_RESULTS, PRO_FIGURE_CONTENTS,
     type FigureContent, type FigureOptions, type FigureView,
@@ -80,12 +82,23 @@
     contents = PRO_FIGURE_CONTENTS.filter((x) => (ids.includes(x) ? v : contents.includes(x)));
     save();
   }
+  const presets = $derived<Preset[]>([
+    { id: 'model', label: t('viewExport.presetModel'), ids: ['model'] },
+    { id: 'diagrams', label: t('viewExport.presetDiagrams'), ids: ['model', 'moment', 'shear', 'axial'] },
+    { id: 'all', label: t('viewExport.presetAll'), ids: offered },
+  ]);
+  function preset(ids: readonly string[]) {
+    contents = PRO_FIGURE_CONTENTS.filter((c) => ids.includes(c));
+    save();
+  }
   function toggle(c: FigureContent) {
     contents = contents.includes(c) ? contents.filter((x) => x !== c) : PRO_FIGURE_CONTENTS.filter((x) => x === c || contents.includes(x));
     save();
   }
 
-  const contentSummary = $derived(chosen.length ? chosen.map((c) => t(LABEL[c])).join(', ') : t('viewExport.nothing'));
+  const contentSummary = $derived(chosen.length
+    ? [chosen.map((c) => t(LABEL[c])).join(', '), chosen.length > 1 ? t(sheet ? 'viewExport.layoutSheet' : 'viewExport.layoutSeparate') : null].filter(Boolean).join(' · ')
+    : t('viewExport.nothing'));
   const resultsSummary = $derived(choices.find((c) => c.key === setKey)?.label ?? choices[0]?.label ?? '—');
   const drawingSummary = $derived([
     t(VIEWS.find((v) => v.id === (options.view ?? 'screen'))!.key),
@@ -94,11 +107,7 @@
     options.values ? t('viewExport.optValues') : null,
     shells && options.shells !== false ? t('proExport.optShells') : null,
   ].filter(Boolean).join(' · '));
-  const outputSummary = $derived([
-    format.toUpperCase(),
-    t(STYLES.find((s) => s.id === options.style)!.key),
-    chosen.length > 1 ? t(sheet ? 'viewExport.layoutSheet' : 'viewExport.layoutSeparate') : null,
-  ].filter(Boolean).join(' · '));
+  const outputSummary = $derived(`${format.toUpperCase()} · ${t(STYLES.find((s) => s.id === options.style)!.key)}`);
 
   async function run(kind: 'download' | 'copy') {
     if (busy || chosen.length === 0) return;
@@ -123,6 +132,7 @@
 <ExportDialog bind:open width={560} title={`${t('proExport.drawingsTitle')} — ${format.toUpperCase()}`} testid="pro-view-export-dialog">
   <DrawingFormatRow current={format} onpick={pick} />
   <ExportSection title={t('viewExport.sectionContent')} summary={contentSummary} open testid="pro-view-export-content">
+    <DrawingPresets {presets} chosen={chosen} onpick={preset} testid="pro-view-export" />
     <div class="vx-cols">
       <CheckGroup title={t('proExport.groupModel')} items={groupItems('model')} on={(id) => contents.includes(id as FigureContent)}
         toggle={(id) => toggle(id as FigureContent)} setAll={(v) => setGroup('model', v)} testid="pro-view-export" />
@@ -139,6 +149,11 @@
     </div>
     {#if needsSolve}<p class="xs-note">{t('viewExport.needsSolve')}</p>{/if}
     {#if chosen.includes('despiece')}<p class="xs-note">{t('viewExport.despieceNote')}</p>{/if}
+    {#if chosen.length > 1}
+      <DrawingLayout together={sheet} labels={[t('viewExport.layoutSheet'), t('viewExport.layoutSeparate')]}
+        notes={[t('viewExport.layoutSheetNote'), t('viewExport.layoutSeparateNote')]}
+        onpick={(v) => { sheet = v; save(); }} testid="pro-view-export-layout" />
+    {/if}
   </ExportSection>
 
   {#if needsSolve && choices.length > 1}
@@ -176,13 +191,6 @@
         {#each STYLES as s (s.id)}
           <button type="button" class:on={options.style === s.id} onclick={() => { options.style = s.id; save(); }}>{t(s.key)}</button>
         {/each}
-      </div>
-    </div>
-    <div class="xs-field">
-      <span>{t('viewExport.layout')}</span>
-      <div class="xs-seg">
-        <button type="button" class:on={sheet} onclick={() => { sheet = true; save(); }}>{t('viewExport.layoutSheet')}</button>
-        <button type="button" class:on={!sheet} onclick={() => { sheet = false; save(); }}>{t('viewExport.layoutSeparate')}</button>
       </div>
     </div>
   </ExportSection>

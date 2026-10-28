@@ -7,6 +7,7 @@
   import ExportDialog from './export/ExportDialog.svelte';
   import ExportSection from './export/ExportSection.svelte';
   import { ensureResults } from '../lib/actions/solve';
+  import { tellIfEmpty } from '../lib/export/empty-model';
   import { kinematicReportOfModel } from '../lib/engine/kinematic-model';
   import { reportFigures } from '../lib/export/report-figures';
   import { DEFAULT_FIGURE_OPTIONS, type FigureOptions } from '../lib/export/view-figure';
@@ -130,6 +131,7 @@
       // After the solve: the record names the results the report prints.
       // Throws ExportChangedError (said below, nothing opened) if the project moved meanwhile.
       data.resultProvenance = { record: await provenanceForExport(token), labels: provenanceLabels() };
+      tellIfEmpty();
       if (format !== 'pdf') {
         const { downloadReport } = await import('../lib/export/report-download');
         const stem = (data.config.projectName || 'stabileo').replace(/[^\w.-]+/g, '-');
