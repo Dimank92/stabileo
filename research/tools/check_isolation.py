@@ -4,7 +4,7 @@ import re
 import sys
 
 DATA = re.compile(r"research/(?:papers\.json|[^/]+/[^/]+/(?:VALIDATION\.json|reference-results/[^/]+\.(?:csv|json)))$")
-QUOTED = re.compile(r'''["']([^"'\n]+)["']''')
+QUOTED = re.compile(r'''["'`]([^"'`\n]+)["'`]''')
 
 
 def check(root):
@@ -33,7 +33,7 @@ def check(root):
                     if not target.is_relative_to(root / "research"):
                         continue
                     rel = target.relative_to(root).as_posix()
-                    if tree != "web/src" or not DATA.fullmatch(rel):
+                    if tree != "web/src" or "${" in rel or not DATA.fullmatch(rel):
                         errors.append(f"{path.relative_to(root)}:{line}: forbidden research import: {raw}")
     cargo = (root / "Cargo.toml").read_text()
     if re.search(r'["\'][^"\']*research[^"\']*["\']', cargo):

@@ -38,21 +38,28 @@ Statuses in `papers.yaml` are assigned from evidence in the repository, not by h
 | `reference-reproduced` | The authors' code ran here; its outputs are committed with the exact environment |
 | `implementation-in-progress` | A Stabileo implementation exists but its validation tests do not yet pass |
 | `numerically-validated` | Tests compare our implementation with the reproduced reference within documented tolerances, and pass in CI. This is agreement with the reference code; whether published numbers were reproduced is the separate `reproduced_published_results` field |
-| `interactive` | Validated, and runnable on stabileo.com/research |
+| `published-figures-compared` | Numerical validation plus `reproduced_published_results: true` and `PUBLISHED_COMPARISON.json` with passing checks naming published sources, metrics, observations and tolerances |
+| `interactive` | Numerical validation plus an existing repository-relative `page` file; this does not imply published-results agreement |
+
+`summary_source` is declared provenance for human review, not machine-verified summary content.
+The checker verifies the allowed source label; it does not compare the prose to the source.
 
 ## Product route size baseline
 
-From `web/`, run `nix develop .. -c node scripts/check-research-route-size.mjs`.
-The script makes a production build with a manifest and measures uncompressed dependency
-bytes for `/en/`, `/es/`, `/pt/` and every `/app/*` mode. Landing routes count the entry's
-static closure; app routes also count App's static and lazy product dependencies (a conservative
-budget shared by all modes). Explicit lazy research routes are excluded; static research
-imports fail. HTML, bundled JS/CSS, manifest assets and statically referenced public files are counted once.
-Runtime-generated asset URLs and the engine binary are outside this gate; a fixed engine stub makes the baseline
-independent of locally built WASM. Browser smoke tests separately check actual route loading.
-Each route may grow at most 128 bytes. Research CI runs this gate.
+Research CI builds `main` and the candidate in separate directories using the candidate's
+pinned Nix toolchain and the same measurement script. Each installs its own locked dependencies.
+The main build writes a temporary baseline; the candidate compares against it with a 128-byte
+per-route tolerance. No baseline from this PR is accepted or checked in.
 
-For an intentional product change, run the same command with `--update`, review the old/new
-per-route totals and explain every increase in the PR. Do not update it to hide research
-bundle leakage. The initial baseline records this checkout, not a comparison with a historical
-revision. Use the pinned Node version and `npm ci` dependencies.
+The script measures uncompressed dependency bytes for `/en/`, `/es/`, `/pt/` and every `/app/*`
+mode. Landing routes count the entry's static closure; app routes also count App's static and
+lazy product dependencies. Explicit lazy research routes are excluded; static research imports
+fail. HTML, bundled JS/CSS, manifest assets and statically referenced public files count once.
+Runtime-generated asset URLs and the engine binary are outside this gate; a fixed engine stub
+makes the measurements independent of locally built WASM.
+
+For local comparisons, run `nix develop .. -c node scripts/check-research-route-size.mjs
+--baseline /tmp/route-main.json --update` from the main build's `web/`, then the same command
+without `--update` from the candidate's `web/`, using the same Nix toolchain for both.
+`node --test web/scripts/research-route-budget.test.mjs` checks unchanged routes, the noise
+allowance, missing measurements and negative cases for real landing/app growth.

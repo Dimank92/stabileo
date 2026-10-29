@@ -22,6 +22,9 @@ class Isolation(unittest.TestCase):
             for code in ["fracture/paper/src/lib.rs", "tools/catalog.py", "papers.yaml", "fracture/paper/reference-results/run.ts"]:
                 source.write_text(f"import data from '../../research/{code}?raw';")
                 self.assertTrue(isolation.check(root), code)
+            for code in ["fracture/paper/src/lib.rs", "${field}/${paper}/solver.js", "fracture/paper/reference-results/${name}.json"]:
+                source.write_text(f"const module = import(`../../research/{code}`);")
+                self.assertTrue(isolation.check(root), code)
             source.unlink()
             (root / "engine").mkdir()
             (root / "engine/lib.rs").write_text('include_str!("../research/papers.json");')
