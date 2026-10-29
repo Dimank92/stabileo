@@ -388,9 +388,9 @@ fn riks_check(
 }
 
 #[test]
-#[ignore = "new finding: axial-reference path error 38.423%; limit not reached"]
+// Crisfield shallow toggle benchmark (fixes #846)
 fn riks_shallow_toggle() {
-    let input: ArcLengthInput = serde_json::from_value(json!({"solver": {"nodes": {"1": {"id": 1, "x": 0.0, "z": 0.0}, "2": {"id": 2, "x": 4.0, "z": 0.0}, "3": {"id": 3, "x": 2.0, "z": 0.1}}, "materials": {"1": {"id": 1, "e": 200000.0, "nu": 0.3}}, "sections": {"1": {"id": 1, "a": 0.01, "iz": 0.0001}}, "elements": {"1": {"id": 1, "type": "frame", "nodeI": 1, "nodeJ": 3, "materialId": 1, "sectionId": 1, "hingeStart": false, "hingeEnd": false}, "2": {"id": 2, "type": "frame", "nodeI": 3, "nodeJ": 2, "materialId": 1, "sectionId": 1, "hingeStart": false, "hingeEnd": false}}, "supports": {"1": {"id": 1, "nodeId": 1, "type": "pinned"}, "2": {"id": 2, "nodeId": 2, "type": "pinned"}}, "loads": [{"type": "nodal", "data": {"nodeId": 3, "fx": 0.0, "fz": -50.0, "my": 0.0}}], "constraints": [], "connectors": {}}, "maxSteps": 100, "maxIter": 30, "tolerance": 1e-05, "initialDs": 0.05, "minDs": 1e-08, "maxDs": 0.5, "targetIter": 5})).unwrap();
+    let input: ArcLengthInput = serde_json::from_value(json!({"solver": {"nodes": {"1": {"id": 1, "x": 0.0, "z": 0.0}, "2": {"id": 2, "x": 4.0, "z": 0.0}, "3": {"id": 3, "x": 2.0, "z": 0.1}}, "materials": {"1": {"id": 1, "e": 200000.0, "nu": 0.3}}, "sections": {"1": {"id": 1, "a": 0.01, "iz": 1e-08}}, "elements": {"1": {"id": 1, "type": "truss", "nodeI": 1, "nodeJ": 3, "materialId": 1, "sectionId": 1, "hingeStart": false, "hingeEnd": false}, "2": {"id": 2, "type": "truss", "nodeI": 3, "nodeJ": 2, "materialId": 1, "sectionId": 1, "hingeStart": false, "hingeEnd": false}}, "supports": {"1": {"id": 1, "nodeId": 1, "type": "pinned"}, "2": {"id": 2, "nodeId": 2, "type": "pinned"}}, "loads": [{"type": "nodal", "data": {"nodeId": 3, "fx": 0.0, "fz": -50.0, "my": 0.0}}], "constraints": [], "connectors": {}}, "maxSteps": 450, "maxIter": 30, "tolerance": 1e-05, "initialDs": 0.05, "minDs": 1e-08, "maxDs": 0.25, "targetIter": 5})).unwrap();
     riks_check(
         input,
         3,

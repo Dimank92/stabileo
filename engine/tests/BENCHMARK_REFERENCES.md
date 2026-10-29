@@ -278,7 +278,7 @@ research-only crates or formula-only `reference` tests. `R::` below means
 | MacNeal–Harder #797: regular MITC4, both load directions | `R::macneal_regular_in`, `R::macneal_regular_out` | pass |
 | MacNeal–Harder #797: trapezoidal MITC4, both directions | `R::macneal_trapezoidal_in`, `R::macneal_trapezoidal_out` | ignored #798 |
 | MacNeal–Harder #797: parallelogram MITC4, both directions | `R::macneal_parallelogram_in`, `R::macneal_parallelogram_out` | ignored #798 |
-| Riks/Crisfield #803: shallow toggle | `R::riks_shallow_toggle` | ignored — new finding (axial-reference mismatch / incomplete path) |
+| Riks/Crisfield #803: shallow toggle | `R::riks_shallow_toggle` | pass |
 | Riks/Crisfield #803: Von Mises peak load, displacement, every path step | `R::riks_von_mises_truss` | pass |
 | Shell obstacle #809: Scordelis–Lo, 6²/8²/12²/16² | `S::research_roof_6`, `_8`, `_12`, `_16` | ignored #810 |
 | Shell obstacle #809: pinched cylinder, 6²/8²/12²/16² | `S::research_cylinder_6`, `_8`, `_12`, `_16` | ignored #810 |
@@ -326,7 +326,7 @@ All Cargo invocations used `CARGO_TARGET_DIR=/private/tmp/claude-501/codex-bench
 
 | Filter / options | Result |
 |---|---|
-| `research_benchmarks -- --nocapture` | 9 passed, 9 ignored |
+| `research_benchmarks -- --nocapture` | 13 passed, 8 ignored |
 | `benchmarks::shell_benchmark -- --test-threads=2` | 69 passed, 8 ignored (includes three new hemisphere checks) |
 | `benchmarks::corotational_benchmarks -- --test-threads=2` | 13 passed |
 | `research -- --ignored --nocapture --test-threads=2` | All 17 deliberately failed the intended accuracy/convergence assertions; no unexpected passes |
