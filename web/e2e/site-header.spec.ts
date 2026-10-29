@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { SITE_NAV } from '../src/components/site/site-nav';
 import { EXPERIMENTS } from '../src/components/research/experiments';
 
 /**
@@ -7,7 +8,7 @@ import { EXPERIMENTS } from '../src/components/research/experiments';
  *
  *   npx playwright test --grep "@smoke site header"
  */
-const ITEMS = ['basic', 'pro', 'ai', 'education', 'pricing', 'blog', 'changelog', 'research'];
+const ITEMS = SITE_NAV.map(({ id }) => id);
 const PAGES: Array<[string, string | null]> = [
   ['/en/', null],
   ['/en/blog/', 'blog'],
@@ -15,6 +16,7 @@ const PAGES: Array<[string, string | null]> = [
   ['/en/cirsoc/', null],
   ['/en/changelog/', 'changelog'],
   ['/en/research/', 'research'],
+  ['/en/tools/', 'tools'],
   ...EXPERIMENTS.map(({ path }): [string, string] => [`/en${path}/`, 'research']),
 ];
 

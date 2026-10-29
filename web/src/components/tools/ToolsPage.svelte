@@ -1,4 +1,5 @@
 <script lang="ts">
+  import './register-i18n';
   import SiteHeader from '../site/SiteHeader.svelte';
   import LandingFooter from '../landing/LandingFooter.svelte';
   import PublicLink from '../landing/PublicLink.svelte';

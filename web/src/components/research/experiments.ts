@@ -19,6 +19,16 @@ export type Experiment = {
 };
 
 export const EXPERIMENTS: Experiment[] = [
+  {
+    paperId: 'ferrari-2025',
+    path: '/research/stability/ferrari-sigmund-2025',
+    name: 'Roorda frame: reproduction in progress',
+    hook: 'Production buckling and an imperfect nonlinear path. The Koiter coefficient comparison is unfinished.',
+    thumbnail: 'research-thumbs/ferrari-sigmund-2025.svg',
+    thumbnailAlt: 'Geometry schematic: two perpendicular one-metre members of the Roorda frame, pinned at their outer ends',
+    thumbnailQuery: '',
+    code: 'https://github.com/lambdaclass/stabileo/tree/main/research/stability/ferrari-sigmund-2025',
+  },
   { paperId: 'andreassen-2011', path: '/research/optimization/andreassen-2011', name: 'Topology optimization of an MBB beam', hook: 'Redistribute material using SIMP and compare both filters against the authors’ code.', thumbnail: 'research-thumbs/andreassen-2011.svg', thumbnailAlt: 'Material density of the optimized MBB beam', thumbnailQuery: '', code: 'https://github.com/lambdaclass/stabileo/tree/main/research/optimization/andreassen-2011' },
   {
     paperId: 'pastrana-2026',
@@ -43,14 +53,14 @@ export const EXPERIMENTS: Experiment[] = [
     paperId: 'mattiasson-elastica', path: '/research/benchmarks/mattiasson-elastica',
     name: 'Mattiasson: cantilever elastica',
     hook: 'Trace the production corotational load path and inspect provisional reference comparisons, including failures.',
-    thumbnail: '', thumbnailAlt: '', thumbnailQuery: '',
+    thumbnail: 'research-thumbs/mattiasson-elastica.svg', thumbnailAlt: 'Geometry schematic of a cantilever under a tip load', thumbnailQuery: '',
     code: 'https://github.com/lambdaclass/stabileo/tree/main/engine/tests/benchmarks',
   },
   {
     paperId: 'macneal-harder-1985', path: '/research/benchmarks/macneal-harder-1985',
     name: 'MacNeal–Harder: production engine benchmarks',
     hook: 'Run the production engine on shared accuracy cases; inspect every result, including failures.',
-    thumbnail: '', thumbnailAlt: '', thumbnailQuery: '',
+    thumbnail: 'research-thumbs/macneal-harder-1985.svg', thumbnailAlt: 'Geometry schematic of the cantilever accuracy benchmark', thumbnailQuery: '',
     code: 'https://github.com/lambdaclass/stabileo/tree/main/engine/tests/benchmarks',
   },
   {

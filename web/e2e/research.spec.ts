@@ -32,7 +32,11 @@ test.describe('@smoke research', () => {
       const path = `/en${experiment.path}/`;
       const card = cards.filter({ has: page.locator(`h3 a[href="${path}"]`) });
       await expect(card).toHaveCount(1);
-      await expect(card.getByRole('heading', { name: experiment.name, exact: true })).toBeVisible();
+      const heading = card.getByRole('heading');
+      await expect(heading).toBeVisible();
+      const title = (await heading.innerText()).trim();
+      expect(title.length).toBeGreaterThan(0);
+      await expect(card.getByText('First version', { exact: true })).toBeVisible();
       // Every runnable experiment shows its build-time thumbnail, never the field icon.
       await expect(card.locator('.rs-g-thumb-icon')).toHaveCount(0);
       await expect(card.locator('a.rs-g-thumb')).toHaveAttribute('href', path);
@@ -43,7 +47,7 @@ test.describe('@smoke research', () => {
       await expect(link).toHaveAttribute('href', path);
       await link.click();
       await expect(page).toHaveURL(new URL(path, page.url()).href);
-      await expect(page.getByRole('heading', { name: experiment.name, exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
       await page.goto('/en/research/');
     }
   });

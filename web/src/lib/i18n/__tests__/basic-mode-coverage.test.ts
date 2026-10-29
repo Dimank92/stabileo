@@ -24,6 +24,7 @@ import steelEn from '../locales/steel/en';
 import steelEs from '../locales/steel/es';
 import steelPt from '../locales/steel/pt';
 import { stepsEn, stepsEs, stepsPt } from '../locales/steps';
+import { toolTranslations } from '../../../components/tools/translations';
 import { batchTranslations } from '../../../components/tools/batch-i18n';
 
 /*
@@ -33,9 +34,9 @@ import { batchTranslations } from '../../../components/tools/batch-i18n';
  */
 // This source scan also visits public tools; their companion dictionaries load only on that route.
 const merged = {
-  en: { ...en, ...steelEn, ...stepsEn, ...batchTranslations.en },
-  es: { ...es, ...steelEs, ...stepsEs, ...batchTranslations.es },
-  pt: { ...pt, ...steelPt, ...stepsPt, ...batchTranslations.pt },
+  en: { ...en, ...steelEn, ...stepsEn, ...batchTranslations.en, ...toolTranslations.en },
+  es: { ...es, ...steelEs, ...stepsEs, ...batchTranslations.es, ...toolTranslations.es },
+  pt: { ...pt, ...steelPt, ...stepsPt, ...batchTranslations.pt, ...toolTranslations.pt },
 };
 
 const SRC = join(import.meta.dirname, '../../..');

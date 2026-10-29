@@ -587,7 +587,7 @@
   let showTools = $state(routeKind().kind === 'tools');
   let tools = $state<typeof import('./components/tools/ToolsPage.svelte').default | null>(null);
   $effect(() => {
-    if (showTools && !tools) void import('./components/tools/ToolsPage.svelte').then(m => tools = m.default);
+    if (showTools && !tools) void import('./components/tools/load-page').then(m => m.loadToolsPage()).then(page => tools = page);
   });
   let showResearch = $state(routeKind().kind === 'research');
   let research = $state<typeof import('./components/research/ResearchPage.svelte').default | null>(null);

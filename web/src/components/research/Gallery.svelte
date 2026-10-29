@@ -40,6 +40,7 @@
   const authors = (list: string[]) => (list.length > 3 ? `${list.slice(0, 3).join(', ')} et al.` : list.join(', '));
   const base = import.meta.env.BASE_URL;
   const s = $derived(rs());
+  const firstVersion = $derived(({ en: 'First version', es: 'Primera versión', pt: 'Primeira versão', de: 'Erste Version', fr: 'Première version', tr: 'İlk sürüm' } as Record<string, string>)[publicI18n.locale] ?? 'First version');
   const topopt = $derived(topoptStrings(publicI18n.locale));
   const arches = $derived(archStrings());
   const f = $derived(fs());
@@ -48,6 +49,7 @@
       const dictionary = e.paperId === 'mattiasson-elastica' ? mattiassonStrings : macnealStrings;
       return dictionary[publicI18n.locale as keyof typeof dictionary] ?? dictionary.en;
     }
+    if (e.paperId === 'ferrari-2025') return { title: s.ferrariTitle, hook: s.ferrariLead };
     return e.paperId === 'grossman-2026' ? { title: s.springsTitle, hook: s.springsHook } : { title: s.shauerTitle, hook: s.shauerHook };
   }
   const nm = $derived(newmarkStrings());
@@ -71,13 +73,13 @@
         <li class="rs-g-runcard">
           <PublicLink to={e.path} class="rs-g-thumb" aria-label={e.paperId === "navier-plate" ? navier.title : e.paperId === "horne-1979" ? plastic.title : e.paperId === "cqc-1981" ? cqc.title : e.paperId === "newmark-1959" ? nm.title : e.paperId === "fairclough-2026" ? f.title : e.paperId === 'zmyslony-2026' ? arches.title : e.paperId === "andreassen-2011" ? topopt.title : e.paperId === "pastrana-2026" ? s.formTitle : e.paperId === "grossman-2026" ? s.springsTitle : experimentText(e).title}>
             {#if e.thumbnail && !thumbFailed[e.paperId]}
-              <img src="{base}{e.thumbnail}" width="640" height="400" loading="lazy" decoding="async" alt={e.paperId === "navier-plate" ? navier.field : e.paperId === "horne-1979" ? plastic.title : e.paperId === "cqc-1981" ? cqc.comparison : e.paperId === "newmark-1959" ? nm.alt : e.paperId === 'grossman-2026' ? s.springsAlt : e.paperId === "fairclough-2026" ? f.alt : e.paperId === 'zmyslony-2026' ? arches.arch : e.paperId === "andreassen-2011" ? topopt.thumbnailAlt : s[e.paperId === "pastrana-2026" ? "formAlt" : e.paperId === "grossman-2026" ? "springsAlt" : "damageAlt"]} onerror={() => (thumbFailed = { ...thumbFailed, [e.paperId]: true })} />
+              <img src="{base}{e.thumbnail}" width="640" height="400" loading="lazy" decoding="async" alt={e.thumbnailAlt} onerror={() => (thumbFailed = { ...thumbFailed, [e.paperId]: true })} />
             {:else}
               <span class="rs-g-thumb-icon"><FieldIcon field={p.area} size={96} /></span>
             {/if}
           </PublicLink>
           <div class="rs-g-runbody">
-            <div class="rs-g-meta"><span>{fieldName(p.area)}</span><span class="rs-g-status rs-g-{p.status}">{statusName(p.status)}</span></div>
+            <div class="rs-g-meta"><span>{fieldName(p.area)}</span><span class="rs-g-status rs-g-{p.status}">{statusName(p.status)}</span><span class="rs-g-status rs-g-first">{firstVersion}</span></div>
             <h3><PublicLink to={e.path}>{e.paperId === "navier-plate" ? navier.title : e.paperId === "horne-1979" ? plastic.title : e.paperId === "cqc-1981" ? cqc.title : e.paperId === "newmark-1959" ? nm.title : e.paperId === "fairclough-2026" ? f.title : e.paperId === 'zmyslony-2026' ? arches.title : e.paperId === "andreassen-2011" ? topopt.title : e.paperId === "pastrana-2026" ? s.formTitle : e.paperId === "grossman-2026" ? s.springsTitle : experimentText(e).title}</PublicLink></h3>
             <p class="rs-g-hook">{e.paperId === "navier-plate" ? navier.lead : e.paperId === "horne-1979" ? plastic.stage : e.paperId === "cqc-1981" ? cqc.stage : e.paperId === "newmark-1959" ? nm.lead : e.paperId === "fairclough-2026" ? f.lead : e.paperId === 'zmyslony-2026' ? arches.lead : e.paperId === "andreassen-2011" ? topopt.hook : e.paperId === "pastrana-2026" ? s.formLead : e.paperId === "grossman-2026" ? s.springsHook : experimentText(e).hook}</p>
             <p class="rs-g-by">{p.crossref.title}. {authors(p.crossref.authors)}, <em>{p.crossref.venue}</em>, {p.crossref.year}.</p>
@@ -145,6 +147,11 @@
 </section>
 
 <style>
+  .rs-g :global(a:link), .rs-g :global(a:visited) { color: var(--fg); }
+  .rs-g :global(a:hover) { color: var(--lp-accent); }
+  .rs-g :global(a.btn-primary:link), .rs-g :global(a.btn-primary:visited) { color: var(--lp-paper-2); }
+  .rs-g-first { color: var(--lp-paper); border-color: var(--lp-slate-2); }
+
   .rs-g {
     padding-top: clamp(4.5rem, 8vw, 6rem);
     padding-bottom: 4rem;

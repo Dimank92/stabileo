@@ -20,33 +20,27 @@
   import { routeKind } from './lib/public-route';
   import { modeToPath } from './lib/app-mode';
 
-  /** The page this address is (`lib/public-route.ts`, which main.ts reads too). */
-  const route = () => routeKind();
-
   function adoptLocaleFromPath() {
     const { locale } = parsePublicPath(location.pathname);
     if (locale && locale !== publicI18n.locale) setLocale(locale);
   }
   adoptLocaleFromPath();
 
-  let current = $state(route());
+  let current = $state(routeKind());
   /** Once loaded, the application owns the page. */
   let app = $state<typeof import('./App.svelte').default | null>(null);
   let loading: Promise<void> | null = null;
 
-  /** Stabileo Research is its own chunk: the landing and the blog never download it. */
-  let research = $state<typeof import('./components/research/ResearchPage.svelte').default | null>(null);
+  /** Each feature keeps its dependency graph behind a two-stage lazy boundary. */
+  let pages = $state<Partial<Record<'research' | 'tools', import('svelte').Component<{ path: string }>>>>({});
   $effect(() => {
-    if (current.kind === 'research' && !research) {
-      void import('./components/research/load-page')
-        .then((m) => m.loadResearchPage())
-        .then((page) => (research = page));
+    const kind = current.kind;
+    if ((kind === 'research' || kind === 'tools') && !pages[kind]) {
+      const loading = kind === 'research'
+        ? import('./components/research/load-page').then(m => m.loadResearchPage())
+        : import('./components/tools/load-page').then(m => m.loadToolsPage());
+      void loading.then(page => { pages[kind] = page; });
     }
-  });
-
-  let tools = $state<typeof import('./components/tools/ToolsPage.svelte').default | null>(null);
-  $effect(() => {
-    if (current.kind === 'tools' && !tools) void import('./components/tools/ToolsPage.svelte').then(m => tools = m.default);
   });
 
   function loadApp() {
@@ -63,10 +57,10 @@
 
   function sync() {
     adoptLocaleFromPath();
-    current = route();
+    current = routeKind();
     if (current.kind === 'app') void loadApp();
   }
-  if (route().kind === 'app') void loadApp();
+  if (routeKind().kind === 'app') void loadApp();
 
   // Until the application is up, the public pages' own navigation comes through here
   // (`landing-utils.ts`); App.svelte listens for the same events once it is mounted.
@@ -81,7 +75,7 @@
     if (app) return;
     // App.svelte decides its mode from the address, so the address goes first: the one App's own
     // enterApp() pushes from a public page.
-    if (route().kind !== 'app') history.pushState(null, '', modeToPath('basico'));
+    if (routeKind().kind !== 'app') history.pushState(null, '', modeToPath('basico'));
     sync();
   }
   function onPopState() {
@@ -104,13 +98,9 @@
   <App />
 {:else if current.kind === 'blog'}
   <BlogPage path={current.path} />
-{:else if current.kind === 'research'}
-  {#if research}
-    {@const Research = research}
-    <Research path={current.path} />
-  {/if}
-{:else if current.kind === 'tools'}
-  {#if tools}{@const Tools = tools}<Tools path={current.path} />{/if}
+{:else if current.kind === 'research' || current.kind === 'tools'}
+  {@const Page = pages[current.kind]}
+  {#if Page}<Page path={current.path} />{/if}
 {:else if current.kind === 'landing'}
   <LandingPage />
 {/if}
