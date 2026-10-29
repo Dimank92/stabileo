@@ -225,7 +225,21 @@ export const REBAR_GRADES: ReadonlyArray<{ name: string; fy: number }> = [
   { name: 'ADN 420', fy: 420 }, { name: 'ADN 500', fy: 500 }, { name: 'AL 220', fy: 220 },
 ];
 
-/** f'c of a concrete material: its own `fc` when stated, else the `fy` older projects kept it in. */
-export function concreteFc(m: { fc?: number; fy?: number } | undefined): number | undefined {
-  return m?.fc ?? m?.fy;
+/** f'c of a concrete material: its own `fc` when stated, else the `fy` older projects kept it in, or parsed from standard grade names like H-30. */
+export function concreteFc(m: { fc?: number; fy?: number; name?: string; gradeId?: string } | undefined): number | undefined {
+  if (!m) return undefined;
+  if (typeof m.fc === 'number' && Number.isFinite(m.fc) && m.fc > 0) return m.fc;
+  if (typeof m.fy === 'number' && Number.isFinite(m.fy) && m.fy > 0) return m.fy;
+  if (m.gradeId && /^cirsoc-h(\d+)/i.test(m.gradeId)) {
+    const match = m.gradeId.match(/^cirsoc-h(\d+)/i);
+    if (match) return parseInt(match[1], 10);
+  }
+  if (m.name) {
+    const match = m.name.match(/^H[- ]?(\d+)/i);
+    if (match) {
+      const val = parseInt(match[1], 10);
+      if (val > 0 && val <= 150) return val;
+    }
+  }
+  return undefined;
 }

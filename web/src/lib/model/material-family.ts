@@ -76,6 +76,8 @@ export interface MaterialFamilyVerdict {
 /** The minimum a material has to look like for this module to read it. */
 export interface FamilyReadableMaterial {
   fy?: number;
+  fc?: number;
+  name?: string;
   /** PR #132's field. Absent on this branch; read defensively so both shapes work. */
   gradeId?: string;
   /** Timber reference design values (`engine/design/materials/timber.ts`): a declared timber. */
@@ -114,8 +116,11 @@ export function materialFamilyOf(
   // Reference design values for timber are a declaration as plain as a grade.
   if (material.timber) return { family: 'timber', basis: 'declaredGrade' };
 
-  const fy = material.fy;
+  const fy = material.fy ?? material.fc;
   if (fy === undefined || fy === null || !Number.isFinite(fy) || fy <= 0) {
+    if (material.name && /^H[- ]?\d+/i.test(material.name)) {
+      return { family: 'concrete', basis: 'inferredFromFy', caveatKey: 'steel.family.inferredConcrete' };
+    }
     return { family: 'unknown', basis: 'noData', caveatKey: 'steel.family.noStrength' };
   }
 
