@@ -42,6 +42,7 @@ import { existsSync } from 'node:fs';
 import { join, dirname, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rootHandoffScript } from './root-handoff';
+import { PUBLIC_LOCALES, type Locale } from '../src/lib/i18n/offered';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 /**
@@ -58,7 +59,7 @@ const DIST = process.env.PRERENDER_OUT
   ? resolve(process.env.PRERENDER_OUT)
   : join(ROOT, 'dist');
 const ORIGIN = 'https://stabileo.com';
-const LOCALES = ['en', 'es', 'pt', 'de', 'fr', 'tr'] as const;
+const LOCALES = PUBLIC_LOCALES;
 /**
  * The language a browser we do not speak is sent to, and the one the root
  * serves. Kept beside LOCALES because `ROOT_REDIRECT` is built from both.
@@ -66,29 +67,6 @@ const LOCALES = ['en', 'es', 'pt', 'de', 'fr', 'tr'] as const;
 const DEFAULT_LOCALE = 'en';
 /** Build day, for the sitemap's lastmod. */
 const TODAY = new Date().toISOString().slice(0, 10);
-type Locale = (typeof LOCALES)[number];
-
-/**
- * `LOCALES` above is the application's `PUBLIC_LOCALES`, restated.
- *
- * It cannot be imported: that constant lives in a `.svelte.ts` module full of
- * runes, and this script runs under tsx with no Svelte compiler. So it is read
- * out of the source instead — the same trick `publicPaths()` uses for the post
- * slugs — and the build fails rather than silently prerendering a language the
- * application no longer offers, or missing one it just gained.
- */
-async function assertLocalesMatchTheApp() {
-  const source = await readFile(join(ROOT, 'src/lib/i18n/store.svelte.ts'), 'utf8');
-  const declared = source.match(/export const PUBLIC_LOCALES\s*=\s*\[([^\]]*)\]/);
-  if (!declared) throw new Error('prerender: could not find PUBLIC_LOCALES in store.svelte.ts');
-  const found = [...declared[1].matchAll(/'([a-z-]+)'/g)].map((m) => m[1]);
-  if (found.join(',') !== LOCALES.join(',')) {
-    throw new Error(
-      `prerender: PUBLIC_LOCALES is [${found}] but this script prerenders [${LOCALES}]. ` +
-        'Update LOCALES here — the pages, the sitemap and the root handoff all come from it.',
-    );
-  }
-}
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -272,8 +250,7 @@ async function publicPaths(): Promise<string[]> {
  * The script the bare root carries, to hand a reader on to their language.
  *
  * Built by `scripts/root-handoff.ts`, which is where the reasoning and the
- * tests for it live. The LIST comes from `LOCALES` above, which
- * `assertLocalesMatchTheApp()` ties back to the application's own.
+ * tests for it live. The LIST comes from `LOCALES` above, which is the application's own.
  */
 const ROOT_REDIRECT = rootHandoffScript(LOCALES, DEFAULT_LOCALE);
 
@@ -353,7 +330,6 @@ async function main() {
     // through a tree this run never touched.
     throw new Error(`prerender: ${join(DIST, 'index.html')} is missing — run the build first`);
   }
-  await assertLocalesMatchTheApp();
   /*
    * Port 0 asks the OS for a free one. A fixed port made the build fail with
    * `EADDRINUSE` whenever anything else happened to be listening — including

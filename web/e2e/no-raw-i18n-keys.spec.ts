@@ -32,6 +32,7 @@ import fullDe from '../src/lib/i18n/locales/full/de';
 import fullFr from '../src/lib/i18n/locales/full/fr';
 import fullTr from '../src/lib/i18n/locales/full/tr';
 import { rawKeyIndex, findRawKeys } from '../src/lib/i18n/raw-keys';
+import { OFFERED_LOCALES, type Locale } from '../src/lib/i18n/offered';
 
 const INDEX = rawKeyIndex([
   { ...es, ...steelEs, ...stepsEs },
@@ -40,25 +41,19 @@ const INDEX = rawKeyIndex([
   fullDe, fullFr, fullTr,
 ] as Array<Record<string, string>>);
 
-const LOCALES = ['es', 'en', 'pt', 'de', 'fr', 'tr'] as const;
+const LOCALES = OFFERED_LOCALES;
 
 /**
  * A fresh project's name, in each language, from the dictionaries: «New structure», «Nueva
  * estructura», «Nova estrutura». The tab shows it in its name field, where the key once stood.
  */
-const NEW_STRUCTURE: Record<(typeof LOCALES)[number], string> = {
-  es: (es as Record<string, string>)['tabBar.newStructure'],
-  en: (en as Record<string, string>)['tabBar.newStructure'],
-  pt: (pt as Record<string, string>)['tabBar.newStructure'],
-  de: (fullDe as Record<string, string>)['tabBar.newStructure'] ?? (en as Record<string, string>)['tabBar.newStructure'],
-  fr: (fullFr as Record<string, string>)['tabBar.newStructure'] ?? (en as Record<string, string>)['tabBar.newStructure'],
-  tr: (fullTr as Record<string, string>)['tabBar.newStructure'] ?? (en as Record<string, string>)['tabBar.newStructure'],
-};
+const DICTS: Record<Locale, Record<string, string>> = { es, en, pt, de: fullDe, fr: fullFr, tr: fullTr } as never;
+const NEW_STRUCTURE = (locale: Locale): string => DICTS[locale]['tabBar.newStructure'];
 
 /** The project tab names a fresh project in the reader's language. */
-async function expectNewProjectName(page: Page, locale: (typeof LOCALES)[number]): Promise<void> {
-  expect(NEW_STRUCTURE[locale], `the ${locale} dictionary names a new structure`).toBeTruthy();
-  await expect(page.locator('input.tab-name').first()).toHaveValue(NEW_STRUCTURE[locale]);
+async function expectNewProjectName(page: Page, locale: Locale): Promise<void> {
+  expect(NEW_STRUCTURE(locale), `the ${locale} dictionary names a new structure`).toBeTruthy();
+  await expect(page.locator('input.tab-name').first()).toHaveValue(NEW_STRUCTURE(locale));
 }
 
 /** Everything a person is shown, with where: visible text, tooltips, labels, the window title. */

@@ -1,5 +1,11 @@
 import { test, expect, type Page } from '@playwright/test';
 import { pickLanguage } from './fixtures';
+import { PUBLIC_LOCALES, isComplete, type Locale } from '../src/lib/i18n/offered';
+
+const NAME: Record<Locale, string> = { en: 'English', es: 'Español', pt: 'Português', de: 'Deutsch', fr: 'Français', tr: 'Türkçe' };
+const OG: Record<Locale, string> = { en: 'en_US', es: 'es_AR', pt: 'pt_BR', de: 'de_DE', fr: 'fr_FR', tr: 'tr_TR' };
+/** The Open Graph alternates a public page in `locale` declares: every other public language. */
+const ogAlternates = (locale: Locale) => PUBLIC_LOCALES.filter((l) => l !== locale).map((l) => OG[l]);
 
 /**
  * Landing-page coverage.
@@ -251,7 +257,7 @@ test.describe('@landing landing page', () => {
       .getByTestId('nav-lang-list')
       .getByRole('option')
       .allInnerTexts();
-    expect(names.map((n) => n.trim())).toEqual(['English', 'Español', 'Português', 'Deutsch', 'Français', 'Türkçe']);
+    expect(names.map((n) => n.trim())).toEqual(PUBLIC_LOCALES.map((l) => NAME[l]));
   });
 
   test('a Brazilian browser gets the Portuguese landing', async ({ browser }) => {
@@ -271,11 +277,11 @@ test.describe('@landing landing page', () => {
     await ctx.close();
   });
 
-  test('a French browser gets the French landing', async ({ browser }) => {
+  test('a French browser gets the French landing once French is complete, and English until then', async ({ browser }) => {
     const ctx = await browser.newContext({ locale: 'fr-FR' });
     const page = await ctx.newPage();
     await bootLanding(page, { manual: false });
-    await expect(page.getByTestId('nav-lang')).toHaveAttribute('data-value', 'fr');
+    await expect(page.getByTestId('nav-lang')).toHaveAttribute('data-value', isComplete('fr') ? 'fr' : 'en');
     await ctx.close();
   });
 
@@ -493,7 +499,7 @@ test.describe('@landing landing page', () => {
       expect(one(h, 'og:site_name')).toBe('Stabileo');
       expect(one(h, 'og:locale')).toBe('en_US');
       // One tag per alternate language, which is how Open Graph reads them.
-      expect(h.meta['og:locale:alternate']).toEqual(['es_AR', 'pt_BR', 'de_DE', 'fr_FR', 'tr_TR']);
+      expect(h.meta['og:locale:alternate']).toEqual(ogAlternates('en'));
       expect(one(h, 'og:title')).toBe(EN_TITLE);
       expect(one(h, 'twitter:card')).toBe('summary_large_image');
       expect(one(h, 'twitter:title')).toBe(EN_TITLE);
@@ -557,7 +563,7 @@ test.describe('@landing landing page', () => {
       expect(h.title).toBe('Stabileo — Software de cálculo estructural gratis, en el navegador');
       expect(one(h, 'og:title')).toBe(h.title);
       expect(one(h, 'og:locale')).toBe('es_AR');
-      expect(h.meta['og:locale:alternate']).toEqual(['en_US', 'pt_BR', 'de_DE', 'fr_FR', 'tr_TR']);
+      expect(h.meta['og:locale:alternate']).toEqual(ogAlternates('es'));
       expect(h.canonicals).toEqual(['https://stabileo.com/es/']);
       // The description is the hero lead, which now carries the positioning:
       // a free, open platform with three modes, rather than live re-solving.
@@ -580,7 +586,7 @@ test.describe('@landing landing page', () => {
       expect(h.title).toBe('Stabileo — Software de cálculo estrutural grátis, no navegador');
       expect(one(h, 'og:title')).toBe(h.title);
       expect(one(h, 'og:locale')).toBe('pt_BR');
-      expect(h.meta['og:locale:alternate']).toEqual(['en_US', 'es_AR', 'de_DE', 'fr_FR', 'tr_TR']);
+      expect(h.meta['og:locale:alternate']).toEqual(ogAlternates('pt'));
       expect(h.canonicals).toEqual(['https://stabileo.com/pt/']);
       expect(one(h, 'twitter:description')).toBe(one(h, 'description'));
     });
@@ -594,7 +600,7 @@ test.describe('@landing landing page', () => {
       await expect(page.locator('.landing')).toHaveCount(0);
 
       const h = await readHead(page);
-      expect(h.meta['og:locale:alternate']).toEqual(['es_AR', 'pt_BR', 'de_DE', 'fr_FR', 'tr_TR']);
+      expect(h.meta['og:locale:alternate']).toEqual(['es_AR', 'pt_BR']);
       expect(one(h, 'og:locale')).toBe('en_US');
     });
 

@@ -6,17 +6,16 @@ import {
   de as publicDe, fr as publicFr, tr as publicTr,
 } from 'virtual:public-i18n';
 import type { Translations } from './types';
+import { OFFERED_LOCALES, PUBLIC_LOCALES, type Locale } from './offered';
 
 // A key a language lacks renders in English. The steel keys live only in `locales/steel/*`,
 // so a bundled dictionary registered without its steel half shows raw keys instead.
-const dicts: Record<string, Translations> = {
-  es: { ...publicEs },
-  en: { ...publicEn },
-  pt: { ...publicPt },
-  de: { ...publicDe },
-  fr: { ...publicFr },
-  tr: { ...publicTr },
+const PUBLIC_DICTS: Record<Locale, Translations> = {
+  es: publicEs, en: publicEn, pt: publicPt, de: publicDe, fr: publicFr, tr: publicTr,
 };
+const dicts: Record<string, Translations> = Object.fromEntries(
+  OFFERED_LOCALES.map((l) => [l, { ...PUBLIC_DICTS[l] }]),
+);
 
 const LAZY_LOCALES: Record<string, () => Promise<{ default: Translations }>> = {
   de: () => import('./locales/full/de'),
@@ -39,7 +38,7 @@ export function registerDictionaries(full: Record<'es' | 'en' | 'pt', Translatio
 /** Resolves once `loc`'s whole dictionary is registered, or has failed to load and left English; at once for the bundled languages. */
 export function ensureLocale(loc: string): Promise<void> {
   const load = LAZY_LOCALES[loc];
-  if (!load) return Promise.resolve();
+  if (!load || !isOfferedLocale(loc)) return Promise.resolve();
   let pending = pendingLoads.get(loc);
   if (!pending) {
     pending = load().then(
@@ -75,8 +74,8 @@ if (hasLocalStorage()) {
 	}
 }
 
-export const OFFERED_LOCALES = ['es', 'en', 'pt', 'de', 'fr', 'tr'] as const;
-export type OfferedLocale = (typeof OFFERED_LOCALES)[number];
+export { OFFERED_LOCALES, PUBLIC_LOCALES };
+export type OfferedLocale = Locale;
 
 /** Whether a bare language code is one the app offers. */
 export function isOfferedLocale(code: string): code is OfferedLocale {
@@ -136,7 +135,7 @@ function lookup(key: string, locale: string): string {
  * re-render the whole app mid-export.
  */
 export function tAt(key: string, locale: string): string {
-	if (locale !== _locale && appDictionaries && LAZY_LOCALES[locale] && !pendingLoads.has(locale)) void ensureLocale(locale);
+	if (locale !== _locale && appDictionaries && !pendingLoads.has(locale)) void ensureLocale(locale);
 	return lookup(key, locale);
 }
 
@@ -222,8 +221,7 @@ export const i18n = {
 	setLocale
 };
 
-export const PUBLIC_LOCALES = ['en', 'es', 'pt', 'de', 'fr', 'tr'] as const;
-export type PublicLocale = (typeof PUBLIC_LOCALES)[number];
+export type PublicLocale = Locale;
 
 function isPublicLocale(loc: string): loc is PublicLocale {
 	return (PUBLIC_LOCALES as readonly string[]).includes(loc);
