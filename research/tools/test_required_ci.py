@@ -17,6 +17,11 @@ assert 'workflow_call' in research.get('on', research.get(True))
 for job in research['jobs'].values():
     assert job['runs-on'] == 'ubuntu-latest'
 assert {'phasefield', 'catalog', 'isolation', 'route-size'} <= research['jobs'].keys()
+# Network checks never run inside the required CI OK (the caller's workflow name is CI there).
+assert workflow['name'] == 'CI'
+for name, job in research['jobs'].items():
+    online = any('--online' in step.get('run', '') or '--links' in step.get('run', '') for step in job['steps'])
+    assert not online or job.get('if') == "github.workflow == 'Research'", name
 script = jobs['ci-ok']['steps'][0]['run']
 for result, expected in [('success', 0), ('skipped', 0), ('failure', 1), ('cancelled', 1)]:
     run = subprocess.run(['sh', '-c', script], env={'RESULTS': f'success skipped {result}'}, capture_output=True)
