@@ -7,6 +7,7 @@
   import { onDestroy, onMount } from 'svelte';
   import refCsv from '../../../../../research/fracture/shauer-2025/reference-results/ex2_steps.csv?raw';
   import validation from '../../../../../research/fracture/shauer-2025/VALIDATION.json';
+  import { rs } from '../i18n';
   import { solverStepCount } from './steps';
   import { compareReference, deepLinkStep } from './comparison';
   import LineChart from './LineChart.svelte';
@@ -26,6 +27,7 @@
   import Toggles from '../shell/Toggles.svelte';
   import ParamRow from '../shell/ParamRow.svelte';
 
+  const strings = $derived(rs());
   const STABILEO = 'var(--rs-plot-ours)';
   const REFERENCE = 'var(--rs-plot-ref)';
   const BASE = `${import.meta.env.BASE_URL}research-wasm/shauer-2025/`;
@@ -249,9 +251,9 @@
     setParams: (p: Record<string, number | string | boolean>) => {
       playback.interact();
       showTab('parameters');
-      if (typeof p.l0 === 'number') l0 = p.l0;
-      if (typeof p.e === 'number') e = p.e;
-      if (typeof p.gc === 'number') gc = p.gc;
+      if (typeof p.l0 === 'number') { l0 = p.l0; invalid.l0 = !inRange(l0, LIMITS.l0); }
+      if (typeof p.e === 'number') { e = p.e; invalid.e = !inRange(e, LIMITS.e); }
+      if (typeof p.gc === 'number') { gc = p.gc; invalid.gc = !inRange(gc, LIMITS.gc); }
       if (typeof p.mesh === 'string' && p.mesh in MESHES) meshKey = p.mesh as MeshKey;
       if (typeof p.history === 'boolean') history = p.history;
       if (p.reset) reset();
@@ -539,7 +541,7 @@
             <button class="btn btn-primary btn-sm" type="button" disabled={!valid} onclick={() => start(false)}>Run</button>
             <button class="btn btn-ghost btn-sm" type="button" disabled={!valid} onclick={() => start(true)}>Solve again in this browser</button>
           {/if}
-          {#if !isReference}<button class="btn btn-ghost btn-sm" type="button" onclick={reset}>Reset to the paper’s parameters</button>{/if}
+          {#if !isReference}<button class="btn btn-ghost btn-sm" type="button" onclick={reset}>{strings.resetParameters}</button>{/if}
           {#if run}<button class="btn btn-ghost btn-sm" type="button" onclick={backToReplay}>Back to the replay</button>{/if}
         </div>
         <p class="rs-status" aria-live="polite">

@@ -52,7 +52,7 @@
       </p>
       <VerificationSummary
         reference={verification?.reference ?? (checks ? { kind: 'checks', passed: checks.passed, total: checks.total, href: '#checks' } : { kind: 'none', why: '' })}
-        published={verification?.published ?? (paper.reproduced_published_results ? { kind: 'checks', passed: 0, total: 0 } : { kind: 'none', why: s.notComparedWhy })}
+        published={verification?.published ?? { kind: 'none', why: s.notComparedWhy }}
       />
       <p class="rs-lead" lang="en">{lead}</p>
     </header>

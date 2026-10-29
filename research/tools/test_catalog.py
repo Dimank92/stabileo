@@ -2,6 +2,7 @@
 
   python3 -I research/tools/test_catalog.py [--online]
 """
+import hashlib
 import copy
 import importlib.util
 import json
@@ -64,8 +65,12 @@ def main():
         catalog.ROOT = os.path.join(tmp, "research")
         implementation = Path(catalog.ROOT) / base[0]["implementation"]
         (implementation / "reference-results").mkdir(parents=True)
-        (implementation / "reference-results/MANIFEST.json").write_text("{}")
-        (implementation / "VALIDATION.json").write_text(json.dumps({"checks": [{"passed": True}]}))
+        reference = implementation / "reference-results/data.csv"
+        reference.write_text("reference")
+        manifest = implementation / "reference-results/MANIFEST.json"
+        manifest_text = json.dumps({"files_sha256": {"data.csv": hashlib.sha256(reference.read_bytes()).hexdigest()}})
+        manifest.write_text(manifest_text)
+        (implementation / "VALIDATION.json").write_text(json.dumps({"checks": [{"passed": True, "metric": "error", "observed": 0, "tolerance": 0.01}]}))
         comparison = implementation / "PUBLISHED_COMPARISON.json"
         comparison.write_text(json.dumps({"checks": [{"source": "paper figure 3", "metric": "relative error", "observed": 0.001, "tolerance": 0.01, "passed": True}]}))
         entry = mutated(lambda p: p.update(status="published-figures-compared", reproduced_published_results=True))[0]
@@ -85,9 +90,32 @@ def main():
         errors = []
         catalog.check_entry(entry, errors)
         assert not errors, errors
+        entry["reproduced_published_results"] = True
+        errors = []
+        catalog.check_entry(entry, errors)
+        assert errors, "interactive published claim needs comparison evidence"
+        entry["reproduced_published_results"] = False
+        for bad in [{}, {"files_sha256": {}}, {"files_sha256": {"data.csv": "invalid"}}, {"files_sha256": {"data.csv": "0" * 64}}]:
+            manifest.write_text(json.dumps(bad))
+            errors = []
+            catalog.check_entry(entry, errors)
+            assert errors, bad
+        manifest.write_text(manifest_text)
+        (implementation / "VALIDATION.json").write_text('{"checks": []}')
+        errors = []
+        catalog.check_entry(entry, errors)
+        assert errors, "empty validation checks"
+        for change in [{"passed": "false"}, {"passed": 1}, {"tolerance": -1}, {"observed": True}, {"observed": 1}, {"observed": float("nan")}]:
+            check = {"passed": True, "metric": "error", "observed": 0, "tolerance": 0.01, **change}
+            (implementation / "VALIDATION.json").write_text(json.dumps({"checks": [check]}))
+            errors = []
+            catalog.check_entry(entry, errors)
+            assert errors, change
     print("ok   validates status-specific evidence and strips display title markup")
 
     cases = {
+        "string boolean": lambda p: p.update(reproduced_published_results="false"),
+        "integer boolean": lambda p: p.update(reproduced_published_results=1),
         "published claim without comparison": lambda p: p.update(status="published-figures-compared", reproduced_published_results=True),
         "interactive without page": lambda p: p.update(status="interactive"),
         "interactive missing page": lambda p: p.update(status="interactive", page="web/src/components/research/Missing.svelte"),

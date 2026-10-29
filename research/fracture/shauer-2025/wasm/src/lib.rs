@@ -63,17 +63,8 @@ impl Simulation {
     }
 }
 
-// Check before problem() allocates nodes, connectivity or solver matrices. The notched square
-// duplicates the negative-x half of the notch row in addition to the rectangular grid.
 fn browser_solver(plate: &NotchedPlate) -> Result<Solver, String> {
-    let nodes = plate.mesh.nx.checked_add(1)
-        .zip(plate.mesh.ny.checked_add(1))
-        .and_then(|(x, y)| x.checked_mul(y))
-        .and_then(|n| n.checked_add(plate.mesh.nx / 2))
-        .ok_or("mesh node count overflows")?;
-    if nodes > MAX_NODES {
-        return Err(format!("mesh has {nodes} nodes; the browser limit is {MAX_NODES}"));
-    }
+    plate.mesh.checked_node_count(MAX_NODES)?;
     Solver::new(plate.problem()?)
 }
 
@@ -83,7 +74,7 @@ mod tests {
 
     #[test]
     fn oversized_configs_are_rejected_before_mesh_allocation() {
-        for (nx, ny) in [(400, 400), (usize::MAX, 80), (70, usize::MAX),
+        for (nx, ny) in [(198, 200), (400, 400), (usize::MAX, 80), (70, usize::MAX),
                          (usize::MAX - 1, 80), (usize::MAX - 1, 0)] {
             let mut plate = NotchedPlate::reference();
             plate.mesh.nx = nx;

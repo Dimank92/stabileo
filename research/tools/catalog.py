@@ -12,6 +12,8 @@ also fetches each GitHub code link (set GITHUB_TOKEN to avoid the anonymous rate
 `show` prints the Crossref block for a DOI, to paste into a new entry.
 """
 import copy
+import hashlib
+import math
 import html
 import json
 import os
@@ -90,6 +92,20 @@ def crossref_block(doi):
     }
 
 
+def valid_checks(checks, published=False):
+    def finite_number(value):
+        return type(value) in (int, float) and math.isfinite(value)
+
+    return isinstance(checks, list) and bool(checks) and all(
+        isinstance(c, dict) and c.get("passed") is True and
+        isinstance(c.get("metric"), str) and bool(c["metric"].strip()) and
+        finite_number(c.get("observed")) and finite_number(c.get("tolerance")) and
+        0 <= c["observed"] <= c["tolerance"] and
+        (not published or isinstance(c.get("source"), str) and bool(c["source"].strip()))
+        for c in checks
+    )
+
+
 def check_entry(p, errors):
     pid = p.get("id", "?")
     for k in REQUIRED:
@@ -110,6 +126,8 @@ def check_entry(p, errors):
     if status not in STATUSES:
         errors.append(f"{pid}: status '{status}' not in {STATUSES}")
         return
+    if type(p.get("reproduced_published_results")) is not bool:
+        errors.append(f"{pid}: reproduced_published_results must be a boolean")
     rank = STATUSES.index(status)
     impl = p.get("implementation")
     if rank >= 1:
@@ -119,6 +137,24 @@ def check_entry(p, errors):
         manifest = os.path.join(ROOT, impl, "reference-results", "MANIFEST.json")
         if not os.path.isfile(manifest):
             errors.append(f"{pid}: status '{status}' needs {os.path.relpath(manifest, ROOT)}")
+        else:
+            with open(manifest) as f:
+                evidence = json.load(f)
+            hashes = evidence.get("files_sha256")
+            if not isinstance(hashes, dict) or not hashes:
+                errors.append(f"{pid}: manifest needs nonempty files_sha256")
+            else:
+                for name, digest in hashes.items():
+                    root = os.path.realpath(os.path.dirname(manifest))
+                    target = os.path.realpath(os.path.join(root, name))
+                    if (not target.startswith(root + os.sep) or
+                            not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest) or
+                            not os.path.isfile(target)):
+                        errors.append(f"{pid}: invalid reference hash entry {name}")
+                    else:
+                        with open(target, "rb") as f:
+                            if hashlib.sha256(f.read()).hexdigest() != digest:
+                                errors.append(f"{pid}: reference hash mismatch for {name}")
     if rank >= 3:
         tests = os.path.join(ROOT, impl, "VALIDATION.json")
         if not os.path.isfile(tests):
@@ -126,10 +162,10 @@ def check_entry(p, errors):
         else:
             with open(tests) as f:
                 v = json.load(f)
-            if not v.get("checks") or not all(c.get("passed") for c in v["checks"]):
+            if not valid_checks(v.get("checks")):
                 errors.append(f"{pid}: status '{status}' but VALIDATION.json has a failing or no check")
-    if status == "published-figures-compared":
-        comparison = os.path.join(ROOT, impl, "PUBLISHED_COMPARISON.json")
+    if status == "published-figures-compared" or p.get("reproduced_published_results") is True:
+        comparison = os.path.join(ROOT, impl or "", "PUBLISHED_COMPARISON.json")
         if p.get("reproduced_published_results") is not True:
             errors.append(f"{pid}: published comparison requires reproduced_published_results: true")
         if not os.path.isfile(comparison):
@@ -138,9 +174,7 @@ def check_entry(p, errors):
             with open(comparison) as f:
                 evidence = json.load(f)
             checks = evidence.get("checks", [])
-            if not checks or not all(c.get("passed") is True and c.get("source") and
-                                     c.get("metric") and isinstance(c.get("observed"), (int, float)) and
-                                     isinstance(c.get("tolerance"), (int, float)) for c in checks):
+            if not valid_checks(checks, published=True):
                 errors.append(f"{pid}: published comparison needs passing checks with sources, metrics, observations and tolerances")
     if status == "interactive":
         page = p.get("page")

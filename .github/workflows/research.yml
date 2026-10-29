@@ -1,8 +1,7 @@
 name: Research
 
-# Stabileo Research (research/): experimental, not part of the required checks, never on self-hosted
-# runners. Web entry/dependency changes also run the route budgets; research remains isolated.
 on:
+  workflow_call:
   push:
     branches: [main]
     paths:
@@ -30,7 +29,7 @@ on:
     - cron: '17 6 * * 1'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-research-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -84,6 +83,7 @@ jobs:
         run: |
           python3 -m venv /tmp/catalog-venv
           /tmp/catalog-venv/bin/pip install --require-hashes -r research/tools/requirements.txt
+      - run: /tmp/catalog-venv/bin/python -I research/tools/test_required_ci.py
       - name: Checker rejects bad entries
         run: /tmp/catalog-venv/bin/python -I research/tools/test_catalog.py --online
       - name: Every DOI, title, author list, year, venue and code license matches its source

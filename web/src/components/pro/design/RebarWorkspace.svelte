@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { editorActivity } from '../../../lib/utils/editor-activity';
+  const editorActive = editorActivity();
   /**
    * The 3-D reinforcement workspace: the whole window, not a corner of it.
    *
@@ -271,6 +273,7 @@
   });
 
   function onKeydown(e: KeyboardEvent) {
+    if (!editorActive()) return;
     if (!rebarWorkspace.open) return;
     if (e.key === 'Escape') { rebarWorkspace.close(); return; }
     if (cycleTabWithin(dialogEl, e)) e.preventDefault();
