@@ -1,6 +1,21 @@
 import type { Translations } from '../types';
 
 const fr: Translations = {
+  "tools.firstVersion": "Première version",
+  "tools.simply-supported-beam.subtitle": "Flèche, effort tranchant et moment fléchissant d’une poutre sur deux appuis.",
+  "tools.cantilever-beam.subtitle": "Flèche, effort tranchant et moment fléchissant d’une poutre encastrée à une extrémité.",
+  "tools.column-buckling.subtitle": "Charge critique élastique, premier mode de flambement et longueur efficace.",
+  "tools.effectiveLength": "Longueur efficace",
+  "tools.assumptionsTitle": "Hypothèses",
+  "tools.modeNote": "L’amplitude du mode est arbitraire et amplifiée pour la visualisation ; ce n’est pas un déplacement postcritique. L’axe de la barre est horizontal.",
+  "tools.technical": "Détails techniques",
+  "tools.solverNote": "Solveur de production Stabileo · éléments de portique plans d’Euler–Bernoulli.",
+  "tools.dofs": "DDL nodaux totaux",
+  "tools.residualNote": "Résidu d’équilibre des forces",
+  "tools.openTool": "Ouvrir",
+  "tools.mode": "Premier mode de flambement",
+  "tools.structure": "Structure et déformée",
+  "tools.deformedNote": "La déformation est amplifiée pour la visualisation.",
   "tools.referenceBooks": "Timoshenko & Gere, Theory of Elastic Stability, 2 édition (1961); Young & Budynas, Roark’s Formulas for Stress and Strain, 7 édition (2002), Chapitre 8.",
   "landing.navTools": "Outils",
   "tools.index": "Calculateurs de structures gratuits",
@@ -12,6 +27,7 @@ const fr: Translations = {
   "tools.modulus": "Module d’élasticité",
   "tools.inertia": "Moment quadratique",
   "tools.load": "Intensité de charge",
+  "tools.loadType": "Type de charge",
   "tools.position": "Position de charge depuis la gauche",
   "tools.uniform": "Charge uniforme",
   "tools.point": "Charge ponctuelle",
@@ -38,7 +54,7 @@ const fr: Translations = {
   "tools.failed": "Échec du calcul.",
   "tools.loading": "Calcul en cours…",
   "tools.at": "à",
-  "tools.bucklingNote": "Le flambement utilise 32 éléments de portique et une compression de référence de 1 kN. L’erreur éléments finis est affichée sans correction. K = 0.7 est une approximation arrondie encastré–articulé (K exact ≈ 0.699156).",
+  "tools.bucklingNote": "Le flambement utilise 32 éléments de portique. Pour un poteau encastré–articulé, K = 0.7 est la valeur arrondie usuelle ; la valeur exacte est environ 0.6992. Le solveur traite directement les conditions aux limites : l’écart d’environ 0.24% provient surtout de cet arrondi, et non de la discrétisation.",
   "tools.columnNote": "Les réactions et diagrammes du poteau décrivent la compression de référence de 1 kN, pas un état postcritique. L’axe de l’élément est horizontal dans le modèle exporté.",
 
   // ─── Shared scalar-field viewer ───

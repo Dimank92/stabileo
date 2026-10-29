@@ -1,5 +1,20 @@
 import type { Translations } from '../types';
 const pt: Translations = {
+  "tools.firstVersion": "Primeira versão",
+  "tools.simply-supported-beam.subtitle": "Flecha, esforço cortante e momento fletor de uma viga sobre dois apoios.",
+  "tools.cantilever-beam.subtitle": "Flecha, esforço cortante e momento fletor de uma viga engastada em uma extremidade.",
+  "tools.column-buckling.subtitle": "Carga crítica elástica, primeiro modo de flambagem e comprimento efetivo.",
+  "tools.effectiveLength": "Comprimento efetivo",
+  "tools.assumptionsTitle": "Hipóteses",
+  "tools.modeNote": "A amplitude do modo é arbitrária e ampliada para visualização; não é um deslocamento pós-crítico. O eixo da barra é horizontal.",
+  "tools.technical": "Detalhes técnicos",
+  "tools.solverNote": "Solver de produção do Stabileo · elementos planos de pórtico de Euler–Bernoulli.",
+  "tools.dofs": "Graus de liberdade nodais totais",
+  "tools.residualNote": "Resíduo do equilíbrio de forças",
+  "tools.openTool": "Abrir",
+  "tools.mode": "Primeiro modo de flambagem",
+  "tools.structure": "Estrutura e deformada",
+  "tools.deformedNote": "A deformação é ampliada para visualização.",
   "tools.referenceBooks": "Timoshenko & Gere, Theory of Elastic Stability, 2 edição (1961); Young & Budynas, Roark’s Formulas for Stress and Strain, 7 edição (2002), Capítulo 8.",
   "landing.navTools": "Ferramentas",
   "tools.index": "Calculadoras de engenharia gratuitas",
@@ -11,6 +26,7 @@ const pt: Translations = {
   "tools.modulus": "Módulo de elasticidade",
   "tools.inertia": "Segundo momento de área",
   "tools.load": "Intensidade da carga",
+  "tools.loadType": "Tipo de carga",
   "tools.position": "Posição da carga a partir da esquerda",
   "tools.uniform": "Carga uniforme",
   "tools.point": "Carga pontual",
@@ -37,7 +53,7 @@ const pt: Translations = {
   "tools.failed": "Falha no cálculo.",
   "tools.loading": "Calculando…",
   "tools.at": "em",
-  "tools.bucklingNote": "A flambagem usa 32 elementos de pórtico e compressão de referência de 1 kN. O erro de elementos finitos é exibido sem correção. K = 0.7 é uma aproximação arredondada de engastado–articulado (K exato ≈ 0.699156).",
+  "tools.bucklingNote": "A flambagem usa 32 elementos de pórtico. Para engastado–articulado, K = 0.7 é o valor arredondado convencional; o valor exato é aproximadamente 0.6992. O solver resolve diretamente as condições de extremidade, portanto a diferença de aproximadamente 0.24% deve-se principalmente ao arredondamento, não à discretização.",
   "tools.columnNote": "Reações e diagramas da coluna descrevem a compressão de referência de 1 kN, não um estado pós-flambagem. O eixo do membro é horizontal no modelo exportado.",
 
   // Shared scalar-field viewer

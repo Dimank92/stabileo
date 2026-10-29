@@ -1,6 +1,21 @@
 import type { Translations } from '../types';
 
 const de: Translations = {
+  "tools.firstVersion": "Erste Version",
+  "tools.simply-supported-beam.subtitle": "Durchbiegung, Querkraft und Biegemoment eines Balkens auf zwei Lagern.",
+  "tools.cantilever-beam.subtitle": "Durchbiegung, Querkraft und Biegemoment eines einseitig eingespannten Balkens.",
+  "tools.column-buckling.subtitle": "Elastische kritische Last, erste Knickform und Knicklänge.",
+  "tools.effectiveLength": "Knicklänge",
+  "tools.assumptionsTitle": "Annahmen",
+  "tools.modeNote": "Die Amplitude der Eigenform ist beliebig und zur Darstellung vergrößert; sie ist keine Verschiebung nach dem Knicken. Die Stabachse liegt horizontal.",
+  "tools.technical": "Technische Details",
+  "tools.solverNote": "Stabileo-Produktionssolver · ebene Euler–Bernoulli-Rahmenelemente.",
+  "tools.dofs": "Gesamte Knotenfreiheitsgrade",
+  "tools.residualNote": "Residuum des Kräftegleichgewichts",
+  "tools.openTool": "Öffnen",
+  "tools.mode": "Erste Knickform",
+  "tools.structure": "Tragwerk und Verformung",
+  "tools.deformedNote": "Die Verformung ist zur Darstellung vergrößert.",
   "tools.referenceBooks": "Timoshenko & Gere, Theory of Elastic Stability, 2 Auflage (1961); Young & Budynas, Roark’s Formulas for Stress and Strain, 7 Auflage (2002), Kapitel 8.",
   "landing.navTools": "Werkzeuge",
   "tools.index": "Kostenlose Rechner für Tragwerke",
@@ -12,6 +27,7 @@ const de: Translations = {
   "tools.modulus": "Elastizitätsmodul",
   "tools.inertia": "Flächenträgheitsmoment",
   "tools.load": "Lastgröße",
+  "tools.loadType": "Lastart",
   "tools.position": "Lastposition vom linken Ende",
   "tools.uniform": "Gleichlast",
   "tools.point": "Einzellast",
@@ -38,7 +54,7 @@ const de: Translations = {
   "tools.failed": "Berechnung fehlgeschlagen.",
   "tools.loading": "Berechnung läuft…",
   "tools.at": "bei",
-  "tools.bucklingNote": "Knicken mit 32 Rahmenelementen und 1 kN Referenzdrucklast. Der FE-Fehler wird unverändert angezeigt. K = 0.7 ist eine gerundete Näherung für eingespannt–gelenkig (exakt K ≈ 0.699156).",
+  "tools.bucklingNote": "Die Knickberechnung verwendet 32 Rahmenelemente. Für eingespannt–gelenkig ist K = 0.7 der übliche gerundete Wert; der exakte Wert beträgt etwa 0.6992. Der Solver berücksichtigt die Randbedingungen direkt. Die Abweichung von etwa 0.24% entsteht daher hauptsächlich durch die Rundung und nicht durch die Diskretisierung.",
   "tools.columnNote": "Stützenreaktionen und Diagramme gelten für die Referenzdrucklast von 1 kN, nicht für den Nachknickzustand. Die Stabachse liegt im exportierten Modell horizontal.",
 
   // ─── Shared scalar-field viewer ───
