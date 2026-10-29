@@ -292,7 +292,7 @@ pub fn run_strip(spec: &StripSpec) -> Result<StripResult, String> {
     let gauge = [closest([0.0, mid]), closest([spec.width, mid])];
     let dx0 = pos[gauge[1]][0] - pos[gauge[0]][0];
     let ddx = resp.u[gauge[1]][0] - resp.u[gauge[0]][0];
-    let poisson = if spec.strain != 0.0 && dx0 != 0.0 { -(ddx / dx0) / spec.strain } else { f64::NAN };
+    let poisson = if resp.full_rank && spec.strain != 0.0 && dx0 != 0.0 { -(ddx / dx0) / spec.strain } else { f64::NAN };
     Ok(StripResult {
         bonds: net.bonds.iter().map(|b| [b.a, b.b]).collect(),
         stiffness: net.bonds.iter().map(|b| b.k).collect(),

@@ -183,11 +183,12 @@ fn part_a(c: &mut Checks) {
         let e0 = relaxed_energy(&net, &base, [0.0; 3]);
         let mut worst: f64 = 0.0;
         for dir in [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.6, -0.3, 0.5]] {
-            let h = 1e-4;
-            // Central second difference removes the first-order (prestress) term.
-            let ep: [f64; 3] = [h * dir[0], h * dir[1], h * dir[2]];
-            let em: [f64; 3] = [-ep[0], -ep[1], -ep[2]];
-            let d2 = (relaxed_energy(&net, &base, ep) + relaxed_energy(&net, &base, em) - 2.0 * e0) / (h * h);
+            let curvature = |h: f64| {
+                let ep = [h * dir[0], h * dir[1], h * dir[2]];
+                let em = [-ep[0], -ep[1], -ep[2]];
+                (relaxed_energy(&net, &base, ep) + relaxed_energy(&net, &base, em) - 2.0 * e0) / (h * h)
+            };
+            let d2 = (4.0 * curvature(0.005) - curvature(0.01)) / 3.0;
             let mut q = 0.0;
             for i in 0..3 {
                 for j in 0..3 {
@@ -294,7 +295,12 @@ fn part_b(c: &mut Checks) {
     let r = periodic(s, 4);
     let tri_area = 3f64.sqrt() / 2.0;
     let mut worst: f64 = 0.0;
-    for p in v["fig7"]["calculation_line"].as_array().unwrap() {
+    let points = v["fig7"]["calculation_line"].as_array().unwrap();
+    assert_eq!(points.len(), 741);
+    for (i, expected) in [(0, [0.00004, 0.14411]), (370, [1.4535, 0.56404]), (740, [3.14225, 0.14411])] {
+        assert_eq!(points[i], serde_json::json!(expected));
+    }
+    for p in points {
         let (t, y) = (p[0].as_f64().unwrap(), p[1].as_f64().unwrap());
         let ours = moduli::uniaxial(&r.c, PI / 2.0 - t).unwrap().0 * tri_area;
         worst = finite_max([worst, (ours - y).abs()]);

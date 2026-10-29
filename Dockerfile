@@ -17,6 +17,9 @@ RUN cargo build --locked -p dedaliano-backend --release
 # ── Stage 2: Build frontend ──────────────────────────────────
 FROM ${RUST_IMAGE} AS wasm-builder
 
+RUN apt-get update && apt-get install -y --no-install-recommends clang \
+    && rm -rf /var/lib/apt/lists/*
+
 # A pinned wasm-pack built from crates.io against its lockfile, instead of
 # piping an unpinned installer script into sh.
 RUN rustup target add wasm32-unknown-unknown \

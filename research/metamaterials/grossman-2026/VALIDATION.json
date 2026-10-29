@@ -36,7 +36,7 @@
       "category": "independent",
       "metric": "nonaffinity",
       "name": "triangular lattice: no nonaffine displacement",
-      "observed": 3.68735336912127e-32,
+      "observed": 3.687353471061644e-32,
       "passed": true,
       "tolerance": 1e-18
     },
@@ -84,7 +84,7 @@
       "category": "independent",
       "metric": "max relative difference",
       "name": "foam eta = 0.3: e^T C e A equals the second difference of the relaxed nonlinear energy",
-      "observed": 1.1586079707341015e-8,
+      "observed": 5.542210391544173e-8,
       "passed": true,
       "tolerance": 0.00001
     },
@@ -92,7 +92,7 @@
       "category": "independent",
       "metric": "max relative difference",
       "name": "foam eta = 0.3 in tension: e^T C e A equals the second difference of the relaxed nonlinear energy",
-      "observed": 7.351865820421064e-9,
+      "observed": 2.2496444268039355e-8,
       "passed": true,
       "tolerance": 0.00001
     },
@@ -100,7 +100,7 @@
       "category": "independent",
       "metric": "max relative difference",
       "name": "frame invariance: C of the rotated foam is C rotated",
-      "observed": 1.1135329755181643e-15,
+      "observed": 1.3919162193977043e-15,
       "passed": true,
       "tolerance": 1e-9
     },
@@ -108,7 +108,7 @@
       "category": "independent",
       "metric": "max G / k",
       "name": "dilution z = 3 (5 samples, 20 x 20): shear modulus vanishes",
-      "observed": 9.665266163858744e-17,
+      "observed": 2.01562874611879e-16,
       "passed": true,
       "tolerance": 1e-6
     },
@@ -124,7 +124,7 @@
       "category": "independent",
       "metric": "max |du| / max |u|",
       "name": "foam strip (eta 0.3): displacements equal the production engine's solve_2d",
-      "observed": 2.47314855560655e-14,
+      "observed": 1.931214269698026e-14,
       "passed": true,
       "tolerance": 1e-8
     },
@@ -132,7 +132,7 @@
       "category": "independent",
       "metric": "max |dN| / max |N|",
       "name": "foam strip (eta 0.3): bond forces equal the engine's axial forces",
-      "observed": 7.664821928501568e-14,
+      "observed": 5.748616446376212e-14,
       "passed": true,
       "tolerance": 1e-8
     },
@@ -140,7 +140,7 @@
       "category": "independent",
       "metric": "nu - 1/3",
       "name": "equilateral strip 13 x 52 (paper's protocol): finite-size bias of nu",
-      "observed": 0.03794923154323465,
+      "observed": 0.03794923154323521,
       "passed": true,
       "tolerance": 0.05
     },
@@ -148,7 +148,7 @@
       "category": "independent",
       "metric": "absolute difference",
       "name": "equilateral strips 26 x 104 and 52 x 208: Richardson extrapolation of nu = 1/3",
-      "observed": 0.0026835828608419154,
+      "observed": 0.0026835828608462453,
       "passed": true,
       "tolerance": 0.005
     },
@@ -188,7 +188,7 @@
       "category": "paper",
       "metric": "max |nu difference|",
       "name": "Eq. (23) honeycomb, k_radial = 1e-3 (l = 0.05 ... 0.95)",
-      "observed": 0.0033500744879860767,
+      "observed": 0.0033500744879865207,
       "passed": true,
       "tolerance": 0.005
     },
@@ -220,7 +220,7 @@
       "category": "paper",
       "metric": "|eta_0 - 0.46|",
       "name": "foam: nu crosses zero near eta = 0.46 (text p. 6)",
-      "observed": 0.013605425095061296,
+      "observed": 0.01360542509506163,
       "passed": true,
       "tolerance": 0.02
     },
@@ -228,7 +228,7 @@
       "category": "paper",
       "metric": "mean nu(0.5)",
       "name": "foam: auxetic as eta -> 0.5 (text: nu = -0.1); ours at most -0.05",
-      "observed": -0.1476082329837648,
+      "observed": -0.14760823298376496,
       "passed": true,
       "tolerance": -0.05
     }

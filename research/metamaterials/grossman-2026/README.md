@@ -52,8 +52,13 @@ tension) acting on the change of its bond vector.
 - **Prestress** (not in the paper's computations): rest lengths x (1 - s), Newton relaxation with
   backtracking to a residual below 1e-11 k, then the linear response about that state.
 - **Solver.** The engine's sparse Cholesky (`dedaliano_engine::linalg`) on K + delta I,
-  delta = 1e-10 max diag K, with three steps of iterative refinement against K (floppy modes carry
-  no load, so the refined solution is the pseudo-inverse one).
+  delta starts at 1e-10 max diag K, with up to 128 refinement steps against K.
+  If the residual fails acceptance, retry at 1e-12 and 1e-14 max diag K, then return an error if still unconverged.
+  Acceptance requires ||r||∞ ≤ 1e-12 ||b||∞; loads no larger than assembly
+  roundoff (8 ε max diag K) instead use that absolute bound. After exhausting
+  refinement at the smallest shift, a residual within assembly roundoff is also accepted.
+  Null-mode displacements are non-unique. Finite-strip ν is indeterminate unless
+  K − 1e-13 max diag K I admits Cholesky factorization.
 
 Assumptions: small strain (the paper minimised the nonlinear energy at 1 % strain), quasi-static,
 two-dimensional, central forces only, unit lattice spacing and k = 1 unless stated.
@@ -62,6 +67,9 @@ two-dimensional, central forces only, unit lattice spacing and k = 1 unless stat
 
 `cargo test --release` runs `tests/validation.rs`: 29 named checks, each with a stated tolerance,
 written to `target/VALIDATION.json` and compared with the committed `VALIDATION.json`.
+The nonlinear-energy curvature check uses central differences at strains 0.01 and 0.005,
+with Richardson extrapolation removing the leading step-size error. This avoids amplifying
+prestress-energy cancellation at a 1e-4 step; freshness tolerances remain unchanged.
 To refresh the evidence after an intentional change, run `cargo test --release --locked`,
 inspect all 29 checks (a stale-record assertion may fail), then copy `target/VALIDATION.json`
 to `VALIDATION.json` and rerun. Computed observations allow absolute roundoff of 1e-12 plus

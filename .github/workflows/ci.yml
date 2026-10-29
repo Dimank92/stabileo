@@ -834,6 +834,7 @@ jobs:
       - changes
       - lint-repo
       - test-ci-scripts
+      - docker-smoke
       - lint-engine
       - test-engine-gates
       - test-engine-suite

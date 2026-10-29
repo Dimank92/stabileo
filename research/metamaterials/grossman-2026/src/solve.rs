@@ -5,12 +5,8 @@
 //! bond tension, L its length, n its direction) acting on the change d of the bond vector; the
 //! energy to second order is sum_e d_e^T S_e d_e / 2.
 //!
-//! Floppy (zero-energy) modes make the stiffness singular. They are handled by factoring
-//! K + delta I with delta = 1e-10 times the largest diagonal entry. Any load that the network
-//! must carry is orthogonal to the floppy modes (for E = |R u + G e|^2 / 2, K = R^T R and the
-//! strain coupling R^T G both vanish on the null space of R), so the regularised solution
-//! converges to the pseudo-inverse one as delta -> 0; `tests/properties.rs` checks the size of
-//! that error.
+//! Singular systems use shifted Cholesky with residual-controlled refinement. Displacements
+//! in null modes are not unique; finite-strip ratios require a numerically full-rank system.
 
 use std::rc::Rc;
 
@@ -20,7 +16,7 @@ use serde::Serialize;
 use crate::network::Network;
 
 pub const REGULARISATION: f64 = 1e-10;
-pub const REFINEMENT_STEPS: usize = 3;
+const MAX_REFINEMENT_STEPS: usize = 128;
 
 /// Tangent of each bond at positions `pos`: (S, tension, unit direction, length).
 pub fn bond_tangents(net: &Network, pos: &[[f64; 2]]) -> Vec<([[f64; 2]; 2], f64, [f64; 2], f64)> {
@@ -95,47 +91,65 @@ impl System {
         }
     }
 
-    /// Factor K + delta I and solve for each right-hand side.
+    fn matrix(&self, shift: f64) -> CscMatrix {
+        let mut rows = self.rows.clone();
+        let mut cols = self.cols.clone();
+        let mut vals = self.vals.clone();
+        for i in 0..self.n {
+            rows.push(i);
+            cols.push(i);
+            vals.push(shift);
+        }
+        CscMatrix::from_triplets(self.n, &rows, &cols, &vals)
+    }
+
+    fn full_rank(&self) -> bool {
+        if self.n == 0 { return true; }
+        let k = self.matrix(0.0);
+        let scale = k.diagonal().into_iter().fold(0.0_f64, f64::max);
+        if scale == 0.0 { return false; }
+        let mut m = self.matrix(-1e-13 * scale);
+        for value in &mut m.values { *value /= scale; }
+        numeric_cholesky(&Rc::new(symbolic_cholesky(&m)), &m).is_some()
+    }
+
     fn solve(&self, rhs: &[Vec<f64>]) -> Result<Vec<Vec<f64>>, String> {
         if self.n == 0 {
             return Ok(rhs.iter().map(|_| Vec::new()).collect());
         }
-        let mut rows = self.rows.clone();
-        let mut cols = self.cols.clone();
-        let mut vals = self.vals.clone();
-        let mut diag = vec![0.0; self.n];
-        for k in 0..rows.len() {
-            if rows[k] == cols[k] {
-                diag[rows[k]] += vals[k];
-            }
-        }
-        let dmax = diag.iter().cloned().fold(0.0f64, f64::max).max(1e-300);
-        for i in 0..self.n {
-            rows.push(i);
-            cols.push(i);
-            vals.push(REGULARISATION * dmax);
-        }
-        let m = CscMatrix::from_triplets(self.n, &rows, &cols, &vals);
-        let k = CscMatrix::from_triplets(self.n, &self.rows, &self.cols, &self.vals);
-        let sym = Rc::new(symbolic_cholesky(&m));
-        let f = numeric_cholesky(&sym, &m).ok_or("stiffness is not positive semi-definite (compressed bonds?)")?;
-        // Iterative refinement against the unshifted K: each step multiplies the shift's error by
-        // delta / (lambda + delta) on the non-floppy modes and adds nothing on the floppy ones
-        // (the residual of a load orthogonal to them stays orthogonal).
-        Ok(rhs
-            .iter()
-            .map(|b| {
+        let k = self.matrix(0.0);
+        let dmax = k.diagonal().into_iter().fold(0.0_f64, f64::max).max(1e-300);
+        let sym = Rc::new(symbolic_cholesky(&k));
+        let norm = |v: &[f64]| v.iter().map(|v| v.abs()).fold(0.0_f64, f64::max);
+        for shift in [REGULARISATION, 1e-12, 1e-14] {
+            let m = self.matrix(shift * dmax);
+            let f = numeric_cholesky(&sym, &m).ok_or("stiffness is not positive semi-definite (compressed bonds?)")?;
+            let mut solutions = Vec::new();
+            for b in rhs {
+                let assembly_noise = 8.0 * f64::EPSILON * dmax;
+                let tolerance = if norm(b) <= assembly_noise { assembly_noise } else { 1e-12 * norm(b) };
                 let mut x = sparse_cholesky_solve(&f, b);
-                for _ in 0..REFINEMENT_STEPS {
+                let mut converged = false;
+                for iteration in 0..MAX_REFINEMENT_STEPS {
                     let kx = k.sym_mat_vec(&x);
                     let r: Vec<f64> = b.iter().zip(&kx).map(|(bi, ki)| bi - ki).collect();
+                    if iteration >= 3 && x.iter().all(|v| v.is_finite())
+                        && (norm(&r) <= tolerance
+                            || (shift == 1e-14 && iteration == MAX_REFINEMENT_STEPS - 1 && norm(&r) <= assembly_noise)) {
+                        converged = true;
+                        break;
+                    }
                     let dx = sparse_cholesky_solve(&f, &r);
                     x.iter_mut().zip(&dx).for_each(|(xi, di)| *xi += di);
                 }
-                x
-            })
-            .collect())
+                if !converged { break; }
+                solutions.push(x);
+            }
+            if solutions.len() == rhs.len() { return Ok(solutions); }
+        }
+        Err("stiffness solve did not converge; load is incompatible or system is too ill-conditioned".into())
     }
+
 }
 
 /// Coupling of a bond vector to the macroscopic strain e = (exx, eyy, exy) (tensor shear):
@@ -188,10 +202,11 @@ pub fn relax(net: &Network, start: &[[f64; 2]], held: &[bool], tol: f64, max_ite
             return Ok(Relaxation { positions: pos, iterations, residual: r, energy });
         }
         let mut sys = System::new(pos.len(), held);
-        for (e, (s, _, _, _)) in net.bonds.iter().zip(bond_tangents(net, &pos)) {
-            // Compressed bonds make the tangent indefinite; keep only the material part for them
-            // in the Newton matrix (a modified Newton step; equilibrium is still exact).
-            let s = if s[0][0] + s[1][1] < 0.0 { [[0.0; 2]; 2] } else { s };
+        for (e, (s, tension, n, _)) in net.bonds.iter().zip(bond_tangents(net, &pos)) {
+            let s = if tension < 0.0 {
+                [[e.k * n[0] * n[0], e.k * n[0] * n[1]],
+                 [e.k * n[1] * n[0], e.k * n[1] * n[1]]]
+            } else { s };
             sys.add_bond(e.a, e.b, &s);
         }
         let mut rhs = vec![0.0; sys.n];
@@ -213,7 +228,10 @@ pub fn relax(net: &Network, start: &[[f64; 2]], held: &[bool], tol: f64, max_ite
                     p[1] += step * du[sys.dof[i] + 1];
                 }
             }
-            if net.energy(&trial) <= e0 + 1e-14 * e0.abs().max(1e-300) {
+            let trial_energy = net.energy(&trial);
+            let energy_roundoff = 16.0 * f64::EPSILON * kmax * net.bonds.iter().map(|b| b.rest * b.rest).sum::<f64>();
+            if trial_energy <= e0 + 1e-14 * e0.abs().max(1e-300)
+                || ((trial_energy - e0).abs() <= energy_roundoff && residual(&force(&trial)) < r) {
                 pos = trial;
                 accepted = true;
                 break;
@@ -311,6 +329,7 @@ pub fn periodic_response(net: &Network, pos: &[[f64; 2]]) -> Result<PeriodicResp
 /// Linear response of a finite network with prescribed displacements on the `held` nodes.
 #[derive(Clone, Debug, Serialize)]
 pub struct FiniteResponse {
+    pub full_rank: bool,
     /// Displacement of every node (prescribed ones included).
     pub u: Vec<[f64; 2]>,
     /// Axial force change of each bond (tension positive), k n . (u_b - u_a).
@@ -354,5 +373,33 @@ pub fn finite_response(net: &Network, pos: &[[f64; 2]], held: &[bool], prescribe
         .zip(&tangents)
         .map(|(e, (_, _, n, _))| e.k * (n[0] * (u[e.b][0] - u[e.a][0]) + n[1] * (u[e.b][1] - u[e.a][1])))
         .collect();
-    Ok(FiniteResponse { u, force })
+    Ok(FiniteResponse { u, force, full_rank: sys.full_rank() })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn near_mechanism_resolves_nonzero_modes() {
+        for lambda in [1e-8, 1e-10, 1e-12] {
+            let mut sys = System::new(1, &[]);
+            sys.push(0, 0, 1.0);
+            sys.push(1, 1, lambda);
+            let x = sys.solve(&[vec![1.0, 1.0]]).unwrap().remove(0);
+            assert!((x[0] - 1.0).abs() < 1e-10);
+            assert!((x[1] * lambda - 1.0).abs() < 1e-10);
+            assert!(sys.full_rank());
+            let x = sys.solve(&[vec![0.0, lambda]]).unwrap().remove(0);
+            assert!((x[1] - 1.0).abs() < 1e-10);
+        }
+    }
+
+    #[test]
+    fn incompatible_mechanism_load_is_rejected() {
+        let mut sys = System::new(1, &[]);
+        sys.push(0, 0, 1.0);
+        assert!(!sys.full_rank());
+        assert!(sys.solve(&[vec![0.0, 1.0]]).is_err());
+    }
 }

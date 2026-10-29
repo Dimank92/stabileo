@@ -9,12 +9,12 @@ experiments:
   - name: foam-auxetic
     inputs: {lattice: triangular phi = psi = 1, eta: [0, 0.5], samples: 10, spring_law: equal k}
     mesh: {periodic: 26 x 26 cells, strip: 0 <= x <= 13, 0 <= y <= 52}
-    solver: {regularisation: 1e-10 max diag, refinement_steps: 3}
+    solver: {regularisation: adaptive 1e-10 to 1e-14 max diag, refinement_steps_max: 128}
     references: [reference-results/fig5_simulation_digitized.csv, reference-results/paper_values.json#foam_poisson_ratio]
   - name: honeycomb-eq23
     inputs: {l: [0.05, 0.95], k_radial: [1e-3, 1e-6]}
     mesh: {periodic: 4 x 4 cells}
-    solver: {regularisation: 1e-10 max diag, refinement_steps: 3}
+    solver: {regularisation: adaptive 1e-10 to 1e-14 max diag, refinement_steps_max: 128}
     references: [reference-results/paper_values.json#honeycomb_poisson_ratio]
   - name: ordered-lattices
     inputs: {cases: [[2, 2], [3, 0.9], [1, 1], [1.5, 1], [1, 0.5], [2, 0.5], [3, 2]], spring_law: [equal k, k ∝ 1/l^2]}

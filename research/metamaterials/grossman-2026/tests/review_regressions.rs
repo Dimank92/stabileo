@@ -45,3 +45,50 @@ fn oversized_json_strips_fail_before_building() {
         assert!(start.elapsed().as_secs_f64() < 1.0);
     }
 }
+
+#[test]
+fn mechanism_bearing_strips_have_indeterminate_poisson_ratio() {
+    use springs_grossman_2026::experiment::{run_strip, StripSpec};
+    for (diagonals, keep) in [(false, 1.0), (true, 0.3), (true, 1.0)] {
+        let spec: StripSpec = serde_json::from_value(serde_json::json!({
+            "network": {"lattice": {"kind": "square", "diagonals": diagonals}, "keep": keep},
+            "width": 8.0, "height": 8.0, "theta": 0.0, "clamp_band": 0.5, "strain": 0.01
+        })).unwrap();
+        let result = run_strip(&spec).unwrap();
+        assert_eq!(result.poisson.is_finite(), diagonals && keep == 1.0);
+        if !result.poisson.is_finite() {
+            assert!(serde_json::to_value(result).unwrap()["poisson"].is_null());
+        }
+    }
+}
+
+#[test]
+fn compressed_bonds_keep_axial_stiffness_during_relaxation() {
+    use springs_grossman_2026::{network::{Bond, Network}, solve};
+    for rest in [1.1, 3.0] {
+        let net = Network {
+            nodes: vec![[0.0, 0.0], [1.0, 0.0]], cell: None,
+            bonds: vec![Bond { a: 0, b: 1, shift: [0, 0], k: 1.0, rest }],
+        };
+        let result = solve::relax(&net, &net.nodes, &[true, false], 1e-10, 100).unwrap();
+        assert!((result.positions[1][0] - rest).abs() < 1e-9);
+        assert!(result.energy < 1e-18);
+        assert!(result.residual < 1e-10);
+    }
+}
+
+#[test]
+fn nearly_parallel_springs_match_the_kinematic_solution() {
+    use springs_grossman_2026::{network::{Bond, Network}, solve};
+    for slope in [1e-4_f64, 1e-5, 1e-6] {
+        let net = Network {
+            nodes: vec![[0.0, 0.0], [1.0, slope], [1.0, -slope]], cell: None,
+            bonds: (1..=2).map(|b| Bond { a: 0, b, shift: [0, 0], k: 1.0, rest: 1.0_f64.hypot(slope) }).collect(),
+        };
+        let response = solve::finite_response(&net, &net.nodes, &[false, true, true], &[[0.0; 2], [1.0, 0.0], [-1.0, 0.0]]).unwrap();
+        assert!(response.full_rank);
+        assert!(response.u[0][0].abs() < 1e-10);
+        assert!((response.u[0][1] * slope - 1.0).abs() < 1e-10);
+        assert!(response.force.iter().all(|f| f.abs() < 1e-10));
+    }
+}

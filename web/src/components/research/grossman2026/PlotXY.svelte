@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { axis } from './plot-axis';
   /**
    * A small SVG chart: lines, bands, points with optional vertical error bars, a highlighted
    * current point and reference rules. Axes fit every series and end on a tick. Encoding: hue is
@@ -38,21 +39,6 @@
   let width = $state(480);
   const M = { l: 44, r: 28, t: 22, b: 30 };
 
-  function step(lo: number, hi: number, n = 5): number {
-    const raw = (hi - lo) / n || 1;
-    const p = 10 ** Math.floor(Math.log10(raw));
-    return [1, 2, 2.5, 5, 10].map((k) => k * p).find((s) => s >= raw) ?? raw;
-  }
-  /** Domain widened outward to whole steps, and the ticks in it. */
-  function axis(lo: number, hi: number, fixed: boolean) {
-    const s = step(lo, hi);
-    const a = fixed ? lo : Math.floor(lo / s + 1e-9) * s;
-    const b = fixed ? hi : Math.ceil(hi / s - 1e-9) * s;
-    const ticks: number[] = [];
-    for (let v = Math.ceil(a / s - 1e-9) * s; v <= b + s * 1e-6; v += s) ticks.push(Number(v.toPrecision(10)));
-    const decimals = Math.max(0, -Math.floor(Math.log10(s) + 1e-9));
-    return { domain: [a, b] as [number, number], ticks, decimals };
-  }
 
   const ys = $derived(
     series.flatMap((s) => s.points.flatMap((p) => [p.y, p.lo ?? p.y, p.hi ?? p.y])).concat(current ? [current.y] : []).filter(Number.isFinite),

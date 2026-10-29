@@ -8,6 +8,7 @@
    * the article call `apply`, which drives the app.
    */
   import { onDestroy, onMount, untrack } from 'svelte';
+  import { initializePage } from './page-load';
   import { EditorLoad } from './editor-load.svelte';
   import { uniaxial } from './moduli';
   import { evidence } from './evidence';
@@ -126,25 +127,28 @@
     const deepLinked = q.has('eta') && Number.isFinite(qEta) && qEta >= 0 && qEta <= 0.5;
     if (deepLinked) eta = qEta;
     thumbMode = q.has('thumb');
-    loadSprings()
-      .then((g) => {
-        glue = g;
-        playback.setCount(SWEEP.length);
-        if (window.location.hash === '#edit') {
-          showTab('edit');
-          return;
-        }
-        if (deepLinked) return;
-        const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-        const narrow = window.innerWidth < 640;
-        if (reducedMotion) return;
-        autoplaying = true;
-        playback.startAutoplay({ reducedMotion, narrow });
-      })
-      .catch((e) => (loadError = e instanceof Error ? e.message : String(e)));
+    const cancelLoad = initializePage(loadSprings(), (g) => {
+      glue = g;
+      playback.setCount(SWEEP.length);
+      if (window.location.hash === '#edit') {
+        showTab('edit');
+        return;
+      }
+      if (deepLinked) return;
+      const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+      const narrow = window.innerWidth < 640;
+      if (reducedMotion) return;
+      autoplaying = true;
+      playback.startAutoplay({ reducedMotion, narrow });
+    }, (e) => {
+      loadError = e instanceof Error ? e.message : String(e);
+    });
     const io = new IntersectionObserver((entries) => playback.setVisible(entries.some((x) => x.isIntersecting)));
     if (pane) io.observe(pane);
-    return () => io.disconnect();
+    return () => {
+      cancelLoad();
+      io.disconnect();
+    };
   });
   onDestroy(() => playback.dispose());
 
@@ -515,7 +519,7 @@
         </div>
         {#if solveError}<p class="warnt">The solver refused the input: {solveError}</p>{/if}
         <dl class="sp-readout">
-          <div><dt>ν, strip (paper’s protocol)</dt><dd>{nf(strip?.poisson)}</dd></div>
+          <div><dt>ν, strip (paper’s protocol)</dt><dd>{strip?.poisson === null ? 'indeterminate' : nf(strip?.poisson)}</dd></div>
           <div><dt>ν along the pull, periodic (exact)</dt><dd>{nf(cellAlong?.[1])}</dd></div>
           <div><dt>B / k · G / k (affine)</dt><dd>{nf(cell?.isotropic.bulk)} · {nf(cell?.isotropic.shear)} <span class="m">({nf(cell?.isotropic_affine.bulk)} · {nf(cell?.isotropic_affine.shear)})</span></dd></div>
           <div><dt>coordination z · nonaffinity</dt><dd>{nf(cell?.coordination, 2)} · {nf(cell?.nonaffinity_shear, 4)}</dd></div>
