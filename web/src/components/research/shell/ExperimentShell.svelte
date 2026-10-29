@@ -133,6 +133,38 @@
       height: calc(100dvh - var(--lp-nav-h, 3.6rem) - 1.5rem);
       overflow: hidden;
     }
+    .rs-shell-app > :global(*) {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .rs-shell-app :global([role="tabpanel"]:not([hidden])),
+    .rs-shell-app :global(.rs-panel:not([hidden])) {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      scrollbar-width: auto;
+      scrollbar-gutter: stable;
+      scrollbar-color: var(--fg-2) var(--hair);
+    }
+    .rs-shell-app :global([role="tabpanel"][hidden]),
+    .rs-shell-app :global(.rs-panel[hidden]) {
+      display: none;
+    }
+    .rs-shell-app :global([role="tabpanel"]:not([hidden])::-webkit-scrollbar),
+    .rs-shell-app :global(.rs-panel:not([hidden])::-webkit-scrollbar) {
+      width: 10px;
+    }
+    .rs-shell-app :global([role="tabpanel"]:not([hidden])::-webkit-scrollbar-track),
+    .rs-shell-app :global(.rs-panel:not([hidden])::-webkit-scrollbar-track) {
+      background: var(--hair);
+    }
+    .rs-shell-app :global([role="tabpanel"]:not([hidden])::-webkit-scrollbar-thumb),
+    .rs-shell-app :global(.rs-panel:not([hidden])::-webkit-scrollbar-thumb) {
+      background: var(--fg-2);
+      border-radius: 5px;
+    }
   }
   :global(.research .mobile-sticky) {
     display: none;
