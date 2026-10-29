@@ -4,7 +4,6 @@ import { resolve } from 'node:path';
 import {
   CHANGELOG,
   CHANGELOG_AREAS,
-  LATEST_CHANGES,
   AREA_LABELS,
   changeStamp,
   formatChangeWhen,
@@ -68,10 +67,6 @@ describe('the changelog', () => {
       }
       for (const l of LOCALES) expect(entry.shot.alt[l].trim(), `${entry.date} ${l}`).not.toBe('');
     }
-  });
-
-  it('shows the three newest weeks on the landing', () => {
-    expect(LATEST_CHANGES).toEqual(CHANGELOG.slice(0, 3));
   });
 
   it('labels every area in every language', () => {

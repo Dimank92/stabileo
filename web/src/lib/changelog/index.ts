@@ -779,8 +779,6 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
 ];
 
-export const LATEST_CHANGES = CHANGELOG.slice(0, 3);
-
 export const AREA_LABELS: Record<PublicLocale, Record<ChangelogArea, string>> = {
   es: { basic: 'Básico', pro: 'PRO', edu: 'Educativo', app: 'App', engine: 'Motor', site: 'Sitio' },
   en: { basic: 'Basic', pro: 'PRO', edu: 'Education', app: 'App', engine: 'Engine', site: 'Website' },

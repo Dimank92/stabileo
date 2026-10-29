@@ -323,12 +323,11 @@ Key test patterns:
 ## Changelog
 
 `src/lib/changelog/index.ts` holds what reached stabileo.com, newest first: one entry per month from
-the first commit (February 2026) to April, marked `period: 'month'`, then one per weekly report. The landing
-shows the newest week in full and the two before it as cards (`LandingChangelog.svelte`), and
-`/<locale>/changelog` draws them all on a timeline by month, with a filter by area
-(`src/components/blog/ChangelogView.svelte`). `src/lib/blog/pages/changelog.ts` only gives that page
-its address, date and metadata. Items are grouped by area on screen, so their order within an area
-is the order they are read in.
+the first commit (February 2026) to April, marked `period: 'month'`, then one per weekly report.
+`/<locale>/changelog`, linked from the landing nav beside Blog and from the footer, draws them on a
+timeline by month with a filter by area (`src/components/blog/ChangelogView.svelte`).
+`src/lib/blog/pages/changelog.ts` only gives that page its address, date and metadata. Items are
+grouped by area on screen, so their order within an area is the order they are read in.
 
 Every Friday, with the weekly report, add one entry dated that Friday:
 - only what was merged to `main` that week, in es, en and pt, one item per area in `areas`;

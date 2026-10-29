@@ -61,7 +61,6 @@ const SECTIONS = [
   'education',
   'pricing',
   'blog',
-  'changelog',
 ] as const;
 
 async function bootLanding(page: Page, opts: { locale?: string; manual?: boolean } = {}) {
@@ -85,23 +84,21 @@ async function bootLanding(page: Page, opts: { locale?: string; manual?: boolean
 }
 
 test.describe('@landing landing page', () => {
-  test('the changelog at the foot shows the three newest weeks and leads to the whole history', async ({ page }) => {
+  test('the nav\'s Changelog item, beside Blog, opens the whole history, and the landing ends at the blog', async ({ page }) => {
     await bootLanding(page, { locale: 'es' });
-    const section = page.locator('#changelog');
-    await section.scrollIntoViewIfNeeded();
+    await expect(page.locator('#changelog')).toHaveCount(0);
+    await expect(page.locator('.landing [data-section]').last()).toHaveAttribute('data-section', 'blog');
 
-    await expect(section.getByRole('heading', { level: 2 })).toHaveText('Qué cambió en Stabileo');
-    await expect(section.getByTestId('changelog-week')).toHaveCount(3);
-    const [latest, next] = await section.getByTestId('changelog-week').all();
-    await expect(latest.locator('time')).toHaveText('23 de octubre de 2026');
-    await expect(latest.getByText('Lo último')).toBeVisible();
-    await expect(latest.getByRole('heading', { level: 4 })).toHaveText(['Motor', 'App', 'Sitio']);
-    await expect(next.locator('figure img')).toHaveAttribute('src', '/screenshots/changelog-basic-report-1600.webp');
-    await expect(next.getByText('6 cambios')).toBeVisible();
-
-    await section.getByRole('link', { name: 'Ver todos los cambios' }).click();
+    const links = page.locator('.landing nav.nav .nav-links a.nav-link');
+    await expect(links.nth(0)).toHaveAttribute('data-nav', 'blog');
+    const changelog = links.nth(1);
+    await expect(changelog).toHaveAttribute('data-nav', 'changelog');
+    await expect(changelog).toHaveText('Changelog');
+    await expect(changelog).toHaveAttribute('href', '/es/changelog/');
+    await changelog.click();
     await expect(page).toHaveURL(/\/es\/changelog\/$/);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Historial de cambios de Stabileo');
+    await expect(page.getByTestId('changelog-entry').first()).toBeVisible();
   });
 
   test('the nav\'s Blog item opens the blog, not the teaser at the foot of the page', async ({ page }) => {
