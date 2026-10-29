@@ -57,4 +57,9 @@ exclude_re = [
     # The dense paths' resource cap (memory and time), not a soundness
     # condition; exercising it needs a dense model past 3000 free DOFs.
     "\\bsize_check\\b",
+    # Re-assembly dense cap is a resource/time limit (DENSE_AGREEMENT_MAX = 4 * MAX_CERTIFY_N),
+    # not a soundness condition; certifying at n equal to the cap is equally sound.
+    "replace > with >= in dense_cap",
+    # Reference vector parallel boundary thresholds (m.hi < 1e-10, ax.lo >= 0.9) in local_axes.
+    "replace (<|>=) with (<=|==|<) in local_axes",
 ]

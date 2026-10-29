@@ -433,3 +433,175 @@ fn agreement_reads_the_assembly_the_solver_used() {
         assert!(matches!(e, EndToEnd::Failed { .. }), "nf {nf}: {e:?}");
     }
 }
+
+/// The agreement check catches stiffness and load discrepancies both when the
+/// engine value is too high (ev.lo > refv.hi) and too low (ev.hi < refv.lo).
+#[test]
+fn agreement_catches_stiffness_and_load_discrepancies_both_ways() {
+    let input = chain_2d(5, false, 0);
+    let r = solve_2d(&input).unwrap();
+    let e = end_to_end_2d(&input, &input.loads, &r);
+    assert!(e.is_certified());
+
+    // 1. Stiffness too high (+1%)
+    let mut eng = engine_assemblies_2d(&input, &input.loads, &r).unwrap();
+    let k_key = *eng[0].k.keys().find(|&&(i, j)| i == j).unwrap();
+    *eng[0].k.get_mut(&k_key).unwrap() *= 1.01;
+    let res = end_to_end_2d_with(&input, &input.loads, &r, || Ok(eng));
+    assert!(matches!(res, EndToEnd::Failed { .. }), "high K not caught");
+
+    // 2. Stiffness too low (-1%)
+    let mut eng = engine_assemblies_2d(&input, &input.loads, &r).unwrap();
+    *eng[0].k.get_mut(&k_key).unwrap() *= 0.99;
+    let res = end_to_end_2d_with(&input, &input.loads, &r, || Ok(eng));
+    assert!(matches!(res, EndToEnd::Failed { .. }), "low K not caught");
+
+    // 3. Load too high (+10%)
+    let mut eng = engine_assemblies_2d(&input, &input.loads, &r).unwrap();
+    let f_idx = eng[0].f.iter().position(|&v| v != 0.0).unwrap();
+    eng[0].f[f_idx] *= 1.10;
+    let res = end_to_end_2d_with(&input, &input.loads, &r, || Ok(eng));
+    assert!(matches!(res, EndToEnd::Failed { .. }), "high F not caught");
+
+    // 4. Load too low (-10%)
+    let mut eng = engine_assemblies_2d(&input, &input.loads, &r).unwrap();
+    eng[0].f[f_idx] *= 0.90;
+    let res = end_to_end_2d_with(&input, &input.loads, &r, || Ok(eng));
+    assert!(matches!(res, EndToEnd::Failed { .. }), "low F not caught");
+}
+
+#[test]
+fn end_to_end_abs_bound_getter_coverage() {
+    let certified = EndToEnd::Certified {
+        abs_bound: 1.234e-6,
+        rel_bound: 5.678e-7,
+        mu: 100.0,
+        residual_norm: 1e-4,
+        k_discrepancy: 1e-12,
+        f_discrepancy: 1e-12,
+        excluded_dofs: vec![],
+    };
+    assert_eq!(certified.abs_bound(), Some(1.234e-6));
+
+    let failed = EndToEnd::Failed { reason: "test fail".into() };
+    assert_eq!(failed.abs_bound(), None);
+
+    let uncertified = EndToEnd::Uncertified { reason: "ill-conditioned".into() };
+    assert_eq!(uncertified.abs_bound(), None);
+
+    let out_of_scope = EndToEnd::OutOfScope { reason: "plates".into() };
+    assert_eq!(out_of_scope.abs_bound(), None);
+
+    let not_checked = EndToEnd::NotChecked;
+    assert_eq!(not_checked.abs_bound(), None);
+}
+
+#[test]
+fn model3d_build_rejects_out_of_scope_element_types_individually() {
+    let base_model = frame_3d();
+    let r = solve_3d(&base_model).unwrap();
+
+    // Plates
+    let mut model = base_model.clone();
+    model.plates.insert("1".into(), serde_json::from_str(r#"{"id":1,"nodes":[1,2,3],"materialId":1,"thickness":0.1}"#).unwrap());
+    let res = end_to_end_3d(&model, &model.loads, &r);
+    assert!(matches!(res, EndToEnd::OutOfScope { reason } if reason.contains("shell and solid elements")));
+
+    // Quads
+    let mut model = base_model.clone();
+    model.quads.insert("1".into(), serde_json::from_str(r#"{"id":1,"nodes":[1,2,3,4],"materialId":1,"thickness":0.1}"#).unwrap());
+    let res = end_to_end_3d(&model, &model.loads, &r);
+    assert!(matches!(res, EndToEnd::OutOfScope { reason } if reason.contains("shell and solid elements")));
+
+    // Quad9s
+    let mut model = base_model.clone();
+    model.quad9s.insert("1".into(), serde_json::from_str(r#"{"id":1,"nodes":[1,2,3,4,1,2,3,4,1],"materialId":1,"thickness":0.1}"#).unwrap());
+    let res = end_to_end_3d(&model, &model.loads, &r);
+    assert!(matches!(res, EndToEnd::OutOfScope { reason } if reason.contains("shell and solid elements")));
+
+    // Solid shells
+    let mut model = base_model.clone();
+    model.solid_shells.insert("1".into(), serde_json::from_str(r#"{"id":1,"nodes":[1,2,3,4,1,2,3,4],"materialId":1}"#).unwrap());
+    let res = end_to_end_3d(&model, &model.loads, &r);
+    assert!(matches!(res, EndToEnd::OutOfScope { reason } if reason.contains("shell and solid elements")));
+
+    // Curved shells
+    let mut model = base_model.clone();
+    model.curved_shells.insert("1".into(), serde_json::from_str(r#"{"id":1,"nodes":[1,2,3,4],"materialId":1,"thickness":0.1}"#).unwrap());
+    let res = end_to_end_3d(&model, &model.loads, &r);
+    assert!(matches!(res, EndToEnd::OutOfScope { reason } if reason.contains("shell and solid elements")));
+
+    // Curved beams
+    let mut model = base_model.clone();
+    model.curved_beams.push(serde_json::from_str(r#"{"nodeStart":1,"nodeMid":2,"nodeEnd":3,"materialId":1,"sectionId":1}"#).unwrap());
+    let res = end_to_end_3d(&model, &model.loads, &r);
+    assert!(matches!(res, EndToEnd::OutOfScope { reason } if reason.contains("curved beams")));
+
+    // Connectors
+    let mut model = base_model.clone();
+    model.connectors.insert("1".into(), serde_json::from_str(r#"{"id":1,"nodeI":1,"nodeJ":2}"#).unwrap());
+    let res = end_to_end_3d(&model, &model.loads, &r);
+    assert!(matches!(res, EndToEnd::OutOfScope { reason } if reason.contains("connector elements")));
+}
+
+#[test]
+fn model3d_supports_validation_and_zero_spring() {
+    let base_model = frame_3d();
+    let r = solve_3d(&base_model).unwrap();
+
+    // Negative spring rejection
+    let mut model = base_model.clone();
+    model.supports.insert("99".into(), serde_json::from_str(r#"{"nodeId":2,"rx":false,"ry":false,"rz":false,"rrx":false,"rry":false,"rrz":false,"kx":-10.0}"#).unwrap());
+    let res = end_to_end_3d(&model, &model.loads, &r);
+    assert!(matches!(res, EndToEnd::OutOfScope { reason } if reason.contains("negative spring")));
+
+    // Normal on non-inclined support rejection
+    let mut model = base_model.clone();
+    model.supports.insert("99".into(), serde_json::from_str(r#"{"nodeId":2,"rx":false,"ry":false,"rz":false,"rrx":false,"rry":false,"rrz":false,"normalX":1.0}"#).unwrap());
+    let res = end_to_end_3d(&model, &model.loads, &r);
+    assert!(matches!(res, EndToEnd::OutOfScope { reason } if reason.contains("not inclined")));
+
+    // Multiple non-plain supports on same node rejection
+    let mut model = base_model.clone();
+    model.supports.insert("99".into(), serde_json::from_str(r#"{"nodeId":1,"rx":true,"ry":true,"rz":true,"rrx":true,"rry":true,"rrz":true,"kx":10.0}"#).unwrap());
+    let res = end_to_end_3d(&model, &model.loads, &r);
+    assert!(matches!(res, EndToEnd::OutOfScope { reason } if reason.contains("several supports on node")));
+
+    // Zero spring accepted without error
+    let mut model = base_model.clone();
+    model.supports.insert("99".into(), serde_json::from_str(r#"{"nodeId":2,"rx":false,"ry":false,"rz":false,"rrx":false,"rry":false,"rrz":false,"kx":0.0}"#).unwrap());
+    let r_solved = solve_3d(&model).unwrap();
+    let res = end_to_end_3d(&model, &model.loads, &r_solved);
+    assert!(res.is_certified());
+}
+
+#[test]
+fn model2d_supports_validation_and_zero_spring() {
+    let base_model = portal_2d();
+    let r = solve_2d(&base_model).unwrap();
+
+    // Unknown support type rejection
+    let mut model = base_model.clone();
+    model.supports.insert("99".into(), serde_json::from_str(r#"{"id":99,"nodeId":2,"type":"unknown_type"}"#).unwrap());
+    let res = end_to_end_2d(&model, &model.loads, &r);
+    assert!(matches!(res, EndToEnd::Uncertified { reason } if reason.contains("unknown support type")));
+
+    // Negative spring rejection
+    let mut model = base_model.clone();
+    model.supports.insert("99".into(), serde_json::from_str(r#"{"id":99,"nodeId":2,"type":"spring","kx":-5.0}"#).unwrap());
+    let res = end_to_end_2d(&model, &model.loads, &r);
+    assert!(matches!(res, EndToEnd::OutOfScope { reason } if reason.contains("negative spring")));
+
+    // Prescribed displacement on free DOF rejection
+    let mut model = base_model.clone();
+    model.supports.insert("99".into(), serde_json::from_str(r#"{"id":99,"nodeId":2,"type":"rollerZ","dz":0.05}"#).unwrap());
+    let res = end_to_end_2d(&model, &model.loads, &r);
+    assert!(matches!(res, EndToEnd::OutOfScope { reason } if reason.contains("prescribed displacement")));
+
+    // Zero spring accepted without error
+    let mut model = base_model.clone();
+    model.supports.insert("99".into(), serde_json::from_str(r#"{"id":99,"nodeId":2,"type":"spring","kx":0.0}"#).unwrap());
+    let r_solved = solve_2d(&model).unwrap();
+    let res = end_to_end_2d(&model, &model.loads, &r_solved);
+    assert!(res.is_certified());
+}

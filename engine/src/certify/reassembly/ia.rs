@@ -289,4 +289,52 @@ mod tests {
         let v = peval(&p, c(2.0)); // 17
         assert!(v.lo <= 17.0 && 17.0 <= v.hi);
     }
+
+    #[test]
+    fn test_ia_comparisons_and_decisions() {
+        let x = I::new(1.0, 2.0);
+        assert!(certainly_gt(x, 0.5));
+        assert!(!certainly_gt(x, 1.0));
+        assert!(!certainly_gt(x, 1.5));
+        assert!(!certainly_gt(I::new(f64::NAN, 2.0), 0.0));
+
+        assert!(certainly_lt(x, 3.0));
+        assert!(!certainly_lt(x, 2.0));
+        assert!(!certainly_lt(x, 1.5));
+        assert!(!certainly_lt(I::new(1.0, f64::NAN), 3.0));
+
+        assert_eq!(decide_gt(I::new(2.0, 3.0), 1.0), Some(true));
+        assert_eq!(decide_gt(I::new(0.0, 0.5), 1.0), Some(false));
+        assert_eq!(decide_gt(I::new(0.5, 1.5), 1.0), None);
+        assert_eq!(decide_gt(I::new(f64::NAN, 2.0), 1.0), None);
+    }
+
+    #[test]
+    fn test_ia_sin_cos_bounds() {
+        assert!(sin_cos(I::new(f64::NAN, 0.0)).is_none());
+        assert!(sin_cos(I::new(0.0, f64::INFINITY)).is_none());
+        assert!(sin_cos(c(1_000_001.0)).is_none());
+        assert!(sin_cos(c(-1_000_001.0)).is_none());
+    }
+
+    #[test]
+    fn test_ia_pmul_and_neg3() {
+        let empty: Poly = Vec::new();
+        let p1 = vec![c(1.0), c(2.0)];
+        assert!(pmul(&empty, &p1).is_empty());
+        assert!(pmul(&p1, &empty).is_empty());
+
+        let p2 = vec![c(3.0), c(4.0)];
+        let res = pmul(&p1, &p2);
+        assert_eq!(res.len(), 3);
+        assert!(res[0].lo <= 3.0 && 3.0 <= res[0].hi);
+        assert!(res[1].lo <= 10.0 && 10.0 <= res[1].hi);
+        assert!(res[2].lo <= 8.0 && 8.0 <= res[2].hi);
+
+        let v = v3([1.5, -2.5, 3.0]);
+        let n = neg3(&v);
+        assert!(n[0].lo <= -1.5 && -1.5 <= n[0].hi);
+        assert!(n[1].lo <= 2.5 && 2.5 <= n[1].hi);
+        assert!(n[2].lo <= -3.0 && -3.0 <= n[2].hi);
+    }
 }

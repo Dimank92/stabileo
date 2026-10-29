@@ -322,4 +322,31 @@ mod tests {
         assert!(close(v, 3.0 / 8.0, 1e-13), "{v:?}");
         assert!(k.get(1, 1).is_none());
     }
+
+    #[test]
+    fn condensation_with_load_and_nonpositive_stiffness() {
+        // 1. Condense with f: Some(&mut f)
+        let p = Plane { ei: c(1.0), shear_flex: I::ZERO, phi: I::ZERO };
+        let b = bending4(&p, c(2.0)).unwrap();
+        let mut k = LMat::zeros(4);
+        place_bending(&mut k, [0, 1, 2, 3], &b, 1.0);
+        let mut f: LVec = vec![Some(c(10.0)), Some(c(5.0)), Some(c(0.0)), Some(c(0.0))];
+        condense(&mut k, Some(&mut f), 1).unwrap();
+        assert!(f[1].is_none());
+        assert!(f[0].is_some());
+        assert!(k.get(1, 1).is_none());
+
+        // 2. Condense on missing stiffness
+        let mut k_empty = LMat::zeros(4);
+        assert!(condense(&mut k_empty, None, 1).is_err());
+
+        // 3. Condense on nonpositive stiffness
+        let mut k_neg = LMat::zeros(4);
+        k_neg.set(1, 1, c(-1.0));
+        assert!(condense(&mut k_neg, None, 1).is_err());
+
+        let mut k_zero = LMat::zeros(4);
+        k_zero.set(1, 1, c(0.0));
+        assert!(condense(&mut k_zero, None, 1).is_err());
+    }
 }
