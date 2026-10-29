@@ -44,6 +44,10 @@
     display: flex;
     gap: 0.25rem;
     border-bottom: 1px solid var(--hair);
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 2;
   }
   .rs-tabs button {
     font: 500 var(--rs-ui, 0.875rem) / 1 var(--st-sans, sans-serif);

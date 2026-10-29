@@ -27,8 +27,10 @@
     sourcePath: string;
     article: Snippet;
     app: Snippet;
+    /** One column with the app first and not sticky (e.g. while an embedded editor is shown). */
+    wide?: boolean;
   };
-  let { paperId, name, lead, checks = null, verification = null, actions, sourcePath, article, app }: Props = $props();
+  let { paperId, name, lead, checks = null, verification = null, actions, sourcePath, article, app, wide = false }: Props = $props();
   provideExperiment(actions);
 
   const paper = catalog.papers.find((p) => p.id === paperId)!;
@@ -53,7 +55,7 @@
       />
       <p class="rs-lead" lang={researchLocale()}>{lead}</p>
     </header>
-    <div class="rs-shell-grid">
+    <div class="rs-shell-grid" class:rs-wide={wide}>
       <article class="rs-shell-article rs-prose" lang={researchLocale()}>
         {@render article()}
         <h2 id="cite">{s.citeThis}</h2>
@@ -124,14 +126,56 @@
       column-gap: 3rem;
       align-items: start;
     }
-    /* One scroll for the page: the pane is sticky, exactly a viewport tall, and never scrolls on
-       its own; tabs organise content, with panel overflow scrolling as a short-window fallback. */
+    /* One scroll for the page: the pane is sticky, at most a viewport tall; tabs organise
+       content, and overflowing panels or the pane scroll within it on short windows. */
     .rs-shell-app {
       order: 0;
       position: sticky;
       top: calc(var(--lp-nav-h, 3.6rem) + 0.75rem);
       height: calc(100dvh - var(--lp-nav-h, 3.6rem) - 1.5rem);
-      overflow: hidden;
+      max-height: calc(100dvh - var(--lp-nav-h, 3.6rem) - 1.5rem);
+      overflow-y: auto;
+      overflow-x: hidden;
+      overscroll-behavior: contain;
+      scrollbar-width: thin;
+      scrollbar-color: var(--fg-2) var(--hair);
+    }
+    .rs-shell-app::-webkit-scrollbar {
+      width: 8px;
+    }
+    .rs-shell-app::-webkit-scrollbar-track {
+      background: var(--hair);
+    }
+    .rs-shell-app::-webkit-scrollbar-thumb {
+      background: var(--fg-2);
+      border-radius: 4px;
+    }
+    .rs-shell-app :global([role="tabpanel"]) {
+      min-height: 0;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--fg-2) var(--hair);
+    }
+    .rs-shell-app :global([role="tabpanel"]::-webkit-scrollbar) {
+      width: 8px;
+    }
+    .rs-shell-app :global([role="tabpanel"]::-webkit-scrollbar-track) {
+      background: var(--hair);
+    }
+    .rs-shell-app :global([role="tabpanel"]::-webkit-scrollbar-thumb) {
+      background: var(--fg-2);
+      border-radius: 4px;
+    }
+    .rs-shell-grid.rs-wide {
+      display: flex;
+      flex-direction: column;
+    }
+    .rs-wide .rs-shell-app {
+      order: -1;
+      position: static;
+      height: auto;
+      max-height: none;
+      overflow: visible;
     }
   }
   :global(.research .mobile-sticky) {
