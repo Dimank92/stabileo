@@ -40,7 +40,7 @@ STATUSES = [
     "numerically-validated", "published-figures-compared", "interactive",
 ]
 COMPLEXITY = {"low", "medium", "high"}
-SUMMARY_SOURCES = {"crossref-abstract", "publisher-abstract", "repository-readme", "full-text", "reference-code"}
+SUMMARY_SOURCES = {"crossref-abstract", "publisher-abstract", "repository-readme", "full-text"}
 REQUIRED = [
     "id", "doi", "crossref", "area", "keywords", "summary", "summary_source", "code", "data", "methods",
     "dependencies", "complexity", "relevance", "status", "reproduced_published_results",

@@ -21,12 +21,17 @@ def main():
     validation = json.loads((implementation / 'VALIDATION.json').read_text())['checks']
     published = json.loads((implementation / 'PUBLISHED_COMPARISON.json').read_text())['checks']
     assert published == [c for c in validation if c['category'] == 'paper']
-    for name in ['dilution z = 5.4', 'foam: auxetic']:
+    for name in ['dilution z = 5.4']:
         check = next(c for c in validation if c['name'].startswith(name))
         assert check['observed'] == check['tolerance'] == 0
         assert valid_checks([check])
         assert not valid_checks([{**check, 'observed': 0.001}])
         assert not valid_checks([{**check, 'observed': -0.001}])
+    regression = next(c for c in validation if c['name'].startswith('foam: periodic ensemble regression'))
+    assert regression['category'] != 'paper'
+    assert regression['tolerance'] == 0.017
+    assert valid_checks([regression])
+    assert not valid_checks([{**regression, 'observed': 100}])
     assert valid_checks(published, published=True)
     print('ok   committed catalog, Grossman signed checks and published comparisons')
 

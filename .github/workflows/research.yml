@@ -45,6 +45,8 @@ jobs:
           persist-credentials: false
       - run: research/tools/check_isolation.sh
       - run: python3 -I research/tools/test_check_isolation.py
+      - run: python3 -I research/tools/test_asset_identity.py
+      - run: python3 -I research/tools/test_docker_context.py
       - name: Research pages draw models only through the shared Stabileo viewer
         run: research/tools/check_viewer.sh
       - name: The viewer rule rejects a page with its own canvas
@@ -85,6 +87,7 @@ jobs:
           python3 -m venv /tmp/catalog-venv
           /tmp/catalog-venv/bin/pip install --require-hashes -r research/tools/requirements.txt
       - run: /tmp/catalog-venv/bin/python -I research/tools/test_required_ci.py
+      - run: /tmp/catalog-venv/bin/python -I research/tools/test_grossman_catalog.py
       - name: Checker rejects bad entries
         run: /tmp/catalog-venv/bin/python -I research/tools/test_catalog.py
       - name: Every entry, evidence file and summary source is well formed

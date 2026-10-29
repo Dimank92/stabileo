@@ -20,9 +20,9 @@
     "staggered scheme",
     "educational code"
    ],
-   "summary": "A compact, self-contained Python finite element code for quasi-static brittle fracture with the AT2 phase-field model: bilinear quadrilaterals, 2x2 Gauss quadrature, a damage-degraded elasticity problem and a damage problem driven by the tensile part of the strain energy, solved alternately until the elasticity residual falls below a tolerance. Examples are a bar in tension (compared with the 1D AT2 analytical response), a single-edge notched plate in tension and a three-point bending test.",
-   "summary_source": "reference-code",
-   "summary_note": "phasefield-jr-py read in full at commit 61037c6; paper full text not accessed",
+   "summary": "",
+   "summary_source": null,
+   "summary_note": "No permitted summary source recorded; reference code alone is insufficient.",
    "code": [
     {
      "url": "https://github.com/nathanshauer/phasefield-jr-py",
