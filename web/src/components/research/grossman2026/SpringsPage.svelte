@@ -87,7 +87,7 @@
 
   const playback = new Playback(140, 1800);
   const SWEEP = Array.from({ length: 26 }, (_, i) => i * 0.02);
-  let autoplaying = $state(false);
+  const autoplaying = $derived(playback.playing);
 
   function solve() {
     if (!glue) return;
@@ -139,7 +139,6 @@
       const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
       const narrow = window.innerWidth < 640;
       if (reducedMotion) return;
-      autoplaying = true;
       playback.startAutoplay({ reducedMotion, narrow });
     }, (e) => {
       loadError = e instanceof Error ? e.message : String(e);
@@ -153,16 +152,8 @@
   });
   onDestroy(() => playback.dispose());
 
-  $effect(() => {
-    if (autoplaying && !playback.playing && !playback.auto) autoplaying = false;
-  });
-
-  /** Any control: the sweep ends for good. */
   function touch() {
-    if (autoplaying) {
-      autoplaying = false;
-      playback.pause();
-    }
+    playback.pause();
   }
 
   /** What the article's links ask of the app pane (ExperimentLink). */

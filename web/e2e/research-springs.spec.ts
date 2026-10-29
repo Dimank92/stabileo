@@ -67,11 +67,52 @@ test.describe('@smoke research springs review regressions', () => {
       expect(await eta.inputValue()).toBe(value);
     });
   }
+  for (const tab of ['Parameters', 'Edit in Stabileo']) {
+    test(`${tab} before WASM loads prevents autoplay`, async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      let release!: () => void;
+      const gate = new Promise<void>(resolve => { release = resolve; });
+      await page.route('**/research-wasm/grossman-2026/springs_bg.wasm', async route => {
+        await gate;
+        await route.continue();
+      });
+      await page.goto('/en/research/metamaterials/grossman-2026/', { waitUntil: 'domcontentloaded' });
+      await page.getByRole('tab', { name: tab, exact: true }).click();
+      release();
+      if (tab === 'Edit in Stabileo') {
+        await expect(page.locator('iframe[title="Stabileo editor (production engine)"]')).toBeVisible();
+      } else {
+        await expect.poll(async () => Number(await page.locator('.sp-viewer').getAttribute('data-nodes'))).toBeGreaterThan(500);
+      }
+      await expect(page.getByRole('button', { name: 'Pause sweep' })).toHaveCount(0);
+      const eta = page.locator('input[aria-label="Disorder eta"]');
+      await expect(eta).toHaveValue('0.3');
+      await page.waitForTimeout(500);
+      await expect(eta).toHaveValue('0.3');
+    });
+  }
+
+  test('a narrow viewport finishes the sweep and clears its live label', async ({ page }) => {
+    await page.setViewportSize({ width: 600, height: 900 });
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.clock.install();
+    await page.goto('/en/research/metamaterials/grossman-2026/');
+    await expect(page.getByRole('button', { name: 'Pause sweep' })).toBeVisible();
+    await page.getByRole('button', { name: 'Pause sweep' }).scrollIntoViewIfNeeded();
+    await page.clock.runFor(6000);
+    await expect(page.getByRole('button', { name: 'Pause sweep' })).toHaveCount(0);
+    await expect(page.getByText('Live sweep of η in your browser (our solver)')).toHaveCount(0);
+    await expect(page.locator('input[aria-label="Disorder eta"]')).toHaveValue('0.5');
+  });
+
   test('prestressed networks cannot be exported to either editor', async ({ page }) => {
     await page.goto('/en/research/metamaterials/grossman-2026/?eta=0.3');
     await expect(page.locator('.sp-viewer canvas').first()).toBeVisible();
     await page.getByRole('tab', { name: 'Parameters', exact: true }).click();
-    await page.getByRole('slider', { name: 'Prestress: rest lengths shortened by' }).fill('0.02');
+    const prestress = page.getByRole('slider', { name: 'Prestress: rest lengths shortened by' });
+    await prestress.press('Home');
+    for (let i = 0; i < 4; i++) await prestress.press('ArrowRight');
+    await expect(prestress).toHaveValue('0.02');
     await expect(page.getByRole('button', { name: 'Open full editor' })).toBeDisabled();
     await expect(page.getByText('Editor export is disabled:')).toBeVisible();
     await page.getByRole('tab', { name: 'Edit in Stabileo' }).click();

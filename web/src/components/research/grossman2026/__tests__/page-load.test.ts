@@ -45,3 +45,29 @@ it('delivers successful loads and failures while mounted', async () => {
   expect(ready).toHaveBeenCalledWith('glue');
   expect(failed).toHaveBeenCalledWith(new Error('unavailable'));
 });
+
+it('preserves an interaction while WASM is loading', async () => {
+  vi.useFakeTimers();
+  const playback = new Playback(10, 10);
+  let resolve!: () => void;
+  initializePage(new Promise<void>(r => { resolve = r; }), () => {
+    playback.setCount(26);
+    playback.startAutoplay({ reducedMotion: false, narrow: false });
+  }, vi.fn());
+  playback.pause();
+  resolve();
+  await Promise.resolve();
+  expect(playback.playing).toBe(false);
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it('stops playing after one narrow-screen sweep', () => {
+  vi.useFakeTimers();
+  const playback = new Playback(140, 1800);
+  playback.setCount(26);
+  playback.startAutoplay({ reducedMotion: false, narrow: true });
+  vi.advanceTimersByTime(5300);
+  expect(playback.shown).toBe(25);
+  expect(playback.playing).toBe(false);
+  playback.dispose();
+});
