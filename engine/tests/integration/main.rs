@@ -39,3 +39,6 @@ mod steel_check;
 mod timber_check;
 mod time_history_3d;
 mod winkler;
+
+#[path = "../benchmarks/plastic_collapse.rs"]
+mod plastic_collapse_benchmark;

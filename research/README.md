@@ -67,3 +67,11 @@ For local comparisons, run `nix develop .. -c node scripts/check-research-route-
 without `--update` from the candidate's `web/`, using the same Nix toolchain for both.
 `node --test web/scripts/research-route-budget.test.mjs` checks unchanged routes, the noise
 allowance, missing measurements and negative cases for real landing/app growth.
+
+## First-version engine benchmarks
+
+`benchmarks/plastic-collapse/` documents one Horne-style portal using the production
+3D plastic-collapse solver. Its shared case lives in
+`engine/tests/benchmarks/plastic_collapse.json` (test data only); its published
+`results/stabileo_results.json` is allowed web replay data. Stage: first-version,
+0 reviews. The page reports hand mechanism bounds separately from the solver result.

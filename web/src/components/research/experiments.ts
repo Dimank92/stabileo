@@ -20,6 +20,12 @@ export type Experiment = {
 
 export const EXPERIMENTS: Experiment[] = [
   {
+    paperId: 'horne-1979', path: '/research/benchmarks/plastic-collapse',
+    name: 'Classic plastic collapse', hook: 'First version · 0 reviews',
+    thumbnail: 'research-thumbs/plastic-collapse.svg', thumbnailAlt: 'Portal frame from the production solver run', thumbnailQuery: '',
+    code: 'https://github.com/lambdaclass/stabileo/tree/main/research/benchmarks/plastic-collapse',
+  },
+  {
     paperId: 'shauer-2025',
     path: '/research/fracture/shauer-2025',
     name: 'Phase-field fracture of a notched plate',
