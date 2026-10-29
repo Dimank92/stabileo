@@ -42,6 +42,7 @@
   import PlanViewChip from './viewport/PlanViewChip.svelte';
   import PointerModeButton from './PointerModeButton.svelte';
   import SelectionDeleteButton from './ribbon/SelectionDeleteButton.svelte';
+  import SelectionClipboardButtons from './ribbon/SelectionClipboardButtons.svelte';
   import ConnectionPrompt from './ConnectionPrompt.svelte';
   import { askAboutNewMember } from '../lib/model/edit/connection-questions';
   import { addThermalLoadIfAny } from '../lib/store/load-ops';
@@ -4371,7 +4372,7 @@
          A press here is not a press on the model. -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="vp-delete" onmousedown={(e) => e.stopPropagation()} onpointerdown={(e) => e.stopPropagation()}
-      ontouchstart={(e) => e.stopPropagation()}><SelectionDeleteButton floating /></div>
+      ontouchstart={(e) => e.stopPropagation()}><SelectionClipboardButtons floating /><SelectionDeleteButton floating /></div>
   {/if}
   <!-- Dev perf HUD (Shift+P or ?perf). Reads: high `calls` + stable `geos` = GPU
        draw-call bound; `geos`/`texs` spiking + high `syncMs` while editing = CPU
@@ -4760,6 +4761,8 @@
   .vp-prompt, .vp-hidden-chip { display: contents; }
 
   .vp-delete {
+    display: flex;
+    gap: 6px;
     position: absolute;
     right: 12px;
     bottom: calc(14px + env(safe-area-inset-bottom, 0px));

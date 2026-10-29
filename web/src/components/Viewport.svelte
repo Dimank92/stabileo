@@ -11,6 +11,7 @@
   import { onMount } from 'svelte';
   import PointerModeButton from './PointerModeButton.svelte';
   import SelectionDeleteButton from './ribbon/SelectionDeleteButton.svelte';
+  import SelectionClipboardButtons from './ribbon/SelectionClipboardButtons.svelte';
   import Icon from './ribbon/Icon.svelte';
   import { t } from '../lib/i18n';
   import { modelStore, uiStore, resultsStore, historyStore, dsmStepsStore } from '../lib/store';
@@ -2849,7 +2850,7 @@
     }));
 
     touchInput = true;
-    if (touches.length === 1 && uiStore.currentTool === 'element') {
+    if (touches.length === 1 && (uiStore.currentTool === 'element' || placementStore.active)) {
       /*
        * The member tool on a finger: pressing shows where the point would go
        * (the snap, the ghost and its dimensions), sliding moves it, lifting
@@ -2978,9 +2979,16 @@
     e.preventDefault();
     cancelLongPress();
     if (touchState?.placeOnLift && !touchState.isPinch && e.touches.length === 0 && touchState.lastTouch && canvas) {
-      // The member tool: the point goes where the finger lifted.
+      // The member tool, or a placement: the point goes where the finger lifted.
       const rect = canvas.getBoundingClientRect();
       const at = touchState.lastTouch;
+      if (placementStore.active) {
+        const w = uiStore.screenToWorld(at.x, at.y);
+        placementHover(w.x, w.y);
+        placementStore.commit(false);
+        touchState = null;
+        return;
+      }
       handleMouseDown({ clientX: at.x + rect.left, clientY: at.y + rect.top, button: 0, shiftKey: false, preventDefault: () => {} } as MouseEvent);
       handleMouseUp();
       touchState = null;
@@ -3304,7 +3312,7 @@
   {#if uiStore.isMobile && uiStore.appMode === 'basico'}
     <!-- The phone's delete button: over the model's lower right corner, level
          with the axes; the canvas shrinks for the sheet, so it rises with it. -->
-    <div class="vp-delete"><SelectionDeleteButton floating /></div>
+    <div class="vp-delete"><SelectionClipboardButtons floating /><SelectionDeleteButton floating /></div>
   {/if}
   <canvas
     bind:this={canvas}
@@ -3389,6 +3397,8 @@
   }
 
   .vp-delete {
+    display: flex;
+    gap: 6px;
     position: absolute;
     right: 12px;
     bottom: calc(14px + env(safe-area-inset-bottom, 0px));

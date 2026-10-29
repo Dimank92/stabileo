@@ -20,6 +20,7 @@ import { modelStore } from './model.svelte';
 import { uiStore } from './ui.svelte';
 import { t, tp } from '../i18n';
 import { planeFragmentToSpace } from './clipboard-workspace';
+import { clipboardState } from './clipboard-state.svelte';
 
 let memory: Fragment | null = null;
 let memoryCode = '';
@@ -55,6 +56,7 @@ export function copySelection(): boolean {
   memory = detach(fragmentOf(set, { withLoads: true, withSupports: true }));
   memoryCode = fragmentToCode(memory);
   memoryInPlane = modelInPlane();
+  clipboardState.filled = true;
   try { void navigator.clipboard?.writeText(memoryCode).catch(() => {}); } catch { /* no clipboard: memory only */ }
   uiStore.toast(tp('clipboard.copied', { n: memory.elements.length + memory.quads.length + memory.plates.length, nodes: memory.nodes.length }), 'info');
   return true;

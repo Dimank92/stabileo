@@ -14228,5 +14228,7 @@ const en: Record<string, string> = {
   "proExport.dxfLayoutLayersNote": "Everything in one DXF; each content on its own layer.",
   "proExport.dxfLayoutSeparateNote": "One DXF of the model and one per result (with the model underneath), together in a .zip.",
   "clipboard.spaceInPlane": "The copy comes from a 3D model: copy it again in 2D to paste it here.",
+  "sel.copyTitle": "Copy the selection (Ctrl+C)",
+  "sel.pasteTitle": "Paste the copy and choose where (Ctrl+V)",
 };
 export default en;
