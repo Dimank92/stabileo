@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { rs } from './i18n';
   /**
    * Stabileo Research: the gallery at /research and one page per runnable paper. Loaded as its own
    * chunk by Root.svelte; the experiment's WASM is fetched only when a simulation is started.
@@ -41,6 +42,7 @@
     if (meta) applyPageMeta({ title: meta.title, description: meta.description, locale: publicI18n.locale, path: route });
     return () => restorePageMeta();
   });
+  const s = $derived(rs());
 </script>
 
 <div class="landing blog research">
@@ -54,8 +56,8 @@
   {:else}
     <section class="sec sec--ink">
       <div class="wrap" style="padding-top: 7rem; padding-bottom: 4rem">
-        <h1>No such research page</h1>
-        <p><PublicLink to="/research">Back to Stabileo Research</PublicLink></p>
+        <h1>{s.missingPage}</h1>
+        <p><PublicLink to="/research">{s.backToResearch}</PublicLink></p>
       </div>
     </section>
   {/if}

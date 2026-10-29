@@ -1,3 +1,5 @@
+import { rs } from '../i18n';
+
 export class EditorLoad {
   attempted = $state(false);
   loading = $state(false);
@@ -18,10 +20,10 @@ export class EditorLoad {
         this.src = url;
         return true;
       }
-      this.error = 'The experiment changed while the editor was loading. Retry to load the current network.';
+      this.error = rs().springsEditorChanged;
     } catch (e) {
       if (id !== this.requestId) return false;
-      this.error = `The Stabileo editor could not be loaded: ${e instanceof Error ? e.message : String(e)}`;
+      this.error = `${rs().springsEditorFailed} ${e instanceof Error ? e.message : String(e)}`;
     }
     this.loading = false;
     return false;

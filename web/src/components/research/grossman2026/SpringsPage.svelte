@@ -7,6 +7,8 @@
    * Layout: the article (left) and a sticky app pane (right: viewer, controls, plots). Links in
    * the article call `apply`, which drives the app.
    */
+  import { rs } from '../i18n';
+  const s = $derived(rs());
   import { onDestroy, onMount, untrack } from 'svelte';
   import { initializePage } from './page-load';
   import { EditorLoad, openEditorWindow } from './editor-load.svelte';
@@ -22,7 +24,7 @@
   import StabileoViewer from '../shell/StabileoViewer.svelte';
   import PaneTabs from '../shell/PaneTabs.svelte';
   import { publicI18n } from '../../../lib/i18n/store.svelte';
-  import { Playback, SOURCE_LABEL } from '../shell/playback.svelte';
+  import { Playback } from '../shell/playback.svelte';
   import PlotXY, { type PlotSeries } from './PlotXY.svelte';
   import { loadSprings, type LatticeKind, type NetworkSpec, type PeriodicResult, type StripResult } from './springs';
   import { embeddedEditorUrl, fullEditorUrl, type StripLabel } from './open-in-stabileo';
@@ -241,31 +243,31 @@
     .map((l) => l.split(','))
     .map((c) => ({ x: Number(c[0]), y: c[1] === '' ? NaN : Number(c[1]), lo: Number(c[2]), hi: Number(c[3]) }));
   const foamSeries = $derived<PlotSeries[]>([
-    { name: `Ours, periodic ${results.foam.cells}² cells, ±1 s.d. of ${results.foam.seeds} samples`, color: OURS, kind: 'band', points: foamP.map((r) => ({ x: r.eta, y: r.nu.mean, lo: r.nu.mean - r.nu.std, hi: r.nu.mean + r.nu.std })) },
-    { name: `Ours, periodic (exact moduli), mean of ${results.foam.seeds}`, color: OURS, kind: 'line', points: foamP.map((r) => ({ x: r.eta, y: r.nu.mean })) },
-    { name: 'Ours, the paper’s 13 × 52 strip protocol', color: OURS, kind: 'line', dashed: true, points: foamS.map((r) => ({ x: r.eta, y: r.nu.mean })) },
-    { name: 'Paper, Fig. 5 simulations (digitised, with error bars)', color: PAPER, kind: 'points', shape: 'triangle', points: fig5.filter((p) => Number.isFinite(p.y)) },
-    { name: 'Paper, text: ν = 0 at η ≃ 0.46, −0.1 as η → 0.5', color: PAPER, kind: 'points', shape: 'square', points: [{ x: 0.46, y: 0 }, { x: 0.5, y: -0.1 }] },
+    { name: s.springsBandSeries.replace('{cells}', String(results.foam.cells)).replace('{seeds}', String(results.foam.seeds)), color: OURS, kind: 'band', points: foamP.map((r) => ({ x: r.eta, y: r.nu.mean, lo: r.nu.mean - r.nu.std, hi: r.nu.mean + r.nu.std })) },
+    { name: s.springsMeanSeries.replace('{seeds}', String(results.foam.seeds)), color: OURS, kind: 'line', points: foamP.map((r) => ({ x: r.eta, y: r.nu.mean })) },
+    { name: s.springsStripSeries, color: OURS, kind: 'line', dashed: true, points: foamS.map((r) => ({ x: r.eta, y: r.nu.mean })) },
+    { name: s.springsFigureSeries, color: PAPER, kind: 'points', shape: 'triangle', points: fig5.filter((p) => Number.isFinite(p.y)) },
+    { name: s.springsTextSeries, color: PAPER, kind: 'points', shape: 'square', points: [{ x: 0.46, y: 0 }, { x: 0.5, y: -0.1 }] },
   ]);
   type Dil = { z: number; bulk: number; shear: number };
   const dil = results.dilution as Dil[];
-  const dilSeries: PlotSeries[] = [
-    { name: 'Bulk modulus B / k', color: OURS, kind: 'line', points: dil.map((r) => ({ x: r.z, y: r.bulk })) },
-    { name: 'Shear modulus G / k', color: OURS, kind: 'line', dashed: true, points: dil.map((r) => ({ x: r.z, y: r.shear })) },
-  ];
+  const dilSeries = $derived<PlotSeries[]>([
+    { name: s.springsBulkSeries, color: OURS, kind: 'line', points: dil.map((r) => ({ x: r.z, y: r.bulk })) },
+    { name: s.springsShearSeries, color: OURS, kind: 'line', dashed: true, points: dil.map((r) => ({ x: r.z, y: r.shear })) },
+  ]);
   type Honey = { l: number; eq23: number; 'nu_k1e-3': number };
-  const honeySeries: PlotSeries[] = [
-    { name: 'Paper, Eq. (23)', color: PAPER, kind: 'line', points: Array.from({ length: 91 }, (_, i) => 0.05 + i * 0.01).map((l) => ({ x: l, y: eq23(l) })) },
-    { name: 'Ours, periodic network, k_radial = 10⁻³', color: OURS, kind: 'points', points: (results.honeycomb as Honey[]).map((r) => ({ x: r.l, y: r['nu_k1e-3'] })) },
-  ];
+  const honeySeries = $derived<PlotSeries[]>([
+    { name: s.springsHoneyPaperSeries, color: PAPER, kind: 'line', points: Array.from({ length: 91 }, (_, i) => 0.05 + i * 0.01).map((l) => ({ x: l, y: eq23(l) })) },
+    { name: s.springsHoneySeries, color: OURS, kind: 'points', points: (results.honeycomb as Honey[]).map((r) => ({ x: r.l, y: r['nu_k1e-3'] })) },
+  ]);
   const orderedSeries = $derived.by<PlotSeries[]>(() => {
     if (!ordered) return [];
     const ts = Array.from({ length: 91 }, (_, i) => (Math.PI * i) / 90);
     const pick = (r: PeriodicResult) => ts.map((t) => ({ x: t, y: uniaxial(r.c, Math.PI / 2 - t)?.[1] ?? NaN }));
     return [
-      { name: 'Paper, Supplemental Eq. (9)', color: PAPER, kind: 'line', points: ts.map((t) => ({ x: t, y: eq9(solved!.phi, solved!.psi, t) })) },
-      { name: 'Ours, equal-weight springs (k ∝ 1/ℓ²)', color: OURS, kind: 'line', dashed: true, points: pick(ordered.eq) },
-      { name: 'Ours, equal Hookean springs (Eq. 3)', color: OURS, kind: 'line', points: pick(ordered.hook) },
+      { name: s.springsOrderedPaperSeries, color: PAPER, kind: 'line', points: ts.map((t) => ({ x: t, y: eq9(solved!.phi, solved!.psi, t) })) },
+      { name: s.springsEqualWeightSeries, color: OURS, kind: 'line', dashed: true, points: pick(ordered.eq) },
+      { name: s.springsHookeanSeries, color: OURS, kind: 'line', points: pick(ordered.hook) },
     ];
   });
 
@@ -314,16 +316,16 @@
     try {
       await openEditorWindow(() => fullEditorUrl(currentStrip, label), () => window.open('about:blank', '_blank'), (url) => window.location.assign(url));
     } catch (e) {
-      fullEditorError = `The full editor could not be opened: ${e instanceof Error ? e.message : String(e)}`;
+      fullEditorError = `${s.springsFullEditorError} ${e instanceof Error ? e.message : String(e)}`;
     }
   }
 </script>
 <ExperimentShell
   paperId="grossman-2026"
-  name="Auxetic spring networks"
-  lead="Pull a strip of Hookean springs and read how much it narrows. Shake the nodes of the triangular lattice and it starts to widen instead: it becomes auxetic. The network on the right is solved in your browser as a truss on Stabileo’s engine, and the same strip opens in the real Stabileo editor. No reference code is public (“available at request”), so we compare with the paper’s published numbers, closed forms and figures, and with exact results."
+  name={s.springsTitle}
+  lead={s.springsLead}
   verification={{
-    reference: { kind: 'none', why: 'None is public: the authors’ code is “available at request”' },
+    reference: { kind: 'none', why: s.springsReferenceUnavailable },
     published: { kind: 'checks', passed: paperChecks.passed, total: paperChecks.total, href: '#checks' },
   }}
   {actions}
@@ -331,149 +333,104 @@
   wide={tab === 'edit'}
 >
   {#snippet article()}
-      <h2>What the paper shows</h2>
-      <p>
-        Many materials, from metamaterial lattices to cell membranes, are modelled as networks of Hookean springs. Grossman and Boudaoud derive the elastic continuum
-        that such a network behaves like, using only its geometry and topology, and they compute the <em>nonaffine</em> displacements: the local deviations from a uniform
-        stretch that make disordered networks softer than the uniform-strain estimate. They check the theory against simulations of a stretched strip for three families:
-        ordered triangular lattices, a honeycomb that turns re-entrant, and a “foam” made by randomly displacing the nodes of a triangular lattice, which becomes
-        <strong>auxetic</strong> (negative Poisson’s ratio: it widens when pulled) as the disorder grows.
-      </p>
-      <p class="sp-try">
-        Try it: <ExperimentLink params={{ family: 'foam', eta: 0 }}>perfect lattice, η = 0</ExperimentLink> ·
+      <h2>{s.springsPaperShows}</h2>
+      <p> {s.springsOverview} <em>{s.springsNonaffine}</em> {s.springsOverviewRelaxation} <strong>{s.springsAuxetic}</strong> {s.springsOverviewAuxetic} </p>
+      <p class="sp-try"> {s.springsTry} <ExperimentLink params={{ family: 'foam', eta: 0 }}>{s.springsPerfect}</ExperimentLink> ·
         <ExperimentLink params={{ family: 'foam', eta: 0.3 }}>η = 0.3</ExperimentLink> ·
-        <ExperimentLink params={{ family: 'foam', eta: 0.5 }}>η = 0.5, auxetic</ExperimentLink>
+        <ExperimentLink params={{ family: 'foam', eta: 0.5 }}>{s.springsTryAuxetic}</ExperimentLink>
       </p>
 
-      <h2>The model we solve</h2>
-      <p>
-        Springs <i>e</i> join nodes; each has stiffness <i>k<sub>e</sub></i>, rest length ℓ̄<sub>e</sub> and current length ℓ<sub>e</sub>, and the energy is
-        <span class="eq"><var>E</var> = ½ Σ<sub>e</sub> <var>k</var><sub>e</sub> (<var>ℓ</var><sub>e</sub> − <var>ℓ̄</var><sub>e</sub>)²</span> (the paper’s Eq. 3). A spring network is a pin-jointed truss, so the right pane
-        shows it in the Stabileo viewer: each bar coloured by its axial force, on the deformed shape. We compute two things.
-      </p>
+      <h2>{s.springsModel}</h2>
+      <p> {s.springsSprings} <i>e</i> {s.springsJoin} <i>k<sub>e</sub></i>{s.springsRestLength}<sub>e</sub> {s.springsCurrentLength}<sub>e</sub>{s.springsEnergy} <span class="eq"><var>E</var> = ½ Σ<sub>e</sub> <var>k</var><sub>e</sub> (<var>ℓ</var><sub>e</sub> − <var>ℓ̄</var><sub>e</sub>)²</span> {s.springsModelViewer} </p>
       <ul>
         <li>
-          <b>The paper’s strip test.</b> A 13 × 52 strip (about 800 nodes), its top and bottom rows held, the top moved up by the imposed strain; the Poisson’s ratio is read
-          from the width change between the two edge nodes nearest mid-height, as in the paper’s Sec. V A. Solved as a linear truss on the Stabileo engine’s sparse Cholesky
-          factorisation; the same model solved by the production engine’s 2D truss analysis agrees to 10⁻¹⁴.
-        </li>
+          <b>{s.springsStripTest}</b> {s.springsStripMethod} </li>
         <li>
-          <b>Exact effective moduli.</b> A periodic cell under an imposed macroscopic strain, with every node free to relax: the stiffness that remains is the network’s elastic
-          tensor C, including the nonaffine softening, with no boundary effects. The uniform-strain (affine) tensor is the same sum without relaxation.
-        </li>
+          <b>{s.springsExactModuli}</b> {s.springsPeriodicMethod} </li>
         <li>
-          <b>Prestress</b> (an addition, not in the paper’s computations): rest lengths shortened by a fraction, the network relaxed to equilibrium by Newton’s method, and the
-          linear response taken about that state, tension stiffening included.
-        </li>
+          <b>{s.springsPrestress}</b> {s.springsPrestressMethod} </li>
       </ul>
 
-      <h2>Comparison with the paper</h2>
-      <h3>Foam: the auxetic transition</h3>
-      <p>
-        The paper reports ν falling with the disorder η, crossing zero at η ≃ 0.46 and reaching −0.1 as η → 0.5. Our exact periodic moduli (10 samples of 26 × 26 cells for each
-        η) cross zero at η = 0.446 and give ν = −0.148 at η = 0.5. This is a cross-protocol comparison: our periodic-cell mean falls inside every error bar of the paper’s 13 × 52 clamped-strip simulations in Fig. 5 for η ≤ 0.45; it does not validate our strip protocol. The paper’s marker at
-        η = 0.49 is an arrow below its plot (about −0.14); ours there is −0.117.
-      </p>
-      <PlotXY series={foamSeries} xLabel="disorder η" yLabel="Poisson’s ratio ν" xDomain={[0, 0.5]} current={family === 'foam' && cell ? { x: eta, y: cell.isotropic.poisson, label: 'This network (periodic)' } : null} ariaLabel="Poisson's ratio against disorder: ours and the paper's" />
-      <p class="sp-note">
-        Our implementation of the strip protocol (dashed) reads 0.371 for the perfect lattice, where the exact value is 1/3 and the paper’s Fig. 5 shows 0.331. The excess is a
-        free-edge effect of order 1/width: strips of 26 and 52 widths read 0.354 and 0.345, extrapolating to 0.336. The paper’s strip does not show it, and its text does not say
-        enough about the measurement for us to find out why.
-      </p>
+      <h2>{s.springsComparison}</h2>
+      <h3>{s.springsFoamHeading}</h3>
+      <p> {s.springsFoamComparison} </p>
+      <PlotXY series={foamSeries} xLabel={s.springsDisorderAxis} yLabel={s.springsPoissonAxis} xDomain={[0, 0.5]} current={family === 'foam' && cell ? { x: eta, y: cell.isotropic.poisson, label: s.springsThisPeriodic } : null} ariaLabel={s.springsFoamPlot} />
+      <p class="sp-note"> {s.springsStripBias} </p>
 
-      <h3>Honeycomb: Eq. (23)</h3>
-      <p>
-        A honeycomb of unit edges whose opposing corners are 2ℓ apart is regular at ℓ = 1 and re-entrant below ℓ = ½. The paper triangulates each hexagon with a centre node and
-        springs 10⁻³ as stiff as the edges, and compares with the closed form ν(ℓ) = −(2 − 4ℓ)(ℓ + ½)/(3 + 4ℓ − 4ℓ²). Our periodic network agrees to 3.4 × 10⁻³ with those springs and
-        to 3.4 × 10⁻⁶ with springs 10⁻⁶ as stiff: the difference is the soft springs’ own stiffness.
-        <ExperimentLink params={{ family: 'honeycomb', ell: 0.25 }}>Show ℓ = 0.25 (re-entrant)</ExperimentLink> ·
+      <h3>{s.springsHoneyHeading}</h3>
+      <p> {s.springsHoneyComparison} <ExperimentLink params={{ family: 'honeycomb', ell: 0.25 }}>{s.springsTryHoney}</ExperimentLink> ·
         <ExperimentLink params={{ family: 'honeycomb', ell: 0.9 }}>ℓ = 0.9</ExperimentLink>
       </p>
-      <PlotXY series={honeySeries} xLabel="ℓ" yLabel="Poisson’s ratio ν" xDomain={[0, 1]} current={family === 'honeycomb' && cellAlong ? { x: ell, y: cellAlong[1], label: 'This network' } : null} ariaLabel="Honeycomb Poisson's ratio: Eq. 23 and our network" />
+      <PlotXY series={honeySeries} xLabel="ℓ" yLabel={s.springsPoissonAxis} xDomain={[0, 1]} current={family === 'honeycomb' && cellAlong ? { x: ell, y: cellAlong[1], label: s.springsThisNetwork } : null} ariaLabel={s.springsHoneyPlot} />
 
-      <h3>Ordered lattices: an observation about spring constants</h3>
-      <p>
-        For ordered triangular lattices the paper gives a closed form, Supplemental Eq. (9), for ν as a function of the cell shape (φ, ψ) and orientation θ, plotted in its Fig. 4.
-        A Bravais lattice has no nonaffine displacements, so the exact answer is the uniform-strain one, which we compute independently. Supplemental Eq. (9) and the
-        calculation line of Fig. 7 (Young’s modulus of the (3, 2) lattice, read from the PDF’s vector data, times the area of one triangle) coincide with that affine result
-        for spring constants k<sub>e</sub> ∝ 1/ℓ̄<sub>e</sub>², to 10⁻¹⁴ and 6 × 10⁻⁴. With equal spring constants we obtain ν = 1/6 at (φ, ψ, θ) = (1, 0.5, 0), where Eq. (9)
-        gives 8/27. This may reflect a convention we have not identified; it is on our list of questions for the authors.
-        <ExperimentLink params={{ family: 'ordered', phi: 1, psi: 0.5, theta: 0, law: 'hookean' }}>Show (1, 0.5)</ExperimentLink> ·
-        <ExperimentLink params={{ family: 'ordered', phi: 2, psi: 0.5, theta: 0.7, law: 'equal_weight' }}>(2, 0.5) at θ = 0.7, equal weight</ExperimentLink>
+      <h3>{s.springsOrderedHeading}</h3>
+      <p> {s.springsOrderedComparison}<sub>e</sub> ∝ 1/ℓ̄<sub>e</sub>{s.springsOrderedConvention} <ExperimentLink params={{ family: 'ordered', phi: 1, psi: 0.5, theta: 0, law: 'hookean' }}>{s.springsTryOrdered}</ExperimentLink> ·
+        <ExperimentLink params={{ family: 'ordered', phi: 2, psi: 0.5, theta: 0.7, law: 'equal_weight' }}>{s.springsTryEqualWeight}</ExperimentLink>
       </p>
       {#if family === 'ordered' && orderedSeries.length}
-        <PlotXY series={orderedSeries} xLabel="lattice orientation θ, rad" yLabel="Poisson’s ratio ν" xDomain={[0, Math.PI]} current={cellAlong ? { x: theta, y: cellAlong[1], label: 'This network' } : null} ariaLabel="Ordered lattice Poisson's ratio against orientation" />
+        <PlotXY series={orderedSeries} xLabel={s.springsOrientationAxis} yLabel={s.springsPoissonAxis} xDomain={[0, Math.PI]} current={cellAlong ? { x: theta, y: cellAlong[1], label: s.springsThisNetwork } : null} ariaLabel={s.springsOrderedPlot} />
       {:else}
-        <p class="sp-note">Select an ordered lattice (without dilution or prestress) to plot Eq. (9) against both spring laws.</p>
+        <p class="sp-note">{s.springsSelectOrdered}</p>
       {/if}
-      <p>
-        We could not reproduce the simulation dots of Fig. 7: the paper does not say how its strip simulation measures Young’s modulus, and our reading (vertical force through
-        mid-height over width and strain) does not reproduce those dots.
-      </p>
+      <p> {s.springsUnreproduced} </p>
 
-      <h3>Rigidity and connectivity (an independent check)</h3>
-      <p>
-        Not in the paper: removing bonds at random from the triangular lattice lowers the mean coordination z from 6. Maxwell’s count (2 degrees of freedom per node against z/2
-        bonds per node) says a generic network cannot be rigid below z = 4. Our moduli vanish to rounding at z = 3 and stay finite above about z = 3.9, the rigidity
-        percolation threshold (e.g. Jacobs and Thorpe, <a href="https://doi.org/10.1103/PhysRevLett.75.4051" rel="noreferrer" target="_blank">PRL 75, 4051, 1995</a>).
-        <ExperimentLink params={{ family: 'foam', eta: 0, keep: 0.62 }}>Dilute to z ≈ 3.7</ExperimentLink> ·
-        <ExperimentLink params={{ family: 'foam', eta: 0, keep: 0.62, prestress: 0.03 }}>…and put it in tension</ExperimentLink>
+      <h3>{s.springsRigidityHeading}</h3>
+      <p> {s.springsRigidity} <a href="https://doi.org/10.1103/PhysRevLett.75.4051" rel="noreferrer" target="_blank">{"PRL 75, 4051, 1995"}</a>).
+        <ExperimentLink params={{ family: 'foam', eta: 0, keep: 0.62 }}>{s.springsTryDilute}</ExperimentLink> ·
+        <ExperimentLink params={{ family: 'foam', eta: 0, keep: 0.62, prestress: 0.03 }}>{s.springsTryTension}</ExperimentLink>
       </p>
-      <PlotXY series={dilSeries} xLabel="mean coordination z" yLabel="modulus / k" xDomain={[2.4, 6]} rules={[{ x: 4, label: 'z = 4' }]} current={family === 'foam' && eta === 0 && cell ? { x: cell.coordination, y: cell.isotropic.shear, label: 'This network: G' } : null} ariaLabel="Moduli against coordination" />
+      <PlotXY series={dilSeries} xLabel={s.springsCoordinationAxis} yLabel={s.springsModulusAxis} xDomain={[2.4, 6]} rules={[{ x: 4, label: 'z = 4' }]} current={family === 'foam' && eta === 0 && cell ? { x: cell.coordination, y: cell.isotropic.shear, label: s.springsThisShear } : null} ariaLabel={s.springsModuliPlot} />
 
-      <h3>All checks</h3>
+      <h3>{s.springsAllChecks}</h3>
       <div id="checks"></div>
       {#each evidence as group (group.category)}
       <table class="sp-checks">
-        <caption>{group.total} {group.category === 'paper' ? 'comparisons with published paper values' : 'independent checks'} run in CI, each with its tolerance</caption>
-        <thead><tr><th scope="col">Check</th><th scope="col">Observed</th><th scope="col">Tolerance</th><th scope="col">Result</th></tr></thead>
+        <caption>{group.total} {group.category === 'paper' ? s.springsPaperChecks : s.springsIndependentChecks} {s.springsChecksRun}</caption>
+        <thead><tr><th scope="col">{s.springsCheck}</th><th scope="col">{s.springsObserved}</th><th scope="col">{s.springsTolerance}</th><th scope="col">{s.springsResult}</th></tr></thead>
         <tbody>
           {#each group.checks as c (c.name)}
-            <tr><td>{c.name}<br /><span class="m">{c.metric}</span></td><td>{fmtSci(c.observed)}</td><td>{fmtSci(c.tolerance)}</td><td>{c.passed ? 'pass' : 'FAIL'}</td></tr>
+            <tr><td>{c.name}<br /><span class="m">{c.metric}</span></td><td>{fmtSci(c.observed)}</td><td>{fmtSci(c.tolerance)}</td><td>{c.passed ? s.pass : s.fail}</td></tr>
           {/each}
         </tbody>
       </table>
       {/each}
 
-      <h2>Limitations</h2>
+      <h2>{s.springsLimitations}</h2>
       <ul>
-        <li>No reference code is public. Comparisons rest on the paper’s text, its closed forms, the vector data of Figs. 7–9 and a digitisation of the raster Fig. 5 (±0.002).</li>
-        <li>We have not implemented the paper’s own semi-analytical method (the nonaffine tensors W of its Eq. 20 in the mean-field approximation); we compare with its results.</li>
-        <li>Linear response only (small strain). The paper minimised the nonlinear energy at 1% strain; at that strain the difference is of order 1%.</li>
-        <li>Live solves and the automatic sweep currently run synchronously on the main thread. Large or prestressed networks can block navigation and Pause until a solve returns. Terminable workers and precomputed replay are pending.</li>
-        <li>The strip’s free edges bias the measured ν by O(1/width); the periodic moduli have no such bias.</li>
-        <li>Our ensemble (10 samples per η) estimates the mean to about ±0.005 at η ≤ 0.3 and ±0.01 near 0.5.</li>
-        <li>Agreement with a paper is not validation against experiments, and nothing here is an engineering design result.</li>
+        <li>{s.springsNoReference}</li>
+        <li>{s.springsNotImplemented}</li>
+        <li>{s.springsLinearOnly}</li>
+        <li>{s.springsSynchronous}</li>
+        <li>{s.springsFreeEdges}</li>
+        <li>{s.springsEnsemble}</li>
+        <li>{s.springsNotDesign}</li>
       </ul>
 
-      <h2>Code and references</h2>
+      <h2>{s.springsCodeReferences}</h2>
       <ul>
-        <li>Implementation, tests, reference values and their provenance: <a href={SOURCE} rel="noreferrer" target="_blank">research/metamaterials/grossman-2026</a> (AGPL-3.0).</li>
-        <li>Article and Supplemental Material: <a href={DOI} rel="noreferrer" target="_blank">doi:10.1103/17sg-gzhl</a>, CC BY 4.0. Figures on this page are drawn from our own runs; the paper’s points are its published data.</li>
-        <li>Foam construction after J. Liu, Y. Nie, H. Tong and N. Xu, <a href="https://doi.org/10.1103/PhysRevMaterials.3.055607" rel="noreferrer" target="_blank">Phys. Rev. Materials 3, 055607 (2019)</a>, the paper’s Ref. 27.</li>
+        <li>{s.springsImplementation} <a href={SOURCE} rel="noreferrer" target="_blank">{SOURCE.replace(`${REPO_URL}/tree/main/`, '')}</a> {"(AGPL-3.0)."}</li>
+        <li>{s.springsArticleSupplement} <a href={DOI} rel="noreferrer" target="_blank">{"doi:10.1103/17sg-gzhl"}</a>{s.springsFiguresCredit}</li>
+        <li>{s.springsFoamCredit} <a href="https://doi.org/10.1103/PhysRevMaterials.3.055607" rel="noreferrer" target="_blank">{"Phys. Rev. Materials 3, 055607 (2019)"}</a>{s.springsPaperReference}</li>
       </ul>
       {/snippet}
 
   {#snippet app()}
       <div class="sp-app" bind:this={pane}>
         <div class="sp-tabbar">
-          <PaneTabs tabs={[{ id: 'experiment', label: 'Network' }, { id: 'params', label: 'Parameters' }, { id: 'edit', label: 'Edit in Stabileo' }]} bind:active={tabId} />
-          <button class="sp-full" type="button" onclick={openFullEditor} disabled={exportDisabled}>Open full editor ↗</button>
+          <PaneTabs tabs={[{ id: 'experiment', label: s.springsNetwork }, { id: 'params', label: s.parameters }, { id: 'edit', label: s.editInStabileo }]} bind:active={tabId} />
+          <button class="sp-full" type="button" onclick={openFullEditor} disabled={exportDisabled}>{s.springsOpenFull}</button>
         </div>
-          {#if solved?.network.prestress}<p class="warnt">Editor export is disabled: prestress and geometric stiffness are not supported by this conversion.</p>{/if}
-          {#if fullEditorError}<p class="warnt" role="alert">{fullEditorError} <button type="button" onclick={openFullEditor} disabled={exportDisabled}>Retry opening full editor</button></p>{/if}
+          {#if solved?.network.prestress}<p class="warnt">{s.springsExportDisabled}</p>{/if}
+          {#if fullEditorError}<p class="warnt" role="alert">{fullEditorError} <button type="button" onclick={openFullEditor} disabled={exportDisabled}>{s.springsRetryFull}</button></p>{/if}
           <div class="sp-editor" role="tabpanel" id="rs-panel-edit" aria-labelledby="rs-tab-edit" hidden={tab !== 'edit'}>
-            <p class="sp-source">
-              Stabileo editor (production engine): this strip as an ordinary truss, end rows pinned, the far end moved by the imposed strain. Edit and press Solve. Bar forces are
-              1000 × the experiment’s (E·A/L = 1000 k kN/m).
-              {#if strip && editor.attempted && strip !== editorStrip && !exportDisabled}<button class="link" type="button" onclick={loadEditor}>Load the experiment’s current network</button>{/if}
+            <p class="sp-source"> {s.springsEditorDescription} {#if strip && editor.attempted && strip !== editorStrip && !exportDisabled}<button class="link" type="button" onclick={loadEditor}>{s.springsLoadCurrent}</button>{/if}
             </p>
-            {#if editor.error}<p class="warnt" role="alert">{editor.error} <button type="button" onclick={loadEditor} disabled={exportDisabled}>Retry loading editor</button></p>{/if}
+            {#if editor.error}<p class="warnt" role="alert">{editor.error} <button type="button" onclick={loadEditor} disabled={exportDisabled}>{s.springsRetryEditor}</button></p>{/if}
             <div class="sp-frame">
-              {#if editor.loading}<div class="sp-frame-loading">Loading the Stabileo editor…</div>{/if}
+              {#if editor.loading}<div class="sp-frame-loading">{s.springsLoadingEditor}</div>{/if}
               {#if editor.src && !exportDisabled}
                 {#key editor.src}{@const loadedSrc = editor.src}
-                <iframe src={loadedSrc} title="Stabileo editor (production engine)" onload={() => editor.loaded(loadedSrc)}></iframe>
+                <iframe src={loadedSrc} title={s.springsEditorTitle} onload={() => editor.loaded(loadedSrc)}></iframe>
                 {/key}
               {/if}
             </div>
@@ -481,13 +438,10 @@
         <div role="tabpanel" id="rs-panel-experiment" aria-labelledby="rs-tab-experiment" hidden={tab !== 'experiment'}>
         <p class="sp-source" aria-live="polite">
           {#if loadError}
-            <span class="warnt">The simulation bundle is not part of this build ({loadError}). Build it with research/metamaterials/grossman-2026/wasm/build.sh.</span>
-          {:else if !glue}
-            Loading the solver…
-          {:else if autoplaying}
-            Live sweep of η in your browser (our solver) <button class="sp-pause" type="button" onclick={touch}>Pause sweep</button>
+            <span class="warnt">{s.springsBundleMissing}{loadError}{s.springsBuildBundle}</span>
+          {:else if !glue} {s.springsLoadingSolver} {:else if autoplaying} {s.springsLiveSweep} <button class="sp-pause" type="button" onclick={touch}>{s.springsPauseSweep}</button>
           {:else}
-            {SOURCE_LABEL.live} · {nf(solveMs, 0)} ms
+            {s.liveSource} · {nf(solveMs, 0)} ms
           {/if}
         </p>
         <div class="sp-viewer" data-nodes={strip?.nodes.length ?? 0}>
@@ -502,7 +456,7 @@
                 colourMap="diverging"
                 perCell={true}
                 range={forceRange}
-                title={Math.abs(solved?.label.strain ?? 0) > 0 ? 'Axial force N / (k ε)' : 'Axial force N / k'}
+                title={Math.abs(solved?.label.strain ?? 0) > 0 ? s.springsAxialNormalized : s.springsAxial}
                 unit=""
                 legendFooter={forceLegend(solved?.label.strain ?? 0)}
                 view={VIEW}
@@ -510,54 +464,52 @@
                 deformScale={deform}
                 showMesh={false}
                 height="clamp(16rem, 46dvh, 26rem)"
-                ariaLabel="Stabileo viewer: the spring network coloured by axial force on its deformed shape"
-                status={[{ label: 'nodes', value: String(strip.nodes.length) }, { label: 'springs', value: String(strip.bonds.length) }]}
+                ariaLabel={s.springsViewerLabel}
+                status={[{ label: s.springsNodes, value: String(strip.nodes.length) }, { label: s.springsBars, value: String(strip.bonds.length) }]}
                 editorButton={false}
               />
             
           {:else}
-            <div class="sp-placeholder">The network appears here.</div>
+            <div class="sp-placeholder">{s.springsPlaceholder}</div>
           {/if}
         </div>
-        {#if solveError}<p class="warnt">The solver refused the input: {solveError}</p>{/if}
+        {#if solveError}<p class="warnt">{s.springsSolverRefused} {solveError}</p>{/if}
         <dl class="sp-readout">
-          <div><dt>ν, strip (paper’s protocol)</dt><dd>{strip?.poisson === null ? 'indeterminate' : nf(strip?.poisson)}</dd></div>
-          <div><dt>ν along the pull, periodic (exact)</dt><dd>{nf(cellAlong?.[1])}</dd></div>
-          <div><dt>B / k · G / k (affine)</dt><dd>{nf(cell?.isotropic.bulk)} · {nf(cell?.isotropic.shear)} <span class="m">({nf(cell?.isotropic_affine.bulk)} · {nf(cell?.isotropic_affine.shear)})</span></dd></div>
-          <div><dt>coordination z · nonaffinity</dt><dd>{nf(cell?.coordination, 2)} · {nf(cell?.nonaffinity_shear, 4)}</dd></div>
+          <div><dt>{s.springsStripReadout}</dt><dd>{strip?.poisson === null ? s.springsIndeterminate : nf(strip?.poisson)}</dd></div>
+          <div><dt>{s.springsPeriodicReadout}</dt><dd>{nf(cellAlong?.[1])}</dd></div>
+          <div><dt>{s.springsAffineReadout}</dt><dd>{nf(cell?.isotropic.bulk)} · {nf(cell?.isotropic.shear)} <span class="m">({nf(cell?.isotropic_affine.bulk)} · {nf(cell?.isotropic_affine.shear)})</span></dd></div>
+          <div><dt>{s.springsCoordinationReadout}</dt><dd>{nf(cell?.coordination, 2)} · {nf(cell?.nonaffinity_shear, 4)}</dd></div>
         </dl>
         </div>
         <div role="tabpanel" id="rs-panel-params" aria-labelledby="rs-tab-params" hidden={tab !== 'params'}>
         <form class="sp-controls" oninput={touch} onsubmit={(e) => e.preventDefault()}>
-          <label>Network
-            <select bind:value={family} aria-label="Network">
-              <option value="foam">Foam (random node shifts η)</option>
-              <option value="ordered">Ordered triangular lattice (φ, ψ, θ)</option>
-              <option value="honeycomb">Honeycomb (ℓ)</option>
-              <option value="square">Square lattice</option>
+          <label>{s.springsNetwork} <select bind:value={family} aria-label={s.springsNetwork}>
+              <option value="foam">{s.springsFoamOption}</option>
+              <option value="ordered">{s.springsOrderedOption}</option>
+              <option value="honeycomb">{s.springsHoneyOption}</option>
+              <option value="square">{s.springsSquareOption}</option>
             </select>
           </label>
           {#if family === 'foam'}
-            <label>Disorder η <input type="range" min="0" max="0.5" step="0.01" bind:value={eta} aria-label="Disorder eta" /><span class="v">{nf(eta, 2)}</span></label>
+            <label>{s.springsDisorder} <input type="range" min="0" max="0.5" step="0.01" bind:value={eta} aria-label={s.springsDisorderLabel} /><span class="v">{nf(eta, 2)}</span></label>
           {:else if family === 'ordered'}
-            <label>Shear φ <input type="range" min="0.5" max="3" step="0.05" bind:value={phi} aria-label="phi" /><span class="v">{nf(phi, 2)}</span></label>
-            <label>Elongation ψ <input type="range" min="0.4" max="2" step="0.05" bind:value={psi} aria-label="psi" /><span class="v">{nf(psi, 2)}</span></label>
-            <label>Orientation θ <input type="range" min="0" max="3.14" step="0.02" bind:value={theta} aria-label="theta" /><span class="v">{nf(theta, 2)}</span></label>
-            <label>Springs
-              <select bind:value={law} aria-label="Spring law"><option value="hookean">equal k (Eq. 3)</option><option value="equal_weight">k ∝ 1/ℓ² (as Eq. 9)</option></select>
+            <label>{s.springsShear} <input type="range" min="0.5" max="3" step="0.05" bind:value={phi} aria-label={s.springsPhi} /><span class="v">{nf(phi, 2)}</span></label>
+            <label>{s.springsElongation} <input type="range" min="0.4" max="2" step="0.05" bind:value={psi} aria-label={s.springsPsi} /><span class="v">{nf(psi, 2)}</span></label>
+            <label>{s.springsOrientation} <input type="range" min="0" max="3.14" step="0.02" bind:value={theta} aria-label={s.springsTheta} /><span class="v">{nf(theta, 2)}</span></label>
+            <label>{s.springsSprings} <select bind:value={law} aria-label={s.springsLaw}><option value="hookean">{s.springsEqualK}</option><option value="equal_weight">{s.springsEqualWeight}</option></select>
             </label>
           {:else if family === 'honeycomb'}
-            <label>Corner distance ℓ <input type="range" min="0.05" max="0.95" step="0.01" bind:value={ell} aria-label="ell" /><span class="v">{nf(ell, 2)}</span></label>
+            <label>{s.springsCornerDistance} <input type="range" min="0.05" max="0.95" step="0.01" bind:value={ell} aria-label={s.springsEll} /><span class="v">{nf(ell, 2)}</span></label>
           {:else}
-            <label class="chk"><input type="checkbox" bind:checked={diagonals} /> Diagonals</label>
+            <label class="chk"><input type="checkbox" bind:checked={diagonals} /> {s.springsDiagonals}</label>
           {/if}
-          <label>Bonds kept <input type="range" min="0.4" max="1" step="0.01" bind:value={keep} aria-label="Fraction of bonds kept" /><span class="v">{nf(keep, 2)}</span></label>
-          <label>Prestress (rest lengths shortened) <input type="range" min="0" max="0.1" step="0.005" bind:value={prestress} aria-label="Prestress: rest lengths shortened by" /><span class="v">{nf(prestress * 100, 1)} %</span></label>
-          <label>Imposed strain <input type="range" min="-0.05" max="0.05" step="0.005" bind:value={strain} aria-label="Imposed strain" /><span class="v">{nf(strain * 100, 1)} %</span></label>
-          <label>Deformation × <input type="range" min="0" max="60" step="1" bind:value={deform} aria-label="Deformation scale" /><span class="v">{deform}</span></label>
-          <label>Seed <input class="seed" type="number" min="0" max="999" step="1" bind:value={seed} aria-label="Random seed" /></label>
+          <label>{s.springsBondsKept} <input type="range" min="0.4" max="1" step="0.01" bind:value={keep} aria-label={s.springsBondsFraction} /><span class="v">{nf(keep, 2)}</span></label>
+          <label>{s.springsPrestressControl} <input type="range" min="0" max="0.1" step="0.005" bind:value={prestress} aria-label={s.springsPrestressLabel} /><span class="v">{nf(prestress * 100, 1)} %</span></label>
+          <label>{s.springsStrain} <input type="range" min="-0.05" max="0.05" step="0.005" bind:value={strain} aria-label={s.springsStrain} /><span class="v">{nf(strain * 100, 1)} %</span></label>
+          <label>{s.springsDeformation} <input type="range" min="0" max="60" step="1" bind:value={deform} aria-label={s.springsDeformationScale} /><span class="v">{deform}</span></label>
+          <label>{s.springsSeed} <input class="seed" type="number" min="0" max="999" step="1" bind:value={seed} aria-label={s.springsSeedLabel} /></label>
         </form>
-          <p class="sp-note">Every change re-solves the strip and the periodic cell at once ({nf(solveMs, 0)} ms for the last one).</p>
+          <p class="sp-note">{s.springsResolveNote}{nf(solveMs, 0)} {s.springsResolveTime}</p>
         </div>
       </div>
       {/snippet}
