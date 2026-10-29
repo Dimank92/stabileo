@@ -153,6 +153,19 @@ test.describe('@smoke research review regressions', () => {
     await expect(run).toBeEnabled();
   });
 
+  test('article parameter links correct malformed input and run', async ({ page }) => {
+    const input = page.locator('#p-l0');
+    await input.fill('oops');
+    await input.blur();
+    await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: 'try ℓ = 0.015 mm', exact: true }).click();
+    await expect(input).toHaveValue('0.015');
+    await expect(input).toHaveAttribute('aria-invalid', 'false');
+    await expect(page.locator('.rs-app')).toHaveAttribute('data-source', 'live');
+    expect(await page.evaluate(() => JSON.parse((window as unknown as { sentConfig: string }).sentConfig).material.l0)).toBe(0.015);
+    await expect(page.locator('.rs-app')).toHaveAttribute('data-steps', '1');
+  });
+
   test('article step links restore the reference replay after a custom load-step run', async ({ page }) => {
     await page.locator('#p-dt').selectOption('0.06');
     await page.getByRole('button', { name: 'Run', exact: true }).click();
@@ -225,8 +238,8 @@ for (const locale of ['es', 'pt', 'en']) {
   });
 }
 
-test('@smoke research navigation preserves recent editor changes and undo history', async ({ page }) => {
-  await page.goto('/app/basic?e2e=1');
+for (const mode of ['basic', 'pro']) test(`@smoke research navigation preserves ${mode} editor changes against public-page shortcuts`, async ({ page }) => {
+  await page.goto(`/app/${mode}?e2e=1`);
   await page.waitForFunction(() => !!window.__stabileoActions);
   const before = await page.evaluate(async () => {
     const app = window as unknown as { __stabileo: StabileoTestHooks; __stabileoActions: StabileoTestActions };
@@ -234,18 +247,26 @@ test('@smoke research navigation preserves recent editor changes and undo histor
     const id = app.__stabileo.nodeIds()[0];
     const position = app.__stabileo.nodePos(id)!;
     app.__stabileoActions.moveNode(id, position.x + 0.25, position.y, position.z);
-    return { id, position, edited: app.__stabileo.nodePos(id), undo: app.__stabileo.undoCount(), timeOrigin: performance.timeOrigin };
+    app.__stabileoActions.selectNodes([id]);
+    return { snapshot: JSON.parse(app.__stabileo.serializeProject()).snapshot, id, position, edited: app.__stabileo.nodePos(id), undo: app.__stabileo.undoCount(), timeOrigin: performance.timeOrigin };
   });
+  await page.keyboard.press('ControlOrMeta+c');
   await page.locator('.logo-home').click();
   await page.locator('.nav [data-nav="research"]').click();
   await expect(page.getByRole('heading', { name: 'Stabileo Research' })).toBeVisible();
+  for (const destination of ['/research/', '/blog/', '/']) {
+    await page.evaluate(path => window.dispatchEvent(new CustomEvent('stabileo-navigate', { detail: path })), destination);
+    await expect(page.locator('.app-container')).toHaveClass(/hidden-behind-landing/);
+    for (const key of ['Delete', 'Backspace', 'Control+z', 'Control+v', 'ControlOrMeta+z', 'ControlOrMeta+v', 'ControlOrMeta+x', 'ControlOrMeta+y']) await page.keyboard.press(key);
+    await page.waitForTimeout(200);
+  }
   await page.locator('.nav-actions > button.btn-primary').click();
   await expect(page.locator('.app-container')).toBeVisible();
   const after = await page.evaluate((id) => {
     const app = window as unknown as { __stabileo: StabileoTestHooks };
-    return { edited: app.__stabileo.nodePos(id), undo: app.__stabileo.undoCount(), timeOrigin: performance.timeOrigin };
+    return { snapshot: JSON.parse(app.__stabileo.serializeProject()).snapshot, edited: app.__stabileo.nodePos(id), undo: app.__stabileo.undoCount(), timeOrigin: performance.timeOrigin };
   }, before.id);
-  expect(after).toEqual({ edited: before.edited, undo: before.undo, timeOrigin: before.timeOrigin });
+  expect(after).toEqual({ snapshot: before.snapshot, edited: before.edited, undo: before.undo, timeOrigin: before.timeOrigin });
   expect(after.undo).toBeGreaterThan(0);
   await page.keyboard.press('ControlOrMeta+z');
   await expect.poll(() => page.evaluate((id) => (window as unknown as { __stabileo: StabileoTestHooks }).__stabileo.nodePos(id), before.id)).toEqual(before.position);
