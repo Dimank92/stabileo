@@ -67,3 +67,11 @@ For local comparisons, run `nix develop .. -c node scripts/check-research-route-
 without `--update` from the candidate's `web/`, using the same Nix toolchain for both.
 `node --test web/scripts/research-route-budget.test.mjs` checks unchanged routes, the noise
 allowance, missing measurements and negative cases for real landing/app growth.
+
+## Newmark (1959), first version
+
+`benchmarks/newmark-1959/` documents one exact SDOF step-response benchmark using
+production Newmark average acceleration. Shared input and native tests live under
+`engine/tests/benchmarks/newmark_1959.*`; published native replay data is
+`benchmarks/newmark-1959/results/stabileo_results.json`. The page uses the existing
+production WASM wrapper and shared Stabileo viewer. Stage: first-version; 0 reviews.
