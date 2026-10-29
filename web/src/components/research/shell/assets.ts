@@ -1,5 +1,8 @@
 export const researchBuildId = import.meta.env.RESEARCH_BUILD_ID ?? 'unavailable';
-export const researchAssetBase = `${import.meta.env.BASE_URL}research-wasm/builds/${researchBuildId}/`;
+export const researchAssetBase =
+  researchBuildId !== 'unavailable'
+    ? `${import.meta.env.BASE_URL}research-wasm/builds/${researchBuildId}/`
+    : `${import.meta.env.BASE_URL}research-wasm/`;
 
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;

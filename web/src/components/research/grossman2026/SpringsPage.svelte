@@ -26,7 +26,9 @@
   import { publicI18n } from '../../../lib/i18n/store.svelte';
   import { Playback } from '../shell/playback.svelte';
   import PlotXY, { type PlotSeries } from './PlotXY.svelte';
-  import { loadSprings, type LatticeKind, type NetworkSpec, type PeriodicResult, type StripResult } from './springs';
+  import { BASE, type LatticeKind, type NetworkSpec, type PeriodicResult, type StripResult } from './springs';
+  import { loadSweepFrames } from './sweep-replay';
+  import type { SolveAllResult } from './simulation.svelte';
   import { embeddedEditorUrl, fullEditorUrl, type StripLabel } from './open-in-stabileo';
 
   const SOURCE = `${REPO_URL}/tree/main/research/metamaterials/grossman-2026`;
@@ -77,7 +79,7 @@
   const stripTheta = $derived(family === 'ordered' ? theta : family === 'honeycomb' ? Math.PI / 2 : 0);
   const cells = $derived(family === 'honeycomb' ? 6 : family === 'foam' ? 26 : 8);
 
-  let glue = $state.raw<Awaited<ReturnType<typeof loadSprings>> | null>(null);
+  let sweepFrames = $state.raw<SolveAllResult[] | null>(null);
   let loadError = $state<string | null>(null);
   const simulation = new Simulation();
   const strip = $derived(simulation.result?.strip ?? null);
@@ -91,13 +93,16 @@
   const SWEEP = Array.from({ length: 26 }, (_, i) => i * 0.02);
   const autoplaying = $derived(playback.playing);
 
-  function solve() {
-    if (!glue) return;
-    simulation.run(glue, {
+  function solve(force = false) {
+    if (typeof window !== 'undefined') {
+      const w = window as unknown as { __grossmanSolves?: number };
+      w.__grossmanSolves = (w.__grossmanSolves ?? 0) + 1;
+    }
+    simulation.run({
       network: $state.snapshot(network) as NetworkSpec,
       label: { family, eta, keep, seed, strain },
       theta: stripTheta, cells, phi, psi,
-    });
+    }, force);
     if (untrack(() => simulation.error)) {
       editor.attempted = false;
       editor.src = null;
@@ -113,12 +118,17 @@
     void strain;
     void stripTheta;
     void cells;
-    if (glue) solve();
+    if (autoplaying) return;
+    solve();
   });
 
   $effect(() => {
     if (!autoplaying) return;
-    eta = SWEEP[playback.shown];
+    const idx = playback.shown;
+    eta = SWEEP[idx];
+    if (sweepFrames && sweepFrames[idx]) {
+      simulation.setReplay(sweepFrames[idx]);
+    }
   });
 
   let pane: HTMLElement;
@@ -130,9 +140,20 @@
     const deepLinked = q.has('eta') && Number.isFinite(qEta) && qEta >= 0 && qEta <= 0.5;
     if (deepLinked) eta = qEta;
     thumbMode = q.has('thumb');
-    const cancelLoad = initializePage(loadSprings(), (g) => {
-      glue = g;
-      playback.setCount(SWEEP.length);
+    if (typeof window !== 'undefined') {
+      const w = window as unknown as { __grossmanSolves?: number; __grossmanSimulation?: Simulation };
+      w.__grossmanSolves = 0;
+      w.__grossmanSimulation = simulation;
+    }
+    simulation.prewarm();
+    const cancelLoad = initializePage(loadSweepFrames(BASE), (frames) => {
+      sweepFrames = frames;
+      playback.setCount(frames.length);
+      if (frames.length > 0 && simulation.result === null) {
+        const initialIdx = deepLinked ? SWEEP.findIndex((v) => Math.abs(v - qEta) < 1e-4) : 0;
+        const frame = initialIdx >= 0 ? frames[initialIdx] : frames[0];
+        if (frame) simulation.setReplay(frame);
+      }
       if (window.location.hash === '#edit') {
         showTab('edit');
         return;
@@ -152,7 +173,10 @@
       io.disconnect();
     };
   });
-  onDestroy(() => playback.dispose());
+  onDestroy(() => {
+    playback.dispose();
+    simulation.dispose();
+  });
 
   function touch() {
     playback.pause();
@@ -436,14 +460,31 @@
             </div>
           </div>
         <div role="tabpanel" id="rs-panel-experiment" aria-labelledby="rs-tab-experiment" hidden={tab !== 'experiment'}>
-        <p class="sp-source" aria-live="polite">
-          {#if loadError}
-            <span class="warnt">{s.springsBundleMissing}{loadError}{s.springsBuildBundle}</span>
-          {:else if !glue} {s.springsLoadingSolver} {:else if autoplaying} {s.springsLiveSweep} <button class="sp-pause" type="button" onclick={touch}>{s.springsPauseSweep}</button>
-          {:else}
-            {s.liveSource} · {nf(solveMs, 0)} ms
-          {/if}
-        </p>
+        <div class="sp-source-bar">
+          <p class="sp-source" aria-live="polite">
+            {#if loadError}
+              <span class="warnt">{s.springsBundleMissing}{loadError}{s.springsBuildBundle}</span>
+            {:else if !sweepFrames && !simulation.result}
+              {s.springsLoadingSolver}
+            {:else if autoplaying}
+              <span class="sp-source-badge sp-source-replay">{s.springsReplaySweep}</span>
+              <button class="sp-pause" type="button" onclick={touch}>{s.springsPauseSweep}</button>
+            {:else if simulation.busy}
+              <span class="sp-source-busy">{s.springsSolving}</span>
+              <button class="sp-ctrl-btn" type="button" onclick={() => simulation.stop()}>{s.springsStop}</button>
+              <button class="sp-ctrl-btn" type="button" onclick={() => simulation.restart()}>{s.springsRestart}</button>
+            {:else if simulation.status === 'stopped'}
+              <span class="warnt">{s.springsStopped}</span>
+              <button class="sp-ctrl-btn sp-ctrl-primary" type="button" onclick={() => solve(true)}>{s.springsRecomputeLive}</button>
+            {:else}
+              <span class="sp-source-badge sp-source-{simulation.origin}">
+                {simulation.origin === 'replay' ? s.springsReplaySweep : simulation.origin === 'cached' ? s.cachedSource : s.liveSource}
+              </span>
+              {#if simulation.ms > 0} · {nf(simulation.ms, 0)} ms{/if}
+              <button class="sp-ctrl-btn" type="button" onclick={() => solve(true)}>{s.springsRecomputeLive}</button>
+            {/if}
+          </p>
+        </div>
         <div class="sp-viewer" data-nodes={strip?.nodes.length ?? 0}>
           {#if strip}
                           <StabileoViewer
@@ -566,7 +607,35 @@
   .sp-source {
     font: 12px var(--lp-mono);
     color: var(--fg-2);
+    margin: 0;
+  }
+  .sp-source-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     margin: 0 0 0.5rem;
+    min-height: 28px;
+  }
+  .sp-ctrl-btn {
+    background: none;
+    border: 1px solid var(--hair);
+    border-radius: 3px;
+    color: var(--fg);
+    padding: 0.15rem 0.5rem;
+    font: 12px var(--lp-sans, sans-serif);
+    cursor: pointer;
+    min-height: 24px;
+    margin-left: 0.4rem;
+  }
+  .sp-ctrl-btn:hover {
+    border-color: var(--fg-2);
+  }
+  .sp-ctrl-primary {
+    border-color: var(--lp-accent, #e5482a);
+    color: var(--lp-accent, #e5482a);
+  }
+  .sp-source-busy {
+    color: var(--lp-accent, #e5482a);
   }
   .sp-viewer {
     min-height: 12rem;

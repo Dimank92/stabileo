@@ -27,5 +27,6 @@ fi
 mkdir -p "$out"
 cp "$tmp/opt.wasm" "$out/springs_bg.wasm"
 cp "$tmp/pkg/springs_grossman_2026_wasm.js" "$out/springs.js"
-( cd "$out" && shasum -a 256 springs_bg.wasm springs.js > SHA256SUMS )
+(cd "$root/research/metamaterials/grossman-2026" && cargo run --locked --release --quiet --bin precompute_sweep -- "$out/sweep-frames.json")
+( cd "$out" && shasum -a 256 springs_bg.wasm springs.js sweep-frames.json > SHA256SUMS )
 echo "research wasm: $(wc -c < "$out/springs_bg.wasm") bytes -> $out"

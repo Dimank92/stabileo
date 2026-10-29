@@ -92,6 +92,12 @@ export type ResearchStrings = {
   springsBuildBundle: string;
   springsLoadingSolver: string;
   springsLiveSweep: string;
+  springsReplaySweep: string;
+  springsRecomputeLive: string;
+  springsStop: string;
+  springsRestart: string;
+  springsSolving: string;
+  springsStopped: string;
   springsPauseSweep: string;
   springsViewerLabel: string;
   springsPlaceholder: string;
@@ -453,7 +459,7 @@ const STRINGS: Record<'en' | 'es' | 'pt', ResearchStrings> = {
     springsNoReference: "No reference code is public. Comparisons rest on the paper’s text, its closed forms, the vector data of Figs. 7–9 and a digitisation of the raster Fig. 5 (±0.002).",
     springsNotImplemented: "We have not implemented the paper’s own semi-analytical method (the nonaffine tensors W of its Eq. 20 in the mean-field approximation); we compare with its results.",
     springsLinearOnly: "Linear response only (small strain). The paper minimised the nonlinear energy at 1% strain; at that strain the difference is of order 1%.",
-    springsSynchronous: "Live solves and the automatic sweep currently run synchronously on the main thread. Large or prestressed networks can block navigation and Pause until a solve returns. Terminable workers and precomputed replay are pending.",
+    springsSynchronous: "Strip and periodic network solves run off the main thread in a terminable worker. The automatic sweep replays precomputed frames from the same solver.",
     springsFreeEdges: "The strip’s free edges bias the measured ν by O(1/width); the periodic moduli have no such bias.",
     springsEnsemble: "Our ensemble (10 samples per η) estimates the mean to about ±0.005 at η ≤ 0.3 and ±0.01 near 0.5.",
     springsNotDesign: "Agreement with a paper is not validation against experiments, and nothing here is an engineering design result.",
@@ -475,6 +481,12 @@ const STRINGS: Record<'en' | 'es' | 'pt', ResearchStrings> = {
     springsBuildBundle: "). Build it with research/metamaterials/grossman-2026/wasm/build.sh.",
     springsLoadingSolver: "Loading the solver…",
     springsLiveSweep: "Live sweep of η in your browser (our solver)",
+    springsReplaySweep: "Replay of η sweep (precomputed with our solver)",
+    springsRecomputeLive: "Recompute live",
+    springsStop: "Stop",
+    springsRestart: "Restart",
+    springsSolving: "Solving in background worker…",
+    springsStopped: "Stopped. Press Recompute live to restart.",
     springsPauseSweep: "Pause sweep",
     springsViewerLabel: "Stabileo viewer: the spring network coloured by axial force on its deformed shape",
     springsPlaceholder: "The network appears here.",
@@ -854,6 +866,12 @@ const STRINGS: Record<'en' | 'es' | 'pt', ResearchStrings> = {
     springsBuildBundle: "). Compilalo con research/metamaterials/grossman-2026/wasm/build.sh.",
     springsLoadingSolver: "Cargando el solver…",
     springsLiveSweep: "Barrido de η en vivo en tu navegador (nuestro solver)",
+    springsReplaySweep: "Reproducción del barrido de η (precalculado con nuestro solver)",
+    springsRecomputeLive: "Recalcular en vivo",
+    springsStop: "Detener",
+    springsRestart: "Reiniciar",
+    springsSolving: "Resolviendo en worker en segundo plano…",
+    springsStopped: "Detenido. Presiona Recalcular en vivo para reiniciar.",
     springsPauseSweep: "Pausar barrido",
     springsViewerLabel: "Visor de Stabileo: la red de resortes coloreada por fuerza axial sobre su forma deformada",
     springsPlaceholder: "La red aparece aquí.",
@@ -1233,6 +1251,12 @@ const STRINGS: Record<'en' | 'es' | 'pt', ResearchStrings> = {
     springsBuildBundle: "). Compile com research/metamaterials/grossman-2026/wasm/build.sh.",
     springsLoadingSolver: "Carregando o solver…",
     springsLiveSweep: "Varredura de η ao vivo no seu navegador (nosso solver)",
+    springsReplaySweep: "Reprodução da varredura de η (pré-calculado com o nosso solver)",
+    springsRecomputeLive: "Recalcular ao vivo",
+    springsStop: "Parar",
+    springsRestart: "Reiniciar",
+    springsSolving: "Resolvendo em worker em segundo plano…",
+    springsStopped: "Parado. Pressione Recalcular ao vivo para reiniciar.",
     springsPauseSweep: "Pausar varredura",
     springsViewerLabel: "Visualizador do Stabileo: a rede de molas colorida pela força axial sobre sua forma deformada",
     springsPlaceholder: "A rede aparece aqui.",

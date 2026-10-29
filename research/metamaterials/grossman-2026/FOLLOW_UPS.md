@@ -1,25 +1,14 @@
 # PR #776 deferred work
 
-## Responsive live computation and precomputed replay (item 6)
+## Responsive live computation and precomputed replay (item 6) - Resolved (#801)
 
-Open follow-up, deliberately deferred under the review request's documentation
-option. Current `Simulation.run` executes synchronous WASM on the UI thread;
-a long solve prevents input, navigation and Pause from being processed. The
-automatic sweep also solves each frame live. The page discloses this limitation.
-
-Move all strip and periodic solves, including prestress relaxation, into a
-research-only module worker. Terminate the worker on Stop, superseding inputs
-and page destruction; reject late results and restart with a fresh worker.
-Load WASM inside the worker with deployment-safe asset URLs. Replace the
-live autoplay sweep with precomputed frames from the same solver; retain
-reduced-motion, visibility, narrow-screen and stop-on-interaction behavior.
-Provide Recompute live, Stop and Restart with accurate source and busy labels.
-
-Acceptance requires browser tests with the real WASM bundle and a slow
-prestressed network: UI heartbeat and navigation remain responsive, Stop
-terminates computation, obsolete results never publish, and Restart completes.
-Verify autoplay performs no solves and worker chunks load only on research
-routes. Mocked worker tests alone cannot establish responsiveness.
+Resolved in #801:
+- Strip and periodic solves (including prestress relaxation) execute inside a dedicated research module worker (`springs.worker.ts`).
+- Worker terminates unconditionally on `Stop`, superseding inputs, and page destruction; rejects late results and restarts with a fresh worker.
+- WASM is loaded inside the worker with deployment-safe asset URLs.
+- The live autoplay sweep is driven by precomputed frames (`sweep-frames.json`) produced by `precompute_sweep.rs` from the same solver, performing zero WASM solver calls during autoplay.
+- UI provides Recompute live, Stop, and Restart controls with accurate source badges (`replay`, `cached`, `live`) and busy indicators.
+- Verified with browser E2E acceptance tests (`e2e/research-springs.spec.ts`) using the real WASM bundle: UI heartbeat and navigation remain responsive, Stop terminates computation, obsolete results never publish, and Restart completes. Autoplay performs 0 solves, and research worker/WASM assets never load on non-research routes.
 
 ## Other deferred items (unchanged)
 

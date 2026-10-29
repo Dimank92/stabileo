@@ -106,7 +106,7 @@ test.describe('@smoke research springs review regressions', () => {
     await page.getByRole('button', { name: 'Pause sweep' }).scrollIntoViewIfNeeded();
     await page.clock.runFor(6000);
     await expect(page.getByRole('button', { name: 'Pause sweep' })).toHaveCount(0);
-    await expect(page.getByText('Live sweep of η in your browser (our solver)')).toHaveCount(0);
+    await expect(page.locator('.sp-source-replay')).toHaveCount(0);
     await expect(page.locator('input[aria-label="Disorder eta"]')).toHaveValue('0.5');
   });
 
@@ -153,5 +153,83 @@ test.describe('@smoke research springs review regressions', () => {
     await page.getByRole('button', { name: 'Retry opening full editor' }).click();
     await expect.poll(attempts).toBe(4);
     await expect.poll(() => page.context().pages().length).toBe(pagesBefore);
+  });
+});
+
+test.describe('@smoke research springs worker and autoplay replay', () => {
+  test('autoplay sweep replays precomputed frames with zero WASM solver invocations', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.goto('/en/research/metamaterials/grossman-2026/');
+    await expect(page.getByRole('button', { name: 'Pause sweep' })).toBeVisible();
+    await expect.poll(async () => Number(await page.locator('.sp-viewer').getAttribute('data-nodes')), { timeout: 30_000 }).toBeGreaterThan(500);
+
+    const etaInput = page.locator('input[aria-label="Disorder eta"]');
+    await expect.poll(async () => Number(await etaInput.inputValue()), { timeout: 10_000 }).toBeGreaterThan(0.02);
+
+    const solves = await page.evaluate(() => (window as unknown as { __grossmanSolves?: number }).__grossmanSolves ?? 0);
+    expect(solves, 'autoplay must perform zero solves').toBe(0);
+    await expect(page.locator('.sp-source-replay')).toBeVisible();
+  });
+
+  test('springs worker and wasm assets are never loaded on non-research routes', async ({ page }) => {
+    const researchRequests = [];
+    page.on('request', (r) => {
+      const url = r.url();
+      if (/research-wasm|springs\.worker|sweep-frames/.test(url)) {
+        researchRequests.push(url);
+      }
+    });
+    await page.goto('/en/');
+    await expect(page.locator('#app')).toBeVisible();
+    await page.waitForTimeout(1000);
+    expect(researchRequests, 'research assets must not load on homepage').toEqual([]);
+  });
+
+  test('live solve in worker: Stop terminates computation and Recompute live completes', async ({ page }) => {
+    await page.goto('/en/research/metamaterials/grossman-2026/?eta=0.3');
+    await expect.poll(async () => Number(await page.locator('.sp-viewer').getAttribute('data-nodes')), { timeout: 30_000 }).toBeGreaterThan(500);
+
+    await page.getByRole('tab', { name: 'Parameters', exact: true }).click();
+    const prestress = page.getByRole('slider', { name: 'Prestress: rest lengths shortened by' });
+    await prestress.press('Home');
+    for (let i = 0; i < 4; i++) await prestress.press('ArrowRight');
+    await page.getByRole('tab', { name: 'Network', exact: true }).click();
+
+    await page.getByRole('button', { name: 'Recompute live' }).first().click();
+
+    await expect.poll(async () => {
+      return page.evaluate(() => (window as unknown as { __grossmanSolves?: number }).__grossmanSolves ?? 0);
+    }).toBeGreaterThanOrEqual(1);
+
+    await expect(page.locator('.sp-source-live')).toBeVisible();
+
+    await page.evaluate(() => {
+      const w = window as unknown as { __grossmanSimulation?: { stop(): void } };
+      w.__grossmanSimulation?.stop();
+    });
+    await expect(page.getByText('Stopped')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Recompute live' }).first()).toBeVisible();
+
+    await page.getByRole('button', { name: 'Recompute live' }).first().click();
+    await expect(page.locator('.sp-source-live')).toBeVisible();
+    await expect(page.getByText('Stopped')).toHaveCount(0);
+  });
+
+  test('superseding inputs discard obsolete results and compute latest state', async ({ page }) => {
+    await page.goto('/en/research/metamaterials/grossman-2026/?eta=0.3');
+    await expect.poll(async () => Number(await page.locator('.sp-viewer').getAttribute('data-nodes')), { timeout: 30_000 }).toBeGreaterThan(500);
+
+    await page.getByRole('tab', { name: 'Parameters', exact: true }).click();
+    const eta = page.getByRole('slider', { name: 'Disorder eta' });
+    await eta.press('Home');
+    for (let i = 0; i < 25; i++) await eta.press('ArrowRight');
+    await page.getByRole('tab', { name: 'Network', exact: true }).click();
+
+    await expect.poll(async () => {
+      return page.evaluate(() => {
+        const w = window as unknown as { __grossmanSimulation?: { result?: { input?: { network?: { eta?: number } } } } };
+        return w.__grossmanSimulation?.result?.input?.network?.eta;
+      });
+    }, { timeout: 30_000 }).toBe(0.25);
   });
 });

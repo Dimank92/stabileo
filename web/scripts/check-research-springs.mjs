@@ -13,7 +13,7 @@ try {
   const readout = await page.locator('.sp-readout dd').first().textContent();
   assert(readout && !readout.includes('—'), 'strip Poisson ratio must be displayed');
   assert.equal(await page.getByRole('button', { name: 'Open full editor ↗' }).isEnabled(), true);
-  for (const file of ['springs.js', 'springs_bg.wasm']) {
+  for (const file of ['springs.js', 'springs_bg.wasm', 'sweep-frames.json']) {
     const response = await page.request.get(new URL('research-wasm/grossman-2026/' + file, base).href);
     assert.equal(response.status(), 200, file);
   }

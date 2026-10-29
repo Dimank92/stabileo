@@ -45,13 +45,13 @@ export type PeriodicResult = {
   nonaffinity_shear: number;
 };
 
-type Glue = {
+export type Glue = {
   default: (opts: { module_or_path: string }) => Promise<unknown>;
   springs_strip: (spec: string) => string;
   springs_periodic: (spec: string) => string;
 };
 
-const BASE = `${import.meta.env.BASE_URL}research-wasm/grossman-2026/`;
+export const BASE = `${import.meta.env.BASE_URL}research-wasm/grossman-2026/`;
 let loading: Promise<Glue> | null = null;
 
 export function loadSprings(): Promise<Glue> {

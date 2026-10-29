@@ -75,6 +75,7 @@ RUN node ../research/fracture/shauer-2025/wasm/check.mjs public/research-wasm/sh
     && test -s dist/research-wasm/shauer-2025/replay.srpl \
     && test -s dist/research-wasm/grossman-2026/springs.js \
     && test -s dist/research-wasm/grossman-2026/springs_bg.wasm \
+    && test -s dist/research-wasm/grossman-2026/sweep-frames.json \
     && test -s dist/research-wasm/viewer/viewer.js \
     && node scripts/check-research-springs.mjs
 
