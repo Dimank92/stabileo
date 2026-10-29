@@ -304,3 +304,48 @@ for (const failure of ['constructor', 'unavailable', 'error']) {
     await expect(page.locator('.rs-placeholder')).not.toContainText('Loading the replay');
   });
 }
+
+test('@smoke research short desktop reaches Run, Stop and Back to replay', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 600 });
+  await page.addInitScript(() => {
+    // Keep a run pending so Stop is available deterministically.
+    window.Worker = class { postMessage() {} terminate() {} } as unknown as typeof Worker;
+  });
+  await page.goto('/en/research/fracture/shauer-2025/');
+  await expect.poll(async () => Number(await page.locator('.rs-app').getAttribute('data-steps'))).toBeGreaterThan(0);
+  await page.locator('#rs-tab-parameters').click();
+  const panel = page.locator('#rs-panel-parameters');
+  await expect(panel).toHaveCSS('overflow-y', 'auto');
+  expect(await panel.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
+  await page.getByRole('button', { name: 'Run', exact: true }).click();
+  await page.getByRole('button', { name: 'Stop', exact: true }).click();
+  await page.getByRole('button', { name: 'Back to the replay', exact: true }).click();
+  await expect(page.locator('.rs-app')).toHaveAttribute('data-source', 'replay');
+});
+
+for (const interaction of ['viewer', 'wheel', 'camera', 'tab', 'keyboard tab', 'article tab']) {
+  test(`@smoke research playback stops on ${interaction} interaction`, async ({ page }) => {
+    await page.goto('/en/research/fracture/shauer-2025/');
+    const slider = page.getByRole('slider', { name: 'Load step shown' });
+    await expect(page.locator('.sfv canvas').first()).toBeVisible();
+    await slider.scrollIntoViewIfNeeded();
+    await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+    if (interaction === 'viewer') await page.locator('.sfv canvas').first().click();
+    else if (interaction === 'wheel') {
+      await page.locator('.sfv canvas').first().hover();
+      await page.mouse.wheel(0, 50);
+    } else if (interaction === 'camera') await page.getByRole('button', { name: 'Zoom to extents', exact: true }).click();
+    else if (interaction === 'article tab') await page.getByRole('button', { name: 'the force', exact: true }).click();
+    else if (interaction === 'tab') await page.locator('#rs-tab-force').click();
+    else {
+      await page.locator('#rs-tab-viewer').focus();
+      await page.keyboard.press('ArrowRight');
+    }
+    await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
+    const step = await slider.inputValue();
+    await page.waitForTimeout(350);
+    await expect(slider).toHaveValue(step);
+    await page.getByRole('button', { name: 'Play', exact: true }).click();
+    await expect.poll(() => slider.inputValue()).not.toBe(step);
+  });
+}

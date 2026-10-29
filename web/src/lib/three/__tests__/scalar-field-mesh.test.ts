@@ -70,6 +70,32 @@ describe('createScalarFieldMesh', () => {
     m.setDisplacement([0, 0, 0.1, 0, 0, 0], 10);
     expect(geo.getAttribute('instanceEnd').getX(0)).toBeCloseTo(2);
     m.setHidden((c) => c === 0);
-    expect((m.group.children[0] as THREE.Mesh).geometry.getAttribute('instanceStart').count).toBe(2);
+    expect((geo as THREE.InstancedBufferGeometry).instanceCount).toBe(2);
   });
+});
+
+it('line updates keep attributes reachable through geometry disposal', () => {
+  const m = createScalarFieldMesh([0, 0, 1, 0, 0, 1], [0, 1, 1, 2, 2, 0], 2);
+  const line = m.group.children[0] as THREE.Mesh;
+  const geo = line.geometry;
+  const attributes = { ...geo.attributes };
+  const position = (geo.getAttribute('instanceStart') as THREE.InterleavedBufferAttribute).data;
+  const colour = (geo.getAttribute('instanceColorStart') as THREE.InterleavedBufferAttribute).data;
+  const versions = [position.version, colour.version];
+  for (let i = 0; i < 30; i++) {
+    m.setField([0, i / 30, 1], { min: 0, max: 1 });
+    m.setDisplacement([0, 0, i / 100, 0, 0, 0], 1);
+    m.setHidden(i % 2 ? c => c === 0 : null);
+    for (const [name, attribute] of Object.entries(attributes)) expect(geo.getAttribute(name)).toBe(attribute);
+  }
+  expect(position.version).toBeGreaterThan(versions[0]);
+  expect(colour.version).toBeGreaterThan(versions[1]);
+  let disposed = 0;
+  geo.addEventListener('dispose', () => {
+    for (const [name, attribute] of Object.entries(attributes)) expect(geo.getAttribute(name)).toBe(attribute);
+    disposed++;
+  });
+  (line.material as THREE.Material).addEventListener('dispose', () => disposed++);
+  m.dispose();
+  expect(disposed).toBe(2);
 });

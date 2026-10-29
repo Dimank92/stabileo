@@ -170,6 +170,7 @@
   let convH = $state(600);
   let flashTimer: ReturnType<typeof setTimeout>;
   function showTab(t: string) {
+    playback.interact();
     tab = t;
     flashTab = t;
     clearTimeout(flashTimer);
@@ -399,7 +400,7 @@
     <ul>
       <li>Agreement with a reference code is not validation against experiments, and none of this is an engineering certification.</li>
       <li>The reference mesh refines only a 0.04 × 0.04 mm box around the notch tip; beyond it the crack crosses elements wider than 3ℓ.</li>
-      <li>No bound constraints: damage can exceed 1 slightly (the reference reaches 1.0096 here and 1.0021897551918642 in example 1) and undershoot 0 on coarse meshes. Values are shown as computed; only the colour scale is clamped.</li>
+      <li>No bound constraints: damage can exceed 1 slightly (the reference reaches 1.0096 here and 1.0021897551918642 in example 1) and undershoot 0. The recorded Python reference outputs have minimum nodal damage 3.076336950017797e-08 (example 1), -0.0031224948220514573 (example 2), and -0.06024191772700118 (example 3). This also occurs in the reference code’s unconstrained AT2 discretization. Negative damage is unphysical: (1-d)² at the example 3 minimum is about 1.124, above intact stiffness. Assembly uses interpolated damage at quadrature points, so this is not a 12.4% assembled-stiffness error. The solver does not clamp damage; the replay’s quantized nodal field and colour scale clamp it for display.</li>
       <li>The alternating scheme is not accelerated; at unstable crack growth it can take hundreds of iterations in one step.</li>
       <li>Browser runs are limited in mesh size and parameter range.</li>
     </ul>
@@ -418,12 +419,12 @@
         <p class="rs-compare-line" role="status">
           <span class="ok" aria-hidden="true">✓</span>
           {source === 'replay' ? 'This replay' : 'This run'} matches the reference code: peak {qty(comparison.peak.step.reaction, 'kN', { dp: 6 })} at step {comparison.peak.step.step}, identical iterations at {comparison.sameIterations} of {reference.length} steps.
-          <button type="button" class="rs-textbtn" onclick={() => (tab = 'convergence')}>Details</button>
+          <button type="button" class="rs-textbtn" onclick={() => { playback.interact(); tab = 'convergence'; }}>Details</button>
         </p>
       {:else if comparison || run?.status === 'unconverged'}
         <p class="rs-compare-line" role="status">{run?.status === 'unconverged' ? 'Non-converged run' : 'Reference mismatch'}: {comparison?.failures.join('; ') || run?.error}</p>
       {/if}
-      <PaneTabs tabs={TABS} bind:active={tab} flash={flashTab} />
+      <PaneTabs oninteract={() => playback.interact()} tabs={TABS} bind:active={tab} flash={flashTab} />
 
       <div class="rs-panel rs-panel-viewer" id="rs-panel-viewer" role="tabpanel" aria-labelledby="rs-tab-viewer" hidden={tab !== 'viewer'}>
         {#if nodes && elements}
@@ -447,7 +448,7 @@
             />
             <Segmented label="View" bind:value={view} options={[{ id: 'plate', label: 'Plate' }, { id: 'band', label: 'Crack band' }, { id: 'tip', label: 'Notch tip' }]} />
           </div>
-          <div class="rs-viewer-slot">
+          <div class="rs-viewer-slot" onpointerdowncapture={() => playback.interact()} onwheelcapture={() => playback.interact()} onkeydowncapture={() => playback.interact()} onclickcapture={() => playback.interact()}>
             <StabileoViewer
               xy={nodes}
               cells={elements}
@@ -605,7 +606,8 @@
     min-height: 0;
   }
   /* In the sticky pane (wide screens) the app is exactly the pane's height and its panels share
-     what is left after the tabs and the step player: nothing scrolls inside it. */
+     what is left after the tabs and the step player. Only overflowing panels scroll as a
+     fallback on short windows; the article keeps the normal page scroll. */
   @media (min-width: 70rem) {
     .rs-app {
       height: 100%;
@@ -613,11 +615,18 @@
     .rs-panel {
       flex: 1 1 auto;
       min-height: 0;
-      overflow: hidden;
+      overflow-y: auto;
+      scrollbar-width: auto;
+      scrollbar-gutter: stable;
+      scrollbar-color: var(--fg-2) var(--hair);
     }
+    .rs-panel::-webkit-scrollbar { width: 10px; }
+    .rs-panel::-webkit-scrollbar-track { background: var(--hair); }
+    .rs-panel::-webkit-scrollbar-thumb { background: var(--fg-2); border-radius: 5px; }
     .rs-viewer-slot {
       flex: 1 1 auto;
       height: auto;
+      min-height: 12rem;
     }
   }
   .rs-stepread {

@@ -129,7 +129,7 @@
       align-items: start;
     }
     /* One scroll for the page: the pane is sticky, exactly a viewport tall, and never scrolls on
-       its own; its content is organised in tabs (PaneTabs) instead. */
+       its own; tabs organise content, with panel overflow scrolling as a short-window fallback. */
     .rs-shell-app {
       order: 0;
       position: sticky;
