@@ -15,6 +15,7 @@ process.env.GITHUB_SHA = '000000000000';
 delete process.env.VITE_E2E;
 delete process.env.VITE_APP_TYPE;
 const researchChunks = new Set();
+const toolsChunks = new Set();
 try {
   // A deterministic engine stub makes this gate independent of locally built WASM. It measures
   // web dependency isolation, not the engine binary, which has its own build/validation gates.
@@ -31,6 +32,7 @@ try {
       if (id === '\0route-size-engine') return 'export function initSync() {} export function solve_3d() { return "{}"; }';
     }, generateBundle(_options, bundle) {
       for (const output of Object.values(bundle)) {
+        if (output.type === 'chunk' && Object.keys(output.modules).some((id) => id.includes('/components/tools/ToolsPage.svelte'))) toolsChunks.add(output.fileName);
         if (output.type === 'chunk' && Object.keys(output.modules).some((id) => id.includes('/components/research/') || /\/research\/.*\.json$/.test(id))) {
           researchChunks.add(output.fileName);
         }
@@ -56,7 +58,7 @@ try {
       for (const dep of chunk.imports ?? []) visit(dep, lazy);
       if (lazy) for (const dep of chunk.dynamicImports ?? []) {
         // Explicit lazy route boundaries are not product dependencies.
-        if (!/components\/research\//.test(dep)) visit(dep, true);
+        if (!/components\/research\//.test(dep) && !toolsChunks.has(manifest[dep]?.file)) visit(dep, true);
       }
     }
     visit('index.html');

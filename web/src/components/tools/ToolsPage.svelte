@@ -2,7 +2,7 @@
   import SiteHeader from '../site/SiteHeader.svelte';
   import LandingFooter from '../landing/LandingFooter.svelte';
   import PublicLink from '../landing/PublicLink.svelte';
-  import { tPublic as t, publicI18n } from '../../lib/i18n/store.svelte';
+  import { publicI18n } from '../../lib/i18n/store.svelte';
   import { applyPageMeta, restorePageMeta } from '../../lib/page-meta';
   import { publicUrl } from '../../lib/i18n/public-routes';
   import { TOOL_IDS, EXAMPLE, FORMULAS, format, formula, valid, workedExamples, type ToolId, type Parameters } from './calculators';
@@ -14,11 +14,15 @@
   import Sci from '../research/shell/Sci.svelte';
   import ParamRow from '../research/shell/ParamRow.svelte';
   import ToolViewer from './ToolViewer.svelte';
+  import { tBatch as t } from './batch-i18n';
+  import { BATCH_IDS } from './batch';
+  import BatchTool from './BatchTool.svelte';
   import ToolPreview from './ToolPreview.svelte';
 
   let { path }: { path: string } = $props();
   const id = $derived(TOOL_IDS.find(id => path.replace(/\/$/, '') === `/tools/${id}`));
-  const title = $derived(t(id ? `tools.${id}` : 'tools.index'));
+  const batchId = $derived(BATCH_IDS.find(id => path.replace(/\/$/, '') === `/tools/${id}`));
+  const title = $derived(t(id || batchId ? `tools.${id || batchId}` : 'tools.index'));
   let p = $state<Parameters>({ ...EXAMPLE });
   let result = $state<Awaited<ReturnType<typeof calculate>> | null>(null);
   let error = $state('');
@@ -29,8 +33,8 @@
   const fields = [ ['length', 'length', 'm', 0.1, 100], ['e', 'modulus', 'MPa', 1, 1000000], ['i', 'inertia', 'm⁴', 1e-10, 10] ] as const;
   const ends = [[0.5, 'fixedFixed'], [0.7, 'fixedPinned'], [1, 'pinnedPinned'], [2, 'fixedFree']] as const;
   $effect(() => {
-    const route = id ? `/tools/${id}` : '/tools';
-    applyPageMeta({ title: `${title} — Stabileo Tools`, description: `${title}. ${t('tools.lead')}`, locale: publicI18n.locale, path: route,
+    const route = id || batchId ? `/tools/${id || batchId}` : '/tools';
+    applyPageMeta({ title: `${title} — Stabileo Tools`, description: batchId ? t(`tools.${batchId}.subtitle`) : `${title}. ${t('tools.lead')}`, locale: publicI18n.locale, path: route,
       graph: [{ '@type': 'WebApplication', name: title, url: publicUrl(route, publicI18n.locale), applicationCategory: 'EducationalApplication', operatingSystem: 'Any', isAccessibleForFree: true, offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' } }] });
     return () => restorePageMeta();
   });
@@ -64,8 +68,10 @@
 <div class="landing blog research tools">
   <SiteHeader current="tools" />
   <main class="sec sec--ink">
-    <div class="wrap tools-wrap" class:gallery={!id}>
-    {#if id}
+    <div class="wrap tools-wrap" class:gallery={!id && !batchId}>
+    {#if batchId}
+      {#key batchId}<BatchTool id={batchId}/>{/key}
+    {:else if id}
       <div class="tool-layout">
         <header class="tool-intro">
           <p class="crumb"><PublicLink to="/tools">{t('tools.index')}</PublicLink></p>
@@ -143,7 +149,7 @@
     {:else}
       <header><h1>{title}</h1><p class="lead">{t('tools.lead')}</p></header>
       <ul class="tool-cards">
-        {#each TOOL_IDS as tool}
+        {#each [...TOOL_IDS, ...BATCH_IDS] as tool}
           <li class="tool-card">
             <PublicLink to={`/tools/${tool}`} class="preview" aria-label={t(`tools.${tool}`)}><ToolPreview id={tool} /></PublicLink>
             <div class="card-body"><span class="badge">{t('tools.firstVersion')}</span><h2><PublicLink to={`/tools/${tool}`}>{t(`tools.${tool}`)}</PublicLink></h2><p>{t(`tools.${tool}.subtitle`)}</p><PublicLink to={`/tools/${tool}`} class="btn btn-primary btn-sm">{t('tools.openTool')} ↗</PublicLink></div>
