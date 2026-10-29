@@ -22,3 +22,23 @@ for (const id of TOOL_IDS) it(`imports ${id} into the editor with the same force
     if (id === 'column-buckling') expect(solveBuckling(imported, 1).modes[0].loadFactor).toBe(solveBuckling(original, 1).modes[0].loadFactor);
   }
 });
+
+import { BATCH_IDS, batchModel, DEFAULT_BATCH } from '../batch';
+import { solveModal } from '../../../lib/engine/wasm-solver';
+for (const id of BATCH_IDS) it(`imports ${id} preserving member type, loads, supports and mass`, async () => {
+  await initSolver();
+  const original = batchModel(id, DEFAULT_BATCH);
+  const options = id === 'beam-natural-frequency' ? { massPerLength: DEFAULT_BATCH.mass } : undefined;
+  const snapshot = decompressSnapshot(editorUrl(original, id, options).split('#data=')[1]);
+  modelStore.restore(snapshot!);
+  const imported = modelStore.buildSolverInput(false)!;
+  expect([...imported.elements.values()].map(e => e.type)).toEqual([...original.elements.values()].map(e => e.type));
+  expect(solve(imported).displacements).toEqual(solve(original).displacements);
+  expect(solve(imported).reactions).toEqual(solve(original).reactions);
+  if (options) {
+    const material = [...modelStore.materials.values()][0];
+    const density = material.rho! * 1000 / 9.81;
+    expect(density * DEFAULT_BATCH.area).toBeCloseTo(DEFAULT_BATCH.mass, 10);
+    expect(solveModal(imported, new Map([[1, density]]), 3).modes.map((m: any) => m.frequency)).toEqual(solveModal(original, new Map([[1, DEFAULT_BATCH.mass / DEFAULT_BATCH.area]]), 3).modes.map((m: any) => m.frequency));
+  }
+});

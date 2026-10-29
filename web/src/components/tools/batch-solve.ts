@@ -1,4 +1,4 @@
-import { initSolver, solve, solveModal } from '../../lib/engine/wasm-solver';
+import { initSolver, solve, solveModal, analyzeKinematics } from '../../lib/engine/wasm-solver';
 import { computeElementDiagram, computeDeformedShape } from '../../lib/engine/diagrams';
 import type { Displacement } from '../../lib/engine/types';
 import { batchModel, continuousInfluence, continuousReactions, frequencies, jointForces, numbers, portalSway, simpleInfluence, type BatchId, type BatchParameters } from './batch';
@@ -6,6 +6,7 @@ export type Series = { name: string; points: [number,number][] };
 export type Comparison = { label: string; engine: number; reference: number; unit: string; difference: number };
 export async function calculateBatch(id:BatchId,p:BatchParameters) {
   const model=batchModel(id,p); await initSolver();
+  if(id==='truss-2d' && analyzeKinematics(model).mechanismModes > 0) throw new Error('tools.batch.unstable');
   const linear=solve(model), charts:Record<string,Series[]>={deflection:[],shear:[],moment:[]};
   const comparisons:Comparison[]=[];
   const compare=(label:string,engine:number,reference:number,unit:string)=>comparisons.push({label,engine,reference,unit,difference:Math.abs(engine-reference)/Math.max(Math.abs(reference),1e-12)});

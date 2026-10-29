@@ -38,7 +38,7 @@
     if(!result) return [];
     if(active.startsWith('mode')) return [{name:label(active),points:result.modes[Number(active.slice(-1))-1]?.displacements.map(d=>[result.model.nodes.get(d.nodeId)!.x,d.uz] as [number,number])??[],color:'var(--lp-accent)'}];
     const series=result.charts[active]??[];
-    if(id==='portal-frame') return series.filter(s=>Number(s.name)===member).map(s=>({...s,color:'var(--lp-accent)'}));
+    if(id==='portal-frame'||id==='truss-2d') return series.filter(s=>Number(s.name)===member).map(s=>({...s,color:'var(--lp-accent)'}));
     if(['moment','shear','deflection'].includes(active)) return [{name:label(active),color:'var(--lp-accent)',points:series.flatMap(s=>s.points.map(([x,v])=>[x+result!.model.nodes.get(result!.model.elements.get(Number(s.name))!.nodeI)!.x,v] as [number,number]))}];
     return series.map(s=>({...s,name:label(active),color:'var(--lp-accent)'}));
   });
@@ -49,10 +49,10 @@
   <ScalarFieldViewer xy={mesh.xy} cells={mesh.cells} values={mesh.values} cellSize={2} perCell={true} lineWidth={3} colourMap="diverging" geometryOnly={active!=='axial'} range={{min:-Math.max(1,...mesh.values.map(Math.abs)),max:Math.max(1,...mesh.values.map(Math.abs))}} title={label(active)} view={bounds.view} height="clamp(15rem, 32vh, 24rem)" editorButton={false} />
   <p class="note">{active==='axial'?`${t('tools.batch.compression')} / ${t('tools.batch.tension')}`:active==='influence'?t('tools.batch.effect'):active.startsWith('mode')?t('tools.batch.modalNote'):t('tools.deformedNote')}</p>
   <div role="tabpanel" id={`rs-panel-${active}`} aria-labelledby={`rs-tab-${active}`} tabindex="0" class="chart">
-    {#if id==='portal-frame'}<label>{t('tools.batch.member')} <select bind:value={member}>{#each [1,2,3] as n}<option value={n}>{n}</option>{/each}</select></label>{/if}
+    {#if id==='portal-frame'||id==='truss-2d'&&active==='deflection'}<label>{t('tools.batch.member')} <select bind:value={member}>{#each [...result.model.elements.keys()] as n}<option value={n}>{n}</option>{/each}</select></label>{/if}
     {#if active==='axial'}<p>{t('tools.batch.axial')} (kN)</p>{:else}
       {#if active.startsWith('mode')}<p>f = {number(result.modes[Number(active.slice(-1))-1].frequency)} Hz</p>{/if}
-      <LineChart series={plot} xLabel={id==='portal-frame'?'s (m)':'x (m)'} yLabel={`${label(active)} ${active==='moment'?'(kN·m)':active==='shear'?'(kN)':active==='deflection'?'(m)':active==='influence'?(result.comparisons[0]?.unit==='kN·m'?'(m)':'(1)'):''}`} height={220} />
+      <LineChart series={plot} xLabel={id==='portal-frame'||id==='truss-2d'?'s (m)':'x (m)'} yLabel={`${label(active)} ${active==='moment'?'(kN·m)':active==='shear'?'(kN)':active==='deflection'?'(m)':active==='influence'?(result.comparisons[0]?.unit==='kN·m'?'(m)':'(1)'):''}`} height={220} />
     {/if}
   </div>
 {:else}<ToolPreview {id} />{/if}
