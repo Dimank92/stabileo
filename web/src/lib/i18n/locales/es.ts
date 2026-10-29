@@ -14220,5 +14220,10 @@ const es: Record<string, string> = {
   "sel.copyTitle": "Copiar lo seleccionado (Ctrl+C)",
   "sel.pasteTitle": "Pegar lo copiado y elegir dónde (Ctrl+V)",
   "results.showDisplacements": "Mostrar desplazamientos",
+  "resultChecks.title": "Verificación de los resultados",
+  "resultChecks.certified": "certificado",
+  "resultChecks.notCertified": "sin certificar",
+  "resultChecks.pending": "calculando…",
+  "resultChecks.discretizationHigh": "error de discretización alto",
 };
 export default es;

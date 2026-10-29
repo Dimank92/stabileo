@@ -13871,5 +13871,10 @@ const pt: Translations = {
   "sel.copyTitle": "Copiar a seleção (Ctrl+C)",
   "sel.pasteTitle": "Colar a cópia e escolher onde (Ctrl+V)",
   "results.showDisplacements": "Mostrar deslocamentos",
+  "resultChecks.title": "Verificação dos resultados",
+  "resultChecks.certified": "certificado",
+  "resultChecks.notCertified": "não certificado",
+  "resultChecks.pending": "calculando…",
+  "resultChecks.discretizationHigh": "erro de discretização alto",
 };
 export default pt;

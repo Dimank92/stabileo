@@ -14231,5 +14231,10 @@ const en: Record<string, string> = {
   "sel.copyTitle": "Copy the selection (Ctrl+C)",
   "sel.pasteTitle": "Paste the copy and choose where (Ctrl+V)",
   "results.showDisplacements": "Show displacements",
+  "resultChecks.title": "Result checks",
+  "resultChecks.certified": "certified",
+  "resultChecks.notCertified": "not certified",
+  "resultChecks.pending": "computing…",
+  "resultChecks.discretizationHigh": "high discretization error",
 };
 export default en;
