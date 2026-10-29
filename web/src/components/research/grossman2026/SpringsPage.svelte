@@ -9,7 +9,8 @@
    */
   import { onDestroy, onMount, untrack } from 'svelte';
   import { initializePage } from './page-load';
-  import { EditorLoad } from './editor-load.svelte';
+  import { EditorLoad, openEditorWindow } from './editor-load.svelte';
+  import { forceScale, forceLegend } from './force-display';
   import { uniaxial } from './moduli';
   import { evidence } from './evidence';
   import { Simulation } from './simulation.svelte';
@@ -225,9 +226,7 @@
   const xy = $derived(strip ? Float64Array.from(strip.nodes.flatMap((p) => [p[1], 13 - p[0]])) : new Float64Array());
   const bars = $derived(strip ? Uint32Array.from(strip.bonds.flat()) : new Uint32Array());
   const disp = $derived(strip ? Float64Array.from(strip.displacement.flatMap((u) => [u[1], -u[0]])) : null);
-  // Forces per unit imposed strain, N / (k ε), so the colours do not depend on the strain's size.
-  const forceScale = $derived(Math.abs(solved?.label.strain ?? 0) > 0 ? 1 / Math.abs(solved!.label.strain) : 1);
-  const forces = $derived(strip ? strip.force.map((f) => f * forceScale) : null);
+  const forces = $derived(strip ? strip.force.map((f) => f * forceScale(solved?.label.strain ?? 0)) : null);
   const forceRange = $derived.by(() => {
     if (!forces) return { min: -1, max: 1 };
     const m = Math.max(1e-12, ...forces.map(Math.abs));
@@ -289,17 +288,21 @@
     if (tabId !== tab) showTab(tabId === 'edit' ? 'edit' : tabId === 'params' ? 'params' : 'experiment');
   });
   const editor = new EditorLoad();
+  let fullEditorError = $state<string | null>(null);
+  const exportDisabled = $derived(!strip || (solved?.network.prestress ?? 0) !== 0);
   let editorStrip = $state.raw<StripResult | null>(null);
   const labelParams = (): StripLabel => solved!.label;
   const e2e = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('e2e') === '1';
 
   async function loadEditor() {
-    if (!strip) return;
+    if (!strip || exportDisabled) return;
     const current = simulation.result;
     const currentStrip = strip;
-    editorStrip = strip;
-    if (e2e) (window as unknown as { __springsEditorStrip?: StripResult }).__springsEditorStrip = strip;
-    await editor.load(() => embeddedEditorUrl(currentStrip, labelParams(), e2e), () => simulation.result === current);
+    const label = labelParams();
+    if (await editor.load(() => embeddedEditorUrl(currentStrip, label, e2e), () => simulation.result === current)) {
+      editorStrip = currentStrip;
+      if (e2e) (window as unknown as { __springsEditorStrip?: StripResult }).__springsEditorStrip = currentStrip;
+    }
   }
 
   function showTab(t: 'experiment' | 'params' | 'edit') {
@@ -312,13 +315,15 @@
     if (tab === 'edit' && strip && !editor.attempted) void loadEditor();
   });
   async function openFullEditor() {
-    if (!strip) return;
-    const w = window.open('about:blank', '_blank');
-    const url = await fullEditorUrl(strip, labelParams());
-    if (w) {
-      w.opener = null;
-      w.location.href = url;
-    } else window.location.assign(url);
+    if (!strip || exportDisabled) return;
+    const currentStrip = strip;
+    const label = labelParams();
+    fullEditorError = null;
+    try {
+      await openEditorWindow(() => fullEditorUrl(currentStrip, label), () => window.open('about:blank', '_blank'), (url) => window.location.assign(url));
+    } catch (e) {
+      fullEditorError = `The full editor could not be opened: ${e instanceof Error ? e.message : String(e)}`;
+    }
   }
 </script>
 <ExperimentShell
@@ -460,19 +465,23 @@
       <div class="sp-app" bind:this={pane}>
         <div class="sp-tabbar">
           <PaneTabs tabs={[{ id: 'experiment', label: 'Network' }, { id: 'params', label: 'Parameters' }, { id: 'edit', label: 'Edit in Stabileo' }]} bind:active={tabId} />
-          <button class="sp-full" type="button" onclick={openFullEditor} disabled={!strip}>Open full editor ↗</button>
+          <button class="sp-full" type="button" onclick={openFullEditor} disabled={exportDisabled}>Open full editor ↗</button>
         </div>
+          {#if solved?.network.prestress}<p class="warnt">Editor export is disabled: prestress and geometric stiffness are not supported by this conversion.</p>{/if}
+          {#if fullEditorError}<p class="warnt" role="alert">{fullEditorError} <button type="button" onclick={openFullEditor} disabled={exportDisabled}>Retry opening full editor</button></p>{/if}
           <div class="sp-editor" role="tabpanel" id="rs-panel-edit" aria-labelledby="rs-tab-edit" hidden={tab !== 'edit'}>
             <p class="sp-source">
               Stabileo editor (production engine): this strip as an ordinary truss, end rows pinned, the far end moved by the imposed strain. Edit and press Solve. Bar forces are
-              1000 × the experiment’s (E·A/L = 1000 k kN/m).{#if prestress > 0} Prestress is not carried over.{/if}
-              {#if strip && editorStrip && strip !== editorStrip}<button class="link" type="button" onclick={loadEditor}>Load the experiment’s current network</button>{/if}
+              1000 × the experiment’s (E·A/L = 1000 k kN/m).
+              {#if strip && editor.attempted && strip !== editorStrip && !exportDisabled}<button class="link" type="button" onclick={loadEditor}>Load the experiment’s current network</button>{/if}
             </p>
-            {#if editor.error}<p class="warnt" role="alert">{editor.error} <button type="button" onclick={loadEditor}>Retry loading editor</button></p>{/if}
+            {#if editor.error}<p class="warnt" role="alert">{editor.error} <button type="button" onclick={loadEditor} disabled={exportDisabled}>Retry loading editor</button></p>{/if}
             <div class="sp-frame">
               {#if editor.loading}<div class="sp-frame-loading">Loading the Stabileo editor…</div>{/if}
-              {#if editor.src}
-                <iframe src={editor.src} title="Stabileo editor (production engine)" onload={() => (editor.loading = false)}></iframe>
+              {#if editor.src && !exportDisabled}
+                {#key editor.src}{@const loadedSrc = editor.src}
+                <iframe src={loadedSrc} title="Stabileo editor (production engine)" onload={() => editor.loaded(loadedSrc)}></iframe>
+                {/key}
               {/if}
             </div>
           </div>
@@ -502,7 +511,7 @@
                 range={forceRange}
                 title={Math.abs(solved?.label.strain ?? 0) > 0 ? 'Axial force N / (k ε)' : 'Axial force N / k'}
                 unit=""
-                legendFooter="tension positive · strip pulled left to right, end rows held"
+                legendFooter={forceLegend(solved?.label.strain ?? 0)}
                 view={VIEW}
                 displacement={disp}
                 deformScale={deform}

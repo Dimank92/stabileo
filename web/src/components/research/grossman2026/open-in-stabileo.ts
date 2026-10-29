@@ -15,6 +15,7 @@ import type { StripResult } from './springs';
 import { currentResultsVersion } from '../../../lib/provenance/result-changes.json?research-page';
 
 export function stripCompact(strip: StripResult, label: string, stamp?: unknown) {
+  if (strip.prestress_force.some((force) => force !== 0)) throw new Error('Editor export does not support prestress or geometric stiffness.');
   const n = strip.nodes.map((p, i) => [i + 1, p[0], p[1]]);
   const sections: (string | number)[][] = [];
   const sectionOf = new Map<number, number>();

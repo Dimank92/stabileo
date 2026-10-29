@@ -67,6 +67,17 @@ test.describe('@smoke research springs review regressions', () => {
       expect(await eta.inputValue()).toBe(value);
     });
   }
+  test('prestressed networks cannot be exported to either editor', async ({ page }) => {
+    await page.goto('/en/research/metamaterials/grossman-2026/?eta=0.3');
+    await expect(page.locator('.sp-viewer canvas').first()).toBeVisible();
+    await page.getByRole('tab', { name: 'Parameters', exact: true }).click();
+    await page.getByRole('slider', { name: 'Prestress: rest lengths shortened by' }).fill('0.02');
+    await expect(page.getByRole('button', { name: 'Open full editor' })).toBeDisabled();
+    await expect(page.getByText('Editor export is disabled:')).toBeVisible();
+    await page.getByRole('tab', { name: 'Edit in Stabileo' }).click();
+    await expect(page.locator('iframe')).toHaveCount(0);
+  });
+
   test('failed encoder attempts once and exposes a manual retry', async ({ page }) => {
     await page.addInitScript(() => {
       Object.assign(window, { __encoderAttempts: 0 });
@@ -88,5 +99,13 @@ test.describe('@smoke research springs review regressions', () => {
     await page.getByRole('button', { name: 'Retry loading editor' }).click();
     await expect.poll(attempts).toBe(2);
     await expect(page.getByRole('alert')).toContainText('raw-deflate unavailable');
+    await page.getByRole('tab', { name: 'Network', exact: true }).click();
+    const pagesBefore = page.context().pages().length;
+    await page.getByRole('button', { name: 'Open full editor' }).click();
+    await expect(page.getByRole('alert').filter({ hasText: 'full editor' })).toContainText('raw-deflate unavailable');
+    await expect.poll(() => page.context().pages().length).toBe(pagesBefore);
+    await page.getByRole('button', { name: 'Retry opening full editor' }).click();
+    await expect.poll(attempts).toBe(4);
+    await expect.poll(() => page.context().pages().length).toBe(pagesBefore);
   });
 });
