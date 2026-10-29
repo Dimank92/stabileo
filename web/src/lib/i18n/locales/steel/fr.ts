@@ -467,7 +467,7 @@ const steelFr: Translations = {
   'steel.rows.state.chosen': 'choisi',
   'steel.rows.state.incomplete': 'incomplet',
   'steel.rows.state.unavailable': 'non disponible',
-  'steel.rows.state.outOfScope': 'hors du champ',
+  'steel.rows.state.outOfScope': 'hors périmètre',
   'steel.rows.state.authorityBlocked': 'bloqué : aucune norme de dimensionnement',
   'steel.rows.missing.grade': 'Nuance déclarée',
   'steel.rows.membersCount': '{n} barres',
