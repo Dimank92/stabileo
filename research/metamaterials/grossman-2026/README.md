@@ -11,19 +11,18 @@ Research, not engineering design. Agreement with a paper is not validation again
 
 Page: `/research/metamaterials/grossman-2026` (web/src/components/research/grossman2026/).
 
-## What is reproduced
+## What is compared
 
 | Paper | What we compare | Result |
 |---|---|---|
-| Sec. II C 2, Fig. 5, text p. 6: foam-like disorder makes the triangular lattice auxetic | Mean Poisson's ratio of periodic networks (10 samples of 26 x 26 cells per eta) | Crosses zero at eta = 0.446 (paper: ~0.46); nu(0.5) = -0.148 (paper: -0.1); inside every error bar of the paper's Fig. 5 simulations for eta <= 0.45 |
+| Sec. II C 2, Fig. 5, text p. 6: foam-like disorder makes the triangular lattice auxetic | Mean Poisson's ratio of periodic networks (10 samples of 26 x 26 cells per eta) | Crosses zero at eta = 0.446 (paper: ~0.46); nu(0.5) = -0.148 (paper: -0.1); cross-protocol agreement with Fig. 5 clamped-strip error bars for eta <= 0.45, not validation of the strip implementation |
 | Eq. (23), Fig. 6: honeycomb Poisson's ratio, triangulated with soft centre springs | Periodic network, l = 0.05 ... 0.95 | Max difference 3.4e-3 with the paper's k_radial = 1e-3, 3.4e-6 with 1e-6 (the error is O(k_radial)) |
 | Supplemental Eq. (9), Fig. 4: ordered lattices | Exact (Cauchy-Born) moduli of the periodic lattice | Equal to 6.7e-15 for spring constants k ∝ 1/l^2 (see Questions) |
 | Fig. 7: Young's modulus of the (3, 2) lattice against orientation | Same, times the area of one triangle | Max difference 6.0e-4 over the 741 points of the line (vector data) |
 | Fig. 9 at eta = 0 | B = sqrt(3)/2, G = sqrt(3)/4 | 2.7e-3 (reading precision of the figure) |
 
 Not reproduced: the simulation dots of Fig. 7 (the paper does not say how its strip measures
-Young's modulus; our reading, vertical force through mid-height over width and strain, differs by
-up to 0.5), and the theory curves of Figs. 8 and 9 for eta > 0 (the paper's mean-field method;
+Young's modulus; our reading, vertical force through mid-height over width and strain, does not reproduce those dots), and the theory curves of Figs. 8 and 9 for eta > 0 (the paper's mean-field method;
 we did not implement it, see Limitations). The comparison series are in
 `results/stabileo_results.json`.
 
@@ -100,7 +99,7 @@ Independent of the paper:
 
 Against the paper: the rows of the table above. Tolerances: 1e-9 or tighter for identities;
 O(k_radial) for Eq. (23); 0.01 (line width plus calibration) for vector-figure data; the paper's
-own error bars (plus 0.003 digitisation) for Fig. 5; 0.02 in eta for "nu = 0 at eta ~ 0.46".
+own error bars (plus 0.003 digitisation) for the cross-protocol Fig. 5 comparison; 0.02 in eta for "nu = 0 at eta ~ 0.46".
 
 The browser bundle is checked in Node by `wasm/check.mjs` (exact lattice values, Eq. 23, input
 refusal) in the research-wasm CI job.
@@ -152,3 +151,21 @@ Drafted here for a maintainer to send (contact: the corresponding author's addre
    1/width. Which nodes were held and which nodes measured the width?
 4. Would you share the simulation and computation code, or the data behind Figs. 4 to 9, so the
    comparison can be made exactly?
+
+## Periodic ensemble regression and browser follow-up
+
+At eta = 0.5 the periodic ensemble has recorded mean -0.14760823298376496 and
+sample standard deviation 0.017861567077351207 (10 seeds). The two-sided
+regression tolerance is 0.017, rounded from three standard errors
+(3 × 0.017861567 / sqrt(10) = 0.016945). This is a conservative regression
+bound on our ensemble, not agreement with the paper's -0.1 strip value or a
+statistical confidence claim about the paper. It is independent evidence.
+The Fig. 5 error-bar and zero-crossing checks compare different boundary
+conditions; the strip's free edges and clamped ends introduce finite-size bias.
+Our perfect strip gives 0.371 versus the paper's 0.331; that discrepancy remains
+unresolved and periodic agreement cannot validate clipping or clamping.
+
+Live solves and the automatic sweep still block the main thread. The deferred
+worker, cancellation and precomputed replay work is tracked in
+[FOLLOW_UPS.md](FOLLOW_UPS.md); this page does not yet meet the precomputed-replay
+and responsive-cancellation requirements of research/CLAUDE.md.

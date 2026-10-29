@@ -350,9 +350,9 @@ fn part_b(c: &mut Checks) {
             }
         }
     }
-    c.at_most("foam: mean periodic nu inside every error bar of Fig. 5's simulations (eta 0 ... 0.45, 10 markers)", "markers outside", outside as f64, 0.0);
+    c.at_most("foam: cross-protocol comparison, periodic nu vs Fig. 5 clamped-strip error bars (eta 0 ... 0.45, 10 markers); not strip validation", "markers outside", outside as f64, 0.0);
     let cross = means.windows(2).find(|w| w[0].1 > 0.0 && w[1].1 <= 0.0).map(|w| w[0].0 + (w[1].0 - w[0].0) * w[0].1 / (w[0].1 - w[1].1)).unwrap_or(f64::NAN);
-    c.at_most("foam: nu crosses zero near eta = 0.46 (text p. 6)", "|eta_0 - 0.46|", (cross - 0.46).abs(), 0.02);
+    c.at_most("foam: periodic zero crossing vs strip text eta = 0.46 (cross-protocol)", "|eta_0 - 0.46|", (cross - 0.46).abs(), 0.02);
     let mut nus = Vec::new();
     for seed in 0..10 {
         let mut s = spec(tri(1.0, 1.0));
@@ -362,7 +362,7 @@ fn part_b(c: &mut Checks) {
     }
     let m5 = nus.iter().sum::<f64>() / nus.len() as f64;
     assert!(m5.is_finite());
-    c.at_most("foam: auxetic as eta -> 0.5 (text: nu = -0.1); ours at most -0.05", "max(0, mean nu(0.5) + 0.05)", (m5 + 0.05).max(0.0), 0.0);
+    c.at_most("foam: periodic ensemble regression at eta = 0.5 (10 seeds, recorded mean -0.147608233, sd 0.017861567)", "|mean nu - recorded mean|", (m5 + 0.14760823298376496).abs(), 0.017);
 }
 
 fn main_checks() -> Checks {
@@ -371,7 +371,7 @@ fn main_checks() -> Checks {
     let independent = c.0.len();
     part_b(&mut c);
     for ch in &mut c.0[independent..] {
-        if !ch.name.starts_with("lattice (1, 0.5), theta = 0") {
+        if !ch.name.starts_with("lattice (1, 0.5), theta = 0") && !ch.name.starts_with("foam: periodic ensemble regression") {
             ch.category = "paper".into();
             ch.source = Some(format!("https://doi.org/10.1103/17sg-gzhl — {}", ch.name));
         }

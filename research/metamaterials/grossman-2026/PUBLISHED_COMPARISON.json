@@ -48,29 +48,20 @@
     {
       "category": "paper",
       "metric": "markers outside",
-      "name": "foam: mean periodic nu inside every error bar of Fig. 5's simulations (eta 0 ... 0.45, 10 markers)",
+      "name": "foam: cross-protocol comparison, periodic nu vs Fig. 5 clamped-strip error bars (eta 0 ... 0.45, 10 markers); not strip validation",
       "observed": 0.0,
       "passed": true,
-      "source": "https://doi.org/10.1103/17sg-gzhl — foam: mean periodic nu inside every error bar of Fig. 5's simulations (eta 0 ... 0.45, 10 markers)",
+      "source": "https://doi.org/10.1103/17sg-gzhl — foam: cross-protocol comparison, periodic nu vs Fig. 5 clamped-strip error bars (eta 0 ... 0.45, 10 markers); not strip validation",
       "tolerance": 0.0
     },
     {
       "category": "paper",
       "metric": "|eta_0 - 0.46|",
-      "name": "foam: nu crosses zero near eta = 0.46 (text p. 6)",
+      "name": "foam: periodic zero crossing vs strip text eta = 0.46 (cross-protocol)",
       "observed": 0.013605425095061685,
       "passed": true,
-      "source": "https://doi.org/10.1103/17sg-gzhl — foam: nu crosses zero near eta = 0.46 (text p. 6)",
+      "source": "https://doi.org/10.1103/17sg-gzhl — foam: periodic zero crossing vs strip text eta = 0.46 (cross-protocol)",
       "tolerance": 0.02
-    },
-    {
-      "category": "paper",
-      "metric": "max(0, mean nu(0.5) + 0.05)",
-      "name": "foam: auxetic as eta -> 0.5 (text: nu = -0.1); ours at most -0.05",
-      "observed": 0.0,
-      "passed": true,
-      "source": "https://doi.org/10.1103/17sg-gzhl — foam: auxetic as eta -> 0.5 (text: nu = -0.1); ours at most -0.05",
-      "tolerance": 0.0
     }
   ]
 }

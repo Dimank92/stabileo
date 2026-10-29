@@ -110,16 +110,7 @@ fn main() {
         .step_by(3)
         .map(|&t| {
             let st = run_strip(&StripSpec { network: s.clone(), width: 13.0, height: 52.0, theta: t, clamp_band: 0.5, strain: 0.01 }).unwrap();
-            // Vertical force through the mid-height section: sum of bond forces' y components
-            // for bonds crossing y = 26.
-            let mut fy = 0.0;
-            for (e, b) in st.bonds.iter().enumerate() {
-                let (pa, pb) = (st.nodes[b[0]], st.nodes[b[1]]);
-                if (pa[1] - 26.0) * (pb[1] - 26.0) < 0.0 {
-                    let l = (pb[0] - pa[0]).hypot(pb[1] - pa[1]);
-                    fy += st.force[e] * (pb[1] - pa[1]).abs() / l;
-                }
-            }
+            let fy = st.section_force_y(26.0);
             fy / (13.0 * 0.01) * tri_area
         })
         .collect();

@@ -263,6 +263,20 @@ pub struct StripResult {
     pub relaxation: Option<RelaxationSummary>,
 }
 
+impl StripResult {
+    /// Axial bond forces across the partition y <= cut; valid without prestress.
+    pub fn section_force_y(&self, cut: f64) -> f64 {
+        assert!(self.prestress_force.iter().all(|f| f.abs() < 1e-12));
+        self.bonds.iter().zip(&self.force).filter_map(|(b, force)| {
+            let (a, b) = (self.nodes[b[0]], self.nodes[b[1]]);
+            if (a[1] <= cut) == (b[1] <= cut) {
+                return None;
+            }
+            Some(force * (b[1] - a[1]).abs() / (b[0] - a[0]).hypot(b[1] - a[1]))
+        }).sum()
+    }
+}
+
 pub fn run_strip(spec: &StripSpec) -> Result<StripResult, String> {
     let net = spec.network.strip(spec.width, spec.height, spec.theta)?;
     if net.nodes.len() < 4 {
