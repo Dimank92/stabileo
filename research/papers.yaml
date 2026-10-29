@@ -15,9 +15,12 @@ papers:
   - brittle fracture
   - staggered scheme
   - educational code
-  summary: ''
-  summary_source: null
-  summary_note: No permitted summary source recorded; reference code alone is insufficient.
+  summary: An educational single-file Python implementation of two-dimensional phase-field fracture with
+    linear quadrilateral elements. It provides sparse and dense examples of a bar in tension and a single-edge
+    notched plate, plus a sparse three-point bending example, with VTK output and stress or reaction-force
+    plots for comparison.
+  summary_source: repository-readme
+  summary_note: Code facts only; README at https://github.com/nathanshauer/phasefield-jr-py/blob/61037c6ce7833a4f92a3ec098a9d60fd477eff2b/README.md
   code:
   - url: https://github.com/nathanshauer/phasefield-jr-py
     commit: 61037c6ce7833a4f92a3ec098a9d60fd477eff2b
@@ -793,7 +796,7 @@ papers:
   implementation: null
   contacts: []
 - id: macneal-harder-1985
-  doi: 10.1016/0168-874X(85)90003-4
+  doi: 10.1016/0168-874x(85)90003-4
   crossref:
     title: A proposed standard set of problems to test finite element accuracy
     authors:
@@ -801,31 +804,27 @@ papers:
     - Robert L. Harder
     year: 1985
     venue: Finite Elements in Analysis and Design
-  area: numerical-methods
-  keywords:
-  - engine benchmarks
-  - finite element accuracy
-  - patch test
-  summary: A set of patch, beam, plate and shell problems tests the accuracy of representative quadrilateral
-    and brick finite elements across several influential parameters.
+  area: shells
+  keywords: &id001
+  - finite element benchmarks
+  - patch tests
+  - mesh distortion
+  summary: Proposes patch tests and beam, plate and shell problems for assessing finite element accuracy.
+    Applications to quadrilateral plate and solid brick elements illustrate sensitivity to important accuracy
+    parameters.
   summary_source: publisher-abstract
-  summary_note: https://www.sciencedirect.com/science/article/pii/0168874X85900034 — publisher abstract
-    accessed 2026-10-29.
+  summary_note: 'Publisher abstract: https://www.sciencedirect.com/science/article/pii/0168874X85900034'
   code: []
   data: []
-  methods:
-  - finite elements
-  - accuracy benchmarks
+  methods: *id001
   dependencies: []
   complexity: low
-  relevance: Production-engine accuracy checks, with live failures and native/WASM comparison.
+  relevance: Exercises Stabileo's beam, plate and shell elements on standard accuracy and mesh-distortion
+    tests; use the supported structural subset.
   status: proposed
   reproduced_published_results: false
-  benchmarks:
-  - straight cantilever
-  - patch tests
-  - shell benchmarks
-  implementation: benchmarks/macneal-harder-1985
+  benchmarks: []
+  implementation: null
   contacts: []
 - id: mattiasson-elastica
   doi: 10.1002/nme.1620170113
@@ -860,37 +859,31 @@ papers:
   implementation: benchmarks/mattiasson-elastica
   contacts: []
 - id: newmark-1959
-  doi: 10.1061/JMCEA3.0000098
+  doi: 10.1061/jmcea3.0000098
   crossref:
     title: A Method of Computation for Structural Dynamics
     authors:
     - Nathan M. Newmark
     year: 1959
     venue: Journal of the Engineering Mechanics Division
-  area: numerical-methods
-  keywords:
-  - Newmark
-  - average acceleration
-  - SDOF
-  - time history
+  area: seismic
+  keywords: &id002
+  - Newmark integration
+  - structural dynamics
   summary: ''
   summary_source: null
   code: []
   data: []
-  methods:
-  - Newmark average acceleration, beta=1/4, gamma=1/2
-  dependencies:
-  - production Stabileo engine (WASM)
+  methods: *id002
+  dependencies: []
   complexity: low
-  relevance: 'Low effort: one constrained member and the existing production solver. High impact: exact
-    response and visible period elongation.'
+  relevance: Exercises Stabileo's Newmark time-history integration for structural response.
   status: proposed
   stage: first-version
   reviews: []
   reproduced_published_results: false
-  benchmarks:
-  - Undamped SDOF step response against closed form; period elongation across four time steps
-  implementation: benchmarks/newmark-1959
+  benchmarks: []
+  implementation: null
   page: web/src/components/research/newmark1959/NewmarkPage.svelte
   contacts: []
 - id: cqc-1981
@@ -1116,27 +1109,22 @@ papers:
     year: 1979
     venue: International Journal of Solids and Structures
   area: numerical-methods
-  keywords:
-  - arc-length method
-  - snap-through
-  - limit points
+  keywords: &id003
   - path following
+  - buckling
+  - snap-through
   summary: ''
   summary_source: null
   code: []
   data: []
-  methods:
-  - arc-length continuation
+  methods: *id003
   dependencies: []
   complexity: low
-  relevance: The production engine's path-following solver runs the same closed-form toggle and von Mises
-    truss cases in native Rust and browser WASM; no numerical example from the paper is claimed.
-  status: implementation-in-progress
+  relevance: Exercises Stabileo's 2D frame arc-length solver through limit points and snap-through.
+  status: proposed
   reproduced_published_results: false
-  benchmarks:
-  - shallow toggle against the engineering-strain closed-form equilibrium path
-  - von Mises truss against the engineering-strain closed-form equilibrium path
-  implementation: numerical-methods/riks-crisfield
+  benchmarks: []
+  implementation: null
   page: web/src/components/research/riksCrisfield/RiksCrisfieldPage.svelte
   contacts: []
 - id: crisfield-1981
@@ -1148,26 +1136,448 @@ papers:
     year: 1981
     venue: Computers & Structures
   area: numerical-methods
-  keywords:
-  - spherical arc-length
+  keywords: &id004
+  - arc-length
   - snap-through
-  - limit points
-  - path following
   summary: ''
   summary_source: null
   code: []
   data: []
-  methods:
-  - spherical arc-length continuation
+  methods: *id004
   dependencies: []
   complexity: low
-  relevance: Stabileo's production solver implements spherical arc-length continuation and is checked
-    on closed-form snap-through cases in native Rust and browser WASM; no paper figure is claimed.
-  status: implementation-in-progress
+  relevance: Method behind Stabileo's Crisfield arc-length solver for 2D frame snap-through and snap-back.
+  status: proposed
   reproduced_published_results: false
-  benchmarks:
-  - shallow toggle against the engineering-strain closed-form equilibrium path
-  - von Mises truss against the engineering-strain closed-form equilibrium path
-  implementation: numerical-methods/riks-crisfield
+  benchmarks: []
+  implementation: null
   page: web/src/components/research/riksCrisfield/RiksCrisfieldPage.svelte
+  contacts: []
+- id: hrennikoff-1941
+  doi: 10.1115/1.4009129
+  crossref:
+    title: Solution of Problems of Elasticity by the Framework Method
+    authors:
+    - A. Hrennikoff
+    year: 1941
+    venue: Journal of Applied Mechanics
+  area: numerical-methods
+  keywords: &id005
+  - framework method
+  - elasticity
+  summary: Approximates an elastic continuum by a patterned framework of bars with suitable elastic properties.
+    The approach covers several stress and bending problems and is illustrated with examples.
+  summary_source: crossref-abstract
+  code: []
+  data: []
+  methods: *id005
+  dependencies: []
+  complexity: low
+  relevance: Exercises Stabileo's linear frame and truss solvers with bar-framework approximations to
+    elastic structures.
+  status: proposed
+  reproduced_published_results: false
+  benchmarks: []
+  implementation: null
+  contacts: []
+- id: courant-1943
+  doi: 10.1090/s0002-9904-1943-07818-4
+  crossref:
+    title: Variational methods for the solution of problems of equilibrium and vibrations
+    authors:
+    - R. Courant
+    year: 1943
+    venue: Bulletin of the American Mathematical Society
+  area: numerical-methods
+  keywords: &id006
+  - variational methods
+  - equilibrium
+  - vibration
+  summary: ''
+  summary_source: null
+  code: []
+  data: []
+  methods: *id006
+  dependencies: []
+  complexity: low
+  relevance: Provides variational energy checks for Stabileo's linear stiffness and modal eigenvalue calculations.
+  status: proposed
+  reproduced_published_results: false
+  benchmarks: []
+  implementation: null
+  contacts: []
+- id: wilson-1981
+  doi: 10.1002/eqe.4290090207
+  crossref:
+    title: A replacement for the srss method in seismic analysis
+    authors:
+    - E. L. Wilson
+    - A. Der Kiureghian
+    - E. P. Bayo
+    year: 1981
+    venue: Earthquake Engineering & Structural Dynamics
+  area: seismic
+  keywords: &id007
+  - CQC
+  - response spectrum
+  - modal combination
+  summary: Introduces complete quadratic combination for seismic modal maxima. In the examples studied
+    it reduces modal-combination errors, and it approaches SRSS when natural frequencies are well separated.
+  summary_source: crossref-abstract
+  code: []
+  data: []
+  methods: *id007
+  dependencies: []
+  complexity: low
+  relevance: Exercises Stabileo's CQC response-spectrum combination, including closely spaced modes and
+    comparison with SRSS.
+  status: proposed
+  reproduced_published_results: false
+  benchmarks: []
+  implementation: null
+  contacts: []
+- id: bathe-dvorkin-1986
+  doi: 10.1002/nme.1620220312
+  crossref:
+    title: A formulation of general shell elements—the use of mixed interpolation of tensorial components
+    authors:
+    - Klaus‐Jürgen Bathe
+    - Eduardo N. Dvorkin
+    year: 1986
+    venue: International Journal for Numerical Methods in Engineering
+  area: shells
+  keywords: &id008
+  - MITC
+  - mixed interpolation
+  - shell elements
+  summary: Discusses practical requirements for general shell elements, explains a four-node mixed-interpolation
+    formulation and introduces an eight-node element using the same approach.
+  summary_source: crossref-abstract
+  code: []
+  data: []
+  methods: *id008
+  dependencies: []
+  complexity: low
+  relevance: Exercises the mixed-interpolation basis of Stabileo's MITC shells, restricted to supported
+    linear shell analysis.
+  status: proposed
+  reproduced_published_results: false
+  benchmarks: []
+  implementation: null
+  contacts: []
+- id: timoshenko-1921
+  doi: 10.1080/14786442108636264
+  crossref:
+    title: LXVI. <i>On the correction for shear of the differential equation for transverse vibrations
+      of prismatic bars</i>
+    authors:
+    - S.P. Timoshenko
+    year: 1921
+    venue: The London, Edinburgh, and Dublin Philosophical Magazine and Journal of Science
+  area: numerical-methods
+  keywords: &id009
+  - shear deformation
+  - beam vibration
+  summary: ''
+  summary_source: null
+  code: []
+  data: []
+  methods: *id009
+  dependencies: []
+  complexity: low
+  relevance: Exercises Stabileo's shear-deformable Timoshenko frame elements and their modal response.
+  status: proposed
+  reproduced_published_results: false
+  benchmarks: []
+  implementation: null
+  contacts: []
+- id: belytschko-1985
+  doi: 10.1016/0045-7825(85)90035-0
+  crossref:
+    title: Stress projection for membrane and shear locking in shell finite elements
+    authors:
+    - Ted Belytschko
+    - Henryk Stolarski
+    - Wing Kam Liu
+    - Nicholas Carpenter
+    - Jame S.J. Ong
+    year: 1985
+    venue: Computer Methods in Applied Mechanics and Engineering
+  area: shells
+  keywords: &id010
+  - stress projection
+  - membrane locking
+  - shear locking
+  summary: ''
+  summary_source: null
+  code: []
+  data: []
+  methods: *id010
+  dependencies: []
+  complexity: medium
+  relevance: Would add a stress-projection option to reduce membrane and shear locking in Stabileo's shell
+    elements.
+  status: proposed
+  reproduced_published_results: false
+  benchmarks: []
+  implementation: null
+  contacts: []
+- id: zienkiewicz-zhu-1987
+  doi: 10.1002/nme.1620240206
+  crossref:
+    title: A simple error estimator and adaptive procedure for practical engineerng analysis
+    authors:
+    - O. C. Zienkiewicz
+    - J. Z. Zhu
+    year: 1987
+    venue: International Journal for Numerical Methods in Engineering
+  area: numerical-methods
+  keywords: &id011
+  - error estimation
+  - adaptive refinement
+  summary: Presents an inexpensive estimator of global energy-norm and local finite element errors. The
+    estimates guide adaptive refinement or mesh redesign to reach a chosen accuracy.
+  summary_source: crossref-abstract
+  code: []
+  data: []
+  methods: *id011
+  dependencies: []
+  complexity: low
+  relevance: Exercises Stabileo's existing recovery-based energy-norm error estimator and shell mesh-refinement
+    workflow.
+  status: proposed
+  reproduced_published_results: false
+  benchmarks: []
+  implementation: null
+  contacts: []
+- id: sigmund-2001
+  doi: 10.1007/s001580050176
+  crossref:
+    title: A 99 line topology optimization code written in Matlab
+    authors:
+    - O. Sigmund
+    year: 2001
+    venue: Structural and Multidisciplinary Optimization
+  area: optimization
+  keywords: &id012
+  - topology optimization
+  - compliance
+  - educational code
+  summary: ''
+  summary_source: null
+  code: []
+  data: []
+  methods: *id012
+  dependencies: []
+  complexity: medium
+  relevance: Would add reusable compliance topology optimization for structural layouts, sharing the queued
+    andreassen-2011 experiment.
+  status: proposed
+  reproduced_published_results: false
+  benchmarks: []
+  implementation: null
+  contacts: []
+- id: rozvany-2008
+  doi: 10.1007/s00158-007-0217-0
+  crossref:
+    title: A critical review of established methods of structural topology optimization
+    authors:
+    - G. I. N. Rozvany
+    year: 2008
+    venue: Structural and Multidisciplinary Optimization
+  area: optimization
+  keywords: &id013
+  - topology optimization
+  - method comparison
+  summary: ''
+  summary_source: null
+  code: []
+  data: []
+  methods: *id013
+  dependencies: []
+  complexity: medium
+  relevance: Guides method selection and comparison for Stabileo's queued structural topology-optimization
+    capability. Crossref dates this review 2008 (online); the print issue is 2009.
+  status: proposed
+  reproduced_published_results: false
+  benchmarks: []
+  implementation: null
+  contacts: []
+- id: bathe-dvorkin-1985
+  doi: 10.1002/nme.1620210213
+  crossref:
+    title: A four‐node plate bending element based on Mindlin/Reissner plate theory and a mixed interpolation
+    authors:
+    - Klaus‐Jürgen Bathe
+    - Eduardo N. Dvorkin
+    year: 1985
+    venue: International Journal for Numerical Methods in Engineering
+  area: shells
+  keywords: &id014
+  - MITC4
+  - plate bending
+  - mixed interpolation
+  summary: Derives a four-node linear elastic plate bending element as a special case of a general shell
+    formulation and uses example solutions to assess its predictions.
+  summary_source: crossref-abstract
+  code: []
+  data: []
+  methods: *id014
+  dependencies: []
+  complexity: low
+  relevance: Exercises Stabileo's MITC4 plate bending formulation across thin and thick plates.
+  status: proposed
+  reproduced_published_results: false
+  benchmarks: []
+  implementation: null
+  contacts: []
+- id: batoz-1980
+  doi: 10.1002/nme.1620151205
+  crossref:
+    title: A study of three‐node triangular plate bending elements
+    authors:
+    - Jean‐Louis Batoz
+    - Klaus‐JÜRgen Bathe
+    - Lee‐Wing Ho
+    year: 1980
+    venue: International Journal for Numerical Methods in Engineering
+  area: shells
+  keywords: &id015
+  - DKT
+  - triangular plates
+  - plate bending
+  summary: Compares three-node triangular plate bending elements with nine displacement degrees of freedom.
+    Theoretical and numerical assessments favour the discrete Kirchhoff and hybrid-stress formulations
+    among the alternatives examined.
+  summary_source: crossref-abstract
+  code: []
+  data: []
+  methods: *id015
+  dependencies: []
+  complexity: low
+  relevance: Exercises Stabileo's DKT triangular plate bending elements against formulation examples.
+  status: proposed
+  reproduced_published_results: false
+  benchmarks: []
+  implementation: null
+  contacts: []
+- id: bucalem-1993
+  doi: 10.1002/nme.1620362109
+  crossref:
+    title: Higher‐order MITC general shell elements
+    authors:
+    - Miguel Luiz Bucalem
+    - Klaus‐Jüen Bathe
+    year: 1993
+    venue: International Journal for Numerical Methods in Engineering
+  area: shells
+  keywords: &id016
+  - MITC9
+  - higher-order shells
+  - mixed interpolation
+  summary: Presents nine-node and sixteen-node MITC shell elements that tie interpolated covariant membrane
+    and shear strains to the displacement field. Numerical tests assess their predictive performance.
+  summary_source: crossref-abstract
+  code: []
+  data: []
+  methods: *id016
+  dependencies: []
+  complexity: low
+  relevance: Exercises Stabileo's MITC9 shell elements on the linear subset of the paper's formulation
+    and tests.
+  status: proposed
+  reproduced_published_results: false
+  benchmarks: []
+  implementation: null
+  contacts: []
+- id: chapelle-1998
+  doi: 10.1016/s0045-7949(97)00078-3
+  crossref:
+    title: Fundamental considerations for the finite element analysis of shell structures
+    authors:
+    - D. Chapelle†
+    - K.J. Bathe
+    year: 1998
+    venue: Computers & Structures
+  area: shells
+  keywords: &id017
+  - shell benchmarks
+  - membrane dominance
+  - bending dominance
+  summary: Explains how geometry and boundary conditions determine whether a thin shell is dominated by
+    membrane action or bending. Proposes test cases for evaluating convergence and its dependence on shell
+    thickness.
+  summary_source: publisher-abstract
+  summary_note: 'Publisher abstract: https://www.sciencedirect.com/science/article/pii/S0045794997000783'
+  code: []
+  data: []
+  methods: *id017
+  dependencies: []
+  complexity: low
+  relevance: Exercises Stabileo's shell mesh convergence across thicknesses, geometries and boundary conditions.
+  status: proposed
+  reproduced_published_results: false
+  benchmarks: []
+  implementation: null
+  contacts: []
+- id: zupan-2004
+  doi: 10.1016/j.finel.2003.10.001
+  crossref:
+    title: 'On “A proposed standard set of problems to test finite element accuracy”: the twisted beam'
+    authors:
+    - D. Zupan
+    - M. Saje
+    year: 2004
+    venue: Finite Elements in Analysis and Design
+  area: shells
+  keywords: &id018
+  - twisted beam
+  - benchmark geometry
+  summary: Compares three interpretations of an initially twisted beam with different twist distributions
+    and cross-sections. The numerical results identify the MacNeal-Harder reference as a linearly twisted
+    beam with curved edges.
+  summary_source: publisher-abstract
+  summary_note: 'Publisher abstract: https://www.sciencedirect.com/science/article/pii/S0168874X03002130'
+  code: []
+  data: []
+  methods: *id018
+  dependencies: []
+  complexity: low
+  relevance: Clarifies the twisted-beam geometry used to check Stabileo's shell tip deflections against
+    MacNeal-Harder references.
+  status: proposed
+  reproduced_published_results: false
+  benchmarks: []
+  implementation: null
+  contacts: []
+- id: bathe-2000
+  doi: 10.1016/s0045-7949(99)00214-x
+  crossref:
+    title: An evaluation of the MITC shell elements
+    authors:
+    - Klaus-Jürgen Bathe
+    - Alexander Iosilevich
+    - Dominique Chapelle
+    year: 2000
+    venue: Computers & Structures
+  area: shells
+  keywords: &id019
+  - MITC
+  - shell benchmarks
+  - convergence
+  summary: Evaluates MITC shell elements on selected test problems using fundamental shell-analysis criteria.
+    The reported results support their use for general engineering applications.
+  summary_source: full-text
+  summary_note: 'Abstract in author-hosted full text: https://web.mit.edu/kjb/www/Principal_Publications/An_Evaluation_of_the_MITC_Shell_Elements.pdf'
+  code: []
+  data: []
+  methods: *id019
+  dependencies: []
+  complexity: low
+  relevance: Exercises Stabileo's MITC4 and MITC9 shells against published shell test results and mesh-convergence
+    comparisons.
+  status: proposed
+  reproduced_published_results: false
+  benchmarks: []
+  implementation: null
   contacts: []
