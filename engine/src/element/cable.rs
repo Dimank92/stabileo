@@ -384,5 +384,127 @@ mod tests {
         let f1 = cable_natural_frequency(1, 50.0, 500.0, 0.01, 1.0);
         // f1 = 1/(2*50) * sqrt(500/0.01) = 0.01 * 223.6 = 2.236 Hz
         assert!((f1 - 2.236).abs() < 0.01);
+
+        // Harmonics scale with mode number
+        let f2 = cable_natural_frequency(2, 50.0, 500.0, 0.01, 1.0);
+        let f3 = cable_natural_frequency(3, 50.0, 500.0, 0.01, 1.0);
+        assert!((f2 - 2.0 * f1).abs() < 1e-12);
+        assert!((f3 - 3.0 * f1).abs() < 1e-12);
+
+        // Degenerate checks
+        assert_eq!(cable_natural_frequency(1, 0.0, 500.0, 0.01, 1.0), 0.0);
+        assert_eq!(cable_natural_frequency(1, 50.0, 500.0, 0.0, 1.0), 0.0);
+        assert_eq!(cable_natural_frequency(1, 50.0, 500.0, 0.01, 0.0), 0.0);
+    }
+
+    #[test]
+    fn test_catenary_ordinate_fallback_and_shape() {
+        // Degenerate zero weight: straight line
+        let (y_deg_w, dy_deg_w) = catenary_ordinate(100.0, 0.0, 50.0, 10.0, 25.0);
+        assert!((y_deg_w - 5.0).abs() < 1e-12);
+        assert!((dy_deg_w - 0.2).abs() < 1e-12);
+
+        // Degenerate zero thrust: straight line
+        let (y_deg_h, dy_deg_h) = catenary_ordinate(0.0, 10.0, 50.0, 10.0, 25.0);
+        assert!((y_deg_h - 5.0).abs() < 1e-12);
+        assert!((dy_deg_h - 0.2).abs() < 1e-12);
+
+        // Level catenary: H=1000, w=10, L=100, h=0 -> a = 100
+        let (y_0, dy_0) = catenary_ordinate(1000.0, 10.0, 100.0, 0.0, 0.0);
+        assert!(y_0.abs() < 1e-10, "y(0) must be 0, got {y_0}");
+        assert!(dy_0 < 0.0, "dy/dx at x=0 must be negative");
+
+        let (y_l, dy_l) = catenary_ordinate(1000.0, 10.0, 100.0, 0.0, 100.0);
+        assert!(y_l.abs() < 1e-10, "y(L) must be 0, got {y_l}");
+        assert!(dy_l > 0.0, "dy/dx at x=L must be positive");
+        assert!((dy_0 + dy_l).abs() < 1e-10, "slopes at ends must be symmetric");
+
+        // Midspan sag and slope
+        let (y_mid, dy_mid) = catenary_ordinate(1000.0, 10.0, 100.0, 0.0, 50.0);
+        assert!(dy_mid.abs() < 1e-10, "slope at midspan must be 0");
+        let expected_mid = 100.0 * (1.0 - (0.5_f64).cosh());
+        assert!((y_mid - expected_mid).abs() < 1e-8);
+
+        // Intermediate symmetry: y(25) == y(75), dy_dx(25) == -dy_dx(75)
+        let (y_25, dy_25) = catenary_ordinate(1000.0, 10.0, 100.0, 0.0, 25.0);
+        let (y_75, dy_75) = catenary_ordinate(1000.0, 10.0, 100.0, 0.0, 75.0);
+        assert!((y_25 - y_75).abs() < 1e-8);
+        assert!((dy_25 + dy_75).abs() < 1e-8);
+
+        // Inclined catenary: H=1000, w=5, L=100, h=20
+        let (y_inc_0, _) = catenary_ordinate(1000.0, 5.0, 100.0, 20.0, 0.0);
+        let (y_inc_l, _) = catenary_ordinate(1000.0, 5.0, 100.0, 20.0, 100.0);
+        assert!(y_inc_0.abs() < 1e-8, "inclined y(0) must be 0");
+        assert!((y_inc_l - 20.0).abs() < 1e-8, "inclined y(L) must be 20");
+    }
+
+    #[test]
+    fn test_cable_length_catenary_calculations() {
+        // Degenerate w=0: straight chord
+        let s_straight = cable_length_catenary(1000.0, 0.0, 80.0, 60.0);
+        assert!((s_straight - 100.0).abs() < 1e-12);
+
+        // Level catenary: H=1250, w=10, L=100, h=0 -> a = 125
+        let s_catenary = cable_length_catenary(1250.0, 10.0, 100.0, 0.0);
+        let expected_s = 250.0 * (0.4_f64).sinh();
+        assert!((s_catenary - expected_s).abs() < 1e-8);
+        assert!(s_catenary > 100.0, "catenary length must exceed straight span");
+
+        // Inclined catenary: H=1250, w=10, L=100, h=30
+        let s_inc = cable_length_catenary(1250.0, 10.0, 100.0, 30.0);
+        let chord = (100.0_f64.powi(2) + 30.0_f64.powi(2)).sqrt();
+        assert!(s_inc > chord, "inclined catenary length must exceed chord");
+    }
+
+    #[test]
+    fn test_cable_end_tensions_resolution() {
+        // Symmetric slopes 0.75: sqrt(1 + 0.75^2) = 1.25 -> T = 125
+        let (ti, tj) = cable_end_tensions(100.0, 0.75, -0.75);
+        assert!((ti - 125.0).abs() < 1e-12);
+        assert!((tj - 125.0).abs() < 1e-12);
+
+        // Asymmetric slopes
+        let (ti2, tj2) = cable_end_tensions(200.0, 0.0, 1.0);
+        assert!((ti2 - 200.0).abs() < 1e-12);
+        assert!((tj2 - 200.0 * 2.0_f64.sqrt()).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_irvine_parameter_calculation() {
+        // Zero thrust -> infinity
+        assert!(irvine_parameter(1.0, 100.0, 0.0, 200_000.0, 0.01).is_infinite());
+
+        // Standard cable: w=1, L=100, H=500, E=200_000, A=0.01
+        let lambda_sq = irvine_parameter(1.0, 100.0, 500.0, 200_000.0, 0.01);
+        assert!((lambda_sq - 80.0 / 502.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_ernst_modulus_edge_cases_and_tangent() {
+        // Zero tension gives 0.0
+        assert_eq!(ernst_equivalent_modulus(200_000.0, 0.005, 0.5, 200.0, 0.0), 0.0);
+
+        // Tangent modulus matches equivalent modulus
+        let e_eq = ernst_equivalent_modulus(200_000.0, 0.005, 0.5, 200.0, 500.0);
+        let e_tan = ernst_tangent_modulus(200_000.0, 0.005, 0.5, 200.0, 500.0);
+        assert_eq!(e_eq, e_tan);
+    }
+
+    #[test]
+    fn test_cable_chord_tension_asymptotes() {
+        // Invalid strain -> NaN
+        assert!(cable_chord_tension(1e6, 0.1, 50.0, f64::NAN).is_nan());
+
+        // Zero weight: pure taut string
+        assert_eq!(cable_chord_tension(1e6, 0.0, 50.0, 0.001), 1000.0);
+        assert_eq!(cable_chord_tension(1e6, 0.0, 50.0, -0.001), 0.0);
+
+        // Very high strain overwhelming sag
+        let t_huge = cable_chord_tension(1e6, 0.01, 10.0, 1e12);
+        assert!((t_huge - 1e18).abs() / 1e18 < 1e-6);
+
+        // Cable under negative strain with weight hangs with positive sag tension
+        let t_slack = cable_chord_tension(1e6, 0.1, 50.0, -0.01);
+        assert!(t_slack > 0.0 && t_slack.is_finite());
     }
 }

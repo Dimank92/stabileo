@@ -57,4 +57,7 @@ exclude_re = [
     # The dense paths' resource cap (memory and time), not a soundness
     # condition; exercising it needs a dense model past 3000 free DOFs.
     "\\bsize_check\\b",
+    # Cable catenary root-finding and singularity tolerances: < vs <= or == on
+    # zero thresholds (1e-15, 1e-30, 1e-12) where physical cables are macroscopic.
+    "replace < with (<=|==) in (catenary_ordinate|cable_length_catenary|ernst_equivalent_modulus|irvine_parameter)",
 ]
