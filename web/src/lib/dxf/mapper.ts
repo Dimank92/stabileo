@@ -1,4 +1,4 @@
-// Map parsed DXF entities to Dedaliano model structures
+// Map parsed DXF entities to Stabileo model structures
 
 import type {
   DxfParseResult, DxfMappingResult, DxfUnit, DxfPoint,

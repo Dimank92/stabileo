@@ -1,7 +1,7 @@
 /**
  * E2E Comprehensive Test Suite — Structural Analysis Engine
  *
- * Acts as a full QA battery for the Dedaliano app, testing every workflow
+ * Acts as a full QA battery for the Stabileo app, testing every workflow
  * a structural engineering student or professional would encounter.
  *
  * Organized by:

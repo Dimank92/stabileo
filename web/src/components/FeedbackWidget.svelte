@@ -12,8 +12,8 @@
   const SHOW_TELEGRAM = false;
   const SHOW_CAFECITO = false;
 
-  const TELEGRAM_URL = 'https://t.me/dedaliano';
-  const CAFECITO_URL = 'https://cafecito.app/dedaliano';
+  const TELEGRAM_URL = 'https://t.me/stabileo';
+  const CAFECITO_URL = 'https://cafecito.app/stabileo';
 
   let isOpen = $state(false);
   let showForm = $state(false);

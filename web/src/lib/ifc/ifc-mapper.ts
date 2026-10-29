@@ -1,4 +1,4 @@
-// Map parsed IFC structural members to Dedaliano model structures
+// Map parsed IFC structural members to Stabileo model structures
 // This mapper is independent of web-ifc and operates on pre-parsed data.
 
 import { profileByName, profileToSectionFull } from '../data/steel-profiles';

@@ -585,7 +585,7 @@ function validateAxisSafety(data: DedalFile): void {
   // to prevent the model from being silently flattened
   if (hasNonZeroZ) {
     uiStore.analysisMode = '3d';
-    console.warn('[Dedaliano] File loaded as 2D but contains non-zero Z coordinates — upgraded to 3D mode');
+    console.warn('[Stabileo] File loaded as 2D but contains non-zero Z coordinates — upgraded to 3D mode');
   }
 }
 

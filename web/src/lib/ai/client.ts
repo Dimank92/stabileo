@@ -1,5 +1,5 @@
 /**
- * AI backend client for Dedaliano capabilities.
+ * AI backend client for Stabileo capabilities.
  *
  * Talks to the Rust/Axum backend at /api/ai/*.
  * Configuration is via environment variables:

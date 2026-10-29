@@ -1,4 +1,4 @@
-# Dedaliano Solver Roadmap
+# Stabileo Solver Roadmap
 
 > **Status (2026-10-18).** The long-term solver sequence below is current. The "Where We Are",
 > "ASAP Hardening Work" and "Wave 1 Trust Hardening" sections predate the October 2026 safety
@@ -151,7 +151,7 @@ Main has no branch protection. When enabled, require these status checks:
 
 This would prevent direct pushes to main. Enable when the team is ready to work through PRs.
 
-## What Still Separates Dedaliano From The Strongest Open Solvers
+## What Still Separates Stabileo From The Strongest Open Solvers
 
 The remaining gaps are not "missing the basics." They are:
 
@@ -163,7 +163,7 @@ The remaining gaps are not "missing the basics." They are:
 
 This changes the strategic target: not `be broader than every open-source mechanics framework` but `be the strongest open structural solver product with the deepest visible proof of correctness`.
 
-## What Would Make Dedaliano 10x Better
+## What Would Make Stabileo 10x Better
 
 The next big gains are not about collecting more categories. They are about making the solver faster on large real models, more obviously correct, more deterministic, harder to break on ugly mixed workflows, and easier to select and use correctly across the shell stack.
 

@@ -1,5 +1,5 @@
 /**
- * IFC Mapper Tests — Verify mapping from IFC members to Dedaliano model
+ * IFC Mapper Tests — Verify mapping from IFC members to Stabileo model
  * These tests use mock data and don't require web-ifc WASM.
  */
 

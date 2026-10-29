@@ -1,4 +1,4 @@
-# Dedaliano AI Roadmap
+# Stabileo AI Roadmap
 
 ## Purpose
 

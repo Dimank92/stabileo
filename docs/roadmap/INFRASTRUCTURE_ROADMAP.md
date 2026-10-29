@@ -1,4 +1,4 @@
-# Dedaliano Infrastructure Roadmap
+# Stabileo Infrastructure Roadmap
 
 ## Purpose
 
