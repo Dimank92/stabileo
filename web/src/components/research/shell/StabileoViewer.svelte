@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { rs, researchLocale } from '../i18n';
   import { researchAssetBase } from './assets';
   /**
    * Stabileo's viewer on a research page: the app's ScalarFieldViewer from its own bundle
@@ -25,7 +26,7 @@
     import(/* @vite-ignore */ `${BASE}viewer.js`)
       .then((m: { mountScalarFieldViewer: (el: HTMLElement, p: Record<string, unknown>) => typeof handle }) => {
         if (cancelled) return;
-        handle = m.mountScalarFieldViewer(host, { ...props });
+        handle = m.mountScalarFieldViewer(host, { ...props, locale: researchLocale() });
       })
       .catch((err) => {
         console.warn('research: the viewer bundle could not be loaded', err);
@@ -37,15 +38,16 @@
   });
 
   $effect(() => {
-    const next = { ...props };
+    const next = { ...props, locale: researchLocale() };
     handle?.update(next);
   });
 
   onDestroy(() => handle?.destroy());
+  const strings = $derived(rs());
 </script>
 
 <div class="rs-viewer-host" bind:this={host}>
-  {#if failed}<p class="rs-viewer-failed">Stabileo’s viewer couldn’t be loaded in this build.</p>{/if}
+  {#if failed}<p class="rs-viewer-failed">{strings.viewerUnavailable}</p>{/if}
 </div>
 
 <style>
