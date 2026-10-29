@@ -1,8 +1,3 @@
-/**
- * The spring-network research bundle (research/metamaterials/grossman-2026/wasm), fetched only on
- * this page. A strip or a periodic cell solves in milliseconds, so it runs on the main thread.
- */
-
 export type LatticeKind =
   | { kind: 'triangular'; phi: number; psi: number }
   | { kind: 'honeycomb'; l: number; k_radial: number }

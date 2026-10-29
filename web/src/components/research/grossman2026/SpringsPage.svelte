@@ -306,6 +306,7 @@
     if (tab === 'edit' && strip && !editor.attempted) void loadEditor();
   });
   async function openFullEditor() {
+    touch();
     if (!strip || exportDisabled) return;
     const currentStrip = strip;
     const label = labelParams();
@@ -370,7 +371,7 @@
       <h3>Foam: the auxetic transition</h3>
       <p>
         The paper reports ν falling with the disorder η, crossing zero at η ≃ 0.46 and reaching −0.1 as η → 0.5. Our exact periodic moduli (10 samples of 26 × 26 cells for each
-        η) cross zero at η = 0.446 and give ν = −0.148 at η = 0.5. The mean falls inside every error bar of the paper’s simulations in Fig. 5 for η ≤ 0.45. The paper’s marker at
+        η) cross zero at η = 0.446 and give ν = −0.148 at η = 0.5. This is a cross-protocol comparison: our periodic-cell mean falls inside every error bar of the paper’s 13 × 52 clamped-strip simulations in Fig. 5 for η ≤ 0.45; it does not validate our strip protocol. The paper’s marker at
         η = 0.49 is an arrow below its plot (about −0.14); ours there is −0.117.
       </p>
       <PlotXY series={foamSeries} xLabel="disorder η" yLabel="Poisson’s ratio ν" xDomain={[0, 0.5]} current={family === 'foam' && cell ? { x: eta, y: cell.isotropic.poisson, label: 'This network (periodic)' } : null} ariaLabel="Poisson's ratio against disorder: ours and the paper's" />
@@ -407,7 +408,7 @@
       {/if}
       <p>
         We could not reproduce the simulation dots of Fig. 7: the paper does not say how its strip simulation measures Young’s modulus, and our reading (vertical force through
-        mid-height over width and strain) differs from them by up to 0.5.
+        mid-height over width and strain) does not reproduce those dots.
       </p>
 
       <h3>Rigidity and connectivity (an independent check)</h3>
@@ -439,6 +440,7 @@
         <li>No reference code is public. Comparisons rest on the paper’s text, its closed forms, the vector data of Figs. 7–9 and a digitisation of the raster Fig. 5 (±0.002).</li>
         <li>We have not implemented the paper’s own semi-analytical method (the nonaffine tensors W of its Eq. 20 in the mean-field approximation); we compare with its results.</li>
         <li>Linear response only (small strain). The paper minimised the nonlinear energy at 1% strain; at that strain the difference is of order 1%.</li>
+        <li>Live solves and the automatic sweep currently run synchronously on the main thread. Large or prestressed networks can block navigation and Pause until a solve returns. Terminable workers and precomputed replay are pending.</li>
         <li>The strip’s free edges bias the measured ν by O(1/width); the periodic moduli have no such bias.</li>
         <li>Our ensemble (10 samples per η) estimates the mean to about ±0.005 at η ≤ 0.3 and ±0.01 near 0.5.</li>
         <li>Agreement with a paper is not validation against experiments, and nothing here is an engineering design result.</li>

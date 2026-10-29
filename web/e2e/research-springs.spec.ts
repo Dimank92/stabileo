@@ -29,10 +29,11 @@ test.describe('@smoke research springs', () => {
     await expect(page.locator('iframe[title="Stabileo editor (production engine)"]')).toBeVisible();
     const editor = () => page.frames().find((f) => f.url().includes('/app/basic'));
     await expect.poll(() => !!editor(), { timeout: 30_000 }).toBe(true);
-    type Hooks = { memberAxialForces(): { id: number; n: number }[] | null };
+    type Hooks = { diagramType(): string; memberAxialForces(): { id: number; n: number }[] | null };
     await expect
       .poll(async () => editor()!.evaluate(() => (window as unknown as { __stabileo?: Hooks }).__stabileo?.memberAxialForces()?.length ?? 0), { timeout: 60_000 })
       .toBeGreaterThan(500);
+    await expect.poll(() => editor()!.evaluate(() => (window as unknown as { __stabileo: Hooks }).__stabileo.diagramType())).toBe('axialColor');
     const app = await editor()!.evaluate(() => (window as unknown as { __stabileo: Hooks }).__stabileo.memberAxialForces()!);
     const ours = await page.evaluate(() => (window as unknown as { __springsEditorStrip: { force: number[] } }).__springsEditorStrip.force);
     expect(app.length).toBe(ours.length);
@@ -44,14 +45,18 @@ test.describe('@smoke research springs', () => {
 });
 
 test.describe('@smoke research springs review regressions', () => {
-  for (const interaction of ['pointer', 'wheel', 'keyboard camera']) {
+  for (const interaction of ['pointer', 'wheel', 'keyboard camera', 'full editor']) {
     test(`viewer ${interaction} stops the live sweep`, async ({ page }) => {
       await page.emulateMedia({ reducedMotion: 'no-preference' });
       await page.goto('/en/research/metamaterials/grossman-2026/');
       const viewer = page.locator('.sp-viewer');
       await expect(viewer.locator('canvas').first()).toBeVisible();
       await expect(page.getByRole('button', { name: 'Pause sweep' })).toBeVisible();
-      if (interaction === 'pointer') await viewer.locator('canvas').first().click();
+      if (interaction === 'full editor') {
+        const popup = page.waitForEvent('popup');
+        await page.getByRole('button', { name: 'Open full editor ↗', exact: true }).click();
+        await (await popup).close();
+      } else if (interaction === 'pointer') await viewer.locator('canvas').first().click();
       else if (interaction === 'wheel') {
         await viewer.hover();
         await page.mouse.wheel(0, 100);
@@ -63,7 +68,7 @@ test.describe('@smoke research springs review regressions', () => {
       await expect(page.getByRole('button', { name: 'Pause sweep' })).toHaveCount(0);
       const eta = page.locator('input[aria-label="Disorder eta"]');
       const value = await eta.inputValue();
-      await page.waitForTimeout(500); // several 140 ms sweep ticks
+      await page.waitForTimeout(2000);
       expect(await eta.inputValue()).toBe(value);
     });
   }
