@@ -301,7 +301,9 @@ regression separately from the paper's rounded **2.4313 ±0.0001**.
 
 The MacNeal frame checks above enforce true relative error; the older shared
 `assert_close` helper's `max(reference,1)` denominator was too permissive for these
-small displacements. No existing assertions or engine implementations were changed.
+small displacements. No engine implementation changed. Existing shell benchmark checks
+now also enforce the response direction (signed displacements against signed
+references), keeping their magnitude tolerances.
 No issue-specific containment exists on audited main for #798/#810/#818; therefore
 there are no passing warning tests pretending those results are contained.
 
@@ -331,8 +333,10 @@ All Cargo invocations used `CARGO_TARGET_DIR=/private/tmp/claude-501/codex-bench
 | `benchmarks::corotational_benchmarks -- --test-threads=2` | 13 passed |
 | `research -- --ignored --nocapture --test-threads=2` | All 17 deliberately failed the intended accuracy/convergence assertions; no unexpected passes |
 
-This adds 29 tests: **12 active, 17 ignored** (13 known-issue cases and four new
-findings). The ignored #818 case returned 4691.397553909858 against 4688.920345,
+This adds 35 tests: **18 active, 17 ignored** (13 known-issue cases and four
+findings later traced to wrong benchmark references, fixed in #849 and #852); the
+six defensive tests (non-finite path samples, reversed responses) were added after
+the filter counts in the table above were recorded. The ignored #818 case returned 4691.397553909858 against 4688.920345,
 a relative error of 0.000528311 versus the required 0.000001.
 `python3 -I scripts/check-test-targets.py` passes: all files belong to one binary.
 `make check.changelog NIX_RUN=` passes with local Python; plain
