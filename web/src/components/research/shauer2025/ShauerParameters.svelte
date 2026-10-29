@@ -29,7 +29,7 @@
       l0: readonly [number, number];
       u: readonly [number, number];
     };
-    meshes: Record<MeshKey, { label: string; mesh: { nx: number; ny: number; nx_fine: number; ny_fine: number; h_fine: number } }>;
+    meshes: Record<MeshKey, { label: 'coarseMesh' | 'mediumMesh' | 'referenceMesh'; mesh: { nx: number; ny: number; nx_fine: number; ny_fine: number; h_fine: number } }>;
     isReference: boolean;
     sigmaC: number;
     hOverL: number;
