@@ -110,8 +110,27 @@ full report with runners-up and rejections kept with the scouting notes):
 | 7 | Form-finding of cable nets and shells | Pastrana, Oktay, Bletzinger, Adams & Adriaenssens 2026, CMAME 458, 118783 | sparse solve; the found form opens in the editor as a gridshell and is checked with 3D analysis and buckling | ~5–7 days | `jax_fdm` (MIT) reference |
 | 8 | Gridshell layout under self-weight | Fairclough, Bołbotowski, He, Liew & Gilbert 2026, Computers & Structures 320, 107997 | new conic optimiser (Clarabel.rs, Apache-2.0) | ~7–10 days | Table 1 volumes |
 
-Order: 3 (quick, famous) → 4 (strongest showcase of the production engine; same DTU group) → 5 and
-6 together (shared 2D stability tooling) → 7 → 8. Known engine limits that pushed other papers
+Status and order (updated 2026-10-29):
+
+| Track | Item | Status |
+|---|---|---|
+| Papers | 1 Phase-field fracture (Shauer 2025) | merging, PR #769 |
+| Papers | 2 Spring networks (Grossman & Boudaoud 2026) | final fixes, PR #776 |
+| Papers | 3 Topology optimisation (Andreassen et al. 2011, 88 lines) | implemented, in verification |
+| Engine benchmarks | MacNeal–Harder (1985) | PR #797; found engine issue #798 (MITC4 distorted in-plane) |
+| Engine benchmarks | Riks / Crisfield snap-through (1979/81) | in progress |
+| Engine benchmarks | Shell obstacle course (Belytschko et al. 1985: Scordelis–Lo, pinched cylinder, hemisphere) | in progress |
+| Engine benchmarks | Mattiasson elastica (1981) | in progress |
+| Papers | 4 Koiter post-buckling (Ferrari & Sigmund 2025) | next: flagship for current researchers |
+| Papers | 5 + 6 Snapping arches (Biggins 2026) with the cut strip (Fehér 2026) | after 4 |
+| Engine benchmarks | Plastic collapse, Newmark / Bathe time integration, Navier plate, NAFEMS LE | about a day each, after the format settles |
+| Papers | Ferrari & Sigmund 2020 (3D topology optimisation) | after the 2D page; small grids in the browser |
+| Papers | 7 Form-finding (Pastrana et al. 2026) | later |
+| Papers | 8 Gridshell layout (Fairclough et al. 2026) with Michell / Gilbert & Tyas layout optimisation | last: needs a conic optimiser |
+
+Rule of thumb: classics go through the production engine (engine benchmarks); new papers are
+separate experiments only where the engine can't do them yet. Merge bar: no Codex/Kimi blockers,
+every claim on the page true, the product unaffected, CI green; other findings become issues. Known engine limits that pushed other papers
 down: arc-length is 2D only; no nonlinear shells. Before starting each, re-check: open questions
 (e.g. the Roorda geometry needs the paper's text; the Zenodo archive for #5 not yet inspected; the
 script link for #8 to ask the authors).
