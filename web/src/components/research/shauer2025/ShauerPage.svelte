@@ -7,6 +7,7 @@
   import { onDestroy, onMount } from 'svelte';
   import refCsv from '../../../../../research/fracture/shauer-2025/reference-results/ex2_steps.csv?raw';
   import validation from '../../../../../research/fracture/shauer-2025/VALIDATION.json';
+  import { solverStepCount } from './steps';
   import { compareReference, deepLinkStep } from './comparison';
   import LineChart from './LineChart.svelte';
   import IterationsChart from './IterationsChart.svelte';
@@ -257,7 +258,7 @@
     },
   };
 
-  const expectedSteps = $derived(run ? Math.floor(run.config.controls.total_time / run.config.controls.dt + 1e-9) : frames.length);
+  const expectedSteps = $derived(run && run.status === 'running' ? solverStepCount(run.config.controls.dt, run.config.controls.total_time) : frames.length);
 
   const forceSeries = $derived.by<Series[]>(() => {
     const out: Series[] = [];
@@ -374,7 +375,7 @@
       just below it in the other. Which row is chosen is decided by floating-point round-off; against the mirror image the final damage
       fields differ by 3.085970368132962 × 10<sup>−10</sup>.
       The thresholds in the table are comparison tolerances, not mathematical error bounds.
-      Displacement fields are compared only at example 1 step 50 and example 2 step 56; example 3 compares damage fields only.
+      Displacement fields are compared at example 1 step 50, example 2 step 56, and example 3 step 56.
     </p>
 
     {#if frames.length}
@@ -468,7 +469,7 @@
             />
           </div>
         {:else}
-          <div class="rs-placeholder">{replayError ? 'The precomputed replay couldn’t be loaded. Press Recompute live to compute it in your browser.' : 'Loading the replay…'}</div>
+          <div class="rs-placeholder">{run?.error ? `The solver failed: ${run.error}. Retry or return to the replay in Parameters.` : replayError ? 'The precomputed replay couldn’t be loaded. Press Recompute live to compute it in your browser.' : 'Loading the replay…'}</div>
         {/if}
       </div>
 
@@ -516,7 +517,7 @@
           <ParamRow id="p-u" name="Top displacement at t = 1" unit="mm" hint="0.004–0.02" invalid={invalid.u || !inRange(u, LIMITS.u)}>{#snippet symbol()}<var>u</var>{/snippet}<NumberField id="p-u" label="Top displacement u at t = 1, mm" min={LIMITS.u[0]} max={LIMITS.u[1]} bind:value={u} bind:invalid={invalid.u} /></ParamRow>
           <ParamRow id="p-dt" name="Load step">{#snippet symbol()}Δ<var>t</var>{/snippet}
             <select id="p-dt" bind:value={dt}>
-              {#each [0.005, 0.01, 0.02, 0.03, 0.06] as v (v)}<option value={v}>{v} ({Math.floor(0.8 / v + 1e-9)} steps)</option>{/each}
+              {#each [0.005, 0.01, 0.02, 0.03, 0.06] as v (v)}<option value={v}>{v} ({solverStepCount(v, 0.8)} steps)</option>{/each}
             </select>
           </ParamRow>
           <ParamRow id="p-mesh" name="Mesh">
@@ -563,7 +564,7 @@
         <div class="rs-scrub">
           <button class="btn btn-ghost btn-sm" type="button" onclick={() => (playback.playing ? playback.pause() : playback.play())}>{playback.playing ? 'Pause' : 'Play'}</button>
           <input type="range" min="0" max={frames.length - 1} value={playback.shown} oninput={(ev) => playback.seek(Number((ev.currentTarget as HTMLInputElement).value))} aria-label="Load step shown" />
-          <span class="rs-stepread">step {frame?.step.step ?? 0} of {frames.length - 1}</span>
+          <span class="rs-stepread">step {frame?.step.step ?? 0} of {Math.max(expectedSteps, frames.length) - 1}</span>
         </div>
       {/if}
     </div>

@@ -81,3 +81,13 @@ it('stops an active run before selecting a cached result and ignores abandoned w
   expect(sim.unavailableReason).toBeNull();
   sim.dispose();
 });
+
+it('records a synchronous Worker constructor failure before mesh creation', () => {
+  vi.stubGlobal('Worker', class { constructor() { throw new Error('Worker blocked'); } });
+  const sim = new SimulationController();
+  expect(() => sim.run(config)).not.toThrow();
+  expect(sim.current?.nodes).toBeNull();
+  expect(sim.current?.status).toBe('error');
+  expect(sim.current?.error).toBe('Worker blocked');
+  sim.dispose();
+});

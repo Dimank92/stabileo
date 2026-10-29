@@ -582,7 +582,7 @@
   }
 
   let showLanding = $state(shouldShowLanding());
-  let showResearch = $state(false);
+  let showResearch = $state(routeKind().kind === 'research');
   let research = $state<typeof import('./components/research/ResearchPage.svelte').default | null>(null);
   $effect(() => {
     if (showResearch && !research) {
