@@ -13867,5 +13867,6 @@ const pt: Translations = {
   "proExport.dxfLayoutSeparate": "Um desenho por arquivo",
   "proExport.dxfLayoutLayersNote": "Tudo em um DXF; cada conteúdo na sua camada.",
   "proExport.dxfLayoutSeparateNote": "Um DXF do modelo e um por resultado (com o modelo de base), juntos em um .zip.",
+  "clipboard.spaceInPlane": "A cópia é de um modelo 3D: copie de novo em 2D para colar aqui.",
 };
 export default pt;

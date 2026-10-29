@@ -14216,5 +14216,6 @@ const es: Record<string, string> = {
   "proExport.dxfLayoutSeparate": "Un plano por dibujo",
   "proExport.dxfLayoutLayersNote": "Todo en un DXF; cada contenido en su capa.",
   "proExport.dxfLayoutSeparateNote": "Un DXF del modelo y uno por cada resultado (con el modelo de base), juntos en un .zip.",
+  "clipboard.spaceInPlane": "Lo copiado es de un modelo 3D: copialo de nuevo en 2D para pegarlo acá.",
 };
 export default es;

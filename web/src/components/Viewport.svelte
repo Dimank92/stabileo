@@ -18,7 +18,9 @@
   import { scaleCanvasText } from '../lib/canvas/text-scale';
   import HiddenItemsChip from './viewport/HiddenItemsChip.svelte';
   import { TWO_D_VERTICAL_AXIS_LABEL, TWO_D_DISPLACEMENT_LABELS, get2DDisplayDisplacementVertical, get2DDisplayedVertical } from '../lib/geometry/coordinate-system';
-  import { projectNode, to3D } from '../lib/geometry/plane-projection';
+  import { projectNode, to2D, to3D } from '../lib/geometry/plane-projection';
+  import { placementStore } from '../lib/store/placement.svelte';
+  import { drawPlacementGhost } from '../lib/canvas/draw-placement';
   import { drawDiagrams, drawEnvelopeDiagrams, computeDiagramGlobalMax, setDiagramUnitSystem, type DiagramKind } from '../lib/canvas/draw-diagrams';
   import { computeDiagramValueAt, computeDisplacementAt } from '../lib/engine/diagrams';
   import { effectiveBendingInertia } from '../lib/engine/solver-service';
@@ -92,6 +94,7 @@
   let pendingNode: { x: number; y: number } | null = null;
   /** Where the member tool's next click would put an end, and what it catches (see memberEndAt). */
   let memberSnapPreview: MemberSnap | null = null;
+  let placementDown: { x: number; y: number } | null = null;
   /** What a dragged node has caught (another node, a member), or null on the grid. */
   let dragSnap: MemberSnap | null = null;
 
@@ -246,6 +249,7 @@
 
   // Model data changes
   $effect(() => { modelStore.nodes; modelStore.elements; invalidate(); });
+  $effect(() => { void placementStore.revision; invalidate(); });
   $effect(() => { modelStore.supports; invalidate(); });
   $effect(() => { modelStore.loads; invalidate(); });
   $effect(() => { modelStore.materials; modelStore.sections; invalidate(); });
@@ -1101,6 +1105,12 @@
       drawMemberSnap(ctx, dragSnap, null, t(`float.snap.${dragSnap.kind}`),
         (x, y) => uiStore.worldToScreen(x, y), { x: uiStore.mouseX, y: uiStore.mouseY }, canvasTheme(), { width, height }, touchInput ? 48 : 14);
     }
+    if (!exportFrame && placementStore.active && placementStore.fragment) {
+      const plane = uiStore.drawPlane2D;
+      drawPlacementGhost(ctx, placementStore.fragment, placementStore.transform(), placementStore.mergePreview().welds,
+        placementStore.target, placementStore.onNode,
+        (p) => { const q = to2D(plane, p[0], p[1], p[2]); return uiStore.worldToScreen(q.x, q.y); }, canvasTheme());
+    }
     // What the member tool's next click catches: a marker on the point and its name by the cursor.
     if (!exportFrame && uiStore.currentTool === 'element' && memberSnapPreview) {
       drawMemberSnap(ctx, memberSnapPreview, pendingNode, t(`float.snap.${memberSnapPreview.kind}`),
@@ -1865,6 +1875,12 @@
     // Close context menu on any click
     uiStore.contextMenu = null;
 
+    // While something is being placed the left button places it, whatever tool is armed.
+    if (placementStore.active && e.button === 0) {
+      placementDown = { x: mx, y: my };
+      return;
+    }
+
     // Pan: middle mouse or pan tool
     if (uiStore.currentTool === 'pan' || e.button === 1) {
       isPanning = true;
@@ -1872,6 +1888,8 @@
       panStartY = my;
       return;
     }
+
+    if (placementStore.active) return;
 
     // Block creation/mutation tools in simplified 2D mode
     if (uiStore.simplified2DMode
@@ -2423,6 +2441,11 @@
       return;
     }
 
+    if (placementStore.active) {
+      if (placementStore.follow) placementHover(world.x, world.y);
+      return;
+    }
+
     // Block dragging in simplified 2D mode
     if (uiStore.simplified2DMode && draggedNodeId !== null) {
       draggedNodeId = null;
@@ -2589,8 +2612,36 @@
     invalidate();
   }
 
-  function handleMouseUp() {
+  /** The placement target: a node under the pointer, else the snapped point on the plane. */
+  function placementHover(wx: number, wy: number) {
+    const s = snapWithMidpoint(wx, wy);
+    const tol = 1e-9 + 1 / Math.max(uiStore.zoom, 1e-9);
+    let nodeId: number | null = null;
+    for (const n of getPickableProjectedNodes().values()) {
+      if (Math.abs(n.x - s.x) <= tol && Math.abs(n.y - s.y) <= tol) { nodeId = n.id; break; }
+    }
+    const node = nodeId !== null ? modelStore.nodes.get(nodeId) : undefined;
+    if (node) { placementStore.setTarget([node.x, node.y, node.z ?? 0], `${t('placement.node')} ${node.id}`, true); return; }
+    const p = to3D(uiStore.drawPlane2D, s.x, s.y, { x: 0, y: 0, z: 0 });
+    placementStore.setTarget([p.x, p.y, p.z]);
+  }
+
+  function handleMouseUp(e?: MouseEvent) {
     isPanning = false;
+
+    if (placementDown) {
+      const down = placementDown;
+      placementDown = null;
+      if (!placementStore.active || !e) return;
+      const rect = canvas.getBoundingClientRect();
+      const moved = Math.hypot(e.clientX - rect.left - down.x, e.clientY - rect.top - down.y);
+      if (moved < 5 && placementStore.follow) {
+        const w = uiStore.screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+        placementHover(w.x, w.y);
+        placementStore.commit(e.shiftKey);
+      }
+      return;
+    }
 
     if (draggedNodeId !== null) {
       if (!dragMoved) {
