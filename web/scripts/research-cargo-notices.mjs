@@ -19,7 +19,11 @@ export function cargoLicenceTexts(pkg) {
 }
 
 export function researchCargoNotices(repo) {
-  const metadata = JSON.parse(execFileSync('cargo', ['metadata', '--locked', '--format-version', '1', '--filter-platform', 'wasm32-unknown-unknown', '--manifest-path', path.join(repo, 'research/fracture/shauer-2025/wasm/Cargo.toml')], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }));
+  return ['research/fracture/shauer-2025/wasm/Cargo.toml', 'research/mechanics/biggins-2026/Cargo.toml'].flatMap(manifest => workspaceNotices(repo, manifest));
+}
+
+function workspaceNotices(repo, manifest) {
+  const metadata = JSON.parse(execFileSync('cargo', ['metadata', '--locked', '--format-version', '1', '--filter-platform', 'wasm32-unknown-unknown', '--manifest-path', path.join(repo, manifest)], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }));
   const nodes = new Map(metadata.resolve.nodes.map(node => [node.id, node]));
   const reachable = new Set();
   function visit(id) {
@@ -30,7 +34,7 @@ export function researchCargoNotices(repo) {
   visit(metadata.resolve.root);
   return metadata.packages.filter(pkg => reachable.has(pkg.id)).sort((a, b) => a.name.localeCompare(b.name)).flatMap(pkg => {
     if (pkg.source === null) {
-      if (!['dedaliano-engine', 'phasefield-shauer-2025', 'phasefield-shauer-2025-wasm'].includes(pkg.name) || pkg.license !== 'AGPL-3.0-only') throw new Error(`Unresolved local Cargo licence: ${pkg.name}`);
+      if (!['dedaliano-engine', 'phasefield-shauer-2025', 'phasefield-shauer-2025-wasm', 'arches-biggins-2026'].includes(pkg.name) || pkg.license !== 'AGPL-3.0-only') throw new Error(`Unresolved local Cargo licence: ${pkg.name}`);
       return [];
     }
     const texts = cargoLicenceTexts(pkg);

@@ -3,6 +3,7 @@
    * /research: the experiments that run here first, then what is being built, then the
    * catalogue (research/papers.yaml, exported to papers.json and checked against Crossref in CI).
    */
+  import { archStrings } from './biggins2026/strings';
   import catalog from '../../../../research/papers.json';
   import PublicLink from '../landing/PublicLink.svelte';
   import { isHttpUrl } from './urls';
@@ -27,6 +28,7 @@
   const authors = (list: string[]) => (list.length > 3 ? `${list.slice(0, 3).join(', ')} et al.` : list.join(', '));
   const base = import.meta.env.BASE_URL;
   const s = $derived(rs());
+  const arches = $derived(archStrings());
 </script>
 
 <section class="sec sec--ink rs-g">
@@ -43,17 +45,17 @@
     <ul class="rs-g-run">
       {#each run as { e, p } (e.paperId)}
         <li class="rs-g-runcard">
-          <PublicLink to={e.path} class="rs-g-thumb" aria-label={e.name}>
+          <PublicLink to={e.path} class="rs-g-thumb" aria-label={e.paperId === 'zmyslony-2026' ? arches.title : e.name}>
             {#if !thumbFailed[e.paperId]}
-              <img src="{base}{e.thumbnail}" width="640" height="400" loading="lazy" decoding="async" alt={s.damageAlt} onerror={() => (thumbFailed = { ...thumbFailed, [e.paperId]: true })} />
+              <img src="{base}{e.thumbnail}" width="640" height="400" loading="lazy" decoding="async" alt={e.paperId === 'zmyslony-2026' ? arches.arch : s.damageAlt} onerror={() => (thumbFailed = { ...thumbFailed, [e.paperId]: true })} />
             {:else}
               <span class="rs-g-thumb-icon"><FieldIcon field={p.area} size={96} /></span>
             {/if}
           </PublicLink>
           <div class="rs-g-runbody">
             <div class="rs-g-meta"><span>{fieldName(p.area)}</span><span class="rs-g-status rs-g-{p.status}">{statusName(p.status)}</span></div>
-            <h3><PublicLink to={e.path}>{e.name}</PublicLink></h3>
-            <p class="rs-g-hook">{e.hook}</p>
+            <h3><PublicLink to={e.path}>{e.paperId === 'zmyslony-2026' ? arches.title : e.name}</PublicLink></h3>
+            <p class="rs-g-hook">{e.paperId === 'zmyslony-2026' ? arches.lead : e.hook}</p>
             <p class="rs-g-by">{p.crossref.title}. {authors(p.crossref.authors)}, <em>{p.crossref.venue}</em>, {p.crossref.year}.</p>
             <div class="rs-g-actions">
               <PublicLink to={e.path} class="btn btn-primary btn-sm">{s.readRun}</PublicLink>

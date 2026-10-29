@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { archStrings } from './biggins2026/strings';
   import { rs } from './i18n';
   /**
    * Stabileo Research: the gallery at /research and one page per runnable paper. Loaded as its own
@@ -10,6 +11,7 @@
   import LandingFooter from '../landing/LandingFooter.svelte';
   import PublicLink from '../landing/PublicLink.svelte';
   import Gallery from './Gallery.svelte';
+  import BigginsPage from './biggins2026/BigginsPage.svelte';
   import ShauerPage from './shauer2025/ShauerPage.svelte';
   import '../landing/landing.css';
   import '../blog/blog.css';
@@ -32,7 +34,7 @@
   };
 
   $effect(() => {
-    const meta = PAGES[route];
+    const meta = route === '/research/mechanics/biggins-2026' ? { title: archStrings().title, description: archStrings().lead } : PAGES[route];
     if (meta) applyPageMeta({ title: meta.title, description: meta.description, locale: publicI18n.locale, path: route });
     return () => restorePageMeta();
   });
@@ -45,6 +47,8 @@
     <Gallery />
   {:else if route === '/research/fracture/shauer-2025'}
     <ShauerPage />
+  {:else if route === '/research/mechanics/biggins-2026'}
+    <BigginsPage />
   {:else}
     <section class="sec sec--ink">
       <div class="wrap" style="padding-top: 7rem; padding-bottom: 4rem">

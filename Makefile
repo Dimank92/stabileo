@@ -363,6 +363,7 @@ web.run: wasm research.wasm
 # The Stabileo Research page's own WASM (web/public/research-wasm/), fetched only on /research pages.
 research.wasm: web.deps
 	$(NIX_RUN) research/fracture/shauer-2025/wasm/build.sh
+	$(NIX_RUN) research/mechanics/biggins-2026/build.sh
 
 # Builds from the installed dependencies (make web.deps), so CI never resolves away from the lockfile.
 web.build: wasm research.wasm
