@@ -5,6 +5,7 @@
   "components/Viewport3D.svelte": 9,
   "components/dsm/MatrixExplorer.svelte": 1,
   "components/edu/ExerciseAuthor.svelte": 3,
+  "components/export/ResultsExportDialog.svelte": 1,
   "components/flex/BarTable.svelte": 1,
   "components/flex/FlexResults.svelte": 1,
   "components/floating-tools/SelectedEntityPanel.svelte": 9,
@@ -14,7 +15,6 @@
   "components/pro/ProAutoLoadsDialog.svelte": 2,
   "components/pro/ProConnectionsTab.svelte": 1,
   "components/pro/ProConstraintsTab.svelte": 6,
-  "components/pro/ProProjectTab.svelte": 1,
   "components/pro/ProReportDialog.svelte": 1,
   "components/pro/ProResultTableModes.svelte": 1,
   "components/pro/ProResultsTab.svelte": 2,
@@ -40,6 +40,5 @@
   "components/tables/ResultsTable.svelte": 10,
   "components/tables/SupportsTable.svelte": 3,
   "components/toolbar/ToolbarAdvanced.svelte": 3,
-  "components/toolbar/ToolbarAiReview.svelte": 1,
-  "components/toolbar/ToolbarProject.svelte": 1
+  "components/toolbar/ToolbarAiReview.svelte": 1
 }

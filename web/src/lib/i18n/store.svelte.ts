@@ -200,9 +200,9 @@ function allTranslations(key: string): Set<string> {
 	return s;
 }
 
-/** Returns true if `name` matches any locale's default structure name. */
+/** Returns true if `name` matches any locale's default structure name, or the untranslated key an older save may carry. */
 export function isDefaultName(name: string): boolean {
-	return allTranslations('tabBar.newStructure').has(name);
+	return name === 'tabBar.newStructure' || allTranslations('tabBar.newStructure').has(name);
 }
 
 export const i18n = {
