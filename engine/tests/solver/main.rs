@@ -47,3 +47,5 @@ mod tower_fixture_test;
 
 #[path = "../benchmarks/cqc_1981.rs"]
 mod cqc_1981;
+#[path = "../lee_frame.rs"]
+mod lee_frame;

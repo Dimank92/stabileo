@@ -25,6 +25,7 @@ The plan every page and contribution follows is [DESIGN.md](DESIGN.md).
 | `benchmarks/mattiasson-elastica/` | Production corotational cantilever benchmark with provisional reference transcriptions |
 | `benchmarks/cqc-1981/` | First version, 0 reviews: close building modes, production modal + spectrum solvers versus closed form |
 | `benchmarks/navier-plate/` | First version: one simply supported plate, production DKT/MITC4 vs Navier series; published `results/stabileo_results.json` |
+| `benchmarks/lee-frame-1968/` | First-version pinned Lee frame, production arc-length replay and provisional limit-load comparison (0 reviews) |
 | `templates/` | Starting point for a new paper entry |
 | `tools/` | Catalog checker and other research-only tooling |
 

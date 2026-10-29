@@ -12,6 +12,8 @@
   import { navierStrings } from './navier1823/strings';
   import { researchLocale } from './i18n';
   const navier = $derived(navierStrings(researchLocale()));
+  import { strings as leeStrings } from './lee1968/i18n';
+  import { researchLocale } from './i18n';
   import catalog from '../../../../research/papers.json';
   import PublicLink from '../landing/PublicLink.svelte';
   import { isHttpUrl } from './urls';
@@ -55,6 +57,7 @@
   const nm = $derived(newmarkStrings());
   const cqc = $derived(cqcStrings());
   const plastic = $derived(ps());
+  const lee = $derived(leeStrings[researchLocale() as keyof typeof leeStrings] ?? leeStrings.en);
 </script>
 
 <section class="sec sec--ink rs-g">
@@ -71,7 +74,7 @@
     <ul class="rs-g-run">
       {#each run as { e, p } (e.paperId)}
         <li class="rs-g-runcard">
-          <PublicLink to={e.path} class="rs-g-thumb" aria-label={e.paperId === "navier-plate" ? navier.title : e.paperId === "horne-1979" ? plastic.title : e.paperId === "cqc-1981" ? cqc.title : e.paperId === "newmark-1959" ? nm.title : e.paperId === "fairclough-2026" ? f.title : e.paperId === 'zmyslony-2026' ? arches.title : e.paperId === "andreassen-2011" ? topopt.title : e.paperId === "pastrana-2026" ? s.formTitle : e.paperId === "grossman-2026" ? s.springsTitle : experimentText(e).title}>
+          <PublicLink to={e.path} class="rs-g-thumb" aria-label={e.paperId === "lee-frame-1968" ? lee.title : e.paperId === "navier-plate" ? navier.title : e.paperId === "horne-1979" ? plastic.title : e.paperId === "cqc-1981" ? cqc.title : e.paperId === "newmark-1959" ? nm.title : e.paperId === "fairclough-2026" ? f.title : e.paperId === 'zmyslony-2026' ? arches.title : e.paperId === "andreassen-2011" ? topopt.title : e.paperId === "pastrana-2026" ? s.formTitle : e.paperId === "grossman-2026" ? s.springsTitle : experimentText(e).title}>
             {#if e.thumbnail && !thumbFailed[e.paperId]}
               <img src="{base}{e.thumbnail}" width="640" height="400" loading="lazy" decoding="async" alt={e.thumbnailAlt} onerror={() => (thumbFailed = { ...thumbFailed, [e.paperId]: true })} />
             {:else}
@@ -80,8 +83,8 @@
           </PublicLink>
           <div class="rs-g-runbody">
             <div class="rs-g-meta"><span>{fieldName(p.area)}</span><span class="rs-g-status rs-g-{p.status}">{statusName(p.status)}</span><span class="rs-g-status rs-g-first">{firstVersion}</span></div>
-            <h3><PublicLink to={e.path}>{e.paperId === "navier-plate" ? navier.title : e.paperId === "horne-1979" ? plastic.title : e.paperId === "cqc-1981" ? cqc.title : e.paperId === "newmark-1959" ? nm.title : e.paperId === "fairclough-2026" ? f.title : e.paperId === 'zmyslony-2026' ? arches.title : e.paperId === "andreassen-2011" ? topopt.title : e.paperId === "pastrana-2026" ? s.formTitle : e.paperId === "grossman-2026" ? s.springsTitle : experimentText(e).title}</PublicLink></h3>
-            <p class="rs-g-hook">{e.paperId === "navier-plate" ? navier.lead : e.paperId === "horne-1979" ? plastic.stage : e.paperId === "cqc-1981" ? cqc.stage : e.paperId === "newmark-1959" ? nm.lead : e.paperId === "fairclough-2026" ? f.lead : e.paperId === 'zmyslony-2026' ? arches.lead : e.paperId === "andreassen-2011" ? topopt.hook : e.paperId === "pastrana-2026" ? s.formLead : e.paperId === "grossman-2026" ? s.springsHook : experimentText(e).hook}</p>
+            <h3><PublicLink to={e.path}>{e.paperId === "lee-frame-1968" ? lee.title : e.paperId === "navier-plate" ? navier.title : e.paperId === "horne-1979" ? plastic.title : e.paperId === "cqc-1981" ? cqc.title : e.paperId === "newmark-1959" ? nm.title : e.paperId === "fairclough-2026" ? f.title : e.paperId === 'zmyslony-2026' ? arches.title : e.paperId === "andreassen-2011" ? topopt.title : e.paperId === "pastrana-2026" ? s.formTitle : e.paperId === "grossman-2026" ? s.springsTitle : experimentText(e).title}</PublicLink></h3>
+            <p class="rs-g-hook">{e.paperId === "lee-frame-1968" ? lee.stage : e.paperId === "navier-plate" ? navier.lead : e.paperId === "horne-1979" ? plastic.stage : e.paperId === "cqc-1981" ? cqc.stage : e.paperId === "newmark-1959" ? nm.lead : e.paperId === "fairclough-2026" ? f.lead : e.paperId === 'zmyslony-2026' ? arches.lead : e.paperId === "andreassen-2011" ? topopt.hook : e.paperId === "pastrana-2026" ? s.formLead : e.paperId === "grossman-2026" ? s.springsHook : experimentText(e).hook}</p>
             <p class="rs-g-by">{p.crossref.title}. {authors(p.crossref.authors)}, <em>{p.crossref.venue}</em>, {p.crossref.year}.</p>
             <div class="rs-g-actions">
               <PublicLink to={e.path} class="btn btn-primary btn-sm">{s.readRun}</PublicLink>
