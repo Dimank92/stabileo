@@ -2373,6 +2373,310 @@ mod tests {
             assert!(o.forces.vy.is_none());
         }
     }
+
+    #[test]
+    fn test_around_boundaries() {
+        assert!(around(f64::NAN, 1.0, "test").is_err());
+        assert!(around(1.0, f64::NAN, "test").is_err());
+        assert!(around(1.0, -0.5, "test").is_err());
+        assert!(around(1.0, -0.0, "test").is_ok());
+        let exact = around(10.0, 0.0, "test").unwrap();
+        assert_eq!(exact, Interval::point(10.0));
+        let bounded = around(10.0, 2.0, "test").unwrap();
+        assert!(bounded.lo <= 8.0 && (bounded.lo - 8.0).abs() < 1e-12);
+        assert!(bounded.hi >= 12.0 && (bounded.hi - 12.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_loaded_and_required_ratios() {
+        // loaded_ratio: d == 0 returns ZERO even if cap is non-positive
+        assert_eq!(loaded_ratio("test", Interval::ZERO, Interval::new(0.0, 0.0)).unwrap(), Interval::ZERO);
+        assert_eq!(loaded_ratio("test", Interval::ZERO, Interval::new(10.0, 20.0)).unwrap(), Interval::ZERO);
+        // d != 0: cap must have lo > 0.0
+        assert!(loaded_ratio("test", Interval::new(1.0, 2.0), Interval::new(0.0, 10.0)).is_err());
+        assert!(loaded_ratio("test", Interval::new(1.0, 2.0), Interval::new(-5.0, 10.0)).is_err());
+        assert!(loaded_ratio("test", Interval::new(1.0, 2.0), Interval::new(f64::NAN, 10.0)).is_err());
+        let lr = loaded_ratio("test", Interval::new(2.0, 4.0), Interval::new(10.0, 20.0)).unwrap();
+        assert!(lr.lo <= 0.1 && (lr.lo - 0.1).abs() < 1e-12);
+        assert!(lr.hi >= 0.4 && (lr.hi - 0.4).abs() < 1e-12);
+
+        // required_ratio: cap must have lo > 0.0 even if d == 0
+        assert!(required_ratio("test", Interval::ZERO, Interval::new(0.0, 10.0)).is_err());
+        assert!(required_ratio("test", Interval::new(1.0, 2.0), Interval::new(0.0, 10.0)).is_err());
+        assert!(required_ratio("test", Interval::new(1.0, 2.0), Interval::new(f64::NAN, 10.0)).is_err());
+        let rr = required_ratio("test", Interval::new(2.0, 4.0), Interval::new(10.0, 20.0)).unwrap();
+        assert!(rr.lo <= 0.1 && (rr.lo - 0.1).abs() < 1e-12);
+        assert!(rr.hi >= 0.4 && (rr.hi - 0.4).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_tri_or_truth_table() {
+        assert_eq!(tri_or(Tri::True, Tri::False), Tri::True);
+        assert_eq!(tri_or(Tri::False, Tri::True), Tri::True);
+        assert_eq!(tri_or(Tri::True, Tri::True), Tri::True);
+        assert_eq!(tri_or(Tri::False, Tri::False), Tri::False);
+        assert_eq!(tri_or(Tri::Unknown, Tri::False), Tri::Unknown);
+        assert_eq!(tri_or(Tri::False, Tri::Unknown), Tri::Unknown);
+        assert_eq!(tri_or(Tri::Unknown, Tri::True), Tri::True);
+        assert_eq!(tri_or(Tri::True, Tri::Unknown), Tri::True);
+    }
+
+    #[test]
+    fn test_certify_members_exact_utilization_thresholds() {
+        // upper == 1.0 must NOT be certified_ok (< 1.0)
+        let m = [1];
+        let d = [1];
+        let names = ["Check 1"];
+        // Exactly at 1.0
+        let res_1 = certify_members(&m, |&id| id, &d, |&id| id, &names, |_m, _d| Ok(vec![Interval::point(1.0)]));
+        assert!(res_1[0].certified);
+        assert_eq!(res_1[0].utilization_upper, 1.0);
+        assert!(!res_1[0].certified_ok, "upper == 1.0 must not be certified_ok");
+        assert!(!res_1[0].certified_fail, "lower == 1.0 must not be certified_fail");
+
+        // Below 1.0
+        let res_below = certify_members(&m, |&id| id, &d, |&id| id, &names, |_m, _d| Ok(vec![Interval::point(0.99)]));
+        assert!(res_below[0].certified_ok);
+        assert!(!res_below[0].certified_fail);
+
+        // Above 1.0
+        let res_above = certify_members(&m, |&id| id, &d, |&id| id, &names, |_m, _d| Ok(vec![Interval::point(1.01)]));
+        assert!(!res_above[0].certified_ok);
+        assert!(res_above[0].certified_fail);
+
+        // Non-finite ratio enclosure
+        let res_nan = certify_members(&m, |&id| id, &d, |&id| id, &names, |_m, _d| Ok(vec![Interval::new(0.0, f64::NAN)]));
+        assert!(!res_nan[0].certified);
+    }
+
+    #[test]
+    fn test_timber_dimensions_guards() {
+        let mut g = Lcg(42);
+        let mut m = timber_member(&mut g, 1);
+        let f = timber_forces(&mut g, &m);
+        let bound = ZERO_BOUND;
+        assert!(timber_ratio_enclosures(&m, &f, &bound).is_ok());
+
+        m.b = 0.0;
+        assert!(timber_ratio_enclosures(&m, &f, &bound).is_err());
+        m.b = -0.15;
+        assert!(timber_ratio_enclosures(&m, &f, &bound).is_err());
+        m.b = 0.15;
+        m.d = 0.0;
+        assert!(timber_ratio_enclosures(&m, &f, &bound).is_err());
+        m.d = f64::NAN;
+        assert!(timber_ratio_enclosures(&m, &f, &bound).is_err());
+        m.b = f64::NAN;
+        assert!(timber_ratio_enclosures(&m, &f, &bound).is_err());
+    }
+
+    #[test]
+    fn test_demands_and_uncertified_converters() {
+        let d = BoundedSteelDemand {
+            forces: ElementDesignForces {
+                element_id: 1,
+                n: 100.0,
+                my: 200.0,
+                mz: Some(50.0),
+                vy: Some(30.0),
+            },
+            bound: DemandBound { n: 1.0, my: 2.0, mz: 3.0, vy: 4.0 },
+        };
+        // cirsoc301_demands
+        let c3 = cirsoc301_demands(&[d.clone()]);
+        assert_eq!(c3.len(), 1);
+        assert_eq!(c3[0].forces.element_id, 1);
+        assert_eq!(c3[0].forces.nu, -100.0);
+        assert_eq!(c3[0].forces.mu_strong, 200.0);
+        assert_eq!(c3[0].forces.mu_weak, 50.0);
+        assert_eq!(c3[0].forces.vu, 30.0);
+
+        // cirsoc201_demands
+        let c2 = cirsoc201_demands(&[d.clone()]);
+        assert_eq!(c2.len(), 1);
+        assert_eq!(c2[0].forces.element_id, 1);
+        assert_eq!(c2[0].forces.axial_compression, Some(-100.0));
+        assert_eq!(c2[0].forces.mu, Some(200.0));
+        assert_eq!(c2[0].forces.vu, Some(30.0));
+
+        // timber_demands
+        let td = timber_demands(&[d.clone()]);
+        assert_eq!(td.len(), 1);
+        assert_eq!(td[0].forces.element_id, 1);
+        assert_eq!(td[0].forces.m, 200.0);
+        assert_eq!(td[0].forces.n, Some(100.0));
+        assert_eq!(td[0].forces.v, Some(30.0));
+
+        // cfs_demands
+        let cd = cfs_demands(&[d.clone()]);
+        assert_eq!(cd.len(), 1);
+        assert_eq!(cd[0].forces.element_id, 1);
+
+        // rc_demands
+        let rcd = rc_demands(&[d]);
+        assert_eq!(rcd.len(), 1);
+        assert_eq!(rcd[0].forces.element_id, 1);
+
+        // members_uncertified
+        let m = w_member(1, 3.5);
+        let uncert = members_uncertified(&[m], "test error");
+        assert_eq!(uncert.len(), 1);
+        assert!(!uncert[0].certified);
+        assert_eq!(uncert[0].reason.as_deref(), Some("test error"));
+    }
+
+    #[test]
+    fn test_require_monotone_guard() {
+        let bad_sec = RcFlexureSection {
+            fc: 30e6,
+            fy: 400e6,
+            es: 200e9,
+            bw: -0.3,
+            bf: -0.3,
+            hf: 0.0,
+            d: 0.5,
+            as_t: 1e-3,
+            as_c: 0.0,
+            d_prime: 0.0,
+        };
+        assert!(require_monotone(&bad_sec).is_err());
+    }
+
+    #[test]
+    fn test_interaction_moment_enclosure_boundaries() {
+        let mut g = Lcg(42);
+        let m = aci_member(&mut g, 1);
+        let es = m.es.unwrap_or(200e9);
+        let (c_lo, c_hi) = interaction_c_range(&m);
+        let p_at = |c: f64| interaction_point::<Interval>(&m, es, Interval::point(c)).0;
+        let (p_lo, p_hi) = (p_at(c_lo), p_at(c_hi));
+
+        // 1. pu.lo <= p_lo.hi: must be rejected (! p_lo.hi < pu.lo)
+        let pu_on_lower = Interval::new(p_lo.hi - 1e3, p_lo.hi);
+        assert!(interaction_moment_enclosure(&m, es, pu_on_lower).is_err());
+
+        // 2. Interior point: valid and tight
+        let mid_p = 0.5 * (p_lo.hi + p_hi.lo);
+        let pu_mid = Interval::point(mid_p);
+        let res = interaction_moment_enclosure(&m, es, pu_mid).unwrap();
+        assert!(res.is_finite());
+        assert!(res.lo >= 0.0);
+        assert!(res.hi - res.lo < 1e-3 * res.hi.max(1.0));
+
+        // 3. pu.hi > p_hi.lo: rejected (pu.hi <= p_hi.lo fails)
+        let pu_above_upper = Interval::new(mid_p, p_hi.lo + 1e2);
+        assert!(interaction_moment_enclosure(&m, es, pu_above_upper).is_err());
+
+        // 4. Non-finite pu
+        assert!(interaction_moment_enclosure(&m, es, Interval::new(f64::NAN, 1e3)).is_err());
+        assert!(interaction_moment_enclosure(&m, es, Interval::new(1e3, f64::INFINITY)).is_err());
+    }
+
+    #[test]
+    fn test_rc_and_cfs_guards() {
+        let mut g = Lcg(123);
+        let mut m = aci_member(&mut g, 1);
+        m.section_type = RCSectionType::Rectangular;
+        let bound = DemandBound { n: 1e4, my: 0.0, mz: 0.0, vy: 0.0 };
+        let f = RCDesignForces { element_id: 1, mu: 1e4, vu: None, nu: Some(1e4) };
+        // nu will be [0.0, 2e4]: includes 0 and nonzero (kills && -> || in nonzero_possible)
+        let r_straddle = rc_ratio_enclosures(&m, &f, &bound).unwrap();
+        assert!(r_straddle[0].is_finite());
+        assert!(r_straddle[0].hi > r_straddle[0].lo);
+
+        // pu.hi == 0.0: compression is 0, pu is [-1e4, 0.0]. Must take hull of compression & tension.
+        let f_boundary = RCDesignForces { element_id: 1, mu: 1e4, vu: None, nu: Some(5e3) };
+        let bound_boundary = DemandBound { n: 5e3, my: 0.0, mz: 0.0, vy: 0.0 };
+        let r_bound = rc_ratio_enclosures(&m, &f_boundary, &bound_boundary).unwrap();
+        assert!(r_bound[2].is_finite());
+
+        // certify_rc_members returns non-empty result
+        let res_rc = certify_rc_members(&CertifiedRcCheckInput {
+            members: vec![m.clone()],
+            demands: vec![BoundedRcDemand { forces: f, bound }],
+        });
+        assert_eq!(res_rc.len(), 1);
+
+        // CFS guards
+        let mut g_cfs = Lcg(456);
+        let m_cfs = cfs_member(&mut g_cfs, 1);
+
+        // Line 1051: m.xo.is_none() with n.lo == 0.0 (zero or pure tension). Must be Ok.
+        let mut m_no_xo = m_cfs.clone();
+        m_no_xo.xo = None;
+        let f_zero = CfsDesignForces { element_id: 1, axial: Some(0.0), mx: None, my: None, shear: None };
+        assert!(cfs_ratio_enclosures(&m_no_xo, &f_zero, &ZERO_BOUND).is_ok());
+
+        // Line 1059: no web geometry with v in [0.0, 100.0] (v.lo == 0, v.hi > 0) must Err
+        let mut m_no_web = m_cfs.clone();
+        m_no_web.h = None;
+        m_no_web.t = None;
+        let f_shear = CfsDesignForces { element_id: 1, axial: None, mx: None, my: None, shear: Some(50.0) };
+        let b_shear = DemandBound { n: 0.0, my: 0.0, mz: 0.0, vy: 50.0 };
+        assert!(cfs_ratio_enclosures(&m_no_web, &f_shear, &b_shear).is_err());
+    }
+
+    #[test]
+    fn test_cirsoc301_guards() {
+        let m: Cirsoc301MemberData = serde_json::from_value(serde_json::json!({
+            "elementId": 1,
+            "Fy": 235.0,
+            "Fu": 370.0,
+            "E": 200000.0,
+            "A": 53.8e-4,
+            "Iz": 83.56e-6,
+            "Iy": 6.04e-6,
+            "h": 0.3,
+            "b": 0.15,
+            "tw": 0.0071,
+            "tf": 0.0107,
+            "L": 3.5,
+            "Lb": 3.5,
+            "tensionConnection": { "An": 53.8e-4, "U": 0.85 }
+        })).unwrap();
+
+        // Tension demand: nu < 0 in cirsoc301
+        let f_tension = Cirsoc301DesignForces {
+            element_id: 1,
+            nu: -1e2,
+            mu_strong: 0.0,
+            mu_weak: 0.0,
+            vu: 0.0,
+        };
+        let r = cirsoc301_ratio_enclosures(&m, &f_tension, &ZERO_BOUND).unwrap();
+        // Tension ratio must be positive (kills delete - in (-n).max(zero))
+        assert!(r[0].lo > 0.0);
+        // Compression ratio must be zero
+        assert_eq!(r[1], Interval::ZERO);
+
+        // certify_cirsoc301_members returns non-empty result
+        let res = certify_cirsoc301_members(&CertifiedCirsoc301CheckInput {
+            members: vec![m.clone()],
+            demands: vec![BoundedCirsoc301Demand { forces: f_tension, bound: ZERO_BOUND }],
+        });
+        assert_eq!(res.len(), 1);
+    }
+
+    #[test]
+    fn test_ec3_tension_with_invalid_cm_guards() {
+        let mut m = ipe(1, 4.0);
+        // Invalid interaction Cm parameter (cmy < 0.4)
+        m.interaction = Some(crate::postprocess::ec3_check::Ec3InteractionData {
+            cmy: Some(0.1),
+            cmz: None,
+            cm_lt: None,
+            hollow: None,
+        });
+        // Tension demand (n_ed > 0) must succeed despite invalid Cm (kills line 332 != -> ==)
+        let f_tension = Ec3DesignForces {
+            element_id: 1,
+            n_ed: Some(1e5),
+            my_ed: Some(1e4),
+            mz_ed: None,
+            v_ed: None,
+        };
+        assert!(ec3_ratio_enclosures(&m, &f_tension, &ZERO_BOUND).is_ok());
+    }
 }
 
 // ==================== Isolated footings (CIRSOC 201) ====================

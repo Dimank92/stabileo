@@ -553,3 +553,38 @@ fn certified_aci_rc_utilization_end_to_end_2d() {
         eprintln!("ACI elem {}: U ∈ [{:.6}, {:.6}] {}", m.element_id, r.utilization_lower, r.utilization_upper, r.governing_check);
     }
 }
+
+#[test]
+fn steel_demands_stations_spacing_and_limits_2d_and_3d() {
+    let mc2 = building_2d();
+    let out2 = certify_multi_case_2d(&mc2).unwrap();
+    // 2D station limits (kills line 394 mutants)
+    assert!(steel_demands_from_combinations_2d(&out2, MAX_DEMAND_STATIONS + 1).is_err());
+    assert!(steel_demands_from_combinations_2d(&out2, MAX_DEMAND_STATIONS).is_ok());
+    // 2D station spacing at stations = 3 (kills line 411 mutants: / -> %, - -> +, - -> /)
+    let d3_2d = steel_demands_from_combinations_2d(&out2, 3).unwrap();
+    assert!(!d3_2d.is_empty());
+    let non_zero_elem = d3_2d.chunks(3).find(|chunk| {
+        let m0 = chunk[0].forces.my;
+        let m1 = chunk[1].forces.my;
+        let m2 = chunk[2].forces.my;
+        (m1 - m0).abs() > 1e-3 && (m1 - m2).abs() > 1e-3
+    });
+    assert!(non_zero_elem.is_some(), "Expected varying moment across stations 0, 1, 2");
+
+    let mc3 = building_3d();
+    let out3 = certify_multi_case_3d(&mc3).unwrap();
+    // 3D station limits (kills line 433 mutants)
+    assert!(steel_demands_from_combinations_3d(&out3, MAX_DEMAND_STATIONS + 1).is_err());
+    assert!(steel_demands_from_combinations_3d(&out3, MAX_DEMAND_STATIONS).is_ok());
+    // 3D station spacing at stations = 3 (kills line 449 mutants: / -> %, / -> *, - -> +, - -> /)
+    let d3_3d = steel_demands_from_combinations_3d(&out3, 3).unwrap();
+    assert!(!d3_3d.is_empty());
+    let non_zero_elem_3d = d3_3d.chunks(3).find(|chunk| {
+        let m0 = chunk[0].forces.my;
+        let m1 = chunk[1].forces.my;
+        let m2 = chunk[2].forces.my;
+        (m1 - m0).abs() > 1e-3 && (m1 - m2).abs() > 1e-3
+    });
+    assert!(non_zero_elem_3d.is_some(), "Expected varying 3D moment across stations 0, 1, 2");
+}
