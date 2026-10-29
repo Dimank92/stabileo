@@ -374,3 +374,88 @@ pub fn engine_assemblies_3d(input: &SolverInput3D, loads: &[SolverLoad3D]) -> Re
         }
     }])
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::certify::reassembly::ia::inp;
+    use crate::certify::reassembly::system::Kinematics;
+
+    #[test]
+    fn test_end_to_end_abs_bound() {
+        let certified = EndToEnd::Certified {
+            abs_bound: 12.34,
+            rel_bound: 0.05,
+            mu: 1.0,
+            residual_norm: 1e-6,
+            k_discrepancy: 1e-10,
+            f_discrepancy: 1e-10,
+            excluded_dofs: vec![],
+        };
+        assert_eq!(certified.abs_bound(), Some(12.34));
+        assert!(certified.is_certified());
+
+        let out_of_scope = EndToEnd::OutOfScope { reason: "test".into() };
+        assert_eq!(out_of_scope.abs_bound(), None);
+        assert!(!out_of_scope.is_certified());
+
+        let failed = EndToEnd::Failed { reason: "test".into() };
+        assert_eq!(failed.abs_bound(), None);
+        assert!(!failed.is_certified());
+
+        let uncertified = EndToEnd::Uncertified { reason: "test".into() };
+        assert_eq!(uncertified.abs_bound(), None);
+        assert!(!uncertified.is_certified());
+
+        let not_checked = EndToEnd::NotChecked;
+        assert_eq!(not_checked.abs_bound(), None);
+        assert!(!not_checked.is_certified());
+    }
+
+    #[test]
+    fn test_dense_cap() {
+        assert_eq!(DENSE_AGREEMENT_MAX, 4 * crate::certify::linear::MAX_CERTIFY_N);
+        assert!(DENSE_AGREEMENT_MAX > 4 + crate::certify::linear::MAX_CERTIFY_N);
+
+        assert!(dense_cap(DENSE_AGREEMENT_MAX).is_ok());
+        assert!(dense_cap(DENSE_AGREEMENT_MAX + 1).is_err());
+        assert!(dense_cap(DENSE_AGREEMENT_MAX + 2).is_err());
+    }
+
+    #[test]
+    fn test_finish_unrestrained_load_fails() {
+        // Model with 1 node, 1 DOF, unstiffened with a load
+        let mut m = Model::new(&[1], 1);
+        let kin = Kinematics::new(m.n());
+        kin.build(&mut m).unwrap();
+        m.add_f(0, inp(10.0));
+
+        let res = finish(Ok(m), |_| Ok(vec![0.0]), || Ok(vec![]));
+        match res {
+            EndToEnd::Failed { reason } => {
+                assert!(reason.starts_with("a load acts on"), "{reason}");
+            }
+            other => panic!("expected EndToEnd::Failed, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_finish_kinematic_mismatch_tolerance() {
+        // Fixed support on DOF 0, but solver returned displacement violates it
+        let mut m = Model::new(&[1], 1);
+        let mut kin = Kinematics::new(m.n());
+        kin.fix(0, crate::certify::reassembly::ia::I::ZERO);
+        kin.build(&mut m).unwrap();
+
+        // Displacement u = [1e-3]: mismatch is 1e-3, u_norm is 1e-3.
+        // KINEMATIC_TOL * u_norm = 1e-9 * 1e-3 = 1e-12 < 1e-3 -> must Fail
+        let res = finish(Ok(m), |_| Ok(vec![1e-3]), || Ok(vec![]));
+        match res {
+            EndToEnd::Failed { reason } => {
+                assert!(reason.contains("violate the model's supports"), "{reason}");
+            }
+            other => panic!("expected EndToEnd::Failed, got {other:?}"),
+        }
+    }
+}

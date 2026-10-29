@@ -830,3 +830,141 @@ pub fn agreement(model: &Model, eng: &EngineAssembly) -> Result<Agreement, Strin
     }
     Ok(out)
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::certify::reassembly::ia::{c, I};
+
+    #[test]
+    fn test_agreement_exact_and_discrepancies() {
+        let mut model = Model::new(&[1, 2], 1);
+        model.k[0].insert(0, Entry { v: c(10.0), scale: 10.0 });
+        model.k[1].insert(1, Entry { v: c(40.0), scale: 40.0 });
+        model.f[0] = Some(Entry { v: c(5.0), scale: 5.0 });
+        model.f[1] = Some(Entry { v: c(8.0), scale: 8.0 });
+
+        let mut map = HashMap::new();
+        map.insert((1, 0), 0);
+        map.insert((2, 0), 1);
+
+        // 1. Exact agreement
+        let mut k_eng = HashMap::new();
+        k_eng.insert((0, 0), 10.0);
+        k_eng.insert((1, 1), 40.0);
+        let eng_exact = EngineAssembly {
+            map: map.clone(),
+            k: k_eng.clone(),
+            f: vec![5.0, 8.0],
+            rotations: vec![],
+        };
+        let agr = agreement(&model, &eng_exact).unwrap();
+        assert_eq!(agr.k_rel, 0.0);
+        assert_eq!(agr.f_rel, 0.0);
+
+        // 2. ev below refv for K: ev = 8.0 < 10.0 => dist = 10.0 - 8.0 = 2.0, sc = 10.0 => rel = 0.2
+        let mut k_below = k_eng.clone();
+        k_below.insert((0, 0), 8.0);
+        let eng_k_below = EngineAssembly {
+            map: map.clone(),
+            k: k_below,
+            f: vec![5.0, 8.0],
+            rotations: vec![],
+        };
+        let agr_k_below = agreement(&model, &eng_k_below).unwrap();
+        assert!((agr_k_below.k_rel - 0.2).abs() < 1e-12);
+
+        // 3. ev above refv for K: ev = 13.0 > 10.0 => dist = 13.0 - 10.0 = 3.0, sc = 10.0 => rel = 0.3
+        let mut k_above = k_eng.clone();
+        k_above.insert((0, 0), 13.0);
+        let eng_k_above = EngineAssembly {
+            map: map.clone(),
+            k: k_above,
+            f: vec![5.0, 8.0],
+            rotations: vec![],
+        };
+        let agr_k_above = agreement(&model, &eng_k_above).unwrap();
+        assert!((agr_k_above.k_rel - 0.3).abs() < 1e-12);
+
+        // 4. Off-diagonal coupling with scale from diag_scale:
+        // diag_scale[0] = 10.0, diag_scale[1] = 40.0 => sqrt(10 * 40) = sqrt(400) = 20.0
+        // ev(0, 1) = 4.0, refv = 0.0 => dist = 4.0, sc = 20.0 => rel = 4.0 / 20.0 = 0.2
+        let mut k_off = k_eng.clone();
+        k_off.insert((0, 1), 4.0);
+        k_off.insert((1, 0), 4.0);
+        let eng_k_off = EngineAssembly {
+            map: map.clone(),
+            k: k_off,
+            f: vec![5.0, 8.0],
+            rotations: vec![],
+        };
+        let agr_k_off = agreement(&model, &eng_k_off).unwrap();
+        assert!((agr_k_off.k_rel - 0.2).abs() < 1e-12);
+
+        // 5. ev below refv for f: ev = 3.0 < 5.0 => dist = 5.0 - 3.0 = 2.0, sc = 5.0 => rel = 0.4
+        let eng_f_below = EngineAssembly {
+            map: map.clone(),
+            k: k_eng.clone(),
+            f: vec![3.0, 8.0],
+            rotations: vec![],
+        };
+        let agr_f_below = agreement(&model, &eng_f_below).unwrap();
+        assert!((agr_f_below.f_rel - 0.4).abs() < 1e-12);
+
+        // 6. ev above refv for f: ev = 7.0 > 5.0 => dist = 7.0 - 5.0 = 2.0, sc = 5.0 => rel = 0.4
+        let eng_f_above = EngineAssembly {
+            map: map.clone(),
+            k: k_eng.clone(),
+            f: vec![7.0, 8.0],
+            rotations: vec![],
+        };
+        let agr_f_above = agreement(&model, &eng_f_above).unwrap();
+        assert!((agr_f_above.f_rel - 0.4).abs() < 1e-12);
+
+        // 7. Non-finite values return Err
+        let mut k_nan = k_eng.clone();
+        k_nan.insert((0, 0), f64::NAN);
+        let eng_nan_k = EngineAssembly { map: map.clone(), k: k_nan, f: vec![5.0, 8.0], rotations: vec![] };
+        assert!(agreement(&model, &eng_nan_k).is_err());
+
+        let eng_inf_f = EngineAssembly { map: map.clone(), k: k_eng.clone(), f: vec![f64::INFINITY, 8.0], rotations: vec![] };
+        assert!(agreement(&model, &eng_inf_f).is_err());
+    }
+
+    #[test]
+    fn test_certify_bounds_and_parameters() {
+        // Model with 1 node, 1 DOF, fixed with zero parameters (m == 0)
+        let mut m0 = Model::new(&[1], 1);
+        let mut kin0 = Kinematics::new(m0.n());
+        kin0.fix(0, I::ZERO);
+        kin0.build(&mut m0).unwrap();
+
+        // 1. Solution with zero mismatch and zero unorm
+        let b0 = certify(&m0, &[0.0]).unwrap();
+        assert_eq!(b0.n_params, 0);
+        assert_eq!(b0.mu, 0.0);
+        assert!(b0.abs_bound < 1e-150);
+        assert!(b0.rel_bound < 1e-150 || b0.rel_bound == 0.0 || b0.rel_bound.is_infinite());
+
+        // 2. Solution with unorm == 0.0 but non-zero abs_bound (e.g. fixed support at 1.0, u = 0.0)
+        let mut m_pres = Model::new(&[1], 1);
+        let mut kin_pres = Kinematics::new(m_pres.n());
+        kin_pres.fix(0, c(1.0));
+        kin_pres.build(&mut m_pres).unwrap();
+        let b_pres = certify(&m_pres, &[0.0]).unwrap();
+        assert!(b_pres.abs_bound > 0.0);
+        assert_eq!(b_pres.u_norm, 0.0);
+        assert_eq!(b_pres.rel_bound, f64::INFINITY);
+
+        // 3. Multi-DOF kinematic mismatch accumulation (d2 = d2 + mg*mg)
+        let mut m2 = Model::new(&[1, 2], 1);
+        let mut kin2 = Kinematics::new(m2.n());
+        kin2.fix(0, I::ZERO);
+        kin2.fix(1, I::ZERO);
+        kin2.build(&mut m2).unwrap();
+        // Displacements [3.0, 4.0]: mismatch is sqrt(3^2 + 4^2) = 5.0
+        let b2 = certify(&m2, &[3.0, 4.0]).unwrap();
+        assert!(b2.mismatch_norm >= 5.0 && b2.mismatch_norm <= 5.0001);
+    }
+}

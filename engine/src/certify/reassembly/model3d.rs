@@ -574,3 +574,253 @@ fn constraints(input: &SolverInput3D, model: &Model, kin: &mut Kinematics, dpn: 
     }
     Ok(())
 }
+
+
+
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_test_input_3d() -> SolverInput3D {
+        let json = r#"{
+          "nodes": {"1": {"id":1,"x":0,"y":0,"z":0}, "2": {"id":2,"x":2,"y":0,"z":0}},
+          "materials": {"1": {"id":1,"e":200000,"nu":0.3}},
+          "sections": {"1": {"id":1,"a":0.01,"iy":0.0001,"iz":0.0001,"j":0.00005}},
+          "elements": {
+            "1": {"id":1,"type":"frame","nodeI":1,"nodeJ":2,"materialId":1,"sectionId":1}
+          },
+          "supports": {},
+          "loads": []
+        }"#;
+        serde_json::from_str(json).unwrap()
+    }
+
+    #[test]
+    fn test_build_out_of_scope_guards() {
+        let input = make_test_input_3d();
+
+        // quad9s
+        let mut inp_quad9 = input.clone();
+        inp_quad9.quad9s.insert("1".into(), serde_json::from_str(r#"{"id":1,"nodes":[1,2,3,4,5,6,7,8,9],"materialId":1,"thickness":0.1}"#).unwrap());
+        assert!(build(&inp_quad9, &[]).is_err());
+
+        // solid_shells
+        let mut inp_solid = input.clone();
+        inp_solid.solid_shells.insert("1".into(), serde_json::from_str(r#"{"id":1,"nodes":[1,2,3,4,5,6,7,8],"materialId":1}"#).unwrap());
+        assert!(build(&inp_solid, &[]).is_err());
+
+        // curved_shells
+        let mut inp_curved = input.clone();
+        inp_curved.curved_shells.insert("1".into(), serde_json::from_str(r#"{"id":1,"nodes":[1,2,3,4],"materialId":1,"thickness":0.1}"#).unwrap());
+        assert!(build(&inp_curved, &[]).is_err());
+    }
+
+    #[test]
+    fn test_build_load_and_section_guards() {
+        let input = make_test_input_3d();
+
+        // Nodal load with bimoment bw != 0 vs bw == 0
+        let ld_bw_nonzero = vec![SolverLoad3D::Nodal(SolverNodalLoad3D {
+            node_id: 1, fx: 0.0, fy: 0.0, fz: 0.0, mx: 0.0, my: 0.0, mz: 0.0, bw: Some(5.0),
+        })];
+        assert!(build(&input, &ld_bw_nonzero).is_err());
+
+        let ld_bw_zero = vec![SolverLoad3D::Nodal(SolverNodalLoad3D {
+            node_id: 1, fx: 0.0, fy: 0.0, fz: 0.0, mx: 0.0, my: 0.0, mz: 0.0, bw: Some(0.0),
+        })];
+        assert!(build(&input, &ld_bw_zero).is_ok());
+
+        // Bimoment load != 0 vs == 0
+        let ld_bm_nonzero = vec![SolverLoad3D::Bimoment(SolverBimomentLoad { node_id: 1, bimoment: 5.0 })];
+        assert!(build(&input, &ld_bm_nonzero).is_err());
+
+        let ld_bm_zero = vec![SolverLoad3D::Bimoment(SolverBimomentLoad { node_id: 1, bimoment: 0.0 })];
+        assert!(build(&input, &ld_bm_zero).is_ok());
+
+        // Frame with warping torsion cw > 0 vs cw == 0
+        let mut inp_cw = input.clone();
+        inp_cw.sections.get_mut("1").unwrap().cw = Some(1e-6);
+        assert!(build(&inp_cw, &[]).is_err());
+
+        let mut inp_cw_zero = input.clone();
+        inp_cw_zero.sections.get_mut("1").unwrap().cw = Some(0.0);
+        assert!(build(&inp_cw_zero, &[]).is_ok());
+    }
+
+    #[test]
+    fn test_build_truss_transverse_load_needs_axes() {
+        let mut input = make_test_input_3d();
+        input.elements.get_mut("1").unwrap().elem_type = "truss".into();
+
+        // Distributed transverse loads on truss exercise needs_axes
+        for (q_yi, q_yj, q_zi, q_zj) in [
+            (1.0, 0.0, 0.0, 0.0),
+            (0.0, 1.0, 0.0, 0.0),
+            (0.0, 0.0, 1.0, 0.0),
+            (0.0, 0.0, 0.0, 1.0),
+        ] {
+            let lds = vec![SolverLoad3D::Distributed(SolverDistributedLoad3D {
+                element_id: 1, q_xi: 0.0, q_xj: 0.0, q_yi, q_yj, q_zi, q_zj, a: None, b: None,
+            })];
+            assert!(build(&input, &lds).is_ok());
+        }
+
+        // Point transverse loads on truss exercise needs_axes
+        for (py, pz) in [(1.0, 0.0), (0.0, 1.0)] {
+            let lds = vec![SolverLoad3D::PointOnElement(SolverPointLoad3D {
+                element_id: 1, a: 1.0, py, pz,
+            })];
+            assert!(build(&input, &lds).is_ok());
+        }
+    }
+
+    #[test]
+    fn test_build_torsion_release_and_distributed_loads() {
+        let mut input = make_test_input_3d();
+
+        // Torsion releases: only placed when !release_t_start && !release_t_end
+        input.elements.get_mut("1").unwrap().release_t_start = true;
+        let m_rel = build(&input, &[]).unwrap();
+        eprintln!("DEBUG k[3*12+9]: {:?}", m_rel.elems[0].k[3 * 12 + 9]); assert!(m_rel.elems[0].k[3 * 12 + 9].unwrap().mag() < 1e-12);
+
+        // Distributed loads components
+        let inp_frame = make_test_input_3d();
+        for (q_xi, q_xj) in [(10.0, 0.0), (0.0, 10.0)] {
+            let lds = vec![SolverLoad3D::Distributed(SolverDistributedLoad3D {
+                element_id: 1, q_xi, q_xj, q_yi: 0.0, q_yj: 0.0, q_zi: 0.0, q_zj: 0.0, a: None, b: None,
+            })];
+            assert!(build(&inp_frame, &lds).is_ok());
+        }
+        for (q_yi, q_yj) in [(10.0, 0.0), (0.0, 10.0)] {
+            let lds = vec![SolverLoad3D::Distributed(SolverDistributedLoad3D {
+                element_id: 1, q_xi: 0.0, q_xj: 0.0, q_yi, q_yj, q_zi: 0.0, q_zj: 0.0, a: None, b: None,
+            })];
+            assert!(build(&inp_frame, &lds).is_ok());
+        }
+        for (q_zi, q_zj) in [(10.0, 0.0), (0.0, 10.0)] {
+            let lds = vec![SolverLoad3D::Distributed(SolverDistributedLoad3D {
+                element_id: 1, q_xi: 0.0, q_xj: 0.0, q_yi: 0.0, q_yj: 0.0, q_zi, q_zj, a: None, b: None,
+            })];
+            assert!(build(&inp_frame, &lds).is_ok());
+        }
+
+        // Thermal gradients
+        let tl_no_grad = vec![SolverLoad3D::Thermal(SolverThermalLoad3D {
+            element_id: 1, dt_uniform: 20.0, dt_gradient_y: 0.0, dt_gradient_z: 0.0,
+            alpha: None, depth_y: None, depth_z: None,
+        })];
+        let m_th = build(&inp_frame, &tl_no_grad).unwrap();
+        assert!(m_th.f[4].is_none());
+        assert!(m_th.f[5].is_none());
+    }
+
+    #[test]
+    fn test_plain_3d_and_ignored_support_fields() {
+        let sup_plain = SolverSupport3D {
+            node_id: 1,
+            rx: true, ry: true, rz: true, rrx: true, rry: true, rrz: true, rw: None,
+            kx: None, ky: None, kz: None, krx: None, kry: None, krz: None, kw: None,
+            dx: None, dy: None, dz: None, drx: None, dry: None, drz: None,
+            is_inclined: None, normal_x: None, normal_y: None, normal_z: None,
+        };
+        assert!(plain_3d(&sup_plain));
+
+        let mut sup_inc = sup_plain.clone();
+        sup_inc.is_inclined = Some(true);
+        assert!(!plain_3d(&sup_inc));
+
+        let mut sup_rw = sup_plain.clone();
+        sup_rw.rw = Some(true);
+        assert!(!plain_3d(&sup_rw));
+
+        let mut sup_nx = sup_plain.clone();
+        sup_nx.normal_x = Some(1.0);
+        assert!(!plain_3d(&sup_nx));
+
+        let mut sup_kx = sup_plain.clone();
+        sup_kx.kx = Some(10.0);
+        assert!(!plain_3d(&sup_kx));
+
+        // ignored_support_fields_3d
+        let mut sup_inc_dx = sup_plain.clone();
+        sup_inc_dx.is_inclined = Some(true);
+        sup_inc_dx.normal_x = Some(1.0);
+        sup_inc_dx.normal_y = Some(0.0);
+        sup_inc_dx.normal_z = Some(0.0);
+        sup_inc_dx.dx = Some(0.01);
+        assert!(ignored_support_fields_3d(&sup_inc_dx, 6).is_ok());
+
+        let mut sup_free_dx = sup_plain.clone();
+        sup_free_dx.rx = false;
+        sup_free_dx.dx = Some(0.01);
+        assert!(ignored_support_fields_3d(&sup_free_dx, 6).is_err());
+    }
+
+    #[test]
+    fn test_supports_3d_and_inclined_normal() {
+        let input = make_test_input_3d();
+        let mk = || (Model::new(&[1, 2], 6), Kinematics::new(12));
+
+        // Negative spring returns Err
+        let mut inp_neg = input.clone();
+        inp_neg.supports.insert("1".into(), SolverSupport3D {
+            node_id: 1,
+            rx: false, ry: false, rz: false, rrx: false, rry: false, rrz: false, rw: None,
+            kx: Some(-10.0), ky: None, kz: None, krx: None, kry: None, krz: None, kw: None,
+            dx: None, dy: None, dz: None, drx: None, dry: None, drz: None,
+            is_inclined: None, normal_x: None, normal_y: None, normal_z: None,
+        });
+        let (mut m, mut kin) = mk();
+        assert!(supports(&inp_neg, &mut m, &mut kin, 6).is_err());
+
+        // Multiple supports on same node with one non-plain returns Err
+        let mut inp_multi = input.clone();
+        inp_multi.supports.insert("1".into(), SolverSupport3D {
+            node_id: 1,
+            rx: true, ry: true, rz: true, rrx: true, rry: true, rrz: true, rw: None,
+            kx: None, ky: None, kz: None, krx: None, kry: None, krz: None, kw: None,
+            dx: None, dy: None, dz: None, drx: None, dry: None, drz: None,
+            is_inclined: None, normal_x: None, normal_y: None, normal_z: None,
+        });
+        inp_multi.supports.insert("2".into(), SolverSupport3D {
+            node_id: 1,
+            rx: false, ry: false, rz: false, rrx: false, rry: false, rrz: false, rw: None,
+            kx: Some(10.0), ky: None, kz: None, krx: None, kry: None, krz: None, kw: None,
+            dx: None, dy: None, dz: None, drx: None, dry: None, drz: None,
+            is_inclined: None, normal_x: None, normal_y: None, normal_z: None,
+        });
+        let (mut m, mut kin) = mk();
+        assert!(supports(&inp_multi, &mut m, &mut kin, 6).is_err());
+
+        // Inclined support exercises normal normalization (line 448)
+        let mut inp_inc = input.clone();
+        inp_inc.supports.insert("1".into(), SolverSupport3D {
+            node_id: 1,
+            rx: false, ry: false, rz: false, rrx: false, rry: false, rrz: false, rw: None,
+            kx: None, ky: None, kz: None, krx: None, kry: None, krz: None, kw: None,
+            dx: None, dy: None, dz: None, drx: None, dry: None, drz: None,
+            is_inclined: Some(true), normal_x: Some(1.0), normal_y: Some(2.0), normal_z: Some(3.0),
+        });
+        let (mut m, mut kin) = mk();
+        assert!(supports(&inp_inc, &mut m, &mut kin, 6).is_ok());
+    }
+
+    #[test]
+    fn test_local_axes_parallel_reference_fallback() {
+        let xi = [c(0.0), c(0.0), c(0.0)];
+        let xj = [c(2.0), c(0.0), c(0.0)];
+        let el = SolverElement3D {
+            id: 1, elem_type: "frame".into(), node_i: 1, node_j: 2,
+            material_id: 1, section_id: 1, roll_angle: None,
+            local_yx: Some(1.0), local_yy: Some(0.0), local_yz: Some(0.0),
+            release_my_start: false, release_my_end: false,
+            release_mz_start: false, release_mz_end: false,
+            release_t_start: false, release_t_end: false,
+        };
+        let axes = local_axes(&xi, &xj, &el, false);
+        assert!(axes.is_ok());
+    }
+}

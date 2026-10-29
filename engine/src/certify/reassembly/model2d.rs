@@ -475,3 +475,236 @@ pub(super) fn linear_mpc(mpc: &LinearMPCConstraint, model: &Model, kin: &mut Kin
     kin.equation(s, masters);
     Ok(())
 }
+
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_restrained_2d_variants() {
+        assert!(restrained_2d("rollerY", 0));
+        assert!(!restrained_2d("rollerY", 1));
+        assert!(restrained_2d("rollerZ", 0));
+        assert!(!restrained_2d("rollerZ", 1));
+
+        assert!(restrained_2d("guidedY", 0));
+        assert!(!restrained_2d("guidedY", 1));
+        assert!(restrained_2d("guidedY", 2));
+
+        assert!(restrained_2d("guidedZ", 0));
+        assert!(!restrained_2d("guidedZ", 1));
+        assert!(restrained_2d("guidedZ", 2));
+
+        assert!(!restrained_2d("inclinedRoller", 0));
+        assert!(restrained_2d("inclinedRoller", 1));
+        assert!(!restrained_2d("inclinedRoller", 2));
+    }
+
+    #[test]
+    fn test_plain_2d_checks() {
+        let sup_rigid = SolverSupport {
+            id: 1, node_id: 1, support_type: "fixed".into(),
+            kx: None, ky: None, kz: None, dx: None, dz: None, dry: None, angle: None,
+        };
+        assert!(plain_2d(&sup_rigid));
+
+        let mut sup_spring = sup_rigid.clone();
+        sup_spring.support_type = "spring".into();
+        assert!(!plain_2d(&sup_spring));
+
+        let mut sup_with_dx = sup_rigid.clone();
+        sup_with_dx.dx = Some(1e-3);
+        assert!(!plain_2d(&sup_with_dx));
+
+        let mut sup_with_angle = sup_rigid.clone();
+        sup_with_angle.angle = Some(0.5);
+        assert!(!plain_2d(&sup_with_angle));
+    }
+
+    #[test]
+    fn test_ignored_support_fields() {
+        let sup_free = SolverSupport {
+            id: 1, node_id: 1, support_type: "free".into(),
+            kx: None, ky: None, kz: None, dx: Some(1.0), dz: None, dry: None, angle: None,
+        };
+        assert!(ignored_support_fields_2d(&sup_free, 3).is_err());
+
+        let sup_spring = SolverSupport {
+            id: 1, node_id: 1, support_type: "spring".into(),
+            kx: Some(100.0), ky: None, kz: None, dx: Some(1.0), dz: None, dry: None, angle: None,
+        };
+        assert!(ignored_support_fields_2d(&sup_spring, 3).is_err());
+
+        let sup_dry = SolverSupport {
+            id: 1, node_id: 1, support_type: "fixed".into(),
+            kx: None, ky: None, kz: None, dx: None, dz: None, dry: Some(0.1), angle: None,
+        };
+        assert!(ignored_support_fields_2d(&sup_dry, 2).is_err());
+    }
+
+    fn make_test_input() -> SolverInput {
+        SolverInput {
+            nodes: HashMap::from([
+                ("1".into(), SolverNode { id: 1, x: 0.0, z: 0.0 }),
+                ("2".into(), SolverNode { id: 2, x: 1.0, z: 0.0 }),
+            ]),
+            elements: HashMap::new(),
+            sections: HashMap::new(),
+            materials: HashMap::new(),
+            masses: Default::default(),
+            loads: vec![],
+            constraints: vec![],
+            connectors: HashMap::new(),
+            solver_options: None,
+            supports: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn test_supports_and_guards() {
+        let mk_mk = || (Model::new(&[1, 2], 3), Kinematics::new(6));
+
+        // Negative spring
+        let mut neg_sup = make_test_input();
+        neg_sup.supports.insert("1".into(), SolverSupport {
+            id: 1, node_id: 1, support_type: "spring".into(),
+            kx: Some(-10.0), ky: None, kz: None, dx: None, dz: None, dry: None, angle: None,
+        });
+        let (mut m, mut kin) = mk_mk();
+        assert!(supports(&neg_sup, &mut m, &mut kin, 3).is_err());
+
+        // Free support should be accepted
+        let mut free_sup = make_test_input();
+        free_sup.supports.insert("1".into(), SolverSupport {
+            id: 1, node_id: 1, support_type: "free".into(),
+            kx: None, ky: None, kz: None, dx: None, dz: None, dry: None, angle: None,
+        });
+        let (mut m, mut kin) = mk_mk();
+        assert!(supports(&free_sup, &mut m, &mut kin, 3).is_ok());
+
+        // Multiple supports on a single node: if one is non-plain, return Err
+        let mut multi_sup = make_test_input();
+        multi_sup.supports.insert("1".into(), SolverSupport {
+            id: 1, node_id: 1, support_type: "fixed".into(),
+            kx: None, ky: None, kz: None, dx: None, dz: None, dry: None, angle: None,
+        });
+        multi_sup.supports.insert("2".into(), SolverSupport {
+            id: 2, node_id: 1, support_type: "spring".into(),
+            kx: Some(10.0), ky: None, kz: None, dx: None, dz: None, dry: None, angle: None,
+        });
+        let (mut m, mut kin) = mk_mk();
+        assert!(supports(&multi_sup, &mut m, &mut kin, 3).is_err());
+
+        // Unrotated spring with kx == 0.0 vs kx > 0.0
+        let mut zero_spring = make_test_input();
+        zero_spring.supports.insert("1".into(), SolverSupport {
+            id: 1, node_id: 1, support_type: "spring".into(),
+            kx: Some(0.0), ky: Some(0.0), kz: None, dx: None, dz: None, dry: None, angle: None,
+        });
+        let (mut m_zero, mut kin) = mk_mk();
+        supports(&zero_spring, &mut m_zero, &mut kin, 3).unwrap();
+        assert_eq!(m_zero.elems.len(), 0);
+
+        // Rotated spring with angle and kx > 0
+        let mut rot_spring = make_test_input();
+        rot_spring.supports.insert("1".into(), SolverSupport {
+            id: 1, node_id: 1, support_type: "spring".into(),
+            kx: Some(100.0), ky: Some(50.0), kz: None, dx: None, dz: None, dry: None, angle: Some(30.0),
+        });
+        let (mut m_rot, mut kin) = mk_mk();
+        supports(&rot_spring, &mut m_rot, &mut kin, 3).unwrap();
+        assert_eq!(m_rot.elems.len(), 1);
+
+        // Rotated spring with angle != 0 but kx == 0.0 and ky == 0.0: rotated must be false
+        let mut rot_zero = make_test_input();
+        rot_zero.supports.insert("1".into(), SolverSupport {
+            id: 1, node_id: 1, support_type: "spring".into(),
+            kx: Some(0.0), ky: Some(0.0), kz: None, dx: None, dz: None, dry: None, angle: Some(30.0),
+        });
+        let (mut m_rot_zero, mut kin) = mk_mk();
+        supports(&rot_zero, &mut m_rot_zero, &mut kin, 3).unwrap();
+        assert_eq!(m_rot_zero.elems.len(), 0);
+    }
+
+    #[test]
+    fn test_constraints_diaphragm_planes() {
+        let input = make_test_input();
+
+        let mut inp_xz = input.clone();
+        inp_xz.constraints.push(Constraint::Diaphragm(DiaphragmConstraint {
+            master_node: 1, slave_nodes: vec![2], plane: "XZ".into(),
+        }));
+        let (m, mut kin) = (Model::new(&[1, 2], 3), Kinematics::new(6));
+        assert!(constraints(&inp_xz, &m, &mut kin, 3, true).is_ok());
+
+        let mut inp_xy = input.clone();
+        inp_xy.constraints.push(Constraint::Diaphragm(DiaphragmConstraint {
+            master_node: 1, slave_nodes: vec![2], plane: "XY".into(),
+        }));
+        let (m, mut kin) = (Model::new(&[1, 2], 3), Kinematics::new(6));
+        assert!(constraints(&inp_xy, &m, &mut kin, 3, true).is_ok());
+
+        let mut inp_yz = input.clone();
+        inp_yz.constraints.push(Constraint::Diaphragm(DiaphragmConstraint {
+            master_node: 1, slave_nodes: vec![2], plane: "YZ".into(),
+        }));
+        let (m, mut kin) = (Model::new(&[1, 2], 3), Kinematics::new(6));
+        assert!(constraints(&inp_yz, &m, &mut kin, 3, true).is_err());
+
+        let (m_truss, mut kin_truss) = (Model::new(&[1, 2], 2), Kinematics::new(4));
+        assert!(constraints(&inp_xz, &m_truss, &mut kin_truss, 2, false).is_err());
+    }
+
+    #[test]
+    fn test_linear_mpc_guards() {
+        let model = Model::new(&[1, 2], 3);
+        let mut kin = Kinematics::new(model.n());
+        kin.fix(0, crate::certify::reassembly::ia::I::ZERO);
+
+        let mpc_fixed = LinearMPCConstraint {
+            terms: vec![MPCTerm { node_id: 1, dof: 0, coefficient: 1.0 }],
+        };
+        assert!(linear_mpc(&mpc_fixed, &model, &mut kin).is_err());
+
+        let mpc_zero_cf = LinearMPCConstraint {
+            terms: vec![MPCTerm { node_id: 1, dof: 1, coefficient: 0.0 }],
+        };
+        assert!(linear_mpc(&mpc_zero_cf, &model, &mut kin).is_err());
+    }
+
+    #[test]
+    fn test_build_thermal_no_gradient() {
+        let input = SolverInput {
+            nodes: HashMap::from([
+                ("1".into(), SolverNode { id: 1, x: 0.0, z: 0.0 }),
+                ("2".into(), SolverNode { id: 2, x: 2.0, z: 0.0 }),
+            ]),
+            elements: HashMap::from([
+                ("1".into(), SolverElement {
+                    id: 1, elem_type: "frame".into(), node_i: 1, node_j: 2,
+                    material_id: 1, section_id: 1, hinge_start: false, hinge_end: false,
+                }),
+            ]),
+            materials: HashMap::from([("1".into(), SolverMaterial { id: 1, e: 200000.0, nu: 0.3 })]),
+            sections: HashMap::from([("1".into(), SolverSection { id: 1, a: 0.01, iz: 0.0001, as_y: None })]),
+            masses: Default::default(),
+            loads: vec![],
+            supports: HashMap::new(),
+            constraints: vec![],
+            connectors: HashMap::new(),
+            solver_options: None,
+        };
+
+        let loads = vec![
+            SolverLoad::Thermal(SolverThermalLoad {
+                element_id: 1, dt_uniform: 20.0, dt_gradient: 0.0, alpha: None, depth: None,
+            }),
+        ];
+        let m = build(&input, &loads).unwrap();
+        assert!(m.f[2].is_none());
+        assert!(m.f[5].is_none());
+    }
+}

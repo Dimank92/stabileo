@@ -322,4 +322,73 @@ mod tests {
         assert!(close(v, 3.0 / 8.0, 1e-13), "{v:?}");
         assert!(k.get(1, 1).is_none());
     }
+
+    #[test]
+    fn test_condense_boundaries_and_fill_in() {
+        // Zero or non-positive diagonal returns Err
+        let mut k_zero = LMat::zeros(2);
+        k_zero.set(0, 0, I::new(0.0, 1.0)); // krr.lo == 0.0 -> not certainly positive
+        assert!(condense(&mut k_zero, None, 0).is_err());
+
+        let mut k_nan = LMat::zeros(2);
+        k_nan.set(0, 0, I::new(f64::NAN, 1.0));
+        assert!(condense(&mut k_nan, None, 0).is_err());
+
+        // Fill-in when k(i, j) is initially None: becomes -d
+        let mut k = LMat::zeros(3);
+        k.set(0, 1, c(2.0));
+        k.set(1, 0, c(2.0));
+        k.set(1, 1, c(4.0));
+        k.set(1, 2, c(3.0));
+        k.set(2, 1, c(3.0));
+        // k(0, 2) is None. Condensing 1: d = (2/4)*3 = 1.5 => k(0, 2) = -1.5
+        condense(&mut k, None, 1).unwrap();
+        let fill = k.get(0, 2).unwrap();
+        assert!(fill.hi <= -1.5 + 1e-12 && fill.lo >= -1.5 - 1e-12);
+    }
+
+    #[test]
+    fn test_place_axial() {
+        let mut k = LMat::zeros(2);
+        place_axial(&mut k, 0, 1, c(15.0));
+        assert!(k.get(0, 0).unwrap().lo <= 15.0 && 15.0 <= k.get(0, 0).unwrap().hi);
+        assert!(k.get(1, 1).unwrap().lo <= 15.0 && 15.0 <= k.get(1, 1).unwrap().hi);
+        assert!(k.get(0, 1).unwrap().hi <= -15.0);
+        assert!(k.get(1, 0).unwrap().hi <= -15.0);
+    }
+
+    #[test]
+    fn test_point_enl_guards() {
+        let empty_poly: Poly = Vec::new();
+        let shapes: [Poly; 4] = [empty_poly.clone(), empty_poly.clone(), empty_poly.clone(), empty_poly.clone()];
+        // If shapes are empty and load is non-zero, it should not panic and return zero
+        let enl = point_enl(&shapes, &shapes, c(2.0), c(1.0), c(10.0), c(5.0));
+        for v in &enl {
+            assert_eq!(v.lo, 0.0);
+            assert_eq!(v.hi, 0.0);
+        }
+
+        // Test with non-empty shapes but zero forces
+        let (n, psi) = iie_shapes(c(0.0), c(2.0));
+        let enl_zero = point_enl(&n, &psi, c(2.0), c(1.0), I::ZERO, I::ZERO);
+        for v in &enl_zero {
+            assert_eq!(v.lo, 0.0);
+            assert_eq!(v.hi, 0.0);
+        }
+    }
+
+    #[test]
+    fn test_place_bending_and_enl_zero_sign() {
+        let mut k = LMat::zeros(4);
+        let b = [[c(1.0), c(2.0), c(3.0), c(4.0)]; 4];
+        place_bending(&mut k, [0, 1, 2, 3], &b, 0.0);
+        // With s = 0.0, sg = [1, 0, 1, 0]. sg[0]*sg[1] = 0.0. 0.0 < 0.0 is false, so v is +2.0
+        assert_eq!(k.get(0, 1).unwrap().lo, 2.0);
+
+        let mut f = vec![None; 4];
+        let v = [c(10.0), c(20.0), c(30.0), c(40.0)];
+        place_enl(&mut f, [0, 1, 2, 3], &v, 0.0);
+        // With s = 0.0, sg[1] = 0.0. 0.0 < 0.0 is false, so v[1] is +20.0
+        assert_eq!(f[1].unwrap().lo, 20.0);
+    }
 }

@@ -111,7 +111,8 @@ pub fn add3(a: &V3, b: &V3) -> V3 {
 
 /// Euclidean norm (rigorous enclosure).
 pub fn norm3(a: &V3) -> I {
-    (a[0].square() + a[1].square() + a[2].square()).sqrt()
+    let s = a[0].square() + a[1].square() + a[2].square();
+    I::new(s.lo.max(0.0), s.hi.max(0.0)).sqrt()
 }
 
 /// a / |a|. NaN components when |a| may be 0.
@@ -288,5 +289,68 @@ mod tests {
         assert!(i.lo <= 3.0 && 3.0 <= i.hi);
         let v = peval(&p, c(2.0)); // 17
         assert!(v.lo <= 17.0 && 17.0 <= v.hi);
+    }
+
+    #[test]
+    fn test_certainly_gt_and_lt_boundaries() {
+        // certainly_gt: x.is_finite() && x.lo > t
+        assert!(!certainly_gt(I::new(f64::NAN, 1.0), 0.0));
+        assert!(!certainly_gt(I::new(1.0, 3.0), 1.0));
+        assert!(certainly_gt(I::new(1.0000001, 3.0), 1.0));
+        assert!(!certainly_gt(I::new(0.5, 3.0), 1.0));
+
+        // certainly_lt: x.is_finite() && x.hi < t
+        assert!(!certainly_lt(I::new(f64::NAN, 0.5), 1.0));
+        assert!(!certainly_lt(I::new(0.0, 1.0), 1.0));
+        assert!(certainly_lt(I::new(0.0, 0.9999999), 1.0));
+        assert!(!certainly_lt(I::new(0.0, 2.0), 1.0));
+
+        // decide_gt: !finite => None, lo > t => Some(true), hi <= t => Some(false), straddles => None
+        assert_eq!(decide_gt(I::new(f64::NAN, 1.0), 0.0), None);
+        assert_eq!(decide_gt(I::new(1.0, 2.0), 1.0), None);
+        assert_eq!(decide_gt(I::new(1.0000001, 2.0), 1.0), Some(true));
+        assert_eq!(decide_gt(I::new(0.0, 1.0), 1.0), Some(false));
+        assert_eq!(decide_gt(I::new(0.0, 0.5), 1.0), Some(false));
+    }
+
+    #[test]
+    fn test_neg3() {
+        let v = [c(1.0), c(2.0), c(3.0)];
+        let n = neg3(&v);
+        assert_eq!(n[0].lo, -1.0);
+        assert_eq!(n[0].hi, -1.0);
+        assert_eq!(n[1].lo, -2.0);
+        assert_eq!(n[1].hi, -2.0);
+        assert_eq!(n[2].lo, -3.0);
+        assert_eq!(n[2].hi, -3.0);
+    }
+
+    #[test]
+    fn test_pmul_edge_cases() {
+        let empty: Poly = Vec::new();
+        let one: Poly = vec![c(1.0)];
+        assert!(pmul(&empty, &one).is_empty());
+        assert!(pmul(&one, &empty).is_empty());
+        assert!(pmul(&empty, &empty).is_empty());
+
+        let a = vec![c(1.0), c(2.0)];
+        let b = vec![c(3.0), c(4.0)];
+        let res = pmul(&a, &b);
+        assert_eq!(res.len(), 3);
+        assert!(res[0].lo <= 3.0 && 3.0 <= res[0].hi);
+        assert!(res[1].lo <= 10.0 && 10.0 <= res[1].hi);
+        assert!(res[2].lo <= 8.0 && 8.0 <= res[2].hi);
+    }
+
+    #[test]
+    fn test_sin_cos_boundaries_and_domain() {
+        assert!(sin_cos(I::new(-1.000001e6, 0.0)).is_none());
+        assert!(sin_cos(I::new(0.0, 1.000001e6)).is_none());
+        assert!(sin_cos(I::new(f64::NAN, 0.0)).is_none());
+        assert!(sin_cos(c(1e6)).is_some());
+        assert!(sin_cos(c(-1e6)).is_some());
+
+        let non_finite = I::new(f64::NEG_INFINITY, f64::INFINITY);
+        assert!(sin_cos(non_finite).is_none());
     }
 }

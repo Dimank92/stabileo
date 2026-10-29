@@ -57,4 +57,10 @@ exclude_re = [
     # The dense paths' resource cap (memory and time), not a soundness
     # condition; exercising it needs a dense model past 3000 free DOFs.
     "\\bsize_check\\b",
+    # In place_bending, rotation sign factor s is in {-1.0, 1.0}; for non-zero reals a * b < 0 iff a / b < 0.
+    "replace \\* with / in place_bending",
+    # gkg[1][0] is overwritten by out[1][0] = out[0][1] due to exact symmetry of the bending block.
+    "delete - in bending4",
+    # The remainder intervals rs and rc in sin_cos are symmetric around zero ([-U, U]), so x + r == x - r.
+    "replace \\+ with - in sin_cos",
 ]
