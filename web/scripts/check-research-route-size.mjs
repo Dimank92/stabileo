@@ -1,4 +1,4 @@
-/** Build and compare each route's dependency footprint. Run from web/ with optional --update.
+/** Build and compare each route's dependency footprint. Run from web/ with --baseline <file> and optional --update.
  * Landing: entry's static closure. /app/*: that closure plus App's static and lazy product
  * dependencies. Modes share an entry, so receive the same conservative byte budget.
  */
@@ -6,9 +6,10 @@ import { build } from 'vite';
 import { readFileSync, writeFileSync, mkdtempSync, rmSync, statSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { compareRouteSizes } from './research-route-budget.mjs';
 
-const baselinePath = fileURLToPath(new URL('../../research/route-size-baseline.json', import.meta.url));
+const baselinePath = process.argv[process.argv.indexOf('--baseline') + 1];
+if (!process.argv.includes('--baseline') || !baselinePath) throw new Error('--baseline <file> is required');
 const outDir = mkdtempSync(join(tmpdir(), 'research-route-size-'));
 process.env.GITHUB_SHA = '000000000000';
 delete process.env.VITE_E2E;
@@ -80,12 +81,7 @@ try {
     console.log(`Updated ${baselinePath}; review every increase before accepting it.`);
   } else {
     const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
-    if (JSON.stringify(Object.keys(baseline.routes).sort()) !== JSON.stringify(Object.keys(measured).sort())) throw new Error('route baseline coverage differs');
-    for (const [route, bytes] of Object.entries(measured)) {
-      if (!Number.isFinite(baseline.routes[route]) || bytes > baseline.routes[route] + 128) {
-        throw new Error(`${route} grew: ${baseline.routes[route]} -> ${bytes} bytes (128 byte tolerance)`);
-      }
-    }
+    compareRouteSizes(baseline.routes, measured);
   }
 } finally {
   rmSync(outDir, { recursive: true, force: true });
