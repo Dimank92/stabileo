@@ -177,6 +177,32 @@ jobs:
       - run: nix develop -c research/optimization/andreassen-2011/wasm/build.sh
       - run: nix develop -c make wasm
       - run: nix develop -c sh -c 'cd web && npm ci && npx vitest run src/components/research/andreassen2011/model.test.ts'
+  engine-benchmarks:
+    name: Production engine benchmarks (native and WASM)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a
+      - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39
+      - run: nix develop -c sh -c 'cd web && npm ci'
+      - run: make wasm
+      - name: Compute native results from the engine-owned cases
+        run: MACNEAL_HARDER_RESULTS=/tmp/macneal-native.json nix develop -c cargo test --locked --manifest-path engine/Cargo.toml --test shells macneal_harder::browser_cases
+      - name: Compare the page runner through the production WASM wrapper
+        run: nix develop -c node research/benchmarks/macneal-harder-1985/wasm/check.mjs /tmp/macneal-native.json
+      - name: Test measurement and editor handoff
+        run: nix develop -c sh -c 'cd web && npx vitest run src/components/research/macneal1985/__tests__/cases.test.ts'
+      - name: Mattiasson native regression assertions
+        run: nix develop -c cargo test --locked --release --manifest-path engine/Cargo.toml --test validation corotational_benchmarks
+      - name: Mattiasson fresh production native results
+        run: nix develop -c cargo run --locked --release --manifest-path research/benchmarks/mattiasson-elastica/Cargo.toml -- /tmp/mattiasson-native.json
+      - name: Mattiasson production WASM parity and measurements
+        run: |
+          nix develop -c node research/benchmarks/mattiasson-elastica/wasm/check.mjs /tmp/mattiasson-native.json
+          nix develop -c sh -c 'cd web && npx vitest run src/components/research/mattiasson1981/__tests__/cases.test.ts'
 
   springs:
     name: Spring networks (Grossman 2026) validation

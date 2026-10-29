@@ -13,6 +13,8 @@
   import PublicLink from '../landing/PublicLink.svelte';
   import Gallery from './Gallery.svelte';
   import TopoptPage from './andreassen2011/TopoptPage.svelte';
+  import MattiassonPage from './mattiasson1981/MattiassonPage.svelte';
+  import MacnealPage from './macneal1985/MacnealPage.svelte';
   import ShauerPage from './shauer2025/ShauerPage.svelte';
   import FerrariPage from './ferrari2025/FerrariPage.svelte';
   import FormPage from './pastrana2026/FormPage.svelte';
@@ -33,6 +35,8 @@
         'A curated catalogue of recent computational-mechanics papers, with the ones Stabileo has reproduced, re-implemented and validated against the authors’ code, runnable in the browser.',
     },
     '/research/optimization/andreassen-2011': { title: 'MBB topology optimization — Stabileo Research', description: 'SIMP topology optimization against the authors’ 88-line reference code.' },
+    '/research/benchmarks/mattiasson-elastica': { title: 'Mattiasson elastica — Stabileo engine benchmarks', description: 'Production corotational cantilever with provisional references and explicit failures.' },
+    '/research/benchmarks/macneal-harder-1985': { title: 'MacNeal–Harder (1985) — Stabileo engine benchmarks', description: 'Live production-engine accuracy benchmarks with explicit references, tolerances and failures.' },
     '/research/fracture/shauer-2025': {
       title: 'Phase-field fracture of a notched plate (Shauer 2025) — Stabileo Research',
       description:
@@ -59,7 +63,11 @@
     <Gallery />
   {:else if route === '/research/optimization/andreassen-2011'}
   <TopoptPage />
-{:else if route === '/research/fracture/shauer-2025'}
+  {:else if route === '/research/benchmarks/mattiasson-elastica'}
+    <MattiassonPage />
+  {:else if route === '/research/benchmarks/macneal-harder-1985'}
+    <MacnealPage />
+  {:else if route === '/research/fracture/shauer-2025'}
     <ShauerPage />
   {:else if route === '/research/metamaterials/grossman-2026'}
     <SpringsPage />

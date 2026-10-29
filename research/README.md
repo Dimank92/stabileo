@@ -21,6 +21,8 @@ The plan every page and contribution follows is [DESIGN.md](DESIGN.md).
 | `form-finding/pastrana-2026/` | Four-cable forward FDM, pinned jax_fdm comparison and production truss check |
 | `mechanics/biggins-2026/` | Centered curvature-patterned shallow arches, using production frame buckling modes |
 | `optimisation/fairclough-2026/` | One five-node self-weight gridshell from Table 1, externally executed reference and isolated Rust/Clarabel implementation |
+| `benchmarks/macneal-harder-1985/` | Production engine accuracy cases using the shared benchmark page format |
+| `benchmarks/mattiasson-elastica/` | Production corotational cantilever benchmark with provisional reference transcriptions |
 | `templates/` | Starting point for a new paper entry |
 | `tools/` | Catalog checker and other research-only tooling |
 
@@ -94,3 +96,8 @@ For local comparisons, run `nix develop .. -c node scripts/check-research-route-
 without `--update` from the candidate's `web/`, using the same Nix toolchain for both.
 `node --test web/scripts/research-route-budget.test.mjs` checks unchanged routes, the noise
 allowance, missing measurements and negative cases for real landing/app growth.
+
+The Mattiasson engine benchmark (`benchmarks/mattiasson-elastica`) reads the
+engine-owned `engine/tests/benchmarks/mattiasson_elastica.json` through its native
+adapter and production WASM page. It publishes no research solver or imported
+research results. Reference transcriptions remain unverified and status proposed.

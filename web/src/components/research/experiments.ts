@@ -40,6 +40,20 @@ export const EXPERIMENTS: Experiment[] = [
     code: 'https://github.com/lambdaclass/stabileo/tree/main/research/optimisation/fairclough-2026',
   },
   {
+    paperId: 'mattiasson-elastica', path: '/research/benchmarks/mattiasson-elastica',
+    name: 'Mattiasson: cantilever elastica',
+    hook: 'Trace the production corotational load path and inspect provisional reference comparisons, including failures.',
+    thumbnail: '', thumbnailAlt: '', thumbnailQuery: '',
+    code: 'https://github.com/lambdaclass/stabileo/tree/main/engine/tests/benchmarks',
+  },
+  {
+    paperId: 'macneal-harder-1985', path: '/research/benchmarks/macneal-harder-1985',
+    name: 'MacNeal–Harder: production engine benchmarks',
+    hook: 'Run the production engine on shared accuracy cases; inspect every result, including failures.',
+    thumbnail: '', thumbnailAlt: '', thumbnailQuery: '',
+    code: 'https://github.com/lambdaclass/stabileo/tree/main/engine/tests/benchmarks',
+  },
+  {
     paperId: 'shauer-2025',
     path: '/research/fracture/shauer-2025',
     name: 'Phase-field fracture of a notched plate',
