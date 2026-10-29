@@ -37,12 +37,13 @@ export function createScalarFieldMesh(xy: ArrayLike<number>, cells: ArrayLike<nu
   const nCells = cells.length / cellSize;
   // Per-cell vertices (not shared), so a per-cell value or a hidden cell does not bleed into its
   // neighbours; nodal values are copied to every vertex of the node.
-  const nv = nCells * cellSize;
+  const verticesPerCell = cellSize === 4 ? 5 : 3;
+  const nv = nCells * verticesPerCell;
   const position = new Float32Array(nv * 3);
   const color = new Float32Array(nv * 3);
   const vertexNode = new Uint32Array(nv);
-  for (let c = 0; c < nCells; c++) for (let k = 0; k < cellSize; k++) vertexNode[c * cellSize + k] = cells[c * cellSize + k];
-  const triPerCell = cellSize === 4 ? 2 : 1;
+  for (let c = 0; c < nCells; c++) for (let k = 0; k < cellSize; k++) vertexNode[c * verticesPerCell + k] = cells[c * cellSize + k];
+  const triPerCell = cellSize === 4 ? 4 : 1;
   const index = new Uint32Array(nCells * triPerCell * 3);
 
   const geometry = new THREE.BufferGeometry();
@@ -69,9 +70,10 @@ export function createScalarFieldMesh(xy: ArrayLike<number>, cells: ArrayLike<nu
     let e = 0;
     for (let c = 0; c < nCells; c++) {
       if (hidden?.(c)) continue;
-      const v = c * cellSize;
-      index[t++] = v; index[t++] = v + 1; index[t++] = v + 2;
-      if (cellSize === 4) { index[t++] = v; index[t++] = v + 2; index[t++] = v + 3; }
+      const v = c * verticesPerCell;
+      if (cellSize === 4) {
+        for (let k = 0; k < 4; k++) { index[t++] = v + k; index[t++] = v + ((k + 1) % 4); index[t++] = v + 4; }
+      } else { index[t++] = v; index[t++] = v + 1; index[t++] = v + 2; }
       for (let k = 0; k < cellSize; k++) { edgeIndex[e++] = v + k; edgeIndex[e++] = v + ((k + 1) % cellSize); }
     }
     geometry.setDrawRange(0, t);
@@ -87,7 +89,10 @@ export function createScalarFieldMesh(xy: ArrayLike<number>, cells: ArrayLike<nu
     setField(values, range, opts = {}) {
       const { perCell = false, bands = 0, colourMap = 'shell' } = opts;
       for (let i = 0; i < nv; i++) {
-        const raw = perCell ? values[Math.floor(i / cellSize)] : values[vertexNode[i]];
+        const cell = Math.floor(i / verticesPerCell);
+        const raw = perCell ? values[cell] : i % verticesPerCell === 4
+          ? (values[cells[cell * 4]] + values[cells[cell * 4 + 1]] + values[cells[cell * 4 + 2]] + values[cells[cell * 4 + 3]]) / 4
+          : values[vertexNode[i]];
         const v = Math.min(range.max, Math.max(range.min, raw));
         tmp.setHex(colourFor(colourMap, bands > 0 ? bandValue(v, range.min, range.max, bands) : v, range.min, range.max));
         color[3 * i] = tmp.r; color[3 * i + 1] = tmp.g; color[3 * i + 2] = tmp.b;
@@ -100,6 +105,12 @@ export function createScalarFieldMesh(xy: ArrayLike<number>, cells: ArrayLike<nu
         position[3 * i] = xy[2 * n] + (u ? scale * u[2 * n] : 0);
         position[3 * i + 1] = xy[2 * n + 1] + (u ? scale * u[2 * n + 1] : 0);
         position[3 * i + 2] = 0;
+      }
+      if (cellSize === 4) for (let c = 0; c < nCells; c++) {
+        const v = c * verticesPerCell;
+        for (let axis = 0; axis < 3; axis++) {
+          position[3 * (v + 4) + axis] = (position[3 * v + axis] + position[3 * (v + 1) + axis] + position[3 * (v + 2) + axis] + position[3 * (v + 3) + axis]) / 4;
+        }
       }
       geometry.getAttribute('position').needsUpdate = true;
       edgeGeometry.getAttribute('position').needsUpdate = true;
