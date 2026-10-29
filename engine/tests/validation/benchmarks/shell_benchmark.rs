@@ -98,63 +98,34 @@ fn scordelis_lo_solve(nx: usize, ntheta: usize) -> f64 {
     let mut supports = HashMap::new();
     let mut sid = 1;
 
-    // x = 0: symmetry — restrain ux, rry
-    for j in 0..=ntheta {
-        let nid = node_grid[0][j];
-        supports.insert(sid.to_string(), sup3d(nid, true, false, false, false, true, false));
-        sid += 1;
-    }
-
-    // x = half_L: rigid diaphragm — restrain uy, uz
-    for j in 0..=ntheta {
-        let nid = node_grid[nx][j];
-        supports.insert(sid.to_string(), sup3d(nid, false, true, true, false, false, false));
-        sid += 1;
-    }
-
-    // theta = 0 (crown): symmetry — restrain uy, rrx
-    for i in 0..=nx {
-        let nid = node_grid[i][0];
-        if !supports.values().any(|s| s.node_id == nid) {
-            supports.insert(sid.to_string(), sup3d(nid, false, true, false, true, false, false));
-            sid += 1;
-        }
-    }
-
-    // Pin corner for rigid body stability
-    let corner = node_grid[0][0];
-    if let Some(s) = supports.values_mut().find(|s| s.node_id == corner) {
-        s.ry = true;
-        s.rz = true;
-    }
-
-    // Equivalent nodal gravity loads
-    let dx_len = half_l / nx as f64;
-    let dtheta = theta_rad / ntheta as f64;
-
-    let mut loads = Vec::new();
     for i in 0..=nx {
         for j in 0..=ntheta {
-            let on_x_edge = i == 0 || i == nx;
-            let on_t_edge = j == 0 || j == ntheta;
-            let factor = match (on_x_edge, on_t_edge) {
-                (true, true)   => 0.25,
-                (true, false) | (false, true) => 0.5,
-                (false, false) => 1.0,
-            };
-            let trib_area = dx_len * r * dtheta;
-            let fz = -gravity_per_area * trib_area * factor;
+            let mut f = [false; 6];
+            // x = 0 (midspan symmetry): restrain ux, rry, rrz
+            if i == 0 { f[0] = true; f[4] = true; f[5] = true; }
+            // x = half_L (rigid diaphragm): restrain uy, uz
+            if i == nx { f[1] = true; f[2] = true; }
+            // theta = 0 (crown symmetry): restrain uy, rrx, rrz
+            if j == 0 { f[1] = true; f[3] = true; f[5] = true; }
 
-            let nid = node_grid[i][j];
-            let is_rz_restrained = supports.values().any(|s| s.node_id == nid && s.rz);
-            if !is_rz_restrained {
-                loads.push(SolverLoad3D::Nodal(SolverNodalLoad3D {
-                    node_id: nid,
-                    fx: 0.0, fy: 0.0, fz,
-                    mx: 0.0, my: 0.0, mz: 0.0, bw: None,
-                }));
+            if f.iter().any(|&b| b) {
+                let nid = node_grid[i][j];
+                supports.insert(sid.to_string(), sup3d(nid, f[0], f[1], f[2], f[3], f[4], f[5]));
+                sid += 1;
             }
         }
+    }
+
+    let rho = 1000.0 / t;
+    let mut loads = Vec::new();
+    for q in 1..qid {
+        loads.push(SolverLoad3D::QuadSelfWeight(SolverQuadSelfWeightLoad {
+            element_id: q,
+            density: rho,
+            gx: 0.0,
+            gy: 0.0,
+            gz: -gravity_per_area,
+        }));
     }
 
     let input = SolverInput3D {
@@ -3118,35 +3089,23 @@ fn pinched_cylinder_solve(nx: usize, ntheta: usize) -> f64 {
     let mut supports = HashMap::new();
     let mut sid = 1;
 
-    // x = 0 (midspan): symmetry — restrain ux, rry, rrz
-    for j in 0..=ntheta {
-        let n = node_grid[0][j];
-        supports.insert(sid.to_string(), sup3d(n, true, false, false, false, true, true));
-        sid += 1;
-    }
-
-    // x = half_L (end diaphragm): restrain uy, uz (radial directions)
-    for j in 0..=ntheta {
-        let n = node_grid[nx][j];
-        supports.insert(sid.to_string(), sup3d(n, false, true, true, false, false, false));
-        sid += 1;
-    }
-
-    // theta = 0 (y-axis, top): symmetry — restrain uz, rrx
     for i in 0..=nx {
-        let n = node_grid[i][0];
-        if !supports.values().any(|s| s.node_id == n) {
-            supports.insert(sid.to_string(), sup3d(n, false, false, true, true, false, false));
-            sid += 1;
-        }
-    }
+        for j in 0..=ntheta {
+            let mut f = [false; 6];
+            // x = 0 (midspan symmetry): restrain ux, rry, rrz
+            if i == 0 { f[0] = true; f[4] = true; f[5] = true; }
+            // x = half_L (rigid diaphragm): restrain uy, uz
+            if i == nx { f[1] = true; f[2] = true; }
+            // theta = 0 (top symmetry, normal = z): restrain uz, rrx, rry
+            if j == 0 { f[2] = true; f[3] = true; f[4] = true; }
+            // theta = pi/2 (side symmetry, normal = y): restrain uy, rrx, rrz
+            if j == ntheta { f[1] = true; f[3] = true; f[5] = true; }
 
-    // theta = π/2 (z-axis, side): symmetry — restrain uy, rrx
-    for i in 0..=nx {
-        let n = node_grid[i][ntheta];
-        if !supports.values().any(|s| s.node_id == n) {
-            supports.insert(sid.to_string(), sup3d(n, false, true, false, true, false, false));
-            sid += 1;
+            if f.iter().any(|&b| b) {
+                let n = node_grid[i][j];
+                supports.insert(sid.to_string(), sup3d(n, f[0], f[1], f[2], f[3], f[4], f[5]));
+                sid += 1;
+            }
         }
     }
 
@@ -7220,63 +7179,34 @@ fn curved_shell_scordelis_lo_solve(nx: usize, ntheta: usize) -> f64 {
     let mut supports = HashMap::new();
     let mut sid = 1;
 
-    // x = 0: symmetry — restrain ux, rry
-    for j in 0..=ntheta {
-        let nid = node_grid[0][j];
-        supports.insert(sid.to_string(), sup3d(nid, true, false, false, false, true, false));
-        sid += 1;
-    }
-
-    // x = half_L: rigid diaphragm — restrain uy, uz
-    for j in 0..=ntheta {
-        let nid = node_grid[nx][j];
-        supports.insert(sid.to_string(), sup3d(nid, false, true, true, false, false, false));
-        sid += 1;
-    }
-
-    // theta = 0 (crown): symmetry — restrain uy, rrx
-    for i in 0..=nx {
-        let nid = node_grid[i][0];
-        if !supports.values().any(|s| s.node_id == nid) {
-            supports.insert(sid.to_string(), sup3d(nid, false, true, false, true, false, false));
-            sid += 1;
-        }
-    }
-
-    // Pin corner for rigid body stability
-    let corner = node_grid[0][0];
-    if let Some(s) = supports.values_mut().find(|s| s.node_id == corner) {
-        s.ry = true;
-        s.rz = true;
-    }
-
-    // Equivalent nodal gravity loads
-    let dx_len = half_l / nx as f64;
-    let dtheta = theta_rad / ntheta as f64;
-
-    let mut loads = Vec::new();
     for i in 0..=nx {
         for j in 0..=ntheta {
-            let on_x_edge = i == 0 || i == nx;
-            let on_t_edge = j == 0 || j == ntheta;
-            let factor = match (on_x_edge, on_t_edge) {
-                (true, true)   => 0.25,
-                (true, false) | (false, true) => 0.5,
-                (false, false) => 1.0,
-            };
-            let trib_area = dx_len * r * dtheta;
-            let fz = -gravity_per_area * trib_area * factor;
+            let mut f = [false; 6];
+            // x = 0 (midspan symmetry): restrain ux, rry, rrz
+            if i == 0 { f[0] = true; f[4] = true; f[5] = true; }
+            // x = half_L (rigid diaphragm): restrain uy, uz
+            if i == nx { f[1] = true; f[2] = true; }
+            // theta = 0 (crown symmetry): restrain uy, rrx, rrz
+            if j == 0 { f[1] = true; f[3] = true; f[5] = true; }
 
-            let nid = node_grid[i][j];
-            let is_rz_restrained = supports.values().any(|s| s.node_id == nid && s.rz);
-            if !is_rz_restrained {
-                loads.push(SolverLoad3D::Nodal(SolverNodalLoad3D {
-                    node_id: nid,
-                    fx: 0.0, fy: 0.0, fz,
-                    mx: 0.0, my: 0.0, mz: 0.0, bw: None,
-                }));
+            if f.iter().any(|&b| b) {
+                let nid = node_grid[i][j];
+                supports.insert(sid.to_string(), sup3d(nid, f[0], f[1], f[2], f[3], f[4], f[5]));
+                sid += 1;
             }
         }
+    }
+
+    let rho = 1000.0 / t;
+    let mut loads = Vec::new();
+    for q in 1..eid {
+        loads.push(SolverLoad3D::CurvedShellSelfWeight(SolverQuadSelfWeightLoad {
+            element_id: q,
+            density: rho,
+            gx: 0.0,
+            gy: 0.0,
+            gz: -gravity_per_area,
+        }));
     }
 
     let input = SolverInput3D {
