@@ -282,7 +282,8 @@ fn ferrari_roorda_closed_form() {
 // von Mises two-bar truss equilibrium, using the formulation documented in
 // engine/tests/validation/domains/nonlinear/nonlinear_extended.rs; arc-length
 // method reference: M. A. Crisfield, Non-linear Finite Element Analysis of
-// Solids and Structures, Vol. 1, Ch. 9 (exact page citation).
+// Solids and Structures, Vol. 1, Ch. 9 (Wiley, 1991), cited as a general arc-length reference; the exact
+// values below come from the closed-form truss equilibrium, not from the book.
 // P(y)=2EA(1-L/L0)y/L, L²=a²+y². The page uses frame elements; the
 // analytical reference omits bending. Rerun prefixes to recover apex uz,
 // because control_displacement is a different DOF.
