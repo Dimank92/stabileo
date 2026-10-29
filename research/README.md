@@ -16,6 +16,7 @@ The plan every page and contribution follows is [DESIGN.md](DESIGN.md).
 | `papers.yaml` | Curated catalog. Bibliographic fields are checked against Crossref by `tools/catalog.py` |
 | `fracture/shauer-2025/` | Phase-field fracture (AT2), after Shauer (2025), reference code and Rust implementation |
 | `metamaterials/grossman-2026/` | Spring networks after Grossman & Boudaoud (2026): moduli, auxetic foam, honeycomb, against the paper's published values |
+| `stability/ferrari-sigmund-2025/` | Roorda-frame buckling and energy derivatives; Koiter reproduction in progress |
 | `templates/` | Starting point for a new paper entry |
 | `tools/` | Catalog checker and other research-only tooling |
 
@@ -55,12 +56,34 @@ pinned Nix toolchain and the same measurement script. Each installs its own lock
 The main build writes a temporary baseline; the candidate compares against it with a 128-byte
 per-route tolerance. No baseline from this PR is accepted or checked in.
 
+The budget measures a change that touches research code or data shipped to the browser: the JSON and
+CSV files under `research/` (outside `research/tools/`), `web/src/components/research/`,
+`web/public/research-*` and `web/vite.research-viewer.config.ts`, plus every push to main. A product change with none of these
+(a landing section, a nav item) grows the routes on purpose and is reviewed as product; it is not measured.
+
 The script measures uncompressed dependency bytes for `/en/`, `/es/`, `/pt/` and every `/app/*`
 mode. Landing routes count the entry's static closure; app routes also count App's static and
 lazy product dependencies. Explicit lazy research routes are excluded; static research imports
 fail. HTML, bundled JS/CSS, manifest assets and statically referenced public files count once.
 Runtime-generated asset URLs and the engine binary are outside this gate; a fixed engine stub
 makes the measurements independent of locally built WASM.
+
+The catalogue (`research/papers.json`), experiment registry (including thumbnail metadata),
+gallery strings and research translations (`components/research/i18n.ts`) are imported only
+below `ResearchPage.svelte`. Root and App dynamically import `components/research/load-page.ts`,
+which in turn dynamically imports ResearchPage. Keep both boundaries: a direct dynamic import
+of ResearchPage puts Vite's transitive preload filename list into Root/App, so adding a paper
+can grow product bytes even without a static import of the paper's data. The loader has no
+static dependencies; its preload list lives on the research side of the boundary. Shared
+navigation labels (`landing.navResearch`, `blog.tag.research`) remain public and do not grow
+with the catalogue. Prerendering still opens every research URL and waits for its rendered page.
+
+The route-size gate also checks Rollup's module membership: any chunk containing a research
+component, registry, translation module or research JSON is forbidden in the landing's static
+closure and App's product dependency closure. Thus adding an experiment entry cannot add a
+static product import unnoticed, even if the entry is smaller than the byte tolerance. The
+byte comparison additionally catches generated preload metadata growth. Do not move per-paper
+strings into public locale dictionaries or add static imports to the lazy loader.
 
 For local comparisons, run `nix develop .. -c node scripts/check-research-route-size.mjs
 --baseline /tmp/route-main.json --update` from the main build's `web/`, then the same command

@@ -38,7 +38,17 @@
   let research = $state<typeof import('./components/research/ResearchPage.svelte').default | null>(null);
   $effect(() => {
     if (current.kind === 'research' && !research) {
-      void import('./components/research/ResearchPage.svelte').then((m) => (research = m.default));
+      void import('./components/research/load-page')
+        .then((m) => m.loadResearchPage())
+        .then((page) => (research = page));
+    }
+  });
+
+  /** The paper, with KaTeX, is its own chunk too. */
+  let paper = $state<typeof import('./components/paper/PaperPage.svelte').default | null>(null);
+  $effect(() => {
+    if (current.kind === 'paper' && !paper) {
+      void import('./components/paper/PaperPage.svelte').then((m) => (paper = m.default));
     }
   });
 
@@ -101,6 +111,11 @@
   {#if research}
     {@const Research = research}
     <Research path={current.path} />
+  {/if}
+{:else if current.kind === 'paper'}
+  {#if paper}
+    {@const Paper = paper}
+    <Paper />
   {/if}
 {:else if current.kind === 'landing'}
   <LandingPage />
