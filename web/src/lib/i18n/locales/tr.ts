@@ -1,6 +1,23 @@
 import type { Translations } from '../types';
 
 const tr: Translations = {
+  // ─── Shared scalar-field viewer ───
+  'scalarViewer.view': 'Görünüm',
+  'scalarViewer.viewOptions': 'Görünüm seçenekleri',
+  'scalarViewer.close': 'Kapat',
+  'scalarViewer.fit': 'Tümünü sığdır',
+  'scalarViewer.plan': '2B (plan, yörünge kilitli)',
+  'scalarViewer.orbit': '3B (yörünge)',
+  'scalarViewer.switchProjection': 'Plan görünümü ile 3B yörünge arasında geçiş yap',
+  'scalarViewer.viewer': 'Stabileo görüntüleyicisi',
+  'scalarViewer.position': 'konum:',
+  'scalarViewer.zoom': 'yakınlaştırma:',
+  'scalarViewer.model': 'model:',
+  'scalarViewer.bars': '{nodes} düğüm, {cells} çubuk',
+  'scalarViewer.elements': '{nodes} düğüm, {cells} eleman',
+  'scalarViewer.openEditor': 'Düzenleyicide aç',
+  'scalarViewer.soon': ' (yakında)',
+  'scalarViewer.editorNote': 'Deneyleri düzenleyicide açma, araştırma moduyla gelecek',
   // ─── Auth / Login ───
   'account.signIn': 'Oturum aç',
   'account.register': 'Hesap oluştur',
@@ -216,6 +233,7 @@ const tr: Translations = {
   'landing.navEducation': 'Eğitim',
   'landing.navPricing': 'Fiyatlandırma',
   'landing.navBlog': 'Blog',
+  'landing.navResearch': 'Araştırma',
   'landing.ebHero': 'ÜCRETSİZ VE AÇIK · YAPI ANALİZİ',
   'landing.heroH': 'Yapı analizi, bir tarayıcı sekmesinde.',
   'landing.heroP': 'Açık bir yapı analizi platformu. Çözücü kendi bilgisayarınızda çalışır: kurulacak bir şey yok, lisans yok.',

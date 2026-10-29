@@ -1,4 +1,22 @@
 const en: Record<string, string> = {
+  // Shared scalar-field viewer
+  "scalarViewer.view": "View",
+  "scalarViewer.viewOptions": "View options",
+  "scalarViewer.close": "Close",
+  "scalarViewer.fit": "Zoom to extents",
+  "scalarViewer.plan": "2D (plan, orbit locked)",
+  "scalarViewer.orbit": "3D (orbit)",
+  "scalarViewer.switchProjection": "Switch between the plan view and orbiting in 3D",
+  "scalarViewer.viewer": "Stabileo viewer",
+  "scalarViewer.position": "pos:",
+  "scalarViewer.zoom": "zoom:",
+  "scalarViewer.model": "model:",
+  "scalarViewer.bars": "{nodes} nodes, {cells} bars",
+  "scalarViewer.elements": "{nodes} nodes, {cells} elements",
+  "scalarViewer.openEditor": "Open in the editor",
+  "scalarViewer.soon": " (soon)",
+  "scalarViewer.editorNote": "Opening experiments in the editor comes with research mode",
+
   // ─── Auth / Login ───
   'account.signIn': 'Sign in',
   'account.register': 'Create account',
@@ -215,6 +233,7 @@ const en: Record<string, string> = {
   'landing.navEducation': 'Education',
   'landing.navPricing': 'Pricing',
   'landing.navBlog': 'Blog',
+  'landing.navResearch': 'Research',
   'landing.ebHero': 'FREE AND OPEN · STRUCTURAL ANALYSIS',
   'landing.heroH': 'Structural analysis, in a browser tab.',
   'landing.heroP': 'An open structural-analysis platform. The solver runs on your own machine: nothing to install, no licences.',

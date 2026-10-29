@@ -1,4 +1,22 @@
 const es: Record<string, string> = {
+  // Shared scalar-field viewer
+  "scalarViewer.view": "Vista",
+  "scalarViewer.viewOptions": "Opciones de vista",
+  "scalarViewer.close": "Cerrar",
+  "scalarViewer.fit": "Ajustar a la extensión",
+  "scalarViewer.plan": "2D (planta, órbita bloqueada)",
+  "scalarViewer.orbit": "3D (órbita)",
+  "scalarViewer.switchProjection": "Alternar entre la vista en planta y la órbita en 3D",
+  "scalarViewer.viewer": "Visor de Stabileo",
+  "scalarViewer.position": "pos:",
+  "scalarViewer.zoom": "zoom:",
+  "scalarViewer.model": "modelo:",
+  "scalarViewer.bars": "{nodes} nodos, {cells} barras",
+  "scalarViewer.elements": "{nodes} nodos, {cells} elementos",
+  "scalarViewer.openEditor": "Abrir en el editor",
+  "scalarViewer.soon": " (próximamente)",
+  "scalarViewer.editorNote": "La apertura de experimentos en el editor llega con el modo investigación",
+
   // ─── Auth / Login ───
   'account.signIn': 'Iniciar sesión',
   'account.register': 'Crear cuenta',
@@ -215,6 +233,7 @@ const es: Record<string, string> = {
   'landing.navEducation': 'Educativo',
   'landing.navPricing': 'Precios',
   'landing.navBlog': 'Blog',
+  'landing.navResearch': 'Investigación',
   'landing.ebHero': 'LIBRE Y ABIERTO · CÁLCULO ESTRUCTURAL',
   'landing.heroH': 'Cálculo estructural, en una pestaña del navegador.',
   'landing.heroP': 'Una plataforma abierta de análisis estructural. El solver corre en tu máquina: sin instalar nada y sin licencias.',

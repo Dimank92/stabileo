@@ -1,6 +1,23 @@
 import type { Translations } from '../types';
 
 const fr: Translations = {
+  // ─── Shared scalar-field viewer ───
+  'scalarViewer.view': 'Vue',
+  'scalarViewer.viewOptions': 'Options d’affichage',
+  'scalarViewer.close': 'Fermer',
+  'scalarViewer.fit': 'Ajuster à l’étendue',
+  'scalarViewer.plan': '2D (plan, orbite verrouillée)',
+  'scalarViewer.orbit': '3D (orbite)',
+  'scalarViewer.switchProjection': 'Basculer entre la vue en plan et l’orbite en 3D',
+  'scalarViewer.viewer': 'Visionneuse Stabileo',
+  'scalarViewer.position': 'pos. :',
+  'scalarViewer.zoom': 'zoom :',
+  'scalarViewer.model': 'modèle :',
+  'scalarViewer.bars': '{nodes} nœuds, {cells} barres',
+  'scalarViewer.elements': '{nodes} nœuds, {cells} éléments',
+  'scalarViewer.openEditor': 'Ouvrir dans l’éditeur',
+  'scalarViewer.soon': ' (bientôt)',
+  'scalarViewer.editorNote': 'L’ouverture des expériences dans l’éditeur arrive avec le mode recherche',
   // ─── Auth / Login ───
   'account.signIn': 'Se connecter',
   'account.register': 'Créer un compte',
@@ -216,6 +233,7 @@ const fr: Translations = {
   'landing.navEducation': 'Enseignement',
   'landing.navPricing': 'Tarifs',
   'landing.navBlog': 'Blog',
+  'landing.navResearch': 'Recherche',
   'landing.ebHero': 'LIBRE ET OUVERT · CALCUL DE STRUCTURES',
   'landing.heroH': 'Le calcul de structures, dans un onglet du navigateur.',
   'landing.heroP': 'Une plateforme ouverte de calcul de structures. Le solveur s\'exécute sur votre propre machine : rien à installer, aucune licence.',

@@ -1,0 +1,142 @@
+name: Research
+
+on:
+  workflow_call:
+  push:
+    branches: [main]
+    paths:
+      - 'research/**'
+      - '.github/workflows/research.yml'
+      - 'engine/**'
+      - 'web/**'
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+      - 'flake.*'
+      - 'rust-toolchain*'
+      - 'Makefile'
+  pull_request:
+    paths:
+      - 'research/**'
+      - '.github/workflows/research.yml'
+      - 'engine/**'
+      - 'web/**'
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+      - 'flake.*'
+      - 'rust-toolchain*'
+      - 'Makefile'
+  schedule:
+    - cron: '17 6 * * 1'
+
+concurrency:
+  group: ${{ github.workflow }}-research-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  isolation:
+    name: Research isolation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: research/tools/check_isolation.sh
+      - run: python3 -I research/tools/test_check_isolation.py
+      - name: Research pages draw models only through the shared Stabileo viewer
+        run: research/tools/check_viewer.sh
+      - name: The viewer rule rejects a page with its own canvas
+        run: research/tools/test_check_viewer.sh
+
+  route-size:
+    name: Landing and app route byte budgets
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          path: route-main
+          persist-credentials: false
+      - uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
+      - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
+      - name: Build main and the candidate with the same pinned toolchain and measurement script
+        run: |
+          cp web/scripts/check-research-route-size.mjs web/scripts/research-route-budget.mjs route-main/web/scripts/
+          nix develop . -c sh -c 'cd route-main/web && npm ci && node scripts/check-research-route-size.mjs --baseline /tmp/route-main.json --update'
+          nix develop . -c sh -c 'cd web && npm ci && node --test scripts/research-route-budget.test.mjs scripts/research-cargo-notices.test.mjs && node scripts/check-research-route-size.mjs --baseline /tmp/route-main.json'
+      - run: nix develop . -c node --test research/fracture/shauer-2025/wasm/check.test.mjs
+
+  # Offline: part of the required CI OK (ci.yml calls this workflow), so it never depends on the network.
+  catalog:
+    name: Research catalog
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned checker dependencies
+        run: |
+          python3 -m venv /tmp/catalog-venv
+          /tmp/catalog-venv/bin/pip install --require-hashes -r research/tools/requirements.txt
+      - run: /tmp/catalog-venv/bin/python -I research/tools/test_required_ci.py
+      - name: Checker rejects bad entries
+        run: /tmp/catalog-venv/bin/python -I research/tools/test_catalog.py
+      - name: Every entry, evidence file and summary source is well formed
+        run: /tmp/catalog-venv/bin/python -I research/tools/catalog.py check --offline
+
+  # Online: Crossref, licences and links. Runs only as the standalone Research workflow (its own
+  # pull_request, push and weekly triggers), never inside the required CI OK: an outage at Crossref
+  # must not block unrelated merges.
+  catalog-online:
+    name: Research catalog (Crossref, licenses)
+    if: github.workflow == 'Research'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned checker dependencies
+        run: |
+          python3 -m venv /tmp/catalog-venv
+          /tmp/catalog-venv/bin/pip install --require-hashes -r research/tools/requirements.txt
+      - name: Checker rejects bad entries
+        run: /tmp/catalog-venv/bin/python -I research/tools/test_catalog.py --online
+      - name: Every DOI, title, author list, year, venue and code license matches its source
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: /tmp/catalog-venv/bin/python -I research/tools/catalog.py check --links
+
+  phasefield:
+    name: Phase-field (Shauer 2025) validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: research/fracture/shauer-2025
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Toolchain from rust-toolchain.toml
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Tests, including the validation against the reference outputs
+        run: cargo test --release --locked -- --nocapture
+      - name: Browser configuration limits reject oversized meshes before allocation
+        run: cargo test --locked --manifest-path wasm/Cargo.toml
+      - name: Reference outputs match their manifest
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os
+          m = json.load(open("reference-results/MANIFEST.json"))
+          for name, digest in m["files_sha256"].items():
+              assert hashlib.sha256(open(os.path.join("reference-results", name), "rb").read()).hexdigest() == digest, name
+          extra = set(os.listdir("reference-results")) - set(m["files_sha256"]) - {"MANIFEST.json"}
+          assert not extra, extra
+          print(len(m["files_sha256"]), "reference files match MANIFEST.json")
+          PY

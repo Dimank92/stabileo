@@ -1,6 +1,23 @@
 import type { Translations } from '../types';
 
 const de: Translations = {
+  // ─── Shared scalar-field viewer ───
+  'scalarViewer.view': 'Ansicht',
+  'scalarViewer.viewOptions': 'Ansichtsoptionen',
+  'scalarViewer.close': 'Schließen',
+  'scalarViewer.fit': 'Auf Ausdehnung zoomen',
+  'scalarViewer.plan': '2D (Grundriss, Orbit gesperrt)',
+  'scalarViewer.orbit': '3D (Orbit)',
+  'scalarViewer.switchProjection': 'Zwischen Grundrissansicht und 3D-Orbit wechseln',
+  'scalarViewer.viewer': 'Stabileo-Viewer',
+  'scalarViewer.position': 'Pos.:',
+  'scalarViewer.zoom': 'Zoom:',
+  'scalarViewer.model': 'Modell:',
+  'scalarViewer.bars': '{nodes} Knoten, {cells} Stäbe',
+  'scalarViewer.elements': '{nodes} Knoten, {cells} Elemente',
+  'scalarViewer.openEditor': 'Im Editor öffnen',
+  'scalarViewer.soon': ' (bald)',
+  'scalarViewer.editorNote': 'Das Öffnen von Experimenten im Editor kommt mit dem Forschungsmodus',
   // ─── Auth / Login ───
   'account.signIn': 'Anmelden',
   'account.register': 'Konto erstellen',
@@ -216,6 +233,7 @@ const de: Translations = {
   'landing.navEducation': 'Lehre',
   'landing.navPricing': 'Preise',
   'landing.navBlog': 'Blog',
+  'landing.navResearch': 'Forschung',
   'landing.ebHero': 'KOSTENLOS UND OFFEN · TRAGWERKSBERECHNUNG',
   'landing.heroH': 'Tragwerksberechnung in einem Browser-Tab.',
   'landing.heroP': 'Eine offene Plattform für die Tragwerksberechnung. Der Gleichungslöser läuft auf Ihrem eigenen Rechner: nichts zu installieren, keine Lizenzen.',
