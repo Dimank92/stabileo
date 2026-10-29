@@ -19,6 +19,7 @@ export type Experiment = {
 };
 
 export const EXPERIMENTS: Experiment[] = [
+  { paperId: 'andreassen-2011', path: '/research/optimization/andreassen-2011', name: 'Topology optimization of an MBB beam', hook: 'Redistribute material using SIMP and compare both filters against the authors’ code.', thumbnail: 'research-thumbs/andreassen-2011.svg', thumbnailAlt: 'Material density of the optimized MBB beam', thumbnailQuery: '', code: 'https://github.com/lambdaclass/stabileo/tree/main/research/optimization/andreassen-2011' },
   {
     paperId: 'shauer-2025',
     path: '/research/fracture/shauer-2025',
@@ -48,5 +49,4 @@ export const SHOW_COMING_NEXT = true;
 export type Upcoming = { name: string; field: string; note: string };
 
 export const COMING_NEXT: Upcoming[] = [
-  { name: 'Topology optimization of an MBB beam', field: 'optimization', note: 'SIMP with density filter and optimality criteria, against the 88-line reference results' },
 ];

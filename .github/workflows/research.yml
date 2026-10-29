@@ -160,6 +160,22 @@ jobs:
           print(len(m["files_sha256"]), "reference files match MANIFEST.json")
           PY
 
+  topopt:
+    name: Topology optimization (Andreassen 2011)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a
+      - run: nix develop -c cargo test --release --locked --manifest-path research/optimization/andreassen-2011/Cargo.toml
+      - run: nix develop -c cargo test --release --locked --manifest-path research/optimization/andreassen-2011/wasm/Cargo.toml
+      - run: nix develop -c node --test research/optimization/andreassen-2011/wasm/check.test.mjs
+      - run: nix develop -c research/optimization/andreassen-2011/wasm/build.sh
+      - run: nix develop -c make wasm
+      - run: nix develop -c sh -c 'cd web && npm ci && npx vitest run src/components/research/andreassen2011/model.test.ts'
+
   springs:
     name: Spring networks (Grossman 2026) validation
     runs-on: ubuntu-latest

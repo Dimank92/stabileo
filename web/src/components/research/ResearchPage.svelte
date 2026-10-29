@@ -10,6 +10,7 @@
   import LandingFooter from '../landing/LandingFooter.svelte';
   import PublicLink from '../landing/PublicLink.svelte';
   import Gallery from './Gallery.svelte';
+  import TopoptPage from './andreassen2011/TopoptPage.svelte';
   import ShauerPage from './shauer2025/ShauerPage.svelte';
   import FerrariPage from './ferrari2025/FerrariPage.svelte';
   import SpringsPage from './grossman2026/SpringsPage.svelte';
@@ -26,6 +27,7 @@
       description:
         'A curated catalogue of recent computational-mechanics papers, with the ones Stabileo has reproduced, re-implemented and validated against the authors’ code, runnable in the browser.',
     },
+    '/research/optimization/andreassen-2011': { title: 'MBB topology optimization — Stabileo Research', description: 'SIMP topology optimization against the authors’ 88-line reference code.' },
     '/research/fracture/shauer-2025': {
       title: 'Phase-field fracture of a notched plate (Shauer 2025) — Stabileo Research',
       description:
@@ -50,7 +52,9 @@
   <SiteHeader current="research" />
   {#if route === '/research'}
     <Gallery />
-  {:else if route === '/research/fracture/shauer-2025'}
+  {:else if route === '/research/optimization/andreassen-2011'}
+  <TopoptPage />
+{:else if route === '/research/fracture/shauer-2025'}
     <ShauerPage />
   {:else if route === '/research/metamaterials/grossman-2026'}
     <SpringsPage />

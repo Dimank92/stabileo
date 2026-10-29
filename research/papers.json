@@ -198,28 +198,41 @@
    },
    "area": "optimization",
    "keywords": [
-    "topology optimization",
     "SIMP",
-    "MBB beam",
-    "educational code"
+    "topology optimization",
+    "MBB",
+    "density filter",
+    "optimality criteria"
    ],
-   "summary": "",
-   "summary_source": null,
+   "summary": "An educational successor to the 99-line topology optimization code adds density filtering and improves computational efficiency through preallocation and vectorization.",
+   "summary_source": "publisher-abstract",
+   "summary_note": "DTU authors' page abstract; 2010 online publication, 2011 volume 43 pages 1–16.",
    "code": [],
+   "reference_source": {
+    "url": "https://www.topopt.mek.dtu.dk/apps-and-software/efficient-topology-optimization-in-matlab",
+    "terms": "Educational use; all rights reserved; no redistributed source.",
+    "provenance": "optimization/andreassen-2011/reference/README.md"
+   },
    "data": [],
    "methods": [
     "SIMP",
-    "Q4 elements",
-    "density and sensitivity filters",
+    "Q4 plane stress",
+    "sensitivity filter",
+    "density filter",
     "optimality criteria"
    ],
-   "dependencies": [],
+   "dependencies": [
+    "GNU Octave"
+   ],
    "complexity": "low",
-   "relevance": "Reference results for the queued topology-optimization experiment (MBB beam), research/DESIGN.md section 6 item 3. Crossref dates it 2010 (online); the print issue is volume 43, 2011. No abstract in Crossref and the publisher page was not readable, so no summary; the code is distributed outside GitHub and its licence has not been checked.",
-   "status": "proposed",
+   "relevance": "Small reusable topology optimizer using the production sparse solver and scalar viewer.",
+   "status": "numerically-validated",
    "reproduced_published_results": false,
-   "benchmarks": [],
-   "implementation": null,
+   "benchmarks": [
+    "MBB 60x20 sensitivity filter",
+    "MBB 60x20 density filter"
+   ],
+   "implementation": "optimization/andreassen-2011",
    "contacts": []
   },
   {
