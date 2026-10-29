@@ -42,21 +42,33 @@ async function boot(page: Page, path: string, locale = 'en') {
 }
 
 test.describe('@smoke blog', () => {
-  test('the changelog page lists every week, newest first, with its screenshots', async ({ page }) => {
+  test('the changelog page lists every week by month, and filters by area', async ({ page }) => {
     await boot(page, '/es/changelog/', 'es');
 
-    await expect(page.locator('.post-title')).toHaveText('Historial de cambios de Stabileo');
-    const weeks = page.locator('.post-body h2.post-h');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Historial de cambios de Stabileo');
+    const weeks = page.getByTestId('changelog-entry');
     await expect(weeks).toHaveCount(CHANGELOG.length);
-    await expect(weeks.first()).toHaveText(`23 de octubre de 2026 · ${CHANGELOG[0].i18n.es.title}`);
-    await expect(page.locator('.post-body li').first()).toHaveText(`Motor: ${CHANGELOG[0].i18n.es.items[0]}`);
+    await expect(weeks.first()).toHaveAttribute('data-date', CHANGELOG[0].date);
+    await expect(weeks.first().getByRole('heading', { level: 3 })).toHaveText(CHANGELOG[0].i18n.es.title);
+    await expect(weeks.first().getByRole('heading', { level: 4 }).first()).toHaveText('Motor');
+    await expect(weeks.first().locator('li').first()).toHaveText(CHANGELOG[0].i18n.es.items[0]);
+    await expect(page.getByRole('heading', { level: 2, name: 'Octubre de 2026' })).toBeVisible();
+    const total = CHANGELOG.reduce((n, e) => n + e.areas.length, 0);
+    await expect(page.getByTestId('changelog-stats')).toContainText(`${CHANGELOG.length} semanas · ${total} cambios`);
 
-    const shots = page.locator('.post-shot img');
+    const shots = page.locator('.cl-shot img');
     await expect(shots).toHaveCount(CHANGELOG.filter((e) => e.shot).length);
     await expect(shots.first()).toHaveAttribute('src', '/screenshots/changelog-basic-report-1600.webp');
     await shots.first().scrollIntoViewIfNeeded();
     await expect.poll(() => shots.first().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
-    await expect(page.locator('.post-body').getByText('Preguntas frecuentes')).toHaveCount(0);
+
+    const edu = CHANGELOG.filter((e) => e.areas.includes('edu'));
+    await page.getByRole('button', { name: /^Educativo/ }).click();
+    await expect(weeks).toHaveCount(edu.length);
+    await expect(weeks.first().getByRole('heading', { level: 4 })).toHaveText(['Educativo']);
+    await expect(page.getByTestId('changelog-stats')).toContainText(`${edu.length} semanas`);
+    await page.getByRole('button', { name: 'Todo' }).click();
+    await expect(weeks).toHaveCount(CHANGELOG.length);
   });
 
   test('renders the index at /blog', async ({ page }) => {

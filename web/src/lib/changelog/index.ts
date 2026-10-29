@@ -629,8 +629,46 @@ export const AREA_LABELS: Record<PublicLocale, Record<ChangelogArea, string>> = 
   pt: { basic: 'Básico', pro: 'PRO', edu: 'Educativo', app: 'App', engine: 'Motor', site: 'Site' },
 };
 
-/** A calendar day in the reader's format; parsed by parts so no time zone moves it a day back. */
-export function formatChangeDate(iso: string, locale: string): string {
+/** Parsed by parts, so no time zone moves the day back. */
+function localDay(iso: string): Date {
   const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' });
+  return new Date(y, m - 1, d);
+}
+
+export function formatChangeDate(iso: string, locale: string): string {
+  return localDay(iso).toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+export function changeDay(iso: string, locale: string): { day: string; month: string } {
+  const date = localDay(iso);
+  return {
+    day: String(date.getDate()),
+    month: date.toLocaleDateString(locale, { month: 'short' }).replace(/\.$/, ''),
+  };
+}
+
+export function formatChangeMonth(iso: string, locale: string): string {
+  const text = localDay(iso).toLocaleDateString(locale, { year: 'numeric', month: 'long' });
+  return text.charAt(0).toLocaleUpperCase(locale) + text.slice(1);
+}
+
+export function entryAreas(entry: ChangelogEntry): ChangelogArea[] {
+  return [...new Set(entry.areas)];
+}
+
+export function itemsByArea(entry: ChangelogEntry, locale: PublicLocale): { area: ChangelogArea; items: string[] }[] {
+  const items = entry.i18n[locale].items;
+  return entryAreas(entry).map((area) => ({ area, items: items.filter((_, i) => entry.areas[i] === area) }));
+}
+
+/** Expects entries newest first, as CHANGELOG is. */
+export function changelogByMonth(entries: ChangelogEntry[]): { key: string; entries: ChangelogEntry[] }[] {
+  const months: { key: string; entries: ChangelogEntry[] }[] = [];
+  for (const entry of entries) {
+    const key = entry.date.slice(0, 7);
+    const last = months.at(-1);
+    if (last?.key === key) last.entries.push(entry);
+    else months.push({ key, entries: [entry] });
+  }
+  return months;
 }

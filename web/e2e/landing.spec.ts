@@ -92,12 +92,16 @@ test.describe('@landing landing page', () => {
 
     await expect(section.getByRole('heading', { level: 2 })).toHaveText('Qué cambió en Stabileo');
     await expect(section.getByTestId('changelog-week')).toHaveCount(3);
-    await expect(section.locator('time').first()).toHaveText('23 de octubre de 2026');
-    await expect(section.locator('figure img')).toHaveAttribute('src', '/screenshots/changelog-basic-report-1600.webp');
+    const [latest, next] = await section.getByTestId('changelog-week').all();
+    await expect(latest.locator('time')).toHaveText('23 de octubre de 2026');
+    await expect(latest.getByText('Lo último')).toBeVisible();
+    await expect(latest.getByRole('heading', { level: 4 })).toHaveText(['Motor', 'App', 'Sitio']);
+    await expect(next.locator('figure img')).toHaveAttribute('src', '/screenshots/changelog-basic-report-1600.webp');
+    await expect(next.getByText('6 cambios')).toBeVisible();
 
     await section.getByRole('link', { name: 'Ver todos los cambios' }).click();
     await expect(page).toHaveURL(/\/es\/changelog\/$/);
-    await expect(page.locator('.post-title')).toHaveText('Historial de cambios de Stabileo');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Historial de cambios de Stabileo');
   });
 
   test('the nav\'s Blog item opens the blog, not the teaser at the foot of the page', async ({ page }) => {

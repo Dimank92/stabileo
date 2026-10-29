@@ -50,9 +50,7 @@ export type Block =
    * (the content test enforces it), so a post cannot send readers anywhere
    * we do not publish.
    */
-  | { k: 'ext'; href: string; label: string; t: string }
-  /** A committed screenshot under /screenshots, rendered by Shot.svelte; `w`/`h` are the file's pixels. */
-  | { k: 'shot'; base: string; w: number; h: number; alt: string };
+  | { k: 'ext'; href: string; label: string; t: string };
 
 export type Localized<T> = Record<'en' | 'es' | 'pt', T> & Partial<Record<PublicLocale, T>>;
 
@@ -133,7 +131,6 @@ export function wordCount(body: PostBody, linkTitle?: (slug: string) => string |
     else if (b.k === 'p' || b.k === 'h' || b.k === 'quote' || b.k === 'note') parts.push(b.t);
     else if (b.k === 'ul' || b.k === 'ol') parts.push(...b.items);
     else if (b.k === 'embed') parts.push(b.label);
-    else if (b.k === 'shot') continue;
     else parts.push(b.caption, ...b.head, ...b.rows.flat());
   }
   return parts.join(' ').split(/\s+/).filter(Boolean).length;

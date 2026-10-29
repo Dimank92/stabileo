@@ -1,7 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { CHANGELOG, CHANGELOG_AREAS, LATEST_CHANGES, AREA_LABELS, formatChangeDate } from '..';
+import {
+  CHANGELOG,
+  CHANGELOG_AREAS,
+  LATEST_CHANGES,
+  AREA_LABELS,
+  changeDay,
+  changelogByMonth,
+  entryAreas,
+  formatChangeDate,
+  formatChangeMonth,
+  itemsByArea,
+} from '..';
 import { changelogPage } from '../../blog/pages/changelog';
 
 const LOCALES = ['es', 'en', 'pt'] as const;
@@ -70,16 +81,40 @@ describe('the changelog page', () => {
     expect(changelogPage.updated).toBe(CHANGELOG[0].date);
   });
 
-  it('lists every week with its date, its screenshot and every item labelled by area', () => {
+  it('is drawn by its own view, with no article blocks or questions to keep in step', () => {
+    expect(changelogPage.view).toBe('changelog');
     for (const l of LOCALES) {
-      const blocks = changelogPage.i18n[l].blocks;
-      expect(blocks.filter((b) => b.k === 'h')).toHaveLength(CHANGELOG.length);
-      expect(blocks.filter((b) => b.k === 'shot')).toHaveLength(CHANGELOG.filter((e) => e.shot).length);
-      const first = blocks[0];
-      expect(first.k === 'h' && first.t).toBe(`${formatChangeDate(CHANGELOG[0].date, l)} · ${CHANGELOG[0].i18n[l].title}`);
-      const items = blocks.flatMap((b) => (b.k === 'ul' ? b.items : []));
-      expect(items).toHaveLength(CHANGELOG.reduce((n, e) => n + e.areas.length, 0));
-      expect(items[0]).toBe(`${AREA_LABELS[l][CHANGELOG[0].areas[0]]}: ${CHANGELOG[0].i18n[l].items[0]}`);
+      expect(changelogPage.i18n[l].blocks).toEqual([]);
+      expect(changelogPage.i18n[l].faq).toEqual([]);
     }
+  });
+});
+
+describe('the changelog helpers', () => {
+  const entry = CHANGELOG.find((e) => e.date === '2026-09-25')!;
+
+  it('groups the items under their areas, in the order the areas first appear, losing none', () => {
+    expect(entryAreas(entry)).toEqual(['site', 'basic', 'edu', 'pro', 'engine']);
+    for (const l of LOCALES) {
+      const groups = itemsByArea(entry, l);
+      expect(groups.map((g) => g.area)).toEqual(entryAreas(entry));
+      expect(groups.flatMap((g) => g.items)).toEqual(entry.i18n[l].items);
+      expect(groups[1].items).toEqual(entry.i18n[l].items.slice(2, 5));
+    }
+  });
+
+  it('splits the history into months, newest first, keeping every week', () => {
+    const months = changelogByMonth(CHANGELOG);
+    expect(months.map((m) => m.key)).toEqual(['2026-10', '2026-09', '2026-08', '2026-07', '2026-06']);
+    expect(months.flatMap((m) => m.entries)).toEqual(CHANGELOG);
+    expect(months[0].entries.map((e) => e.date)).toEqual(['2026-10-23', '2026-10-16', '2026-10-09', '2026-10-02']);
+  });
+
+  it('names the day and the month for the timeline', () => {
+    expect(changeDay('2026-10-02', 'es')).toEqual({ day: '2', month: 'oct' });
+    expect(changeDay('2026-06-12', 'en')).toEqual({ day: '12', month: 'Jun' });
+    expect(formatChangeMonth('2026-10-01', 'es')).toBe('Octubre de 2026');
+    expect(formatChangeMonth('2026-10-01', 'en')).toBe('October 2026');
+    expect(formatChangeMonth('2026-10-01', 'pt')).toBe('Outubro de 2026');
   });
 });

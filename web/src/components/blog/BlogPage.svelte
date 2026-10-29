@@ -18,6 +18,7 @@
   import PublicLink from '../landing/PublicLink.svelte';
   import LandingFooter from '../landing/LandingFooter.svelte';
   import BlogBlocks from './BlogBlocks.svelte';
+  import ChangelogView from './ChangelogView.svelte';
   import { findStandingPage } from '../../lib/blog/pages';
   import '../landing/landing.css';
   import './blog.css';
@@ -186,7 +187,9 @@
        and that reader needs the way back to the index more than anyone. -->
   <SiteHeader current={standing ? null : 'blog'} />
 
-  {#if standing && standingBody}
+  {#if standing?.view === 'changelog' && standingBody}
+    <ChangelogView eyebrow={standingBody.eyebrow} title={standingBody.title} lead={standingBody.lead} />
+  {:else if standing && standingBody}
     <article class="sec sec--ink post standing">
       <div class="wrap post-wrap">
         <p class="eyebrow">
