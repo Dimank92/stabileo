@@ -1297,13 +1297,14 @@ function createUIStore() {
       // its modes: keep the current one instead.
       if (!isAnalysisMode(v)) return;
       analysisMode = v;
-      // When switching into a 3D-capable mode with a flat 2D model already loaded,
-      // keep the model upright in the XZ plane instead of dropping it flat on XY.
-      if (is3DWorkspace(v) && _isModelFlat2D?.() === true) {
-        viewportPresentation3D = 'upright2dIn3d';
-      } else {
-        viewportPresentation3D = 'native3d';
-      }
+      this.choosePresentation3D();
+    },
+    /**
+     * A flat 2D model in a space workspace stands upright in the XZ plane instead of lying on XY;
+     * anything else is shown as stored. For a mode switch, and for an undo to a step taken in 2D.
+     */
+    choosePresentation3D() {
+      viewportPresentation3D = is3DWorkspace(analysisMode) && _isModelFlat2D?.() === true ? 'upright2dIn3d' : 'native3d';
     },
     _setModelFlatnessProvider(fn: () => boolean) { _isModelFlat2D = fn; },
     get drawPlane2D() { return drawPlane2D; },
