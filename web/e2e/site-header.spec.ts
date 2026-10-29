@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { EXPERIMENTS } from '../src/components/research/experiments';
 
 /**
  * Every public page carries the same header (components/site/SiteHeader.svelte): the same items
@@ -13,7 +14,7 @@ const PAGES: Array<[string, string | null]> = [
   ['/en/blog/the-determinism-boundary/', 'blog'],
   ['/en/cirsoc/', null],
   ['/en/research/', 'research'],
-  ['/en/research/fracture/shauer-2025/', 'research'],
+  ...EXPERIMENTS.map(({ path }): [string, string] => [`/en${path}/`, 'research']),
 ];
 
 test.describe('@smoke site header', () => {
