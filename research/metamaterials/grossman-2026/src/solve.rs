@@ -117,25 +117,30 @@ impl System {
         if self.n == 0 {
             return Ok(rhs.iter().map(|_| Vec::new()).collect());
         }
-        let k = self.matrix(0.0);
+        let mut k = self.matrix(0.0);
         let dmax = k.diagonal().into_iter().fold(0.0_f64, f64::max).max(1e-300);
+        for value in &mut k.values { *value /= dmax; }
         let sym = Rc::new(symbolic_cholesky(&k));
         let norm = |v: &[f64]| v.iter().map(|v| v.abs()).fold(0.0_f64, f64::max);
         for shift in [REGULARISATION, 1e-12, 1e-14] {
-            let m = self.matrix(shift * dmax);
+            let mut m = self.matrix(shift * dmax);
+            for value in &mut m.values { *value /= dmax; }
             let f = numeric_cholesky(&sym, &m).ok_or("stiffness is not positive semi-definite (compressed bonds?)")?;
             let mut solutions = Vec::new();
             for b in rhs {
-                let assembly_noise = 8.0 * f64::EPSILON * dmax;
-                let tolerance = if norm(b) <= assembly_noise { assembly_noise } else { 1e-12 * norm(b) };
-                let mut x = sparse_cholesky_solve(&f, b);
+                let magnitude = norm(b);
+                if magnitude == 0.0 {
+                    solutions.push(vec![0.0; self.n]);
+                    continue;
+                }
+                let b: Vec<f64> = b.iter().map(|v| v / magnitude).collect();
+                let mut x = sparse_cholesky_solve(&f, &b);
                 let mut converged = false;
                 for iteration in 0..MAX_REFINEMENT_STEPS {
                     let kx = k.sym_mat_vec(&x);
                     let r: Vec<f64> = b.iter().zip(&kx).map(|(bi, ki)| bi - ki).collect();
                     if iteration >= 3 && x.iter().all(|v| v.is_finite())
-                        && (norm(&r) <= tolerance
-                            || (shift == 1e-14 && iteration == MAX_REFINEMENT_STEPS - 1 && norm(&r) <= assembly_noise)) {
+                        && norm(&r) <= 1e-12 {
                         converged = true;
                         break;
                     }
@@ -143,7 +148,7 @@ impl System {
                     x.iter_mut().zip(&dx).for_each(|(xi, di)| *xi += di);
                 }
                 if !converged { break; }
-                solutions.push(x);
+                solutions.push(x.into_iter().map(|v| v * (magnitude / dmax)).collect());
             }
             if solutions.len() == rhs.len() { return Ok(solutions); }
         }
@@ -171,6 +176,12 @@ pub struct Relaxation {
 /// fixed), with backtracking on the energy. Needed only when the rest lengths are not the
 /// built lengths (prestress); a stress-free network is returned unchanged.
 pub fn relax(net: &Network, start: &[[f64; 2]], held: &[bool], tol: f64, max_iter: usize) -> Result<Relaxation, String> {
+    let mut anchored = held.to_vec();
+    if net.cell.is_some() && !held.iter().any(|h| *h) {
+        anchored.resize(start.len(), false);
+        anchored[0] = true;
+    }
+    let held = anchored.as_slice();
     let mut pos = start.to_vec();
     let kmax = net.bonds.iter().map(|e| e.k).fold(0.0f64, f64::max).max(1e-300);
     let force = |pos: &[[f64; 2]]| -> Vec<[f64; 2]> {
@@ -263,7 +274,9 @@ pub struct PeriodicResponse {
 pub fn periodic_response(net: &Network, pos: &[[f64; 2]]) -> Result<PeriodicResponse, String> {
     let area = net.area().ok_or("periodic_response needs a periodic network")?;
     let n_nodes = pos.len();
-    let mut sys = System::new(n_nodes, &[]);
+    let mut held = vec![false; n_nodes];
+    held[0] = true;
+    let mut sys = System::new(n_nodes, &held);
     let mut kue = vec![vec![0.0; 2 * n_nodes]; 3];
     let mut kee = [[0.0; 3]; 3];
     for (e, (s, _, _, _)) in net.bonds.iter().zip(bond_tangents(net, pos)) {
@@ -287,8 +300,8 @@ pub fn periodic_response(net: &Network, pos: &[[f64; 2]]) -> Result<PeriodicResp
             }
         }
     }
-    let rhs: Vec<Vec<f64>> = kue.iter().map(|v| v.iter().map(|x| -x).collect()).collect();
-    let sol = sys.solve(&rhs)?;
+    let rhs: Vec<Vec<f64>> = kue.iter().map(|v| v[2..].iter().map(|x| -x).collect()).collect();
+    let sol: Vec<Vec<f64>> = sys.solve(&rhs)?.into_iter().map(|v| [vec![0.0; 2], v].concat()).collect();
     let mut c = [[0.0; 3]; 3];
     let mut c_affine = [[0.0; 3]; 3];
     for a in 0..3 {
@@ -392,6 +405,19 @@ mod tests {
             assert!(sys.full_rank());
             let x = sys.solve(&[vec![0.0, lambda]]).unwrap().remove(0);
             assert!((x[1] - 1.0).abs() < 1e-10);
+        }
+    }
+
+    #[test]
+    fn small_load_and_stiffness_scales_preserve_relative_accuracy() {
+        for scale in [1e-16, 1e-8, 1.0, 1e8, 1e16] {
+            let mut sys = System::new(1, &[]);
+            sys.push(0, 0, scale);
+            sys.push(1, 1, 2e-13 * scale);
+            let x = sys.solve(&[vec![0.0, 1e-16 * scale]]).unwrap().remove(0);
+            assert!((x[1] / 5e-4 - 1.0).abs() < 1e-10);
+            assert!(sys.full_rank());
+            assert!(sys.solve(&[vec![0.0, 0.0]]).unwrap()[0].iter().all(|v| *v == 0.0));
         }
     }
 

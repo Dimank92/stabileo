@@ -92,3 +92,25 @@ fn nearly_parallel_springs_match_the_kinematic_solution() {
         assert!(response.force.iter().all(|f| f.abs() < 1e-10));
     }
 }
+
+#[test]
+fn uniform_stiffness_scaling_preserves_network_response() {
+    use springs_grossman_2026::experiment::{run_strip, StripSpec};
+    for k in [1e-16, 1e-8, 1.0, 1e8, 1e16] {
+        let network = serde_json::json!({"lattice": {"kind": "triangular", "phi": 1.0, "psi": 1.0}, "k": k});
+        let periodic: PeriodicSpec = serde_json::from_value(serde_json::json!({"network": network, "n1": 4, "n2": 4})).unwrap();
+        let result = run_periodic(&periodic).unwrap();
+        assert!((result.isotropic.bulk / k - 3f64.sqrt() / 2.0).abs() < 1e-10);
+        assert!((result.isotropic.shear / k - 3f64.sqrt() / 4.0).abs() < 1e-10);
+        let strip: StripSpec = serde_json::from_value(serde_json::json!({"network": network,
+            "width": 8.0, "height": 8.0, "theta": 0.0, "clamp_band": 0.5, "strain": 0.01})).unwrap();
+        let response = run_strip(&strip).unwrap();
+        let mut unit = strip;
+        unit.network.k = 1.0;
+        let expected = run_strip(&unit).unwrap();
+        assert!((response.poisson - expected.poisson).abs() < 1e-9);
+        for (actual, expected) in response.force.iter().zip(&expected.force) {
+            assert!((actual / k - expected).abs() < 1e-10);
+        }
+    }
+}

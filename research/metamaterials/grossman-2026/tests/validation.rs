@@ -318,10 +318,10 @@ fn part_b(c: &mut Checks) {
         c.at_most(&format!("Eq. (23) honeycomb, k_radial = {kr:e} (l = 0.05 ... 0.95)"), "max |nu difference|", worst, tol);
     }
 
-    // B5. Fig. 9 at eta = 0 (vector data) against the exact triangular lattice.
+    let triangular = periodic(spec(tri(1.0, 1.0)), 4);
     let b0 = v["fig9"]["B"]["mean_line"][0][1].as_f64().unwrap();
     let g0 = v["fig9"]["G"]["mean_line"][0][1].as_f64().unwrap();
-    c.at_most("Fig. 9 at eta = 0: B = sqrt(3)/2, G = sqrt(3)/4", "max absolute difference", finite_max([(b0 - 3f64.sqrt() / 2.0).abs(), (g0 - 3f64.sqrt() / 4.0).abs()]), 5e-3);
+    c.at_most("Fig. 9 at eta = 0: B = sqrt(3)/2, G = sqrt(3)/4", "max absolute difference", finite_max([(b0 - triangular.isotropic.bulk).abs(), (g0 - triangular.isotropic.shear).abs()]), 5e-3);
 
     // B6. Foam: exact periodic moduli, 10 samples of 26 x 26 cells per eta, against the paper's
     // simulations (Fig. 5, digitised markers and error bars) and statements (p. 6).
