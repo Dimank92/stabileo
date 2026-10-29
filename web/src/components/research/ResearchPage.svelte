@@ -11,6 +11,7 @@
   import PublicLink from '../landing/PublicLink.svelte';
   import Gallery from './Gallery.svelte';
   import ShauerPage from './shauer2025/ShauerPage.svelte';
+  import ArchPage from './dadeppo1975/ArchPage.svelte';
   import SpringsPage from './grossman2026/SpringsPage.svelte';
   import '../landing/landing.css';
   import '../blog/blog.css';
@@ -20,6 +21,7 @@
   const route = $derived(path.replace(/\/+$/, '') || '/research');
 
   const PAGES: Record<string, { title: string; description: string }> = {
+    '/research/benchmarks/dadeppo-arch-1975': { title: 'DaDeppo–Schmidt deep arch (1975) — Stabileo Research', description: 'First version: a clamped–hinged circular arch traced by the production arc-length solver.' },
     '/research': {
       title: 'Stabileo Research — computational mechanics you can run',
       description:
@@ -53,6 +55,8 @@
     <ShauerPage />
   {:else if route === '/research/metamaterials/grossman-2026'}
     <SpringsPage />
+  {:else if route === '/research/benchmarks/dadeppo-arch-1975'}
+    <ArchPage />
   {:else}
     <section class="sec sec--ink">
       <div class="wrap" style="padding-top: 7rem; padding-bottom: 4rem">

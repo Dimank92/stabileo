@@ -20,6 +20,12 @@ export type Experiment = {
 
 export const EXPERIMENTS: Experiment[] = [
   {
+    paperId: 'dadeppo-arch-1975', path: '/research/benchmarks/dadeppo-arch-1975',
+    name: 'DaDeppo–Schmidt deep arch', hook: 'First version: the production arc-length solver traces a 215° arch through its limit load.',
+    thumbnail: 'research-thumbs/dadeppo-arch-1975.svg', thumbnailAlt: 'Deformed arch from the production solver', thumbnailQuery: '',
+    code: 'https://github.com/lambdaclass/stabileo/tree/main/research/benchmarks/dadeppo-arch-1975',
+  },
+  {
     paperId: 'shauer-2025',
     path: '/research/fracture/shauer-2025',
     name: 'Phase-field fracture of a notched plate',

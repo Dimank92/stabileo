@@ -44,3 +44,5 @@ mod sparse_solver_paths;
 mod stiffness_definiteness_warning;
 #[path = "../tower_fixture_test.rs"]
 mod tower_fixture_test;
+#[path = "../benchmarks/dadeppo_arch.rs"]
+mod dadeppo_arch;
