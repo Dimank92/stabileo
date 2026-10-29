@@ -1,0 +1,4 @@
+### Fixed
+#### Close mutation test gap in plastic collapse certificates (2026-10-29)
+
+Added unit test coverage covering 765 surviving mutants across 49 functions in 2D and 3D rigid-plastic collapse certificates (`engine/src/certify/plastic.rs`, `plastic_3d.rs`, `plastic_bundle.rs`): transverse member load pieces (`lm_pieces`, `lm_end`), resultant force components (`elem_resultant`), critical point detection (`cutting_samples`), incremental solver state recovery (`solver_state_field`), mechanism verification and work/dissipation ratio (`check_mechanism`), least-squares solver (`least_squares`), dense solver (`dense_solve`), support restraint mapping (`support_restrains`), 3D local coordinate orientation (`exact_axes`), plastic moment computation (`mp_3d`), golden section search (`golden_max`), polygon edge normals and angle insertion (`edges`, `insert_dir`), and Bernstein polynomial evaluation and bounding (`bern`, `poly_at`, `to_bernstein`) (#745).

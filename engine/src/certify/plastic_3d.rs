@@ -2097,4 +2097,159 @@ mod tests {
         }
         assert_eq!(sqrt_up(&qi(16)), qi(4));
     }
+
+    #[test]
+    fn test_golden_max() {
+        let (xmax, ymax) = golden_max(|x| -(x - 0.7).powi(2) + 10.0, 0.0, 1.0);
+        assert!((xmax - 0.7).abs() < 1e-6);
+        assert!((ymax - 10.0).abs() < 1e-6);
+
+        let (xmax2, ymax2) = golden_max(|x| 3.0 * x, 1.0, 5.0);
+        assert!((xmax2 - 5.0).abs() < 1e-6);
+        assert!((ymax2 - 15.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_edges_and_insert_dir() {
+        let mut dirs = vec![0.0, std::f64::consts::FRAC_PI_2, std::f64::consts::PI, 3.0 * std::f64::consts::FRAC_PI_2];
+        let ed = edges(&dirs);
+        assert_eq!(ed.len(), 4);
+        assert!((ed[0].0 - 1.0).abs() < 1e-10);
+        assert!((ed[0].1 - 1.0).abs() < 1e-10);
+
+        assert!(!insert_dir(&mut dirs, 0.0));
+        assert!(!insert_dir(&mut dirs, std::f64::consts::TAU));
+        assert_eq!(dirs.len(), 4);
+
+        assert!(insert_dir(&mut dirs, std::f64::consts::FRAC_PI_4));
+        assert_eq!(dirs.len(), 5);
+        assert_eq!(dirs[1], std::f64::consts::FRAC_PI_4);
+    }
+
+    #[test]
+    fn test_exact_axes() {
+        let mut el = SolverElement3D {
+            id: 1,
+            elem_type: "beam".to_string(),
+            node_i: 0,
+            node_j: 1,
+            material_id: 1,
+            section_id: 1,
+            release_my_start: false,
+            release_my_end: false,
+            release_mz_start: false,
+            release_mz_end: false,
+            release_t_start: false,
+            release_t_end: false,
+            roll_angle: None,
+            local_yx: None,
+            local_yy: None,
+            local_yz: None,
+        };
+
+        // Horizontal beam along X: d = [3, 0, 0]
+        let d_x = [qi(3), qi(0), qi(0)];
+        let l2_x = qi(9);
+        let (uy, uz) = exact_axes(&el, &d_x, &l2_x, false).unwrap();
+        assert_eq!(dot(&uy, &d_x), qi(0));
+        assert_eq!(dot(&uz, &d_x), qi(0));
+        assert_eq!(dot(&uy, &uz), qi(0));
+
+        // Vertical beam along Z: d = [0, 0, 4]
+        let d_z = [qi(0), qi(0), qi(4)];
+        let l2_z = qi(16);
+        let (uy_v, uz_v) = exact_axes(&el, &d_z, &l2_z, false).unwrap();
+        assert_eq!(dot(&uy_v, &d_z), qi(0));
+        assert_eq!(dot(&uz_v, &d_z), qi(0));
+        assert_eq!(dot(&uy_v, &uz_v), qi(0));
+
+        // Roll angles: 90, 180, 270 deg
+        el.roll_angle = Some(90.0);
+        let (uy_90, uz_90) = exact_axes(&el, &d_x, &l2_x, false).unwrap();
+        assert_eq!(uy_90, uz);
+        assert_eq!(uz_90, neg(&uy));
+
+        el.roll_angle = Some(180.0);
+        let (uy_180, uz_180) = exact_axes(&el, &d_x, &l2_x, false).unwrap();
+        assert_eq!(uy_180, neg(&uy));
+        assert_eq!(uz_180, neg(&uz));
+
+        el.roll_angle = Some(270.0);
+        let (uy_270, uz_270) = exact_axes(&el, &d_x, &l2_x, false).unwrap();
+        assert_eq!(uy_270, neg(&uz));
+        assert_eq!(uz_270, uy);
+
+        // Invalid roll angle returns Err
+        el.roll_angle = Some(45.0);
+        assert!(exact_axes(&el, &d_x, &l2_x, false).is_err());
+
+        // Left handed system negates uy
+        el.roll_angle = None;
+        let (uy_lh, uz_lh) = exact_axes(&el, &d_x, &l2_x, true).unwrap();
+        assert_eq!(uy_lh, neg(&uy));
+        assert_eq!(uz_lh, uz);
+
+        // Degenerate direction returns Err
+        let d_zero = [qi(0), qi(0), qi(0)];
+        assert!(exact_axes(&el, &d_zero, &qi(0), false).is_err());
+    }
+
+    #[test]
+    fn test_mp_3d() {
+        let sec_dummy = PlasticSectionData3D {
+            b: None,
+            h: None,
+            d: None,
+            a: 0.01,
+            iy: 1e-4,
+            iz: 1e-4,
+            material_id: 1,
+        };
+        let mp_ov = mp_3d(&sec_dummy, 250.0, Some([150.0, 250.0])).unwrap();
+        assert_eq!(mp_ov, Some([(qi(150), qi(150)), (qi(250), qi(250))]));
+
+        // Negative override returns Err
+        assert!(mp_3d(&sec_dummy, 250.0, Some([-10.0, 50.0])).is_err());
+
+        // Rectangular section: b = 0.2, h = 0.4, fy = 250 (fyk = 250000)
+        // Mpy = 250000 * 0.2 * 0.4^2 / 4 = 2000
+        // Mpz = 250000 * 0.4 * 0.2^2 / 4 = 1000
+        let sec_rect = PlasticSectionData3D {
+            b: Some(0.2),
+            h: Some(0.4),
+            d: None,
+            a: 0.08,
+            iy: 1.067e-3,
+            iz: 2.667e-4,
+            material_id: 1,
+        };
+        let mp_rect = mp_3d(&sec_rect, 250.0, None).unwrap().unwrap();
+        assert!((to_f64(&mp_rect[0].0) - 2000.0).abs() < 1e-10);
+        assert_eq!(mp_rect[0].0, mp_rect[0].1);
+        assert!((to_f64(&mp_rect[1].0) - 1000.0).abs() < 1e-10);
+        assert_eq!(mp_rect[1].0, mp_rect[1].1);
+
+        // Missing data returns None
+        let sec_empty = PlasticSectionData3D {
+            b: None,
+            h: None,
+            d: None,
+            a: 0.0,
+            iy: 0.0,
+            iz: 0.0,
+            material_id: 1,
+        };
+        assert_eq!(mp_3d(&sec_empty, 250.0, None).unwrap(), None);
+    }
+
+    #[test]
+    fn test_to_bernstein_constant_and_linear() {
+        let c_const = [qi(7)];
+        let b_const = to_bernstein(&c_const, &qi(0), &qi(1));
+        assert_eq!(b_const, vec![qi(7)]);
+
+        let c_lin = [qi(1), qi(2)]; // 1 + 2t on [0, 1] -> b0 = 1, b1 = 3
+        let b_lin = to_bernstein(&c_lin, &qi(0), &qi(1));
+        assert_eq!(b_lin, vec![qi(1), qi(3)]);
+    }
 }

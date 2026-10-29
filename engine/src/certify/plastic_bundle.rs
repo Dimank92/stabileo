@@ -581,4 +581,33 @@ mod tests {
             assert_eq!(parse_q(&qs(&x)).unwrap(), x);
         }
     }
+
+    #[test]
+    fn test_bern_exact_coefficients_and_poly_at() {
+        let q = [qi(1), qi(2), qi(3), qi(4)];
+        // At t = 0: 1
+        assert_eq!(poly_at(&q, &qi(0)), qi(1));
+        // At t = 1: 1 + 2 + 3 + 4 = 10
+        assert_eq!(poly_at(&q, &qi(1)), qi(10));
+        // At t = 2: 1 + 4 + 12 + 32 = 49
+        assert_eq!(poly_at(&q, &qi(2)), qi(49));
+        // At t = -1: 1 - 2 + 3 - 4 = -2
+        assert_eq!(poly_at(&q, &qi(-1)), qi(-2));
+
+        // Exact Bernstein bounds on [0, 1]
+        let b01 = bern(&q, &qi(0), &qi(1));
+        assert_eq!(b01, qi(10));
+
+        // Exact Bernstein bounds on [1, 2]
+        let b12 = bern(&q, &qi(1), &qi(2));
+        assert_eq!(b12, qi(49));
+
+        // Negative coefficients
+        let q_neg = [qi(-5), qi(2), qi(-1), qi(3)];
+        assert_eq!(poly_at(&q_neg, &qi(0)), qi(-5));
+        assert_eq!(poly_at(&q_neg, &qi(1)), qi(-1));
+        let b_neg = bern(&q_neg, &qi(0), &qi(1));
+        assert!(b_neg >= qi(5));
+    }
+
 }

@@ -1753,4 +1753,336 @@ mod tests {
         assert!((mu[2] - 2.0).abs() < 1e-12 && mu[0] == 0.0 && mu[1] == 0.0);
         assert!((y[0] - 1.0 / 3.0).abs() < 1e-12);
     }
+
+    #[test]
+    fn test_support_restrains() {
+        assert_eq!(support_restrains("fixed").unwrap(), [true, true, true]);
+        assert_eq!(support_restrains("pinned").unwrap(), [true, true, false]);
+        assert_eq!(support_restrains("rollerX").unwrap(), [false, true, false]);
+        assert_eq!(support_restrains("rollerY").unwrap(), [true, false, false]);
+        assert_eq!(support_restrains("rollerZ").unwrap(), [true, false, false]);
+        assert_eq!(support_restrains("guidedX").unwrap(), [false, true, true]);
+        assert_eq!(support_restrains("guidedY").unwrap(), [true, false, true]);
+        assert_eq!(support_restrains("guidedZ").unwrap(), [true, false, true]);
+        assert!(support_restrains("spring").is_err());
+        assert!(support_restrains("inclinedRoller").is_err());
+        assert_eq!(support_restrains("unknown").unwrap(), [false, false, false]);
+    }
+
+    #[test]
+    fn test_dense_solve() {
+        let bm = vec![vec![2.0, 1.0], vec![1.0, 2.0]];
+        let r = vec![vec![5.0], vec![4.0]];
+        let x = dense_solve(bm, r).unwrap();
+        assert!((x[0][0] - 2.0).abs() < 1e-12);
+        assert!((x[1][0] - 1.0).abs() < 1e-12);
+
+        let bm_sing = vec![vec![1.0, 2.0], vec![2.0, 4.0]];
+        let r_sing = vec![vec![1.0], vec![2.0]];
+        assert!(dense_solve(bm_sing, r_sing).is_none());
+    }
+
+    #[test]
+    fn test_least_squares() {
+        let cols = vec![vec![1.0, 0.0, 0.0], vec![0.0, 2.0, 0.0]];
+        let target = vec![3.0, 8.0, 10.0];
+        let z = least_squares(&cols, &target);
+        assert_eq!(z.len(), 2);
+        assert!((z[0] - 3.0).abs() < 1e-6);
+        assert!((z[1] - 4.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_lm_pieces_and_lm_end() {
+        let l = qi(4);
+        let l2 = qi(16);
+
+        // Point load at ta = 0.5: P = 10, my = 5
+        let loads_pt = vec![ElemLoad::Point {
+            ta: qr(1, 2),
+            p: qi(10),
+            px: qi(0),
+            my: qi(5),
+        }];
+        let bps = vec![qi(0), qr(1, 2), qi(1)];
+        let pcs = lm_pieces(&loads_pt, Some(&l), &l2, &bps).unwrap();
+        assert_eq!(pcs.len(), 2);
+        assert_eq!(pcs[0].c, [qi(0), qi(0), qi(0), qi(0)]);
+        assert_eq!(pcs[1].c[0], qi(25));
+        assert_eq!(pcs[1].c[1], qi(-40));
+        assert_eq!(pcs[1].c[2], qi(0));
+        assert_eq!(pcs[1].c[3], qi(0));
+
+        let end_pt = lm_end(&loads_pt, Some(&l), &l2);
+        assert_eq!(end_pt, qi(-15));
+
+        // Uniform distributed load qi = 3, qj = 3 on [0, 1], l = 2, l2 = 4
+        let l_dist = qi(2);
+        let l2_dist = qi(4);
+        let loads_dist = vec![ElemLoad::Dist {
+            ta: qi(0),
+            tb: qi(1),
+            qi: qi(3),
+            qj: qi(3),
+        }];
+        let bps_dist = vec![qi(0), qi(1)];
+        let pcs_dist = lm_pieces(&loads_dist, Some(&l_dist), &l2_dist, &bps_dist).unwrap();
+        assert_eq!(pcs_dist.len(), 1);
+        assert_eq!(pcs_dist[0].c[0], qi(0));
+        assert_eq!(pcs_dist[0].c[1], qi(0));
+        assert_eq!(pcs_dist[0].c[2], qi(-6));
+        assert_eq!(pcs_dist[0].c[3], qi(0));
+
+        let end_dist = lm_end(&loads_dist, Some(&l_dist), &l2_dist);
+        assert_eq!(end_dist, qi(-6));
+    }
+
+    #[test]
+    fn test_elem_resultant() {
+        let pelem = PElem {
+            id: 1,
+            ni: 0,
+            nj: 1,
+            dx: qi(3),
+            dz: qi(4),
+            l: Some(qi(5)),
+            l2: qi(25),
+            mp: Some((qi(100), qi(100))),
+            rel_i: false,
+            rel_j: false,
+            loads: vec![
+                ElemLoad::Dist {
+                    ta: qi(0),
+                    tb: qi(1),
+                    qi: qi(2),
+                    qj: qi(2),
+                },
+                ElemLoad::Point {
+                    ta: qr(1, 2),
+                    p: qi(10),
+                    px: qi(5),
+                    my: qi(0),
+                },
+            ],
+            pieces: Vec::new(),
+        };
+
+        let (wx, wz) = elem_resultant(&pelem);
+        assert_eq!(wx, qi(-13));
+        assert_eq!(wz, qi(16));
+    }
+
+    #[test]
+    fn test_solver_state_field() {
+        let model = PlasticModel {
+            node_ids: vec![1, 2],
+            restrained: vec![[true, true, true], [false, false, false]],
+            nodal: vec![[qi(0), qi(0), qi(0)], [qi(0), qi(0), qi(0)]],
+            elems: vec![PElem {
+                id: 10,
+                ni: 0,
+                nj: 1,
+                dx: qi(5),
+                dz: qi(0),
+                l: Some(qi(5)),
+                l2: qi(25),
+                mp: Some((qi(100), qi(100))),
+                rel_i: false,
+                rel_j: false,
+                loads: Vec::new(),
+                pieces: Vec::new(),
+            }],
+        };
+
+        let json_str = r#"{
+            "collapseFactor": 1.5,
+            "steps": [{
+                "loadFactor": 1.5,
+                "hingesFormed": [],
+                "results": {
+                    "displacements": [],
+                    "reactions": [],
+                    "elementForces": [{
+                        "elementId": 10,
+                        "nStart": 10.0,
+                        "nEnd": -10.0,
+                        "vStart": 20.0,
+                        "vEnd": -20.0,
+                        "mStart": 30.0,
+                        "mEnd": -30.0,
+                        "length": 5.0,
+                        "qI": 0.0,
+                        "qJ": 0.0,
+                        "pointLoads": [],
+                        "distributedLoads": []
+                    }]
+                }
+            }],
+            "hinges": [],
+            "isMechanism": true,
+            "redundancy": 0
+        }"#;
+
+        let mut res: PlasticResult = serde_json::from_str(json_str).unwrap();
+
+        let (lam, x) = solver_state_field(&model, &res).unwrap();
+        assert_eq!(lam, 1.5);
+        assert_eq!(x.len(), 3);
+        assert_eq!(x[0], -10.0);
+        assert_eq!(x[1], 20.0);
+        assert_eq!(x[2], 30.0);
+
+        // Zero collapse factor returns None
+        res.collapse_factor = 0.0;
+        assert!(solver_state_field(&model, &res).is_none());
+    }
+
+    #[test]
+    fn test_check_mechanism() {
+        let model = PlasticModel {
+            node_ids: vec![1, 2],
+            restrained: vec![[true, true, true], [false, false, false]],
+            nodal: vec![[qi(0), qi(0), qi(0)], [qi(0), qi(10), qi(0)]],
+            elems: vec![PElem {
+                id: 1,
+                ni: 0,
+                nj: 1,
+                dx: qi(4),
+                dz: qi(0),
+                l: Some(qi(4)),
+                l2: qi(16),
+                mp: Some((qi(100), qi(100))),
+                rel_i: false,
+                rel_j: false,
+                loads: Vec::new(),
+                pieces: Vec::new(),
+            }],
+        };
+
+        // Valid cantilever mechanism
+        let valid_mech = Mechanism {
+            nodes: vec![[qi(0), qi(0), qi(0)], [qi(0), qi(4), qi(1)]],
+            elems: vec![ElemMech {
+                hinges: Vec::new(),
+                omegas: vec![qi(1)],
+            }],
+        };
+        let check = check_mechanism(&model, &valid_mech).unwrap();
+        assert_eq!(check.work, qi(40));
+        assert_eq!(check.dissipation, qi(100));
+        assert_eq!(check.lambda_upper, qr(5, 2)); // 2.5
+
+        // Wrong size
+        let bad_size = Mechanism {
+            nodes: vec![[qi(0), qi(0), qi(0)]],
+            elems: Vec::new(),
+        };
+        assert!(check_mechanism(&model, &bad_size).is_err());
+
+        // Moving restrained node
+        let move_restrained = Mechanism {
+            nodes: vec![[qi(1), qi(0), qi(0)], [qi(0), qi(4), qi(1)]],
+            elems: vec![ElemMech {
+                hinges: Vec::new(),
+                omegas: vec![qi(1)],
+            }],
+        };
+        assert!(check_mechanism(&model, &move_restrained).is_err());
+
+        // Wrong omegas length (hinges = 0, omegas must be 1)
+        let bad_omegas = Mechanism {
+            nodes: vec![[qi(0), qi(0), qi(0)], [qi(0), qi(4), qi(1)]],
+            elems: vec![ElemMech {
+                hinges: Vec::new(),
+                omegas: vec![qi(1), qi(2)],
+            }],
+        };
+        assert!(check_mechanism(&model, &bad_omegas).is_err());
+
+        // Decreasing hinge positions
+        let bad_hinge_order = Mechanism {
+            nodes: vec![[qi(0), qi(0), qi(0)], [qi(0), qi(4), qi(1)]],
+            elems: vec![ElemMech {
+                hinges: vec![qr(3, 4), qr(1, 4)],
+                omegas: vec![qi(1), qi(1), qi(1)],
+            }],
+        };
+        assert!(check_mechanism(&model, &bad_hinge_order).is_err());
+
+        // Incompatible segment closure
+        let incompatible = Mechanism {
+            nodes: vec![[qi(0), qi(0), qi(0)], [qi(0), qi(99), qi(1)]],
+            elems: vec![ElemMech {
+                hinges: Vec::new(),
+                omegas: vec![qi(1)],
+            }],
+        };
+        assert!(check_mechanism(&model, &incompatible).is_err());
+
+        // Non-positive work
+        let mut model_rev = model.clone();
+        model_rev.nodal[1] = [qi(0), qi(-10), qi(0)];
+        assert!(check_mechanism(&model_rev, &valid_mech).is_err());
+    }
+
+
+    #[test]
+    fn test_cutting_samples() {
+        let model = PlasticModel {
+            node_ids: vec![1, 2],
+            restrained: vec![[true, true, true], [false, false, false]],
+            nodal: vec![[qi(0), qi(0), qi(0)], [qi(0), qi(0), qi(0)]],
+            elems: vec![PElem {
+                id: 1,
+                ni: 0,
+                nj: 1,
+                dx: qi(1),
+                dz: qi(0),
+                l: Some(qi(1)),
+                l2: qi(1),
+                mp: Some((qi(4), qi(4))),
+                rel_i: false,
+                rel_j: false,
+                loads: Vec::new(),
+                pieces: Vec::new(),
+            }],
+        };
+
+        let ef = vec![ElemF {
+            dx: 1.0,
+            dz: 0.0,
+            pieces: vec![(0.0, 1.0, [0.0, 10.0, -10.0, 0.0])],
+            lm_end: 0.0,
+            mp: 4.0,
+        }];
+
+        let x = vec![0.0, 0.0, 0.0];
+        let lam = 1.0;
+        let existing = Vec::new();
+
+        let samples = cutting_samples(&model, &ef, &x, lam, &existing);
+        assert_eq!(samples.len(), 1);
+        assert!((samples[0].tf - 0.5).abs() < 1e-12);
+
+        // Piece with c2 = 0, c3 = 0 has no interior critical point
+        let ef_flat = vec![ElemF {
+            dx: 1.0,
+            dz: 0.0,
+            pieces: vec![(0.0, 1.0, [0.0, 10.0, 0.0, 0.0])],
+            lm_end: 0.0,
+            mp: 4.0,
+        }];
+        assert!(cutting_samples(&model, &ef_flat, &x, lam, &existing).is_empty());
+
+        // Low moment below 0.5 * mp is filtered out
+        let ef_low = vec![ElemF {
+            dx: 1.0,
+            dz: 0.0,
+            pieces: vec![(0.0, 1.0, [0.0, 10.0, -10.0, 0.0])],
+            lm_end: 0.0,
+            mp: 100.0, // |m| = 2.5 < 50
+        }];
+        assert!(cutting_samples(&model, &ef_low, &x, lam, &existing).is_empty());
+    }
+
 }
