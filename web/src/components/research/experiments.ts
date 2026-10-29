@@ -90,6 +90,13 @@ export const EXPERIMENTS: Experiment[] = [
     thumbnailQuery: '',
     code: 'https://github.com/lambdaclass/stabileo/tree/main/research/mechanics/biggins-2026',
   },
+  {
+    paperId: 'cqc-1981', path: '/research/benchmarks/cqc-1981',
+    name: 'SRSS vs CQC', hook: 'Closely spaced building modes — first version, 0 reviews.',
+    thumbnail: 'research-thumbs/cqc-1981.webp', thumbnailAlt: 'Base shear from our SRSS and CQC runs', thumbnailQuery: '',
+    code: 'https://github.com/lambdaclass/stabileo/tree/main/research/benchmarks/cqc-1981',
+  },
+
 ];
 
 /** The "Coming next" row; set false to hide it. */

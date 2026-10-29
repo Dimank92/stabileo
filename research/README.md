@@ -23,6 +23,7 @@ The plan every page and contribution follows is [DESIGN.md](DESIGN.md).
 | `optimisation/fairclough-2026/` | One five-node self-weight gridshell from Table 1, externally executed reference and isolated Rust/Clarabel implementation |
 | `benchmarks/macneal-harder-1985/` | Production engine accuracy cases using the shared benchmark page format |
 | `benchmarks/mattiasson-elastica/` | Production corotational cantilever benchmark with provisional reference transcriptions |
+| `benchmarks/cqc-1981/` | First version, 0 reviews: close building modes, production modal + spectrum solvers versus closed form |
 | `templates/` | Starting point for a new paper entry |
 | `tools/` | Catalog checker and other research-only tooling |
 
