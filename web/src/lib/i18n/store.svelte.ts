@@ -200,6 +200,11 @@ export function inSentence(label: string, locale: string = _locale): string {
 	return locale === 'de' ? label : label.toLocaleLowerCase(locale);
 }
 
+/** A phrase that may open with a lowercase label ("{what} çiz"), with its first letter raised by the language's own rules. */
+export function capitalized(text: string, locale: string = _locale): string {
+	return text.charAt(0).toLocaleUpperCase(locale) + text.slice(1);
+}
+
 /** Set of all translations for a given key (across every locale). */
 function allTranslations(key: string): Set<string> {
 	const s = new Set<string>();
