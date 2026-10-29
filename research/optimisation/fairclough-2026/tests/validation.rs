@@ -94,6 +94,11 @@ fn five_node_reference_and_engine() {
     .unwrap();
     assert!(checks.iter().all(|c| c["passed"] == true), "{evidence}");
     let results = json!({"layout":layout,"engine":engine_check,"engine_input":input});
+    fs::write(
+        root.join("target/stabileo_results.json"),
+        serde_json::to_string_pretty(&results).unwrap() + "\n",
+    )
+    .unwrap();
     if std::env::var_os("UPDATE_FAIRCLOUGH").is_some() {
         for (name, value) in [
             ("VALIDATION.json", evidence.clone()),
@@ -126,30 +131,31 @@ fn five_node_reference_and_engine() {
         .abs()
             < 1e-8
     );
-    fn close(a: &Value, b: &Value) {
+    fn close(a: &Value, b: &Value, path: &str) {
         match (a, b) {
             (Value::Number(x), Value::Number(y)) => assert!(
                 (x.as_f64().unwrap() - y.as_f64().unwrap()).abs()
-                    <= 1e-8 * x.as_f64().unwrap().abs().max(1.)
+                    <= 1e-8 * x.as_f64().unwrap().abs().max(1.),
+                "{path}: recorded {x}, computed {y}"
             ),
             (Value::Array(x), Value::Array(y)) => {
                 assert_eq!(x.len(), y.len());
-                for (a, b) in x.iter().zip(y) {
-                    close(a, b);
+                for (i, (a, b)) in x.iter().zip(y).enumerate() {
+                    close(a, b, &format!("{path}[{i}]"));
                 }
             }
             (Value::Object(x), Value::Object(y)) => {
                 assert_eq!(x.len(), y.len());
                 for (k, v) in x {
-                    close(v, &y[k]);
+                    close(v, &y[k], &format!("{path}.{k}"));
                 }
             }
             _ => assert_eq!(a, b),
         }
     }
-    close(&stored, &results);
+    close(&stored, &results, "results");
     let comparison: Value =
         serde_json::from_str(&fs::read_to_string(root.join("PUBLISHED_COMPARISON.json")).unwrap())
             .unwrap();
-    close(&comparison, &published);
+    close(&comparison, &published, "published");
 }

@@ -31,13 +31,13 @@ implementation of published mathematics: no GPL source has been copied or adapte
 |---|---:|---|
 | Published normalized volume | 13.8394 | Table 1, five-node column, first row |
 | Unmodified Python reference | 13.839373588474706 | `reference-results/five-node.json` |
-| Rust / Clarabel | 13.839373540328406 | `results/stabileo_results.json` |
-| Relative volume difference | 3.47894e-9 | `VALIDATION.json` |
-| Maximum centreline coordinate difference / L | 5.39334e-8 | Same |
-| Apex elevation difference / L | 1.43619e-9 | Same |
-| Maximum force component difference / F | 3.63403e-6 | Same |
-| Independent cone feasibility violation | 3.90443e-12 | Same |
-| Production engine vertical force balance, relative | 9.07499e-12 | Same |
+| Rust / Clarabel | 13.83937354032954 | `results/stabileo_results.json` |
+| Relative volume difference | 3.47885e-09 | `VALIDATION.json` |
+| Maximum centreline coordinate difference / L | 5.39511e-08 | Same |
+| Apex elevation difference / L | 1.43616e-09 | Same |
+| Maximum force component difference / F | 3.62828e-06 | Same |
+| Independent cone feasibility violation | 3.09264e-12 | Same |
+| Production engine vertical force balance, relative | 1.37741e-11 | Same |
 
 Four active curved members connect the centre to the corners. Layout comparisons include
 all ten force triples and 33 sampled points on each active curve, not just volume.
@@ -78,7 +78,7 @@ curl -L https://ndownloader.figshare.com/files/54492344 -o /tmp/vaultopt.py
 128 straight 3D **frame** segments, with circular sections and explicit lumped nodal
 self-weight, pinned corner translations, E=1000 MPa and ν=0.3. The linear static solver
 returns a maximum displacement of about 1.26707e-6 m and total vertical reaction
-23.8570253749 kN. This frame's discrete volume is checked to within 0.2% of the conic volume.
+23.8570253743 kN. This frame's discrete volume is checked to within 0.2% of the conic volume.
 The editor receives the same geometry, sections and loads; material density is zero to
 avoid automatic self-weight doubling the explicit loads. The project name carries the
 research disclaimer. The editor solves an ordinary structural model, not the optimizer.
@@ -101,6 +101,13 @@ nix develop -c node research/optimisation/fairclough-2026/wasm/check.mjs
 
 The numerical test writes fresh evidence to `target/`, checks the committed evidence and
 full published result for freshness (allowing floating-point roundoff across platforms).
+The SOCP matrix uses pinned `libm` 0.2.16 (MIT) for length and sine/cosine
+coefficients. Host libc differences in their last bits otherwise perturb the
+interior-point trajectory and amplify into frame section inertias beyond the
+existing `1e-8` relative comparison. Solver and test tolerances are unchanged.
+The test also writes `target/stabileo_results.json` and reports the JSON path and
+values on a numerical mismatch. CI needs only the committed outputs; the external
+GPL script is never needed by `cargo test`.
 To intentionally refresh: set `UPDATE_FAIRCLOUGH=1`, run the test, inspect the evidence,
 and rerun without that variable. `PUBLISHED_COMPARISON.json` names the exact table/page
 and uses a 0.00005 rounding tolerance. Catalogue status remains `numerically-validated`,

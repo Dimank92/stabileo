@@ -21,6 +21,7 @@ solver:
   tolerance_absolute_gap: 1e-10
   tolerance_relative_gap: 1e-10
   tolerance_feasibility: 1e-10
+  coefficient_math: libm 0.2.16 (MIT), portable hypot/sin/cos
   active_member_threshold: 1e-5
 reference:
   version: 10.15131/shef.data.29046755.v1

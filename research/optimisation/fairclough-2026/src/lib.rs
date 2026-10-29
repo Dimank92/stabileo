@@ -29,8 +29,11 @@ pub fn square() -> Result<Layout, String> {
     for (e, &[i, j]) in edges.iter().enumerate() {
         let dx = plan[j][0] - plan[i][0];
         let dy = plan[j][1] - plan[i][1];
-        let length = dx.hypot(dy);
-        let (sn, cs) = (pg * length).sin_cos();
+        // Pin the SOCP coefficients across host libcs. A last-bit difference in
+        // sin/cos changes the interior-point trajectory enough to exceed the
+        // full frame-section regression tolerance after area is squared.
+        let length = libm::hypot(dx, dy);
+        let (sn, cs) = (libm::sin(pg * length), libm::cos(pg * length));
         let (s, a, z) = (3 * e, 3 * e + 1, 3 * e + 2);
         if j == 4 {
             rows[0][s] = dx / length;

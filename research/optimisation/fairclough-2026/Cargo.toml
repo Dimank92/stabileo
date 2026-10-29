@@ -15,6 +15,7 @@ default = ["engine-check"]
 engine-check = ["dep:dedaliano-engine"]
 
 [dependencies]
+libm = "=0.2.16"
 clarabel = { version = "=0.11.1", default-features = false, features = ["serde"] }
 dedaliano-engine = { path = "../../../engine", default-features = false, optional = true }
 serde = { version = "1", features = ["derive"] }
