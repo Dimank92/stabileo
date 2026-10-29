@@ -131,10 +131,12 @@
     if (view) return view;
     let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
     for (let i = 0; i < xy.length; i += 2) {
-      x0 = Math.min(x0, xy[i]);
-      x1 = Math.max(x1, xy[i]);
-      y0 = Math.min(y0, xy[i + 1]);
-      y1 = Math.max(y1, xy[i + 1]);
+      const x = xy[i] + deformScale * (displacement?.[i] ?? 0);
+      const y = xy[i + 1] + deformScale * (displacement?.[i + 1] ?? 0);
+      x0 = Math.min(x0, x);
+      x1 = Math.max(x1, x);
+      y0 = Math.min(y0, y);
+      y1 = Math.max(y1, y);
     }
     return [x0, y0, x1, y1];
   }
