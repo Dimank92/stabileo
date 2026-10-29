@@ -1,6 +1,7 @@
 import { test, expect, type Browser, type Page } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { PUBLIC_LOCALES } from '../src/lib/i18n/offered';
 
 /**
  * What a crawler receives, with JavaScript switched off.
@@ -77,7 +78,7 @@ const POST_TITLE = {
 
 const LOCALES = ['en', 'es', 'pt'] as const;
 type Locale = (typeof LOCALES)[number];
-const PUBLIC = ['de', 'en', 'es', 'fr', 'pt', 'tr'];
+const PUBLIC = [...PUBLIC_LOCALES].sort();
 
 /** The languages a page names as its alternates: every one for the landing and the blog index, and for a post those it is written in. */
 function writtenIn(path: string): string[] {
