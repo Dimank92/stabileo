@@ -88,10 +88,53 @@ pub fn loads_3d(loads: &[SolverLoad3D]) -> Vec<StructuredDiagnostic> {
     }))
 }
 
-/// The warnings a 3D model carries whatever its loads. None is open now: curved shells (SH-6),
-/// warped MITC9 (SH-7) and arches (SP-15) are fixed. Kept as the place a model-level finding goes.
-pub fn model_3d(_input: &SolverInput3D) -> Vec<StructuredDiagnostic> {
-    Vec::new()
+/// Distorted MITC4 quad elements (trapezoidal, parallelogram, skew > 10° or taper > 0.05) suffer severe
+/// in-plane shear locking under in-plane bending (up to -92% under-prediction; MacNeal–Harder 1985, #798).
+fn is_distorted_quad(nodes: &[usize; 4], xyz: &std::collections::HashMap<usize, [f64; 3]>) -> bool {
+    let p: Vec<[f64; 3]> = nodes.iter().filter_map(|n| xyz.get(n).copied()).collect();
+    if p.len() < 4 {
+        return false;
+    }
+    let coords: [[f64; 3]; 4] = [p[0], p[1], p[2], p[3]];
+    let qm = crate::element::quad::quad_quality_metrics(&coords);
+
+    // Edge lengths: 0->1, 1->2, 2->3, 3->0
+    let e0 = ((coords[1][0] - coords[0][0]).powi(2) + (coords[1][1] - coords[0][1]).powi(2) + (coords[1][2] - coords[0][2]).powi(2)).sqrt();
+    let e1 = ((coords[2][0] - coords[1][0]).powi(2) + (coords[2][1] - coords[1][1]).powi(2) + (coords[2][2] - coords[1][2]).powi(2)).sqrt();
+    let e2 = ((coords[3][0] - coords[2][0]).powi(2) + (coords[3][1] - coords[2][1]).powi(2) + (coords[3][2] - coords[2][2]).powi(2)).sqrt();
+    let e3 = ((coords[0][0] - coords[3][0]).powi(2) + (coords[0][1] - coords[3][1]).powi(2) + (coords[0][2] - coords[3][2]).powi(2)).sqrt();
+
+    let max02 = e0.max(e2);
+    let taper02 = if max02 > 1e-12 { (e0 - e2).abs() / max02 } else { 0.0 };
+    let max13 = e1.max(e3);
+    let taper13 = if max13 > 1e-12 { (e1 - e3).abs() / max13 } else { 0.0 };
+    let taper = taper02.max(taper13);
+
+    qm.max_skew > 10.0 || taper > 0.05
+}
+
+/// The warnings a 3D model carries whatever its loads: distorted MITC4 shells under in-plane shear locking (SH-17, #798).
+pub fn model_3d(input: &SolverInput3D) -> Vec<StructuredDiagnostic> {
+    let mut out = Vec::new();
+    if !input.quads.is_empty() {
+        let xyz: std::collections::HashMap<usize, [f64; 3]> =
+            crate::ordered::values(&input.nodes).map(|n| (n.id, [n.x, n.y, n.z])).collect();
+        let distorted: Vec<usize> = crate::ordered::values(&input.quads)
+            .filter(|q| is_distorted_quad(&q.nodes, &xyz))
+            .map(|q| q.id)
+            .collect();
+        if !distorted.is_empty() {
+            let mut d = hit(
+                "SH-17",
+                798,
+                "MITC4 4-node quad shell elements on distorted meshes (skewed or tapered) suffer severe in-plane shear locking under in-plane bending; refine the mesh or use rectangular elements",
+            );
+            d.element_ids = distorted;
+            d.element_kind = Some(ElementKind::Quad);
+            out.push(d);
+        }
+    }
+    out
 }
 
 /// The known-issue warnings that apply to a 2D result of `analysis` on `input`.

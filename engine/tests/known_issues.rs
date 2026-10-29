@@ -150,3 +150,26 @@ fn a_direct_constrained_solve_carries_its_warnings_once() {
     let r = solve_2d(&with).unwrap();
     assert_eq!(assumed(&r.structured_diagnostics), vec!["alpha".to_string()]);
 }
+
+#[test]
+fn distorted_mitc4_quads_carry_known_issue_sh17() {
+    let mut base = beam3d();
+    // Regular quad: rectangular, not distorted -> no SH-17
+    base.nodes.insert("101".into(), SolverNode3D { id: 101, x: 0.0, y: 0.0, z: 0.0 });
+    base.nodes.insert("102".into(), SolverNode3D { id: 102, x: 1.0, y: 0.0, z: 0.0 });
+    base.nodes.insert("103".into(), SolverNode3D { id: 103, x: 1.0, y: 0.2, z: 0.0 });
+    base.nodes.insert("104".into(), SolverNode3D { id: 104, x: 0.0, y: 0.2, z: 0.0 });
+    base.quads.insert("1".into(), SolverQuadElement { id: 1, nodes: [101, 102, 103, 104], material_id: 1, thickness: 0.1 });
+    assert!(!ids(&for_3d(&base, Analysis::Linear)).contains(&"SH-17".to_string()));
+
+    // Distorted quad: skewed / trapezoidal (interior edge at 45°) -> carries SH-17
+    let mut distorted = base.clone();
+    distorted.nodes.insert("102".into(), SolverNode3D { id: 102, x: 0.9, y: 0.0, z: 0.0 });
+    distorted.nodes.insert("103".into(), SolverNode3D { id: 103, x: 1.1, y: 0.2, z: 0.0 });
+    let diags = for_3d(&distorted, Analysis::Linear);
+    assert!(ids(&diags).contains(&"SH-17".to_string()), "distorted MITC4 must be flagged with SH-17");
+    let sh17 = diags.iter().find(|d| d.phase.as_deref() == Some("SH-17")).expect("SH-17 diagnostic");
+    assert_eq!(sh17.value, Some(798.0));
+    assert_eq!(sh17.element_ids, vec![1]);
+    assert_eq!(sh17.element_kind, Some(ElementKind::Quad));
+}
