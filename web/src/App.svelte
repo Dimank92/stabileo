@@ -591,6 +591,13 @@
       void import('./components/research/ResearchPage.svelte').then((m) => (research = m.default));
     }
   });
+  let showPaper = $state(routeKind().kind === 'paper');
+  let paper = $state<typeof import('./components/paper/PaperPage.svelte').default | null>(null);
+  $effect(() => {
+    if (showPaper && !paper) {
+      void import('./components/paper/PaperPage.svelte').then((m) => (paper = m.default));
+    }
+  });
   let showBlog = $state(typeof window !== 'undefined' && isBlogRoute(location.pathname));
   /** The address the blog reads its slug from; kept in state so it is reactive. */
   let blogPath = $state(typeof window !== 'undefined' ? parsePublicPath(location.pathname).path : '/blog');
@@ -616,15 +623,17 @@
     showLanding = false;
     showBlog = false;
     showResearch = false;
+    showPaper = false;
   }
 
   function syncRouteState() {
     showResearch = routeKind().kind === 'research';
+    showPaper = routeKind().kind === 'paper';
     adoptLocaleFromPath();
     showBlog = isBlogRoute(location.pathname);
     blogPath = publicRoute(location.pathname).path;
     showLanding = shouldShowLanding();
-    if (!showLanding && !showBlog && !showResearch) {
+    if (!showLanding && !showBlog && !showResearch && !showPaper) {
       const nextMode = pathToMode(location.pathname);
       currentAppMode = nextMode;
       if (nextMode === 'educativo') {
@@ -789,7 +798,7 @@
     importText = '';
   }
 
-  const editorActive = $derived(!showLanding && !showBlog && !showResearch);
+  const editorActive = $derived(!showLanding && !showBlog && !showResearch && !showPaper);
   provideEditorActivity(() => editorActive);
 
   let pendingPaste = $state<{ inPlace: boolean; started: boolean } | null>(null);
@@ -1161,7 +1170,7 @@
    * copies or reloads is the wrong one.
    */
   $effect(() => {
-    if (showLanding || showBlog || showResearch || typeof window === 'undefined') return;
+    if (showLanding || showBlog || showResearch || showPaper || typeof window === 'undefined') return;
     replaceAppUrl(uiStore.appMode, modelStore.model.name);
   });
 
@@ -1409,6 +1418,11 @@
     {@const Research = research}
     <Research path={blogPath} />
   {/if}
+{:else if showPaper}
+  {#if paper}
+    {@const Paper = paper}
+    <Paper />
+  {/if}
 {:else if showBlog}
   <BlogPage path={blogPath} />
 {:else if showLanding}
@@ -1433,7 +1447,7 @@
       </div>
 {/snippet}
 
-<div class="app-container" class:embed-mode={uiStore.embedMode} class:hidden-behind-landing={showLanding || showBlog || showResearch}>
+<div class="app-container" class:embed-mode={uiStore.embedMode} class:hidden-behind-landing={showLanding || showBlog || showResearch || showPaper}>
   <header class="app-header" class:has-autosave={showAutosaveBanner}>
     <div class="logo">
       <button class="logo-home" onclick={() => { history.pushState(null, '', '/'); syncRouteState(); }} title={t('app.backHome')}>
@@ -2148,7 +2162,7 @@
     </footer>
   {/if}
 
-  {#if !uiStore.embedMode && !showLanding && !showBlog && !showResearch}
+  {#if !uiStore.embedMode && !showLanding && !showBlog && !showResearch && !showPaper}
     <WhatsNewNotice />
   {/if}
 

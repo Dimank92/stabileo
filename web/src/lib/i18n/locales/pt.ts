@@ -231,6 +231,7 @@ const pt: Translations = {
   'landing.navEducation': 'Educacional',
   'landing.navPricing': 'Preços',
   'landing.navBlog': 'Blog',
+  'landing.navPaper': 'Artigo',
   'landing.navResearch': 'Pesquisa',
   'landing.ebHero': 'LIVRE E ABERTO · CÁLCULO ESTRUTURAL',
   'landing.heroH': 'Cálculo estrutural, numa aba do navegador.',

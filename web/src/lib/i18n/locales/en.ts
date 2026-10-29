@@ -233,6 +233,7 @@ const en: Record<string, string> = {
   'landing.navEducation': 'Education',
   'landing.navPricing': 'Pricing',
   'landing.navBlog': 'Blog',
+  'landing.navPaper': 'Paper',
   'landing.navResearch': 'Research',
   'landing.ebHero': 'FREE AND OPEN · STRUCTURAL ANALYSIS',
   'landing.heroH': 'Structural analysis, in a browser tab.',
