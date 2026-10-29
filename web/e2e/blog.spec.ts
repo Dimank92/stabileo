@@ -42,6 +42,19 @@ async function boot(page: Page, path: string, locale = 'en') {
 }
 
 test.describe('@smoke blog', () => {
+  for (const locale of PUBLIC_LOCALES.filter((l) => l !== 'es')) {
+    test(`the changelog page in ${locale}: every entry in its language, no raw key, and an alternate per published language`, async ({ page }) => {
+      await boot(page, `/${locale}/changelog/`, locale);
+      const weeks = page.getByTestId('changelog-entry');
+      await expect(weeks).toHaveCount(CHANGELOG.length);
+      await expect(weeks.first().getByRole('heading', { level: 3 })).toHaveText(CHANGELOG[0].i18n[locale].title);
+      await expect(weeks.last().locator('li').first()).toHaveText(CHANGELOG.at(-1)!.i18n[locale].items[0]);
+      expect(await page.locator('main, body').first().innerText()).not.toMatch(/\b(changelog|landing|blog)\.[a-zA-Z]/);
+      const alts = await page.locator('link[rel="alternate"][hreflang]').evaluateAll((els) => els.map((e) => e.getAttribute('hreflang')).sort());
+      expect(alts).toEqual([...PUBLIC_LOCALES, 'x-default'].sort());
+    });
+  }
+
   test('the changelog page lists every entry since February by month, and filters by area', async ({ page }) => {
     await boot(page, '/es/changelog/', 'es');
 

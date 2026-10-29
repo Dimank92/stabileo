@@ -13,9 +13,10 @@ import {
   formatChangeMonth,
   itemsByArea,
 } from '..';
-import { changelogPage } from '../../blog/pages/changelog';
+import { findStandingPage } from '../../blog/pages';
 
-const LOCALES = ['es', 'en', 'pt'] as const;
+const LOCALES = ['es', 'en', 'pt', 'de', 'fr', 'tr'] as const;
+const changelogPage = findStandingPage('/changelog')!;
 const SCREENSHOTS = resolve(__dirname, '../../../../public/screenshots');
 
 describe('the changelog', () => {
@@ -76,6 +77,9 @@ describe('the changelog', () => {
   it('formats a calendar day without moving it across time zones', () => {
     expect(formatChangeDate('2026-10-23', 'es')).toBe('23 de octubre de 2026');
     expect(formatChangeDate('2026-10-23', 'en')).toBe('October 23, 2026');
+    expect(formatChangeDate('2026-10-23', 'de')).toBe('23. Oktober 2026');
+    expect(formatChangeDate('2026-10-23', 'fr')).toBe('23 octobre 2026');
+    expect(formatChangeDate('2026-10-23', 'tr')).toBe('23 Ekim 2026');
   });
 });
 
@@ -123,5 +127,12 @@ describe('the changelog helpers', () => {
     expect(formatChangeMonth('2026-10-01', 'en')).toBe('October 2026');
     expect(formatChangeMonth('2026-10-01', 'pt')).toBe('Outubro de 2026');
     expect(formatChangeMonth('2026-02-01', 'es', { capitalize: false })).toBe('febrero de 2026');
+    expect(changeStamp(week, 'fr')).toEqual({ big: '2', small: 'oct' });
+    expect(changeStamp(week, 'de')).toEqual({ big: '2', small: 'Okt' });
+    expect(changeStamp(month, 'tr')).toEqual({ big: 'Mar', small: null });
+    expect(formatChangeMonth('2026-10-01', 'fr')).toBe('Octobre 2026');
+    expect(formatChangeMonth('2026-02-01', 'fr', { capitalize: false })).toBe('février 2026');
+    expect(formatChangeMonth('2026-02-01', 'tr')).toBe('Şubat 2026');
+    expect(formatChangeMonth('2026-10-01', 'de')).toBe('Oktober 2026');
   });
 });

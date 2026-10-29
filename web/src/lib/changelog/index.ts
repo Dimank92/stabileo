@@ -63,6 +63,36 @@ export const CHANGELOG: ChangelogEntry[] = [
           'Dois artigos novos no blog, um índice redesenhado e uma página que detalha o que o Stabileo verifica de cada norma CIRSOC.',
         ],
       },
+      de: {
+        title: 'Nachweise im Rechenkern und die Versionen 0.2.0 und 0.3.0',
+        items: [
+          'Die Nachweise für Stahlbeton (CIRSOC 201) und Stahl (CIRSOC 301) laufen jetzt im Rechenkern, mit Validierungsreihen an veröffentlichten Referenzmodellen.',
+          'Für die Ergebnisse, die es zulassen, berechnet der Rechenkern mit Intervallarithmetik eine Fehlerschranke.',
+          'Die Versionen 0.2.0 und 0.3.0 sind erschienen, mit Versionshinweisen auf Spanisch, Englisch und Portugiesisch. Betrifft eine Änderung Ergebnisse, weist die App darauf hin, gespeicherte Projekte neu zu berechnen.',
+          'Die Startseite erhält einen Abschnitt zur Verifikation und lädt jetzt 152 KB statt 6,4 MB.',
+          'Zwei neue Blogbeiträge, ein überarbeitetes Verzeichnis und eine Seite, die zeigt, was Stabileo aus jeder CIRSOC-Norm nachweist.',
+        ],
+      },
+      fr: {
+        title: 'Les vérifications dans le moteur, et les versions 0.2.0 et 0.3.0',
+        items: [
+          'Les vérifications du béton armé (CIRSOC 201) et de l\'acier (CIRSOC 301) sont désormais calculées dans le moteur, avec des séries de validation sur des modèles de référence publiés.',
+          'Pour les résultats qui s\'y prêtent, le moteur calcule une borne d\'erreur par arithmétique d\'intervalles.',
+          'Les versions 0.2.0 et 0.3.0 sont sorties, avec des notes en espagnol, en anglais et en portugais. Quand une modification touche les résultats, l\'application invite à recalculer les projets enregistrés.',
+          'La page d\'accueil gagne une section sur la vérification et ne charge plus que 152 Ko au lieu de 6,4 Mo.',
+          'Deux nouveaux articles de blog, un sommaire repensé et une page qui détaille ce que Stabileo vérifie de chaque règlement CIRSOC.',
+        ],
+      },
+      tr: {
+        title: 'Motorda kontroller ve 0.2.0 ile 0.3.0 sürümleri',
+        items: [
+          'Betonarme (CIRSOC 201) ve çelik (CIRSOC 301) kontrolleri artık motorun içinde hesaplanıyor; yayımlanmış referans modellere karşı doğrulama setleri de var.',
+          'İzin veren sonuçlar için motor, aralık aritmetiğiyle bir hata sınırı hesaplıyor.',
+          '0.2.0 ve 0.3.0 sürümleri İspanyolca, İngilizce ve Portekizce notlarla yayımlandı. Bir değişiklik sonuçları etkilediğinde uygulama, kayıtlı projelerin yeniden hesaplanması için uyarıyor.',
+          'Açılış sayfasına doğrulama üzerine bir bölüm eklendi ve sayfa artık 6,4 MB yerine 152 KB yükleniyor.',
+          'Blogda iki yeni yazı, yeniden tasarlanmış bir dizin ve Stabileo\'nun her CIRSOC yönetmeliğinden neyi kontrol ettiğini ayrıntılı anlatan bir sayfa.',
+        ],
+      },
     },
   },
   {
@@ -76,6 +106,9 @@ export const CHANGELOG: ChangelogEntry[] = [
         es: 'El diálogo del informe de cálculo del modo Básico, con la lista de contenidos para elegir qué incluir',
         en: 'The Basic mode calculation report dialog, with the list of contents to choose what to include',
         pt: 'O diálogo do relatório de cálculo do modo Básico, com a lista de conteúdos para escolher o que incluir',
+        de: 'Der Dialog der statischen Berechnung im Basis-Modus, mit der Inhaltsliste, in der man auswählt, was aufgenommen wird',
+        fr: 'La boîte de dialogue de la note de calcul du mode Basique, avec la liste des contenus où l\'on choisit ce qu\'elle inclut',
+        tr: 'Temel modundaki hesap raporu iletişim kutusu; neyin dahil edileceğini seçmek için içerik listesiyle',
       },
     },
     i18n: {
@@ -112,6 +145,39 @@ export const CHANGELOG: ChangelogEntry[] = [
           'Unidades em todo o PRO e exportações para Excel, CSV, relatório PDF, DXF e imagens, cada uma com um diálogo que mostra o que sai.',
         ],
       },
+      de: {
+        title: 'Eine statische Berechnung nach Maß in Basis und dynamische Lasten in PRO',
+        items: [
+          'Zoom von Kilometern bis zu Millimetern, Auswahl überlappender Stäbe, Ausblenden von Modellteilen und besser lesbare Beschriftungen.',
+          'Die statische Berechnung als PDF wird zusammengestellt, indem man auswählt, was hineinkommt, unter anderem die kinematische Analyse und die Freikörperbilder im Gleichgewicht, und die Abbildungen werden druckfertig exportiert.',
+          'Ein Video, das zeigt, wie das Tragwerk Geschoss für Geschoss entsteht.',
+          'Zusammengesetzte Lastfälle und Referenzlastfälle, Ersatzlasten und Kombinationen nach SRSS und ABS.',
+          'Dynamische und bewegliche Lasten: projekteigene Antwortspektren und Fahrzeuge aus dem Katalog.',
+          'Einheiten im gesamten PRO und Exporte nach Excel, CSV, PDF-Bericht, DXF und als Bilder, jeweils mit einem Dialog, der zeigt, was ausgegeben wird.',
+        ],
+      },
+      fr: {
+        title: 'Une note de calcul sur mesure dans Basique, et des charges dynamiques dans PRO',
+        items: [
+          'Zoom du kilomètre au millimètre, sélection de barres superposées, masquage de parties du modèle et étiquettes plus lisibles.',
+          'La note de calcul en PDF se compose en choisissant ce qu\'elle contient, entre autres l\'analyse cinématique et les corps libres en équilibre, et les figures s\'exportent prêtes à imprimer.',
+          'Une vidéo qui montre la structure s\'élever étage par étage.',
+          'Cas de charge composés et de référence, charges notionnelles et combinaisons SRSS et ABS.',
+          'Charges dynamiques et mobiles : spectres de réponse propres au projet et véhicules de catalogue.',
+          'Unités dans tout PRO et exports vers Excel, CSV, note de calcul PDF, DXF et images, chacun avec une boîte de dialogue qui montre ce qui sera produit.',
+        ],
+      },
+      tr: {
+        title: 'Temel\'de isteğe göre hazırlanan rapor ve PRO\'da dinamik yükler',
+        items: [
+          'Kilometreden milimetreye yakınlaştırma, üst üste binen çubukların seçimi, modelin bölümlerini gizleme ve daha okunaklı etiketler.',
+          'PDF hesap raporu, içine ne gireceği seçilerek hazırlanıyor; bunlar arasında kinematik analiz ve dengedeki serbest cisim diyagramları da var. Şekiller yazdırmaya hazır olarak dışa aktarılıyor.',
+          'Yapının kat kat yükselişini gösteren bir video.',
+          'Bileşik ve referans yük durumları, fiktif yükler ve SRSS ile ABS kombinasyonları.',
+          'Dinamik ve hareketli yükler: projeye özgü tepki spektrumları ve katalogdan araçlar.',
+          'PRO\'nun tamamında birimler ve Excel, CSV, PDF rapor, DXF ve görüntü olarak dışa aktarma; her biri neyin çıkacağını gösteren bir iletişim kutusuyla.',
+        ],
+      },
     },
   },
   {
@@ -145,6 +211,33 @@ export const CHANGELOG: ChangelogEntry[] = [
           'O dimensionamento de concreto armado de um edifício inteiro leva menos da metade do tempo de antes.',
         ],
       },
+      de: {
+        title: 'Lasten nach Norm in PRO',
+        items: [
+          'Der Lastgenerator nach Norm deckt Dächer, Schneeverwehungen und feldweise Lastanordnung ab und berechnet den Böenfaktor des Winds nach CIRSOC 102.',
+          'Lasten auf Stäben, Knoten und Platten lassen sich mit Richtung, Verlauf und belasteter Fläche von Hand eingeben.',
+          'Anzeigeeinheiten, gevoutete Stäbe und Verbesserungen am Querschnittseditor.',
+          'Die Stahlbetonbemessung eines ganzen Gebäudes dauert weniger als halb so lange wie zuvor.',
+        ],
+      },
+      fr: {
+        title: 'Charges réglementaires dans PRO',
+        items: [
+          'Le générateur de charges réglementaires couvre les toitures, les accumulations de neige et les charges en damier, et calcule le facteur de rafale du vent selon le CIRSOC 102.',
+          'Les charges sur les barres, les nœuds et les plaques se saisissent à la main avec leur direction, leur variation et la zone qu\'elles couvrent.',
+          'Unités d\'affichage, barres à inertie variable et améliorations de l\'éditeur de sections.',
+          'Le dimensionnement en béton armé d\'un bâtiment entier prend moins de la moitié du temps qu\'auparavant.',
+        ],
+      },
+      tr: {
+        title: 'PRO\'da yönetmeliğe göre yükler',
+        items: [
+          'Yönetmeliğe göre yük oluşturucu çatıları, kar birikmesini ve dama tahtası yüklemesini kapsıyor ve rüzgârın hamle faktörünü CIRSOC 102\'ye göre hesaplıyor.',
+          'Çubuklara, düğümlere ve plaklara gelen yükler doğrultuları, değişimleri ve kapladıkları alanla elle girilebiliyor.',
+          'Görüntüleme birimleri, değişken kesitli çubuklar ve kesit düzenleyicide iyileştirmeler.',
+          'Bütün bir binanın betonarme boyutlandırması eskisinin yarısından daha kısa sürüyor.',
+        ],
+      },
     },
   },
   {
@@ -158,6 +251,9 @@ export const CHANGELOG: ChangelogEntry[] = [
         es: 'Un edificio de varios pisos modelado en el modo PRO, con grillas y niveles',
         en: 'A multi-story building modeled in PRO mode, with grids and levels',
         pt: 'Um edifício de vários andares modelado no modo PRO, com eixos e níveis',
+        de: 'Ein mehrgeschossiges Gebäude, im PRO-Modus mit Raster und Geschossen modelliert',
+        fr: 'Un bâtiment de plusieurs étages modélisé dans le mode PRO, avec grilles et niveaux',
+        tr: 'PRO modunda aks ızgaraları ve katlarla modellenmiş çok katlı bir bina',
       },
     },
     i18n: {
@@ -203,6 +299,48 @@ export const CHANGELOG: ChangelogEntry[] = [
           'Um solucionador que acelera muito os modelos grandes e uma correção dos elementos de placa.',
         ],
       },
+      de: {
+        title: 'Von der Übung zum echten Projekt in PRO',
+        items: [
+          'Stäbe werden von Punkt zu Punkt gezeichnet, mit Fang an Knoten, Mittelpunkten und Schnittpunkten, und die App fragt, ob sich Kreuzendes verbinden soll.',
+          'Erklärte Schritt-für-Schritt-Lösungen für fünfzehn Berechnungsverfahren.',
+          'Die dynamische Analyse zeichnet die Eigenformen.',
+          'Raster und Geschosse, Tragwerksgeneratoren, die in das Modell einfügen, sowie Kopieren und Einfügen.',
+          'Deckenlasten über Einzugsflächen, Vernetzung von Platten, elastische Auflager und Gründungen.',
+          'Ergebnistabellen, Durchbiegungsgrenzen, Isoliniendarstellungen auf Platten, eine Excel-Arbeitsmappe des Projekts und ein Bericht.',
+          'Ein Editor zum Zeichnen zusammengesetzter Querschnitte und die Suche nach dem leichtesten Profil, das den Nachweis erfüllt.',
+          'Sieben veröffentlichte Referenztragwerke, modelliert, um die Ergebnisse daran zu prüfen, und eine Galerie mit 24 Beispielen.',
+          'Ein Gleichungslöser, der große Modelle deutlich beschleunigt, und eine Korrektur der Plattenelemente.',
+        ],
+      },
+      fr: {
+        title: 'De l\'exercice au vrai projet dans PRO',
+        items: [
+          'Les barres se dessinent de point à point, avec accrochage aux nœuds, aux milieux et aux intersections, et l\'application demande s\'il faut relier ce qui se croise.',
+          'Des solutions pas à pas commentées couvrant quinze méthodes de calcul.',
+          'L\'analyse dynamique dessine les modes propres.',
+          'Grilles et niveaux, générateurs de structures qui s\'insèrent dans le modèle, et copier-coller.',
+          'Charges de plancher par aire d\'influence, maillage des plaques, appuis élastiques et fondations.',
+          'Tableaux de résultats, limites de flèche, isovaleurs sur les plaques, un classeur Excel du projet et une note de calcul.',
+          'Un éditeur pour dessiner des sections composées, et la recherche du profilé le plus léger qui est conforme.',
+          'Sept structures de référence publiées, modélisées pour confronter les résultats, et une galerie de 24 exemples.',
+          'Un solveur qui accélère nettement les grands modèles, et une correction des éléments de plaque.',
+        ],
+      },
+      tr: {
+        title: 'PRO\'da alıştırmadan gerçek projeye',
+        items: [
+          'Çubuklar noktadan noktaya çiziliyor; düğümlere, orta noktalara ve kesişimlere yakalama var ve uygulama kesişen elemanların birleştirilip birleştirilmeyeceğini soruyor.',
+          'On beş hesap yöntemini kapsayan açıklamalı adım adım çözümler.',
+          'Dinamik analiz mod şekillerini çiziyor.',
+          'Aks ızgaraları ve katlar, modele eklenen yapı oluşturucular ve kopyala yapıştır.',
+          'Etki alanına göre döşeme yükleri, plaklarda ağ oluşturma, elastik mesnetler ve temeller.',
+          'Sonuç tabloları, sehim sınırları, plaklarda kontur çizimleri, projenin Excel çalışma kitabı ve bir rapor.',
+          'Yapma kesitleri çizmek için bir düzenleyici ve kontrolleri sağlayan en hafif profilin aranması.',
+          'Sonuçları karşılaştırmak için modellenmiş, yayımlanmış yedi referans yapı ve 24 örneklik bir galeri.',
+          'Büyük modelleri belirgin biçimde hızlandıran bir çözücü ve plak elemanlarında bir düzeltme.',
+        ],
+      },
     },
   },
   {
@@ -216,6 +354,9 @@ export const CHANGELOG: ChangelogEntry[] = [
         es: 'Las armaduras diseñadas de una estructura de hormigón armado, vistas en 3D en el modo PRO',
         en: 'The designed reinforcement of a reinforced concrete structure, shown in 3D in PRO mode',
         pt: 'As armaduras dimensionadas de uma estrutura de concreto armado, vistas em 3D no modo PRO',
+        de: 'Die bemessene Bewehrung eines Stahlbetontragwerks, im PRO-Modus in 3D dargestellt',
+        fr: 'Les armatures dimensionnées d\'une structure en béton armé, vues en 3D dans le mode PRO',
+        tr: 'Betonarme bir yapının boyutlandırılmış donatıları, PRO modunda 3B olarak',
       },
     },
     i18n: {
@@ -261,6 +402,48 @@ export const CHANGELOG: ChangelogEntry[] = [
           'Um modelo mal montado agora é rejeitado com uma mensagem em vez de devolver zeros.',
         ],
       },
+      de: {
+        title: 'Stahlbetonbemessung in PRO',
+        items: [
+          'Eine kürzere Startseite mit dem Preisvorschlag und einem Kontaktbereich, der auch in der App erscheint.',
+          'Ein neuer Blogbeitrag dazu, wann man mit Stäben und wann mit finiten Elementen modelliert, und ein Benutzerhandbuch.',
+          'Der Stahlbetonrechner nach CIRSOC Flex schlägt jetzt die Bewehrungsstäbe vor und wurde mit der ursprünglichen Tabellenkalkulation abgeglichen.',
+          'Schritt-für-Schritt-Lösungen nach dem Weggrößen- und dem Kraftgrößenverfahren, in 2D und 3D.',
+          'Temperaturlasten in allen Berechnungen.',
+          'Der Lehrmodus wurde zu einem Bereich innerhalb von Basis.',
+          'Stahlbetonbemessung und eine neu geordnete PRO-Oberfläche.',
+          'Eine Gleichgewichtskontrolle des Modells und dynamische Analysen: modal, mit Antwortspektrum und im Zeitverlauf.',
+          'Ein fehlerhaft aufgebautes Modell wird jetzt mit einer Meldung abgewiesen, statt Nullen zu liefern.',
+        ],
+      },
+      fr: {
+        title: 'Le dimensionnement du béton armé dans PRO',
+        items: [
+          'Une page d\'accueil plus courte, avec la proposition tarifaire et un panneau de contact qui apparaît aussi dans l\'application.',
+          'Un nouvel article de blog sur le moment de modéliser avec des barres ou avec des éléments finis, et un guide d\'utilisation.',
+          'La calculatrice de béton armé selon CIRSOC Flex propose désormais les barres, et a été confrontée au tableur d\'origine.',
+          'Des solutions pas à pas par la méthode des déplacements et par la méthode des forces, en 2D et en 3D.',
+          'Charges thermiques dans tous les calculs.',
+          'Le mode Enseignement est devenu un panneau à l\'intérieur de Basique.',
+          'Le dimensionnement du béton armé et une interface PRO réorganisée.',
+          'Un contrôle de l\'équilibre du modèle et des analyses dynamiques : modale, spectrale et temporelle.',
+          'Un modèle mal construit est désormais refusé avec un message au lieu de renvoyer des zéros.',
+        ],
+      },
+      tr: {
+        title: 'PRO\'da betonarme boyutlandırma',
+        items: [
+          'Fiyat önerisini ve uygulamanın içinde de görünen bir iletişim panelini içeren daha kısa bir açılış sayfası.',
+          'Blogda ne zaman çubuklarla, ne zaman sonlu elemanlarla modellemek gerektiğine dair yeni bir yazı ve bir kullanım kılavuzu.',
+          'CIRSOC Flex\'e göre betonarme hesap aracı artık donatı çubuklarını öneriyor ve özgün hesap tablosuyla karşılaştırıldı.',
+          'Rijitlik ve esneklik yöntemleriyle adım adım çözümler, 2B ve 3B\'de.',
+          'Tüm analizlerde sıcaklık yükleri.',
+          'Eğitim modu, Temel\'in içinde bir panel oldu.',
+          'Betonarme boyutlandırma ve yeniden düzenlenmiş bir PRO arayüzü.',
+          'Model denge kontrolü ve dinamik analizler: modal, tepki spektrumu ve zaman tanım alanında.',
+          'Hatalı kurulmuş bir model artık sıfır döndürmek yerine bir iletiyle reddediliyor.',
+        ],
+      },
     },
   },
   {
@@ -274,6 +457,9 @@ export const CHANGELOG: ChangelogEntry[] = [
         es: 'El modo Básico en un celular, con el diagrama de momentos de un pórtico',
         en: 'Basic mode on a phone, with the bending moment diagram of a frame',
         pt: 'O modo Básico em um celular, com o diagrama de momentos de um pórtico',
+        de: 'Der Basis-Modus auf einem Smartphone, mit der Momentenlinie eines Rahmens',
+        fr: 'Le mode Basique sur un téléphone, avec le diagramme des moments d\'un portique',
+        tr: 'Telefonda Temel modu; bir çerçevenin eğilme momenti diyagramıyla',
       },
     },
     i18n: {
@@ -304,6 +490,33 @@ export const CHANGELOG: ChangelogEntry[] = [
           'Estruturas metálicas: seletores de seções e materiais, geradores, o fluxo de trabalho em aço e o dimensionamento de ligações.',
         ],
       },
+      de: {
+        title: 'Stabileo auf dem Smartphone',
+        items: [
+          'Eine Oberfläche für das Smartphone, mit demselben Aufbau für Basis und PRO.',
+          'Import von Modellen aus Excel, und geteilte Links öffnen wieder das vollständige Modell.',
+          'Bewehrungsbemessung von Querschnitten nach CIRSOC Flex, der Tabellenkalkulation, die die meisten Bauingenieure in Argentinien verwenden.',
+          'Stahltragwerke: Auswahl von Querschnitten und Werkstoffen, Generatoren, der Arbeitsablauf im Stahlbau und die Bemessung von Anschlüssen.',
+        ],
+      },
+      fr: {
+        title: 'Stabileo sur votre téléphone',
+        items: [
+          'Une interface pour téléphone, avec la même disposition pour Basique et PRO.',
+          'Import de modèles depuis Excel, et les liens partagés rouvrent le modèle complet.',
+          'Dimensionnement des armatures de sections selon CIRSOC Flex, le tableur qu\'utilisent la plupart des ingénieurs civils en Argentine.',
+          'Structures métalliques : sélection des sections et des matériaux, générateurs, le flux de travail acier et le dimensionnement des assemblages.',
+        ],
+      },
+      tr: {
+        title: 'Stabileo telefonunuzda',
+        items: [
+          'Temel ve PRO için aynı düzene sahip bir telefon arayüzü.',
+          'Excel\'den model içe aktarma; paylaşılan bağlantılar da yeniden tam modeli açıyor.',
+          'Arjantin\'deki inşaat mühendislerinin çoğunun kullandığı hesap tablosu CIRSOC Flex\'e göre kesitlerin donatı boyutlandırması.',
+          'Çelik yapılar: kesit ve malzeme seçicileri, oluşturucular, çelik iş akışı ve birleşim boyutlandırması.',
+        ],
+      },
     },
   },
   {
@@ -317,6 +530,9 @@ export const CHANGELOG: ChangelogEntry[] = [
         es: 'Una nave industrial metálica generada con parámetros editables',
         en: 'A steel industrial shed built from editable parameters',
         pt: 'Um galpão industrial metálico gerado com parâmetros editáveis',
+        de: 'Eine Industriehalle aus Stahl, aus bearbeitbaren Parametern erzeugt',
+        fr: 'Une halle industrielle métallique générée à partir de paramètres modifiables',
+        tr: 'Düzenlenebilir parametrelerle oluşturulmuş çelik bir endüstriyel yapı',
       },
     },
     i18n: {
@@ -347,6 +563,33 @@ export const CHANGELOG: ChangelogEntry[] = [
           'Três erros de cálculo corrigidos: o cortante de um tubo circular, o cortante de pico e uma análise por etapas que descartava lajes e paredes.',
         ],
       },
+      de: {
+        title: 'Stahltragwerke und die Website in drei Sprachen',
+        items: [
+          'Generatoren für Fachwerke, Gitterstützen und Industriehallen aus bearbeitbaren Parametern, mit einer Profilauswahl samt Katalog und Filtern.',
+          'Die Startseite und der Blog auf Spanisch, Englisch und Portugiesisch. Die Website wurde für Suchmaschinen indexierbar, mit achtzehn Seiten und vier Beiträgen.',
+          'Sieben kurze Anleitungen, die die geführte Tour ersetzen.',
+          'Drei Rechenfehler behoben: die Querkraft eines Kreisrohrs, die Spitzenquerkraft und eine Berechnung in Bauphasen, die Decken und Wände wegließ.',
+        ],
+      },
+      fr: {
+        title: 'Les structures métalliques, et le site en trois langues',
+        items: [
+          'Générateurs de fermes, de poteaux en treillis et de halles industrielles à partir de paramètres modifiables, avec un sélecteur de profilés doté d\'un catalogue et de filtres.',
+          'La page d\'accueil et le blog en espagnol, en anglais et en portugais. Le site est devenu indexable par les moteurs de recherche, avec dix-huit pages et quatre articles.',
+          'Sept tutoriels courts, qui remplacent la visite guidée.',
+          'Trois erreurs de calcul corrigées : l\'effort tranchant d\'un tube circulaire, l\'effort tranchant de pointe et une analyse par phases qui omettait des dalles et des voiles.',
+        ],
+      },
+      tr: {
+        title: 'Çelik yapılar ve üç dilde site',
+        items: [
+          'Düzenlenebilir parametrelerden kafes kirişler, kafes kolonlar ve endüstriyel yapılar için oluşturucular; katalog ve filtreler içeren bir profil seçiciyle.',
+          'Açılış sayfası ve blog İspanyolca, İngilizce ve Portekizce. Site, on sekiz sayfa ve dört yazıyla arama motorlarında dizine eklenebilir hâle geldi.',
+          'Rehberli turun yerini alan yedi kısa öğretici.',
+          'Üç hesap hatası düzeltildi: dairesel bir borunun kesme kuvveti, tepe kesme kuvveti ve döşemeleri ve perde duvarları atlayan aşamalı bir analiz.',
+        ],
+      },
     },
   },
   {
@@ -360,6 +603,9 @@ export const CHANGELOG: ChangelogEntry[] = [
         es: 'El análisis de sección del modo Básico, con el estado tensional sobre el contorno real del perfil',
         en: 'Basic mode section analysis, with the stress state over the real outline of the section',
         pt: 'A análise de seção do modo Básico, com o estado de tensões sobre o contorno real do perfil',
+        de: 'Die Querschnittsanalyse im Basis-Modus, mit dem Spannungszustand über dem tatsächlichen Umriss des Profils',
+        fr: 'L\'analyse de section du mode Basique, avec l\'état de contrainte sur le contour réel du profilé',
+        tr: 'Temel modunda kesit analizi; profilin gerçek konturu üzerindeki gerilme durumuyla',
       },
     },
     i18n: {
@@ -390,6 +636,33 @@ export const CHANGELOG: ChangelogEntry[] = [
           'O PRO foi redesenhado com a mesma identidade visual do Básico.',
         ],
       },
+      de: {
+        title: 'Querschnittsanalyse und eine neue PRO-Oberfläche',
+        items: [
+          'Ein Klick auf einen beliebigen Punkt des Tragwerks liefert den Spannungszustand über dem tatsächlichen Querschnitt, mit Hauptspannungen, Mohr-Spannungskreis, Querschnittskern und einem Lastpunkt, den man verschiebt, um die Wirkung der Exzentrizität zu sehen.',
+          'Eine Werkstoff- und Profildatenbank für Argentinien, Europa, die Vereinigten Staaten und Brasilien, mit mehr als 700 anhand ihrer Normen geprüften Profilen.',
+          'Komfortablere Werkzeuge zum Auswählen und Verschieben und Spannungsbilder mit Farbskala.',
+          'PRO wurde mit derselben visuellen Identität wie Basis neu gestaltet.',
+        ],
+      },
+      fr: {
+        title: 'L\'analyse de section, et une nouvelle interface PRO',
+        items: [
+          'Un clic sur n\'importe quel point de la structure donne l\'état de contrainte sur la section réelle, avec les contraintes principales, le cercle de Mohr, le noyau central et un point de charge que l\'on fait glisser pour voir l\'effet de l\'excentricité.',
+          'Une base de matériaux et de profilés pour l\'Argentine, l\'Europe, les États-Unis et le Brésil, avec plus de 700 profilés vérifiés par rapport à leurs normes.',
+          'Des outils de sélection et de déplacement plus pratiques, et des cartes de contraintes avec une échelle de couleurs.',
+          'PRO a été redessiné avec la même identité visuelle que Basique.',
+        ],
+      },
+      tr: {
+        title: 'Kesit analizi ve yeni PRO arayüzü',
+        items: [
+          'Yapının herhangi bir noktasına tıklamak gerçek kesit üzerindeki gerilme durumunu veriyor: asal gerilmeler, Mohr dairesi, kesit çekirdeği ve dışmerkezliğin etkisini görmek için sürüklenen bir yük noktası.',
+          'Arjantin, Avrupa, ABD ve Brezilya için bir malzeme ve profil veritabanı; standartlarına göre kontrol edilmiş 700\'den fazla profille.',
+          'Daha rahat seçme ve taşıma araçları ve renk ölçekli gerilme haritaları.',
+          'PRO, Temel ile aynı görsel kimlikle yeniden tasarlandı.',
+        ],
+      },
     },
   },
   {
@@ -403,6 +676,9 @@ export const CHANGELOG: ChangelogEntry[] = [
         es: 'Un ejercicio del modo Educativo, con los diagramas que traza el alumno corregidos contra el cálculo',
         en: 'An Education mode exercise, with the diagrams the student draws graded against the analysis',
         pt: 'Um exercício do modo Educativo, com os diagramas traçados pelo aluno corrigidos contra o cálculo',
+        de: 'Eine Übung im Lehrmodus, bei der die von den Studierenden gezeichneten Verläufe mit der Berechnung abgeglichen und bewertet werden',
+        fr: 'Un exercice du mode Enseignement, avec les diagrammes tracés par l\'étudiant corrigés par rapport au calcul',
+        tr: 'Eğitim modunda bir alıştırma; öğrencinin çizdiği diyagramlar hesaba göre değerlendiriliyor',
       },
     },
     i18n: {
@@ -436,6 +712,36 @@ export const CHANGELOG: ChangelogEntry[] = [
           'Correções nas verificações de dimensionamento: valores padrão contra a segurança, estados limites que faltavam e dados que eram ignorados.',
         ],
       },
+      de: {
+        title: 'Eine neue visuelle Identität und der Lehrmodus',
+        items: [
+          'Die gesamte Oberfläche von Basis in der visuellen Identität der neuen Startseite.',
+          'Jedes Profil wird auf seinen genauen Umriss zurückgeführt. Fehlt dieser, berechnet die App keine Spannungen, statt die fehlenden Dicken zu erfinden.',
+          'Die Lehrkraft erstellt die Übung in der App und die Studierenden lösen sie; die von ihnen gezeichneten Verläufe werden mit der Berechnung abgeglichen und bewertet.',
+          'Stahlbetonfundamente: von der Bewehrungsbemessung bis zu einer CAD-Datei, mit der Biegeliste in 3D.',
+          'Korrekturen an den Nachweisen: Standardwerte auf der unsicheren Seite, fehlende Grenzzustände und Eingaben, die ignoriert wurden.',
+        ],
+      },
+      fr: {
+        title: 'Une nouvelle identité visuelle, et le mode Enseignement',
+        items: [
+          'Toute l\'interface de Basique avec l\'identité visuelle de la nouvelle page d\'accueil.',
+          'Chaque profilé est ramené à son contour exact. S\'il n\'en a pas, l\'application ne calcule pas de contraintes plutôt que d\'inventer les épaisseurs manquantes.',
+          'L\'enseignant construit l\'exercice dans l\'application et l\'étudiant le résout ; les diagrammes qu\'il trace sont corrigés par rapport au calcul.',
+          'Semelles en béton armé : du dimensionnement des armatures jusqu\'à un fichier CAO, avec la nomenclature des armatures en 3D.',
+          'Corrections des vérifications : valeurs par défaut du côté de l\'insécurité, états limites manquants et données qui étaient ignorées.',
+        ],
+      },
+      tr: {
+        title: 'Yeni bir görsel kimlik ve Eğitim modu',
+        items: [
+          'Temel\'in tüm arayüzü yeni açılış sayfasının görsel kimliğiyle.',
+          'Her profil tam konturuna çözümleniyor. Konturu yoksa uygulama, eksik kalınlıkları uydurmak yerine gerilme hesaplamıyor.',
+          'Öğretmen alıştırmayı uygulamanın içinde hazırlıyor, öğrenci çözüyor; öğrencinin çizdiği diyagramlar hesaba göre değerlendiriliyor.',
+          'Betonarme temeller: donatı boyutlandırmasından bir CAD dosyasına, donatı açılımı 3B olarak.',
+          'Kontrollerde düzeltmeler: güvensiz taraftaki varsayılan değerler, eksik sınır durumları ve göz ardı edilen girdiler.',
+        ],
+      },
     },
   },
   {
@@ -464,6 +770,30 @@ export const CHANGELOG: ChangelogEntry[] = [
           'A landing foi refeita: explica o que é o Stabileo, o que funciona hoje e o que está em desenvolvimento, com seções para o Básico, o Educativo e o PRO.',
           'Cargas e verificações segundo as normas CIRSOC 2025, com a edição de cada norma registrada no projeto.',
           'Pós-processamento e visualizador 3D mais rápidos em modelos grandes.',
+        ],
+      },
+      de: {
+        title: 'Eine neue Startseite und die CIRSOC-Normen 2025',
+        items: [
+          'Die Startseite wurde neu aufgebaut: Sie erklärt, was Stabileo ist, was heute funktioniert und was in Entwicklung ist, mit Abschnitten zu Basis, Lehre und PRO.',
+          'Lasten und Nachweise nach den CIRSOC-Normen 2025, wobei die Ausgabe jeder Norm im Projekt festgehalten wird.',
+          'Schnellere Nachbearbeitung und eine schnellere 3D-Ansicht bei großen Modellen.',
+        ],
+      },
+      fr: {
+        title: 'Une nouvelle page d\'accueil, et les règlements CIRSOC 2025',
+        items: [
+          'La page d\'accueil a été refaite : elle explique ce qu\'est Stabileo, ce qui fonctionne aujourd\'hui et ce qui est en développement, avec des sections pour Basique, Enseignement et PRO.',
+          'Charges et vérifications selon les règlements CIRSOC 2025, avec l\'édition de chaque règlement enregistrée dans le projet.',
+          'Post-traitement et vue 3D plus rapides sur les grands modèles.',
+        ],
+      },
+      tr: {
+        title: 'Yeni açılış sayfası ve CIRSOC 2025 yönetmelikleri',
+        items: [
+          'Açılış sayfası yeniden yapıldı: Stabileo\'nun ne olduğunu, bugün neyin çalıştığını ve neyin geliştirilmekte olduğunu Temel, Eğitim ve PRO bölümleriyle anlatıyor.',
+          'CIRSOC 2025 yönetmeliklerine göre yükler ve kontroller; her yönetmeliğin baskısı projeye kaydediliyor.',
+          'Büyük modellerde daha hızlı son işlem ve 3B görüntüleyici.',
         ],
       },
     },
@@ -496,6 +826,30 @@ export const CHANGELOG: ChangelogEntry[] = [
           'Correções em vínculos e apoios inclinados.',
         ],
       },
+      de: {
+        title: 'Ergebnisse, die immer zum Modell passen',
+        items: [
+          'Wird das Modell bearbeitet, werden die dadurch veralteten Ergebnisse und Nachweise ungültig, sodass nie Ergebnisse angezeigt werden, die nicht mehr gelten.',
+          'Schnellere Berechnung: Lastfälle verwenden die Faktorisierung wieder, Kombinationen werden gebündelt gelöst und die Berechnung läuft im Hintergrund.',
+          'Korrekturen an Kopplungen und geneigten Auflagern.',
+        ],
+      },
+      fr: {
+        title: 'Des résultats qui correspondent toujours au modèle',
+        items: [
+          'Modifier le modèle invalide les résultats et les vérifications devenus obsolètes, si bien que des résultats qui ne s\'appliquent plus ne sont jamais affichés.',
+          'Calcul plus rapide : les cas de charge réutilisent la factorisation, les combinaisons sont résolues par lots et le calcul s\'exécute en arrière-plan.',
+          'Corrections des liaisons et des appuis inclinés.',
+        ],
+      },
+      tr: {
+        title: 'Her zaman modele karşılık gelen sonuçlar',
+        items: [
+          'Model düzenlendiğinde güncelliğini yitiren sonuçlar ve kontroller geçersiz sayılıyor; böylece artık geçerli olmayan sonuçlar hiçbir zaman gösterilmiyor.',
+          'Daha hızlı analiz: yük durumları ayrıştırmayı yeniden kullanıyor, kombinasyonlar toplu çözülüyor ve analiz arka planda çalışıyor.',
+          'Kısıtlarda ve eğik mesnetlerde düzeltmeler.',
+        ],
+      },
     },
   },
   {
@@ -520,6 +874,24 @@ export const CHANGELOG: ChangelogEntry[] = [
           'O importador de plantas DXF ganhou pré-visualização e diagnósticos, controle de unidades, vários pavimentos e interpretação de vigas, com um assistente mais claro.',
         ],
       },
+      de: {
+        title: 'Import von DXF-Plänen',
+        items: [
+          'Der Import von DXF-Plänen erhält eine Vorschau und Diagnosen, eine Einheitenkontrolle, mehrere Geschosse und die Erkennung von Balken, mit einem übersichtlicheren Assistenten.',
+        ],
+      },
+      fr: {
+        title: 'Import de plans DXF',
+        items: [
+          'L\'import de plans DXF gagne un aperçu et des diagnostics, le contrôle des unités, plusieurs niveaux et l\'interprétation des poutres, avec un assistant plus clair.',
+        ],
+      },
+      tr: {
+        title: 'DXF plan içe aktarıcı',
+        items: [
+          'DXF plan içe aktarıcıya önizleme ve tanılama, birim kontrolü, birden çok kat ve kiriş yorumlama eklendi; sihirbaz da daha anlaşılır.',
+        ],
+      },
     },
   },
   {
@@ -542,6 +914,24 @@ export const CHANGELOG: ChangelogEntry[] = [
         title: 'Diagramas de corpo livre no Básico',
         items: [
           'Diagramas de corpo livre de barras em 2D e 3D, com articulações deslizantes em 2D e de seis graus de liberdade em 3D, e os vetores em cada extremidade.',
+        ],
+      },
+      de: {
+        title: 'Freikörperbilder der Stäbe in Basis',
+        items: [
+          'Freikörperbilder von Stäben in 2D und 3D, mit Schiebegelenken in 2D und Freigaben in allen sechs Freiheitsgraden in 3D sowie den Kraftvektoren an jedem Ende.',
+        ],
+      },
+      fr: {
+        title: 'Les corps libres des barres dans Basique',
+        items: [
+          'Corps libres des barres en 2D et en 3D, avec des rotules glissantes en 2D et des libérations sur les six degrés de liberté en 3D, et les vecteurs d\'effort à chaque extrémité.',
+        ],
+      },
+      tr: {
+        title: 'Temel\'de çubukların serbest cisim diyagramları',
+        items: [
+          'Çubukların 2B ve 3B serbest cisim diyagramları; 2B\'de kayan mafsallar, 3B\'de altı serbestlik derecesinde serbestlikler ve her uçtaki kuvvet vektörleri.',
         ],
       },
     },
@@ -574,6 +964,30 @@ export const CHANGELOG: ChangelogEntry[] = [
           'Eixos e seções unificados no Básico 2D e 3D.',
         ],
       },
+      de: {
+        title: 'Vom CAD-Plan zum Stahlbetonmodell',
+        items: [
+          'Von einem DXF-Plan zu einem Tragwerksentwurf in Stahlbeton: ein Assistent, der Layer klassifiziert, eine herunterladbare Vorlage und Beispiele.',
+          'Die Konvention der lokalen Achsen in 3D wurde in der Oberfläche und im Rechenkern korrigiert, und bestehende Modelle wurden migriert.',
+          'Achsen und Querschnitte in Basis 2D und 3D vereinheitlicht.',
+        ],
+      },
+      fr: {
+        title: 'Du plan CAO au modèle en béton armé',
+        items: [
+          'D\'un plan DXF à une ébauche de structure en béton armé : un assistant qui classe les calques, un gabarit téléchargeable et des exemples.',
+          'La convention des axes locaux en 3D corrigée dans l\'interface et dans le moteur, avec migration des modèles existants.',
+          'Axes et sections unifiés dans Basique 2D et 3D.',
+        ],
+      },
+      tr: {
+        title: 'CAD planından betonarme modele',
+        items: [
+          'Bir DXF planından betonarme bir yapı taslağına: katmanları sınıflandıran bir sihirbaz, indirilebilir bir şablon ve örnekler.',
+          '3B yerel eksen kuralı arayüzde ve motorda düzeltildi; mevcut modeller de taşındı.',
+          'Temel 2B ve 3B\'de eksenler ve kesitler birleştirildi.',
+        ],
+      },
     },
   },
   {
@@ -587,6 +1001,9 @@ export const CHANGELOG: ChangelogEntry[] = [
         es: 'Los esfuerzos normales de un edificio en el modo PRO, con perfiles reales en el visor 3D',
         en: 'Axial forces in a building in PRO mode, with real section shapes in the 3D viewer',
         pt: 'Os esforços normais de um edifício no modo PRO, com perfis reais no visualizador 3D',
+        de: 'Die Normalkräfte eines Gebäudes im PRO-Modus, mit realen Querschnittsformen in der 3D-Ansicht',
+        fr: 'Les efforts normaux d\'un bâtiment dans le mode PRO, avec les formes réelles des sections dans la vue 3D',
+        tr: 'PRO modunda bir binanın normal kuvvetleri; 3B görüntüleyicide gerçek kesit şekilleriyle',
       },
     },
     i18n: {
@@ -618,6 +1035,36 @@ export const CHANGELOG: ChangelogEntry[] = [
           'Visualizador 3D com perfis reais e eixos locais, e excentricidades de barras para modelar vigas na face do pilar.',
           'Lajes e paredes com visualização, eixos, tensões principais e relatório.',
           'O modo Básico foi reescrito, com limites mais claros em relação ao PRO.',
+        ],
+      },
+      de: {
+        title: 'Ein professioneller Arbeitsablauf in PRO',
+        items: [
+          'Bemessung, Lasten und statische Berechnung greifen in PRO ineinander, mit vereinheitlichten Nachweisen.',
+          'Ergebnisse nach Lastfall, Kombination und Einhüllender.',
+          'Eine 3D-Ansicht mit realen Querschnittsformen und lokalen Achsen sowie Stabversätze, um Balken an der Stützenseite anzuschließen.',
+          'Decken und Wände mit Darstellung, Achsen, Hauptspannungen und Bericht.',
+          'Der Basis-Modus wurde neu geschrieben, mit einer klareren Abgrenzung zu PRO.',
+        ],
+      },
+      fr: {
+        title: 'Un flux de travail professionnel dans PRO',
+        items: [
+          'Dimensionnement, charges et note de calcul fonctionnent ensemble dans PRO, avec des vérifications unifiées.',
+          'Résultats par cas de charge, par combinaison et par enveloppe.',
+          'Une vue 3D avec les formes réelles des sections et les axes locaux, et des excentrements de barres pour modéliser les poutres au nu du poteau.',
+          'Dalles et voiles avec affichage, axes, contraintes principales et note de calcul.',
+          'Le mode Basique a été réécrit, avec une séparation plus nette par rapport à PRO.',
+        ],
+      },
+      tr: {
+        title: 'PRO\'da profesyonel bir iş akışı',
+        items: [
+          'PRO\'da boyutlandırma, yükler ve hesap raporu birlikte çalışıyor; kontroller de birleştirildi.',
+          'Yük durumu, kombinasyon ve zarfa göre sonuçlar.',
+          'Gerçek kesit şekilleri ve yerel eksenlerle bir 3B görüntüleyici; kirişleri kolon yüzünde modellemek için çubuk kaçıklıkları.',
+          'Görüntüleme, eksenler, asal gerilmeler ve raporla döşemeler ve perde duvarlar.',
+          'Temel modu yeniden yazıldı; PRO ile arasındaki sınır daha net.',
         ],
       },
     },
@@ -660,6 +1107,39 @@ export const CHANGELOG: ChangelogEntry[] = [
           'Correções no salvamento, nos links compartilhados e nas exportações.',
         ],
       },
+      de: {
+        title: 'Eine flüssigere 3D-Ansicht und ein robusterer Rechenkern',
+        items: [
+          'Eine neu gestaltete Startseite.',
+          'Fast tausend neue Robustheitstests, mit Genauigkeitskorrekturen im Rechenkern, in den Elementen und den Kopplungen, sowie Warnungen vor Instabilität, bevor die Berechnung läuft.',
+          'Gelenke in 3D, an jedem Stabende Achse für Achse freigegeben.',
+          'Die 3D-Ansicht bewegt sich bei Modellen mit über tausend Knoten flüssig: Die Knoten werden in einem Durchgang gezeichnet, und die Auswahl von Stäben ist schneller.',
+          'Die Achsen wurden in der ganzen App mit Z nach oben vereinheitlicht, und die Momente My und Mz wurden in Spannungen und Nachweisen korrigiert.',
+          'Korrekturen beim Speichern, bei geteilten Links und bei Exporten.',
+        ],
+      },
+      fr: {
+        title: 'Une vue 3D plus fluide et un moteur plus robuste',
+        items: [
+          'Une page d\'accueil repensée.',
+          'Près de mille nouveaux tests de robustesse, avec des corrections de précision dans le moteur, les éléments et les liaisons, et des avertissements d\'instabilité avant le calcul.',
+          'Rotules en 3D libérées axe par axe à chaque extrémité de barre.',
+          'La vue 3D reste fluide sur des modèles de plus de mille nœuds : les nœuds sont dessinés en une seule passe et la sélection des barres est plus rapide.',
+          'Les axes ont été unifiés avec Z vers le haut dans toute l\'application, et les moments My et Mz ont été corrigés dans les contraintes et les vérifications.',
+          'Corrections de l\'enregistrement, des liens partagés et des exports.',
+        ],
+      },
+      tr: {
+        title: 'Daha akıcı bir 3B görüntüleyici ve daha sağlam bir motor',
+        items: [
+          'Yeniden tasarlanmış bir açılış sayfası.',
+          'Bine yakın yeni sağlamlık testi; motorda, elemanlarda ve kısıtlarda doğruluk düzeltmeleri ve analiz çalışmadan önce kararsızlık uyarıları.',
+          '3B\'de her çubuk ucunda eksen eksen serbest bırakılan mafsallar.',
+          '3B görüntüleyici bini aşkın düğümlü modellerde akıcı hareket ediyor: düğümler tek geçişte çiziliyor ve çubuk seçimi daha hızlı.',
+          'Eksenler uygulamanın tamamında Z yukarı olacak biçimde birleştirildi; gerilmelerde ve kontrollerde My ve Mz momentleri düzeltildi.',
+          'Kaydetmede, paylaşılan bağlantılarda ve dışa aktarmalarda düzeltmeler.',
+        ],
+      },
     },
   },
   {
@@ -674,6 +1154,9 @@ export const CHANGELOG: ChangelogEntry[] = [
         es: 'Un pórtico espacial con su diagrama de momentos en 3D',
         en: 'A space frame with its bending moment diagram in 3D',
         pt: 'Um pórtico espacial com seu diagrama de momentos em 3D',
+        de: 'Ein räumlicher Rahmen mit seiner Momentenlinie in 3D',
+        fr: 'Un portique spatial avec son diagramme des moments en 3D',
+        tr: '3B eğilme momenti diyagramıyla bir uzay çerçeve',
       },
     },
     i18n: {
@@ -722,6 +1205,51 @@ export const CHANGELOG: ChangelogEntry[] = [
           'Um assistente com IA que monta e edita modelos a partir de uma conversa.',
         ],
       },
+      de: {
+        title: 'Der Rechenkern in Rust, der PRO-Modus und der Name Stabileo',
+        items: [
+          'Der Rechenkern wurde in Rust neu geschrieben und läuft über WebAssembly im Browser. Bevor er den alten ersetzte, wurden beide an 90 Modellen verglichen.',
+          'Über zweitausend Validierungstests gegen Lehrbuchlösungen und veröffentlichte Referenzfälle.',
+          'Geometrisch und materiell nichtlineare Berechnung, Dynamik modal, mit Antwortspektrum und im Zeitverlauf, Platten und Schalen, Seile, Berechnung in Bauphasen und federnd gelagerte Gründungen.',
+          'Ein Löser für dünnbesetzte Matrizen, der große Modelle beschleunigt: Die Modalanalyse in 3D wurde 11,8-mal schneller.',
+          'Das Projekt wurde in Stabileo umbenannt, mit eigener Domain, einer Startseite und der Oberfläche in 14 Sprachen.',
+          'Der PRO-Modus, mit Stahlbetonnachweisen nach CIRSOC 201, automatischen Lasten, Diagnosen und statischer Berechnung.',
+          'Ein Arbeitsablauf für Stahlbeton mit der maßgebenden Kombination für jeden Stab, automatischen Nachweisen, Bewehrungsführung und Knoten, sowie großen Beispielen wie einem Stadion mit 1005 Knoten.',
+          'Der Lehrmodus, mit geführten Übungen, die Schritt für Schritt bewertet werden.',
+          'Der Basis-Modus erhält die 3D-Ansicht und die Umwandlung von 3D-Modellen in 2D-Modelle.',
+          'Ein KI-Assistent, der Modelle aus einem Gespräch heraus erstellt und bearbeitet.',
+        ],
+      },
+      fr: {
+        title: 'Le moteur en Rust, le mode PRO et le nom Stabileo',
+        items: [
+          'Le moteur de calcul a été réécrit en Rust et s\'exécute dans le navigateur grâce à WebAssembly. Avant qu\'il remplace l\'ancien, les deux ont été comparés sur 90 modèles.',
+          'Plus de deux mille tests de validation par rapport à des solutions de manuels et à des cas de référence publiés.',
+          'Analyse non linéaire géométrique et matérielle, dynamique modale, spectrale et temporelle, plaques et coques, câbles, construction par phases et fondations sur ressorts.',
+          'Un solveur pour matrices creuses qui accélère les grands modèles : l\'analyse modale en 3D est devenue 11,8 fois plus rapide.',
+          'Le projet a été renommé Stabileo, avec son propre domaine, une page d\'accueil et l\'interface en 14 langues.',
+          'Le mode PRO, avec la vérification du béton armé selon le CIRSOC 201, des charges automatiques, des diagnostics et une note de calcul.',
+          'Un flux de travail pour le béton armé avec la combinaison déterminante pour chaque barre, la vérification automatique, le ferraillage et les nœuds, et de grands exemples comme un stade de 1005 nœuds.',
+          'Le mode Enseignement, avec des exercices guidés corrigés pas à pas.',
+          'Le mode Basique ajoute la vue 3D et le passage de modèles 3D en modèles 2D.',
+          'Un assistant d\'IA qui construit et modifie des modèles à partir d\'une conversation.',
+        ],
+      },
+      tr: {
+        title: 'Rust ile yazılan motor, PRO modu ve Stabileo adı',
+        items: [
+          'Hesap motoru Rust ile yeniden yazıldı ve tarayıcıda WebAssembly ile çalışıyor. Eskisinin yerini almadan önce ikisi 90 model üzerinde karşılaştırıldı.',
+          'Ders kitabı çözümlerine ve yayımlanmış referans durumlara karşı iki binden fazla doğrulama testi.',
+          'Geometrik ve malzeme bakımından doğrusal olmayan analiz; modal, spektral ve zaman tanım alanında dinamik; plaklar ve kabuklar, kablolar, aşamalı yapım ve yaylar üzerinde temeller.',
+          'Büyük modelleri hızlandıran bir seyrek matris çözücüsü: 3B modal analiz 11,8 kat hızlandı.',
+          'Projenin adı Stabileo oldu; kendi alan adı, bir açılış sayfası ve 14 dilde arayüzle.',
+          'CIRSOC 201\'e göre betonarme kontrolleri, otomatik yükler, tanılamalar ve hesap raporuyla PRO modu.',
+          'Her çubuk için belirleyici kombinasyonu, otomatik kontrolleri, donatı detaylandırmayı ve düğümleri içeren bir betonarme iş akışı ve 1005 düğümlü bir stadyum gibi büyük örnekler.',
+          'Adım adım değerlendirilen rehberli alıştırmalarla Eğitim modu.',
+          'Temel moduna 3B görünüm ve 3B modellerin 2B\'ye dönüştürülmesi eklendi.',
+          'Bir konuşmadan modeller oluşturan ve düzenleyen bir yapay zekâ asistanı.',
+        ],
+      },
     },
   },
   {
@@ -736,6 +1264,9 @@ export const CHANGELOG: ChangelogEntry[] = [
         es: 'Un pórtico plano con su diagrama de momentos flectores en el modo Básico',
         en: 'A plane frame with its bending moment diagram in Basic mode',
         pt: 'Um pórtico plano com seu diagrama de momentos fletores no modo Básico',
+        de: 'Ein ebener Rahmen mit seiner Momentenlinie im Basis-Modus',
+        fr: 'Un portique plan avec son diagramme des moments fléchissants dans le mode Basique',
+        tr: 'Temel modunda eğilme momenti diyagramıyla bir düzlem çerçeve',
       },
     },
     i18n: {
@@ -775,6 +1306,42 @@ export const CHANGELOG: ChangelogEntry[] = [
           'Interface para celulares, links compartilhados que levam o modelo, um tour guiado e atalhos de teclado.',
         ],
       },
+      de: {
+        title: 'Der Anfang: ein Tragwerkseditor im Browser',
+        items: [
+          'Die erste Version, am 10. Februar: Stäbe, Auflager und Lasten in 2D, mit Auflagerreaktionen, Schnittgrößenverläufen und Verformungsfigur, ohne etwas zu installieren.',
+          'Einzellasten, abschnittsweise Streckenlasten und Wanderlasten, Lastfälle, Kombinationen und Einhüllende mit ihren beiden Kurven.',
+          'Stahl- und Betonquerschnitte mit einem Profileditor sowie Spannungen im Querschnitt nach Navier, Jourawski und von Mises.',
+          'Geneigte Auflager, Federn und Setzungen sowie das Eigengewicht der Stäbe.',
+          'Ein 3D-Rechenkern mit sechs Freiheitsgraden je Knoten und seine Ansicht, dazu P-Delta, Knicken und Einflusslinien in 2D.',
+          'Eine kinematische Analyse für die Lehre, die Stab für Stab erklärt, warum ein Tragwerk ein Mechanismus ist oder nicht.',
+          'Eine Oberfläche für Mobilgeräte, geteilte Links, die das Modell mitnehmen, eine geführte Tour und Tastenkürzel.',
+        ],
+      },
+      fr: {
+        title: 'Les débuts : un éditeur de structures dans le navigateur',
+        items: [
+          'La première version, le 10 février : barres, appuis et charges en 2D, avec réactions, diagrammes et déformée, sans rien installer.',
+          'Charges ponctuelles, réparties partielles et mobiles, cas de charge, combinaisons et enveloppes avec leurs deux courbes.',
+          'Sections en acier et en béton avec un constructeur de profilés, et contraintes dans la section selon Navier, Jourawski et von Mises.',
+          'Appuis inclinés, ressorts et tassements, et poids propre des barres.',
+          'Un moteur 3D à six degrés de liberté par nœud et sa vue, ainsi que P-Delta, flambement et lignes d\'influence en 2D.',
+          'Une analyse cinématique pédagogique, qui explique barre par barre pourquoi une structure est ou n\'est pas un mécanisme.',
+          'Une interface pour mobile, des liens partagés qui transportent le modèle, une visite guidée et des raccourcis clavier.',
+        ],
+      },
+      tr: {
+        title: 'Başlangıç: tarayıcıda bir yapı düzenleyici',
+        items: [
+          'İlk sürüm, 10 Şubat\'ta: 2B\'de çubuklar, mesnetler ve yükler; tepkiler, diyagramlar ve şekil değiştirmiş durumla, hiçbir şey kurmadan.',
+          'Tekil, kısmi yayılı ve hareketli yükler, yük durumları, kombinasyonlar ve iki eğrisiyle zarflar.',
+          'Profil oluşturucuyla çelik ve beton kesitler; Navier, Jourawski ve von Mises\'e göre kesit gerilmeleri.',
+          'Eğik mesnetler, yaylar ve oturmalar ile çubukların öz ağırlığı.',
+          'Düğüm başına altı serbestlik dereceli bir 3B motor ve görüntüleyicisi; ayrıca 2B\'de P-Delta, burkulma ve tesir çizgileri.',
+          'Bir yapının neden mekanizma olduğunu ya da olmadığını çubuk çubuk açıklayan öğretici bir kinematik analiz.',
+          'Mobil arayüz, modeli taşıyan paylaşılan bağlantılar, rehberli tur ve klavye kısayolları.',
+        ],
+      },
     },
   },
 ];
@@ -783,6 +1350,9 @@ export const AREA_LABELS: Record<PublicLocale, Record<ChangelogArea, string>> = 
   es: { basic: 'Básico', pro: 'PRO', edu: 'Educativo', app: 'App', engine: 'Motor', site: 'Sitio' },
   en: { basic: 'Basic', pro: 'PRO', edu: 'Education', app: 'App', engine: 'Engine', site: 'Website' },
   pt: { basic: 'Básico', pro: 'PRO', edu: 'Educativo', app: 'App', engine: 'Motor', site: 'Site' },
+  de: { basic: 'Basis', pro: 'PRO', edu: 'Lehre', app: 'App', engine: 'Rechenkern', site: 'Website' },
+  fr: { basic: 'Basique', pro: 'PRO', edu: 'Enseignement', app: 'Application', engine: 'Moteur', site: 'Site' },
+  tr: { basic: 'Temel', pro: 'PRO', edu: 'Eğitim', app: 'Uygulama', engine: 'Motor', site: 'Site' },
 };
 
 /** Parsed by parts, so no time zone moves the day back. */
