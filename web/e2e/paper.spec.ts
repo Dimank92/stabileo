@@ -1,18 +1,18 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * /paper: the JAIE 2026 paper in full, in English, set as its LaTeX article (KaTeX), between Blog and
- * Research in the site header, with the typeset PDF and the Spanish original.
+ * /paper: the JAIE 2026 paper in full, in English, set as its LaTeX article (KaTeX), between Changelog
+ * and Research in the site header, with the typeset PDF and the Spanish original.
  *
  *   npx playwright test --grep "@smoke paper"
  */
 test.describe('@smoke paper', () => {
-  test('the header links Blog, Paper, Research in that order and Paper opens the paper', async ({ page }) => {
+  test('the header links Blog, Changelog, Paper, Research in that order and Paper opens the paper', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/es/blog/');
     const nav = page.locator('nav.site-header [data-nav]');
     const ids = await nav.evaluateAll((els) => els.map((e) => e.getAttribute('data-nav')));
-    expect(ids.slice(ids.indexOf('blog'), ids.indexOf('blog') + 3)).toEqual(['blog', 'paper', 'research']);
+    expect(ids.slice(ids.indexOf('blog'), ids.indexOf('blog') + 4)).toEqual(['blog', 'changelog', 'paper', 'research']);
     const link = page.locator('nav.site-header [data-nav="paper"]');
     await expect(link).toHaveText('Paper');
     await link.click();
