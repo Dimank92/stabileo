@@ -22,7 +22,8 @@ test.describe('@smoke Ferrari research', () => {
     await page.goto('/en/research/stability/ferrari-sigmund-2025/');
     await expect(page.getByTestId('ferrari-buckling')).toContainText('2.431356');
     await expect(page.getByTestId('ferrari-source')).toContainText('Precomputed replay');
-    await expectFrame(page, replay.frames[0].displacement);
+    // With reduced motion the replay does not autoplay: it opens on the final load step.
+    await expectFrame(page, replay.frames.at(-1)!.displacement);
     const slider = page.getByRole('slider');
     await slider.press('End');
     await expectFrame(page, replay.frames.at(-1)!.displacement);
@@ -46,7 +47,7 @@ test.describe('@smoke Ferrari research', () => {
         await page.setViewportSize({ width, height });
         await page.emulateMedia({ reducedMotion: 'reduce' });
         await page.goto(`/${locale}/research/stability/ferrari-sigmund-2025/`);
-        await expectFrame(page, replay.frames[0].displacement);
+        await expectFrame(page, replay.frames.at(-1)!.displacement);
         const experiment = page.getByTestId('ferrari-experiment');
         expect(await page.evaluate(() => scrollY)).toBe(0);
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
