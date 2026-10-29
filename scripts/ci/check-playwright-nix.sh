@@ -22,7 +22,7 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   use: { video: 'on' }, // Also exercise the packaged ffmpeg.
-  projects: ['chromium', 'firefox', 'webkit'].map(browserName => ({
+  projects: ['chromium', 'firefox'] // WebKit from nix does not start on Linux; Determinism (the only WebKit job) stays on GitHub.map(browserName => ({
     name: browserName, use: { browserName: browserName as 'chromium' | 'firefox' | 'webkit' },
   })),
 });

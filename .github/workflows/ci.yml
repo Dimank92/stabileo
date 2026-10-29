@@ -748,7 +748,9 @@ jobs:
   # Firefox and WebKit, each compared bit for bit with the same run in Node.
   determinism:
     name: Determinism
-    runs-on: ${{ (vars.STABILEO_SELF_HOSTED == 'true' && (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))) && fromJSON('["self-hosted","stabileo"]') || 'ubuntu-latest' }}
+    # Stays on GitHub's runners: nix-provided WebKit does not start on Linux hosts (checked
+    # with scripts/ci/check-playwright-nix.sh on 2026-10-29); Chromium and Firefox do.
+    runs-on: ubuntu-latest
     # On GitHub, browser system libraries come from apt (only browser binaries are
     # cached); a slow mirror day took the whole 40 minutes once. Headroom for that.
     timeout-minutes: 75
