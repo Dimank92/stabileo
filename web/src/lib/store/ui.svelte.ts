@@ -643,7 +643,7 @@ function createUIStore() {
   let showGrid3D_basic = $state<boolean>(true);
   let snapToGrid3D_basic = $state<boolean>(true);
   let gridSize3D_basic = $state<number>(1);
-  let gridExtent3D_basic = $state<number>(50);
+  let gridExtent3D_basic = $state<number>(100);
   let showNodeLabels3D_basic = $state<boolean>(true);
   let showElementLabels3D_basic = $state<boolean>(false);
   let showShellLabels3D_basic = $state<boolean>(false);
