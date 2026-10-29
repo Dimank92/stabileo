@@ -138,3 +138,11 @@ jobs:
         run: nix develop -c node research/benchmarks/macneal-harder-1985/wasm/check.mjs /tmp/macneal-native.json
       - name: Test measurement and editor handoff
         run: nix develop -c sh -c 'cd web && npx vitest run src/components/research/macneal1985/__tests__/cases.test.ts'
+      - name: Mattiasson native regression assertions
+        run: nix develop -c cargo test --locked --release --manifest-path engine/Cargo.toml --test validation corotational_benchmarks
+      - name: Mattiasson fresh production native results
+        run: nix develop -c cargo run --locked --release --manifest-path research/benchmarks/mattiasson-elastica/Cargo.toml -- /tmp/mattiasson-native.json
+      - name: Mattiasson production WASM parity and measurements
+        run: |
+          nix develop -c node research/benchmarks/mattiasson-elastica/wasm/check.mjs /tmp/mattiasson-native.json
+          nix develop -c sh -c 'cd web && npx vitest run src/components/research/mattiasson1981/__tests__/cases.test.ts'

@@ -63,3 +63,8 @@ For local comparisons, run `nix develop .. -c node scripts/check-research-route-
 without `--update` from the candidate's `web/`, using the same Nix toolchain for both.
 `node --test web/scripts/research-route-budget.test.mjs` checks unchanged routes, the noise
 allowance, missing measurements and negative cases for real landing/app growth.
+
+The Mattiasson engine benchmark (`benchmarks/mattiasson-elastica`) reads the
+engine-owned `engine/tests/benchmarks/mattiasson_elastica.json` through its native
+adapter and production WASM page. It publishes no research solver or imported
+research results. Reference transcriptions remain unverified and status proposed.
