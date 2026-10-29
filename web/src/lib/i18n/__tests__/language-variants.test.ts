@@ -136,3 +136,18 @@ describe('a label set inside a sentence', () => {
     expect(inSentence('Élément', 'fr')).toBe('élément');
   });
 });
+
+describe('a phrase that opens with a label', () => {
+  it('raises its first letter by the language’s own rules', async () => {
+    const { capitalized } = await import('../store.svelte');
+    expect(capitalized('işlem çiz', 'tr')).toBe('İşlem çiz');
+    expect(capitalized('ızgara çiz', 'tr')).toBe('Izgara çiz');
+    expect(capitalized('Schale zeichnen', 'de')).toBe('Schale zeichnen');
+    expect(capitalized('dessiner coque', 'fr')).toBe('Dessiner coque');
+  });
+
+  it('puts the verb where each language puts it', () => {
+    const d = { en, es, pt } as Record<string, Record<string, string>>;
+    for (const l of ['en', 'es', 'pt']) for (const k of ['pro.drawWhat', 'pro.writeWhat', 'pro.addWhat']) expect(d[l][k]).toContain('{what}');
+  });
+});

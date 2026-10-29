@@ -111,8 +111,8 @@ test.describe('a stored locale the app no longer offers', () => {
   });
 });
 
-test.describe('the three offered locales each hold the namespace on their own', () => {
-  for (const locale of ['es', 'en', 'pt'] as const) {
+test.describe('the offered locales each hold the namespace on their own', () => {
+  for (const locale of OFFERED_LOCALES) {
     test(`${locale} renders the metallic props card without falling through to English`, async ({ page }) => {
       await bootWithStoredLocale(page, locale);
       expect(await activeLocale(page)).toBe(locale);

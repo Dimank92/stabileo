@@ -1,6 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
 import { pickLanguage } from './fixtures';
 import { PUBLIC_LOCALES, isComplete, type Locale } from '../src/lib/i18n/offered';
+import fullDe from '../src/lib/i18n/locales/full/de';
+import fullFr from '../src/lib/i18n/locales/full/fr';
+import fullTr from '../src/lib/i18n/locales/full/tr';
 
 const NAME: Record<Locale, string> = { en: 'English', es: 'Español', pt: 'Português', de: 'Deutsch', fr: 'Français', tr: 'Türkçe' };
 const OG: Record<Locale, string> = { en: 'en_US', es: 'es_AR', pt: 'pt_BR', de: 'de_DE', fr: 'fr_FR', tr: 'tr_TR' };
@@ -924,7 +927,7 @@ test.describe('@landing the model the deck states', () => {
 });
 
 /*
- * The deck in the three languages it ships.
+ * The deck in every language it ships.
  *
  * `t()` falls back to English and then to the key itself, so a locale missing
  * a key does not error — it renders `landing.proCalcH` on the page, or worse,
@@ -932,15 +935,19 @@ test.describe('@landing the model the deck states', () => {
  * working page to anyone who does not read that language.
  */
 test.describe('@landing every language gets the whole deck', () => {
-  const HEADING = {
+  const HEADING: Record<Locale, string> = {
     es: 'Cómo pensamos sostener un proyecto abierto',
     en: 'How we plan to sustain an open project',
     pt: 'Como pensamos sustentar um projeto aberto',
-  } as const;
+    de: fullDe['landing.pricingH'], fr: fullFr['landing.pricingH'], tr: fullTr['landing.pricingH'],
+  };
 
-  const FREE = { es: 'Gratis', en: 'Free', pt: 'Grátis' } as const;
+  const FREE: Record<Locale, string> = {
+    es: 'Gratis', en: 'Free', pt: 'Grátis',
+    de: fullDe['landing.priceFree'], fr: fullFr['landing.priceFree'], tr: fullTr['landing.priceFree'],
+  };
 
-  for (const locale of ['es', 'en', 'pt'] as const) {
+  for (const locale of PUBLIC_LOCALES) {
     test(`${locale}: nine sections, no raw keys, and a priced table`, async ({ page }) => {
       await bootLanding(page, { locale });
 
