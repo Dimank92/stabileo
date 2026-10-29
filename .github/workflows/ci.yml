@@ -463,6 +463,7 @@ jobs:
             research/fracture/shauer-2025/wasm
             research/metamaterials/grossman-2026/wasm
             research/form-finding/pastrana-2026/wasm
+            research/optimisation/fairclough-2026
           shared-key: research-wasm
       - name: Install web dependencies (the research viewer bundle is built with Vite)
         run: make web.deps
@@ -470,6 +471,8 @@ jobs:
         run: make research.wasm
       - name: The browser bundle reproduces the reference (Node)
         run: nix develop --command node research/fracture/shauer-2025/wasm/check.mjs web/public/research-wasm/shauer-2025 research/fracture/shauer-2025/reference-results/ex2_steps.csv
+      - name: The five-node gridshell bundle reproduces Table 1 (Node)
+        run: nix develop --command node research/optimisation/fairclough-2026/wasm/check.mjs
       - name: The spring-network bundle gives the exact lattice answers (Node)
         run: nix develop --command node research/metamaterials/grossman-2026/wasm/check.mjs web/public/research-wasm/grossman-2026
       - name: Four-cable browser solver

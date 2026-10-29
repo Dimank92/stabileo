@@ -20,6 +20,7 @@ The plan every page and contribution follows is [DESIGN.md](DESIGN.md).
 | `stability/ferrari-sigmund-2025/` | Roorda-frame buckling and energy derivatives; Koiter reproduction in progress |
 | `form-finding/pastrana-2026/` | Four-cable forward FDM, pinned jax_fdm comparison and production truss check |
 | `mechanics/biggins-2026/` | Centered curvature-patterned shallow arches, using production frame buckling modes |
+| `optimisation/fairclough-2026/` | One five-node self-weight gridshell from Table 1, externally executed reference and isolated Rust/Clarabel implementation |
 | `templates/` | Starting point for a new paper entry |
 | `tools/` | Catalog checker and other research-only tooling |
 

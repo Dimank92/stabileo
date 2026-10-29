@@ -368,6 +368,7 @@ research.wasm: web.deps
 	$(NIX_RUN) research/mechanics/biggins-2026/build.sh
 	$(NIX_RUN) research/metamaterials/grossman-2026/wasm/build.sh
 	$(NIX_RUN) research/form-finding/pastrana-2026/wasm/build.sh
+	$(NIX_RUN) research/optimisation/fairclough-2026/wasm/build.sh
 
 # Builds from the installed dependencies (make web.deps), so CI never resolves away from the lockfile.
 web.build: wasm research.wasm
