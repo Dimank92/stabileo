@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { pickLanguage } from './fixtures';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { PUBLIC_LOCALES } from '../src/lib/i18n/offered';
 
 /**
  * The blog at /blog.
@@ -483,7 +484,7 @@ test.describe('@smoke blog', () => {
     const written = ['en', 'es', 'pt', ...['de', 'fr', 'tr'].filter((l) =>
       existsSync(fileURLToPath(new URL(`../src/lib/blog/translations/${l}/${SLUG}.ts`, import.meta.url))))];
     expect(alts).toEqual([
-      ...['de', 'en', 'es', 'fr', 'pt', 'tr'].filter((l) => written.includes(l)).map((l) => `${l} https://stabileo.com/${l}/blog/${SLUG}/`),
+      ...[...PUBLIC_LOCALES].sort().filter((l) => written.includes(l)).map((l) => `${l} https://stabileo.com/${l}/blog/${SLUG}/`),
       // x-default names the English version of THIS POST. English because the
       // root declares /en as its canonical, so pointing the default at the
       // root would name a URL that is not canonical for itself — and this
