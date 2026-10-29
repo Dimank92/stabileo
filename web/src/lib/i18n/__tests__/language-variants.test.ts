@@ -125,3 +125,14 @@ describe('the kinematics plural ending glued to a word', () => {
     expect(plural(en as Record<string, string>, 'kinematic.mechanismDetected')).toBe('✗ Detected 2 mechanism modes.');
   });
 });
+
+describe('a label set inside a sentence', () => {
+  it('is lowercased by the language’s own rules, and German nouns keep their capital', async () => {
+    const { inSentence } = await import('../store.svelte');
+    expect(inSentence('İç kuvvetler', 'tr')).toBe('iç kuvvetler');
+    expect(inSentence('Işık', 'tr')).toBe('ışık');
+    expect(inSentence('Stäbe', 'de')).toBe('Stäbe');
+    expect(inSentence('Nodos', 'es')).toBe('nodos');
+    expect(inSentence('Élément', 'fr')).toBe('élément');
+  });
+});
