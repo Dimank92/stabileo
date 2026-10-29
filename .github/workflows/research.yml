@@ -88,7 +88,7 @@ jobs:
       - name: Checker rejects bad entries
         run: /tmp/catalog-venv/bin/python -I research/tools/test_catalog.py
       - name: Every entry, evidence file and summary source is well formed
-        run: /tmp/catalog-venv/bin/python -I research/tools/catalog.py check
+        run: /tmp/catalog-venv/bin/python -I research/tools/catalog.py check --offline
 
   # Online: Crossref, licences and links. Runs only as the standalone Research workflow (its own
   # pull_request, push and weekly triggers), never inside the required CI OK: an outage at Crossref
