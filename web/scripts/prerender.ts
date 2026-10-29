@@ -254,7 +254,7 @@ async function publicPaths(): Promise<string[]> {
     if (day) POST_LASTMOD.set(pagePath, day);
   }
   // Stabileo Research: the gallery and each runnable paper (web/src/components/research).
-  const research = ['/research', '/research/fracture/shauer-2025'];
+  const research = ['/research', '/research/fracture/shauer-2025', '/research/optimization/andreassen-2011'];
   return ['/', ...pages, '/blog', ...slugs.map((s) => `/blog/${s}`), ...research];
 }
 
