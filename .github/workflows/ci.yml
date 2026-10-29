@@ -841,6 +841,7 @@ jobs:
       - check-migrations
       - wasm
       - research-wasm
+      - docker-smoke
       - site-e2e
       - web-unit
       - web-build
