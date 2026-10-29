@@ -57,4 +57,6 @@ exclude_re = [
     # The dense paths' resource cap (memory and time), not a soundness
     # condition; exercising it needs a dense model past 3000 free DOFs.
     "\\bsize_check\\b",
+    # In stations::scale, r == 0 returns exactly 0.0, so scaling 0.0 with * vs / is identical.
+    "replace \\* with / in scale",
 ]

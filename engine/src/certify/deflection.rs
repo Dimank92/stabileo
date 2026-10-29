@@ -154,3 +154,165 @@ pub fn deflection_bounds_2d(input: &SolverInput, abs_bound: f64) -> Vec<Deflecti
 pub fn deflection_bounds_3d(input: &SolverInput3D, abs_bound: f64) -> Vec<DeflectionBound> {
     deflection_bounds(&deflection_factors_3d(input), abs_bound)
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cubic_and_plane_sup() {
+        let cubics = [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]];
+        let s = cubic_sup_sq(&cubics, 2.0);
+        assert!(s.is_finite() && s > 0.0);
+
+        // ei <= 1e-6 fallback
+        let s_fallback = plane_sup(2.0, 1e-7, None, false, false);
+        let s_one = plane_sup(2.0, 1.0, None, false, false);
+        assert!((s_fallback - s_one).abs() < 1e-12);
+
+        // gas filter > 0.0
+        let s_timoshenko = plane_sup(2.0, 1000.0, Some(500.0), false, false);
+        assert!(s_timoshenko.is_finite() && s_timoshenko > 0.0);
+        let s_neg_gas = plane_sup(2.0, 1000.0, Some(-1.0), false, false);
+        let s_no_gas = plane_sup(2.0, 1000.0, None, false, false);
+        assert!((s_neg_gas - s_no_gas).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_factor_and_bounds() {
+        let f1 = factor(0.5);
+        let expected1 = up(up(1.0 * T_NORM) * T_NORM);
+        assert!((f1 - expected1).abs() < 1e-12);
+
+        let f4 = factor(4.0);
+        let expected4 = up(up(2.0 * T_NORM) * T_NORM);
+        assert!((f4 - expected4).abs() < 1e-12);
+
+        let factors = vec![(10, 2.0)];
+        let bounds = deflection_bounds(&factors, 0.05);
+        assert_eq!(bounds.len(), 1);
+        assert_eq!(bounds[0].element_id, 10);
+        assert!((bounds[0].displacement - up(2.0 * 0.05)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_deflection_factors_2d() {
+        let json = r#"{
+            "nodes": {
+                "1": {"id": 1, "x": 0.0, "z": 0.0},
+                "2": {"id": 2, "x": 3.0, "z": 4.0},
+                "3": {"id": 3, "x": 6.0, "z": 4.0}
+            },
+            "elements": {
+                "1": {"id": 1, "nodeI": 1, "nodeJ": 2, "materialId": 1, "sectionId": 1, "type": "frame", "hingeStart": false, "hingeEnd": false},
+                "2": {"id": 2, "nodeI": 2, "nodeJ": 3, "materialId": 1, "sectionId": 1, "type": "truss", "hingeStart": false, "hingeEnd": false}
+            },
+            "materials": {
+                "1": {"id": 1, "e": 210.0, "nu": 0.3}
+            },
+            "sections": {
+                "1": {"id": 1, "a": 0.01, "iz": 0.0002, "asY": 0.005}
+            },
+            "supports": {},
+            "loads": []
+        }"#;
+        let input: SolverInput = serde_json::from_str(json).unwrap();
+        let factors = deflection_factors_2d(&input);
+        assert_eq!(factors.len(), 2);
+        assert_eq!(factors[0].0, 1);
+        assert_eq!(factors[1].0, 2);
+        assert!(factors[0].1 > 0.0);
+        assert!(factors[1].1 > 0.0);
+
+        let bounds = deflection_bounds_2d(&input, 0.01);
+        assert_eq!(bounds.len(), 2);
+    }
+
+    #[test]
+    fn test_deflection_factors_3d() {
+        let json = r#"{
+            "nodes": {
+                "1": {"id": 1, "x": 0.0, "y": 0.0, "z": 0.0},
+                "2": {"id": 2, "x": 3.0, "y": 4.0, "z": 0.0},
+                "3": {"id": 3, "x": 6.0, "y": 4.0, "z": 0.0}
+            },
+            "elements": {
+                "1": {"id": 1, "nodeI": 1, "nodeJ": 2, "materialId": 1, "sectionId": 1, "type": "frame", "releaseMzStart": true, "releaseMzEnd": false, "releaseMyStart": false, "releaseMyEnd": true},
+                "2": {"id": 2, "nodeI": 2, "nodeJ": 3, "materialId": 1, "sectionId": 1, "type": "cable", "releaseMzStart": false, "releaseMzEnd": false, "releaseMyStart": false, "releaseMyEnd": false}
+            },
+            "materials": {
+                "1": {"id": 1, "e": 210.0, "nu": 0.3}
+            },
+            "sections": {
+                "1": {"id": 1, "a": 0.01, "iy": 0.0001, "iz": 0.0002, "j": 0.00005, "asY": 0.005, "asZ": 0.005}
+            },
+            "supports": {},
+            "loads": []
+        }"#;
+        let input: SolverInput3D = serde_json::from_str(json).unwrap();
+        let factors = deflection_factors_3d(&input);
+        assert_eq!(factors.len(), 2);
+        assert_eq!(factors[0].0, 1);
+        assert_eq!(factors[1].0, 2);
+        assert!(factors[0].1 > 0.0);
+        assert!(factors[1].1 > 0.0);
+    }
+
+
+    #[test]
+    fn test_mutants_issue_751_deflection() {
+        let zero_cubics = [[0.0; 4]; 4];
+        assert!(cubic_sup_sq(&zero_cubics, 2.0) <= 1e-15);
+        let cubics = [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]];
+        let s = cubic_sup_sq(&cubics, 2.0);
+        assert!(s > 0.0 && s.is_finite());
+
+        let p1 = plane_sup(2.0, 1000.0, None, false, false);
+        assert!(p1 > 0.0 && p1.is_finite());
+        let p2 = plane_sup(2.0, 1000.0, Some(500.0), true, false);
+        assert!(p2 > 0.0 && p2.is_finite());
+        let p3 = plane_sup(2.0, 0.0, None, false, true);
+        assert!(p3 > 0.0 && p3.is_finite());
+
+        let f = factor(4.0);
+        assert!(f >= 2.0 && f.is_finite());
+
+        let json2d = r#"{
+            "nodes": {"1": {"id": 1, "x": 0.0, "z": 0.0}, "2": {"id": 2, "x": 4.0, "z": 0.0}},
+            "materials": {"1": {"id": 1, "e": 200.0, "nu": 0.3}},
+            "sections": {"1": {"id": 1, "a": 0.01, "iz": 0.0001, "asY": 0.005}},
+            "elements": {
+                "1": {"id": 1, "type": "frame", "nodeI": 1, "nodeJ": 2, "materialId": 1, "sectionId": 1, "hingeStart": false, "hingeEnd": false},
+                "2": {"id": 2, "type": "truss", "nodeI": 1, "nodeJ": 2, "materialId": 1, "sectionId": 1}
+            },
+            "supports": {}, "loads": []
+        }"#;
+        let in2d: SolverInput = serde_json::from_str(json2d).unwrap();
+        let f2d = deflection_factors_2d(&in2d);
+        assert_eq!(f2d.len(), 2);
+        assert!(f2d[0].1 > 0.0 && f2d[1].1 > 0.0);
+        let b2d = deflection_bounds_2d(&in2d, 1e-4);
+        assert_eq!(b2d.len(), 2);
+        assert!(b2d[0].displacement > 0.0);
+
+        let json3d = r#"{
+            "nodes": {"1": {"id": 1, "x": 0.0, "y": 0.0, "z": 0.0}, "2": {"id": 2, "x": 4.0, "y": 0.0, "z": 0.0}},
+            "materials": {"1": {"id": 1, "e": 200.0, "nu": 0.3, "density": 7850.0}},
+            "sections": {"1": {"id": 1, "a": 0.01, "iy": 0.0001, "iz": 0.0002, "j": 0.00005, "asY": 0.005, "asZ": 0.004}},
+            "elements": {
+                "1": {"id": 1, "nodeI": 1, "nodeJ": 2, "materialId": 1, "sectionId": 1, "type": "frame", "releaseMzStart": true, "releaseMzEnd": false, "releaseMyStart": false, "releaseMyEnd": true},
+                "2": {"id": 2, "nodeI": 1, "nodeJ": 2, "materialId": 1, "sectionId": 1, "type": "truss"}
+            },
+            "supports": {}, "loads": []
+        }"#;
+        let in3d: SolverInput3D = serde_json::from_str(json3d).unwrap();
+        let f3d = deflection_factors_3d(&in3d);
+        assert_eq!(f3d.len(), 2);
+        assert!(f3d[0].1 > 0.0 && f3d[1].1 > 0.0);
+        let b3d = deflection_bounds_3d(&in3d, 1e-4);
+        assert_eq!(b3d.len(), 2);
+        assert!(b3d[0].displacement > 0.0);
+    }
+
+}

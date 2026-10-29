@@ -624,4 +624,49 @@ mod tests {
             }
         }
     }
+
+
+    #[test]
+    fn test_mutants_issue_751_forces() {
+        let k = vec![3.0, 4.0, 1.0, 2.0];
+        let rn = row_norm(&k, 2, 0);
+        assert!(rn >= 5.0 && rn < 5.0000001);
+
+        let json2d = r#"{
+            "nodes": {"1": {"id": 1, "x": 0.0, "z": 0.0}, "2": {"id": 2, "x": 3.0, "z": 0.0}},
+            "materials": {"1": {"id": 1, "e": 200.0, "nu": 0.3}},
+            "sections": {"1": {"id": 1, "a": 0.01, "iz": 0.0001, "asY": 0.005}},
+            "elements": {
+                "1": {"id": 1, "type": "frame", "nodeI": 1, "nodeJ": 2, "materialId": 1, "sectionId": 1},
+                "2": {"id": 2, "type": "truss", "nodeI": 1, "nodeJ": 2, "materialId": 1, "sectionId": 1}
+            },
+            "supports": {}, "loads": []
+        }"#;
+        let in2d: SolverInput = serde_json::from_str(json2d).unwrap();
+        let lk2d = local_stiffness_2d(&in2d);
+        assert_eq!(lk2d.len(), 2);
+        assert_eq!(lk2d[0].row(0).len(), 6);
+        assert_eq!(lk2d[1].row(0).len(), 2);
+        let fb2d = force_bounds_2d(&in2d, 1e-4);
+        assert_eq!(fb2d.len(), 2);
+        assert!(fb2d[0].n > 0.0 && fb2d[1].n > 0.0);
+
+        let json3d = r#"{
+            "nodes": {"1": {"id": 1, "x": 0.0, "y": 0.0, "z": 0.0}, "2": {"id": 2, "x": 3.0, "y": 0.0, "z": 0.0}},
+            "materials": {"1": {"id": 1, "e": 200.0, "nu": 0.3}},
+            "sections": {"1": {"id": 1, "a": 0.01, "iy": 0.0001, "iz": 0.0002, "j": 0.00005}},
+            "elements": {
+                "1": {"id": 1, "type": "frame", "nodeI": 1, "nodeJ": 2, "materialId": 1, "sectionId": 1},
+                "2": {"id": 2, "type": "truss", "nodeI": 1, "nodeJ": 2, "materialId": 1, "sectionId": 1}
+            },
+            "supports": {}, "loads": []
+        }"#;
+        let in3d: SolverInput3D = serde_json::from_str(json3d).unwrap();
+        let lk3d = local_stiffness_3d(&in3d);
+        assert_eq!(lk3d.len(), 2);
+        let fb3d = force_bounds_3d(&in3d, 1e-4);
+        assert_eq!(fb3d.len(), 2);
+        assert!(fb3d[0].n > 0.0 && fb3d[0].vy > 0.0);
+    }
+
 }

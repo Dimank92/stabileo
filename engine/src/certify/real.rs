@@ -421,4 +421,90 @@ mod tests {
         let p = Interval::pi();
         assert!(p.lo < std::f64::consts::PI && std::f64::consts::PI < p.hi);
     }
+
+
+    #[test]
+    fn test_mutants_issue_751_real() {
+        // bisect_increasing
+        let r = bisect_increasing(|x| x - 3.0, 0.0, 5.0);
+        assert!((r - 3.0).abs() < 1e-12);
+        assert!(bisect_increasing(|x| x - 3.0, 5.0, 0.0).is_nan());
+        assert!(bisect_increasing(|x| x - 3.0, 4.0, 5.0).is_nan());
+        assert!(bisect_increasing(|x| x - 3.0, 0.0, 2.0).is_nan());
+
+        // increasing_root on Interval
+        let root_iv = Interval::increasing_root(|x| x - 2.5, |x| x - Interval::point(2.5), 0.0, 5.0);
+        assert!(root_iv.is_finite());
+        assert!(root_iv.lo <= 2.5 && 2.5 <= root_iv.hi);
+        let root_fail = Interval::increasing_root(|x| x - 2.5, |x| x - Interval::point(2.5), 3.0, 5.0);
+        assert!(!root_fail.is_finite());
+
+        // mid and hull on f64 and Interval
+        assert_eq!(4.5f64.mid(), 4.5);
+        assert!(3.0f64.hull(5.0).is_nan());
+        assert_eq!(iv(2.0, 6.0).mid(), 4.0);
+        assert!(Interval::NAN.mid().is_nan());
+
+        // Interval::le
+        assert_eq!(iv(1.0, 2.0).le(iv(2.0, 3.0)), Tri::True);
+        assert_eq!(iv(2.0, 3.0).le(iv(0.0, 1.0)), Tri::False);
+        assert_eq!(iv(1.0, 3.0).le(iv(2.0, 4.0)), Tri::Unknown);
+        assert_eq!(Interval::NAN.le(iv(1.0, 2.0)), Tri::Unknown);
+
+        // acos
+        let ac = iv(0.0, 0.5).acos();
+        assert!(ac.is_finite());
+        assert!(!iv(-1.5, 0.5).acos().is_finite());
+        assert!(!iv(0.5, 1.5).acos().is_finite());
+
+        // tan
+        let tn = iv(0.0, 0.5).tan();
+        assert!(tn.is_finite());
+        assert!(!iv(1.5, 1.7).tan().is_finite());
+
+        // powf
+        assert!(!iv(-2.0, -1.0).powf(iv(1.0, 2.0)).is_finite());
+        let pw = iv(2.0, 3.0).powf(iv(2.0, 2.0));
+        assert!(pw.lo <= 4.0 && pw.hi >= 9.0);
+    }
+
+
+    #[test]
+    fn test_mid_and_hull() {
+        assert_eq!(iv(-2.0, 2.0).mid(), 0.0);
+        assert_eq!(iv(1.0, 3.0).mid(), 2.0);
+        assert!(iv(f64::NAN, 1.0).mid().is_nan());
+        assert_eq!(Real::mid(5.5f64), 5.5);
+        assert!(Real::hull(1.0f64, 2.0f64).is_nan());
+    }
+
+    #[test]
+    fn test_bisect_and_increasing_root() {
+        // Bisect domain guards
+        assert!(bisect_increasing(|x| x - 2.0, 3.0, 1.0).is_nan()); // !(lo < hi)
+        assert!(bisect_increasing(|x| x - 2.0, 3.0, 5.0).is_nan()); // !(g(lo) < 0)
+        assert!(bisect_increasing(|x| x - 2.0, 0.0, 1.0).is_nan()); // !(g(hi) > 0)
+
+        let r = bisect_increasing(|x| x - 2.0, 0.0, 4.0);
+        assert!((r - 2.0).abs() < 1e-12);
+
+        // increasing_root
+        let root = <Interval as Real>::increasing_root(|x| x - 2.0, |x| x - Interval::point(2.0), 0.0, 4.0);
+        assert!(root.lo <= 2.0 && 2.0 <= root.hi);
+
+        // Fail to bracket when g returns bad intervals
+        let bad = <Interval as Real>::increasing_root(|x| x - 2.0, |_| Interval::new(-1.0, 1.0), 0.0, 4.0);
+        assert!(!bad.is_finite());
+    }
+
+    #[test]
+    fn test_tan_and_acos_boundaries() {
+        assert!(!iv(-1.58, 0.0).tan().is_finite());
+        assert!(!iv(0.0, 1.58).tan().is_finite());
+        assert!(!iv(-1.1, 0.0).acos().is_finite());
+        assert!(!iv(0.0, 1.1).acos().is_finite());
+
+        // le false case
+        assert_eq!(iv(3.0, 4.0).le(iv(1.0, 2.0)), Tri::False);
+    }
 }

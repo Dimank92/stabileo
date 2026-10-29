@@ -556,4 +556,47 @@ mod tests {
         let b = rotate_back(cert, std::slice::from_ref(&rot), &ur, &[0.3, -0.1]).abs_bound().unwrap();
         assert!(b >= 0.1 * (1.0 - 1e-12), "{b:e}");
     }
+
+
+    #[test]
+    fn test_mutants_issue_751_constrained() {
+        // finish function edge cases
+        let c_nan = finish(f64::NAN, &[1.0, 2.0], 1.0, 0.0);
+        assert!(!c_nan.is_certified());
+        let c_inf = finish(f64::INFINITY, &[1.0, 2.0], 1.0, 0.0);
+        assert!(!c_inf.is_certified());
+
+        let c_zero = finish(0.0, &[1.0, 2.0], 1.0, 0.0);
+        assert!(c_zero.is_certified());
+        if let Certificate::Certified { rel_bound, .. } = c_zero {
+            assert_eq!(rel_bound, 0.0);
+        } else { panic!(); }
+
+        let c_zero_u = finish(0.1, &[0.0, 0.0], 1.0, 0.0);
+        assert!(c_zero_u.is_certified());
+        if let Certificate::Certified { rel_bound, .. } = c_zero_u {
+            assert_eq!(rel_bound, f64::INFINITY);
+        } else { panic!(); }
+
+        let c_norm = finish(0.1, &[3.0, 4.0], 1.0, 0.0);
+        assert!(c_norm.is_certified());
+        if let Certificate::Certified { rel_bound, .. } = c_norm {
+            assert!(rel_bound >= 0.02 && rel_bound < 0.0200001);
+        } else { panic!(); }
+
+        // symmetric_part_lower branches: a == b, a > b, a < b, and merging
+        let slots = vec![
+            (0, 0, Interval::point(2.0)),
+            (0, 0, Interval::point(3.0)), // merged -> 5.0
+            (1, 0, Interval::point(4.0)), // a > b
+            (0, 1, Interval::point(2.0)), // a < b
+            (1, 1, Interval::point(6.0)),
+        ];
+        let (csc, ivs) = symmetric_part_lower(2, slots);
+        assert_eq!(csc.n, 2);
+        assert!(ivs[0].lo <= 5.0 && ivs[0].hi >= 5.0);
+        assert!(ivs[1].lo <= 3.0 && ivs[1].hi >= 3.0);
+        assert!(ivs[2].lo <= 6.0 && ivs[2].hi >= 6.0);
+    }
+
 }

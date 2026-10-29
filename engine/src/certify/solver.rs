@@ -1012,4 +1012,75 @@ mod tests {
             assert!(!p.certify(f, u).is_certified(), "sparse: f {f:?}, u {u:?}");
         }
     }
+
+
+    #[test]
+    fn test_mutants_issue_751_solver() {
+        let mut e2e_good = EndToEnd::Certified {
+            abs_bound: 1e-5,
+            rel_bound: 1e-4,
+            mu: 1.0,
+            residual_norm: 1e-7,
+            k_discrepancy: 1e-8,
+            f_discrepancy: 1e-8,
+            excluded_dofs: vec![],
+        };
+        guard_end_to_end(&mut e2e_good);
+        assert!(e2e_good.is_certified());
+
+        let mut e2e_bad = EndToEnd::Certified {
+            abs_bound: f64::NAN,
+            rel_bound: 1e-4,
+            mu: 1.0,
+            residual_norm: 1e-7,
+            k_discrepancy: 1e-8,
+            f_discrepancy: 1e-8,
+            excluded_dofs: vec![],
+        };
+        guard_end_to_end(&mut e2e_bad);
+        assert!(!e2e_bad.is_certified());
+
+        let mut e2e_uncert = EndToEnd::Uncertified { reason: "test".to_string() };
+        guard_end_to_end(&mut e2e_uncert);
+        assert!(!e2e_uncert.is_certified());
+
+        let empty_2d = r#"{"displacements": [], "reactions": [], "elementForces": []}"#;
+        let mut r2d = CertifiedResults2D {
+            results: serde_json::from_str(empty_2d).unwrap(),
+            certificate: Certificate::Certified { abs_bound: 1e-5, rel_bound: 1e-4, sigma: 1.0, residual_norm: 1e-7 },
+            force_bounds: vec![ForceBound2D { element_id: 1, n: f64::NAN, v: 1.0, m: 1.0 }],
+            shown: ShownBounds::default(),
+            end_to_end: e2e_good.clone(),
+            certificate_level: CertificateLevel::Assembled,
+        };
+        r2d.guard();
+        assert!(!r2d.certificate.is_certified());
+        assert!(r2d.force_bounds.is_empty());
+
+        let empty_3d = r#"{"displacements": [], "reactions": [], "elementForces": []}"#;
+        let mut r3d = CertifiedResults3D {
+            results: serde_json::from_str(empty_3d).unwrap(),
+            certificate: Certificate::Certified { abs_bound: 1e-5, rel_bound: 1e-4, sigma: 1.0, residual_norm: 1e-7 },
+            force_bounds: vec![],
+            shell_bounds: vec![ShellBound {
+                element_id: 1,
+                kind: "quad".to_string(),
+                sigma_xx: f64::NAN,
+                sigma_yy: 0.0,
+                tau_xy: 0.0,
+                mx: 0.0,
+                my: 0.0,
+                mxy: 0.0,
+                qx: None,
+                qy: None,
+            }],
+            shown: ShownBounds::default(),
+            end_to_end: e2e_good,
+            certificate_level: CertificateLevel::Assembled,
+        };
+        r3d.guard();
+        assert!(!r3d.certificate.is_certified());
+        assert!(r3d.shell_bounds.is_empty());
+    }
+
 }

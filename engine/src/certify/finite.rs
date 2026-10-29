@@ -355,3 +355,90 @@ impl ser::SerializeStructVariant for &mut Audit {
     }
     fn end(self) -> R { Ok(()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::certify::linear::Certificate;
+
+    #[derive(serde::Serialize)]
+    struct DummySample {
+        a: f64,
+        b: Vec<f64>,
+        #[serde(rename = "relBound")]
+        rel_bound: f64,
+    }
+
+    #[derive(serde::Serialize)]
+    struct TupleSample(f64, f64, f64);
+
+    #[test]
+    fn test_mutants_issue_751_finite() {
+        let one = vec!["$.a=NaN".to_string()];
+        let d1 = describe("test", &one);
+        assert_eq!(d1, "non-finite number in the test at $.a=NaN");
+
+        let three = vec!["$.a=NaN".to_string(), "$.b=inf".to_string(), "$.c=NaN".to_string()];
+        let d3 = describe("test", &three);
+        assert_eq!(d3, "non-finite number in the test at $.a=NaN, $.b=inf, $.c=NaN");
+
+        let five = vec![
+            "$.a=NaN".to_string(),
+            "$.b=inf".to_string(),
+            "$.c=NaN".to_string(),
+            "$.d=inf".to_string(),
+            "$.e=NaN".to_string(),
+        ];
+        let d5 = describe("test", &five);
+        assert_eq!(d5, "non-finite number in the test at $.a=NaN, $.b=inf, $.c=NaN and 2 more");
+
+        let valid = DummySample { a: 1.0, b: vec![2.0, 3.0], rel_bound: 0.1 };
+        assert!(check_input(&valid).is_ok());
+        assert!(check_results(&valid).is_ok());
+
+        let invalid = DummySample { a: f64::NAN, b: vec![2.0], rel_bound: 0.1 };
+        assert!(check_input(&invalid).is_err());
+        assert!(check_results(&invalid).is_err());
+
+        // Documented infinity
+        let doc_inf = DummySample { a: 1.0, b: vec![2.0], rel_bound: f64::INFINITY };
+        assert!(check_input(&doc_inf).is_err()); // input does not allow inf
+        assert!(check_results(&doc_inf).is_ok()); // results allow relBound=+inf
+
+        let tuple_val = TupleSample(1.0, f64::NAN, 3.0);
+        let paths = non_finite_paths(&tuple_val);
+        assert_eq!(paths, vec!["$[1]=NaN"]);
+
+        let mut cert = Certificate::Certified {
+            abs_bound: f64::NAN,
+            rel_bound: 0.0,
+            sigma: 1.0,
+            residual_norm: 0.0,
+        };
+        guard(&mut cert);
+        assert!(!cert.is_certified());
+
+        let mut cert_valid = Certificate::Certified {
+            abs_bound: 1e-6,
+            rel_bound: 1e-4,
+            sigma: 1.0,
+            residual_norm: 1e-10,
+        };
+        guard(&mut cert_valid);
+        assert!(cert_valid.is_certified());
+
+        // guard_all
+        let mut cert_to_guard = cert_valid.clone();
+        guard_all(&valid, &doc_inf, &mut cert_to_guard);
+        assert!(cert_to_guard.is_certified());
+
+        let mut cert_to_fail = cert_valid.clone();
+        guard_all(&invalid, &doc_inf, &mut cert_to_fail);
+        assert!(!cert_to_fail.is_certified());
+
+        let err = Error("custom error".to_string());
+        assert_eq!(format!("{}", err), "custom error");
+    }
+
+}

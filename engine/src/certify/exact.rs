@@ -225,4 +225,29 @@ mod tests {
         let a = vec![vec![qi(1), qi(1)], vec![qi(2), qi(2)]];
         assert!(rref_solve(&a, Some(&[qi(1), qi(3)]), 2).particular.is_none());
     }
+
+    #[test]
+    fn test_qabs_and_to_f64_down_boundaries() {
+        assert_eq!(qabs(&qr(-7, 3)), qr(7, 3));
+        assert_eq!(qabs(&qr(7, 3)), qr(7, 3));
+        assert_eq!(qabs(&qi(0)), qi(0));
+
+        let half = qr(1, 2);
+        assert_eq!(to_f64_down(&half), Some(0.5));
+        assert_eq!(to_f64_up(&half), Some(0.5));
+
+        let x_exact = q(1.0).unwrap();
+        assert_eq!(to_f64_down(&x_exact), Some(1.0));
+
+        let third = qr(1, 3);
+        let down = to_f64_down(&third).unwrap();
+        let up = to_f64_up(&third).unwrap();
+        assert!(q(down).unwrap() <= third);
+        assert!(third <= q(up).unwrap());
+        assert_eq!(down.next_up(), up);
+
+        let huge = Q::new(BigInt::from(10).pow(400), BigInt::one());
+        assert_eq!(to_f64_down(&huge), None);
+        assert_eq!(to_f64_up(&huge), None);
+    }
 }

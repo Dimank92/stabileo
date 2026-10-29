@@ -446,3 +446,287 @@ pub fn with_gaps_3d(bounds: &mut [StationBound3D], forces: &[ElementForces3D]) {
         b.gaps = by_id.get(&b.element_id).map(|ef| diagram_gaps_3d(ef));
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_scale() {
+        let r = 2.0;
+        let abs_bound = 3.0;
+        let s = scale(r, abs_bound);
+        let expected = up(up(2.0 * T_NORM) * 3.0);
+        assert!((s - expected).abs() < 1e-12);
+        assert!(scale(0.0, 3.0) < 1e-150);
+    }
+
+    #[test]
+    fn test_dist_methods_and_kinks() {
+        let d = Dist { qi: -10.0, qj: 4.0, a: 1.0, b: 4.0 };
+        assert_eq!(d.qmax(), 10.0);
+        assert!((d.slope() - 14.0 / 3.0).abs() < 1e-12);
+
+        let dl = vec![
+            DistributedLoadInfo { q_i: 1.0, q_j: 2.0, a: 0.0, b: 1.0 },
+            DistributedLoadInfo { q_i: 3.0, q_j: 4.0, a: 1.0, b: 1.0 + 1e-14 },
+        ];
+        let dists = dists_of(&dl);
+        assert_eq!(dists.len(), 1);
+        assert_eq!(dists[0].qi, 1.0);
+        assert_eq!(dists[0].b, 1.0);
+
+        let kinks = load_end_kinks(&dists);
+        assert_eq!(kinks.len(), 2);
+        assert_eq!(kinks[0].x, 0.0);
+        assert_eq!(kinks[0].kink, 1.0);
+        assert_eq!(kinks[1].x, 1.0);
+        assert_eq!(kinks[1].kink, 2.0);
+    }
+
+    #[test]
+    fn test_gap_curvature_kinks_and_jumps() {
+        let stations = vec![0.0, 2.0];
+        let shape_curv = Shape {
+            dists: vec![Dist { qi: 4.0, qj: 4.0, a: 0.0, b: 2.0 }],
+            events: vec![],
+            curvature: Dist::qmax,
+            lip: Box::new(|_, _| 0.0),
+        };
+        let g = gap(&stations, &shape_curv);
+        assert!(g >= 2.0 && g < 2.0000001);
+
+        let shape_kink = Shape {
+            dists: vec![],
+            events: vec![Event { x: 1.0, kink: 8.0, jump: 0.0 }],
+            curvature: Dist::qmax,
+            lip: Box::new(|_, _| 0.0),
+        };
+        let gk = gap(&stations, &shape_kink);
+        assert!(gk >= 4.0 && gk < 4.0000001);
+
+        let shape_jump = Shape {
+            dists: vec![],
+            events: vec![Event { x: 1.0, kink: 0.0, jump: 3.0 }],
+            curvature: Dist::qmax,
+            lip: Box::new(|_, _h| 1.0),
+        };
+        let gj = gap(&stations, &shape_jump);
+        assert!(gj >= 2.0 && gj < 2.0000001);
+
+        let shape_outside = Shape {
+            dists: vec![],
+            events: vec![Event { x: 3.0, kink: 8.0, jump: 3.0 }],
+            curvature: Dist::qmax,
+            lip: Box::new(|_, _| 1.0),
+        };
+        let go = gap(&stations, &shape_outside);
+        assert_eq!(go, 0.0);
+    }
+
+    #[test]
+    fn test_diagram_gaps_2d_and_with_gaps() {
+        let mut ef = ElementForces {
+            element_id: 1,
+            length: 4.0,
+            n_start: 0.0,
+            n_end: 0.0,
+            v_start: 0.0,
+            v_end: 0.0,
+            m_start: 0.0,
+            m_end: 0.0,
+            hinge_start: false,
+            hinge_end: false,
+            q_i: 2.0,
+            q_j: 5.0,
+            distributed_loads: vec![DistributedLoadInfo { q_i: 2.0, q_j: 5.0, a: 0.0, b: 4.0 }],
+            distributed_loads_x: vec![DistributedLoadInfo { q_i: 1.0, q_j: 1.0, a: 0.0, b: 4.0 }],
+            point_loads: vec![
+                PointLoadInfo { a: 2.0, p: 10.0, my: Some(5.0), px: Some(3.0) }
+            ],
+        };
+        let gaps = diagram_gaps_2d(&ef);
+        assert!(gaps.axial > 0.0);
+        assert!(gaps.shear > 0.0);
+        assert!(gaps.moment > 0.0);
+
+        ef.distributed_loads.clear();
+        let gaps_fallback = diagram_gaps_2d(&ef);
+        assert!(gaps_fallback.moment > 0.0);
+
+        let mut bounds = vec![
+            StationBound2D { element_id: 1, axial: 1.0, shear: 1.0, moment: 1.0, gaps: None },
+            StationBound2D { element_id: 2, axial: 1.0, shear: 1.0, moment: 1.0, gaps: None },
+        ];
+        with_gaps_2d(&mut bounds, &[ef]);
+        assert!(bounds[0].gaps.is_some());
+        assert!(bounds[1].gaps.is_none());
+    }
+
+    #[test]
+    fn test_diagram_gaps_3d_and_with_gaps() {
+        let json = r##"{
+            "elementId": 42,
+            "length": 3.0,
+            "nStart": 0.0, "nEnd": 0.0,
+            "vyStart": 0.0, "vyEnd": 0.0,
+            "vzStart": 0.0, "vzEnd": 0.0,
+            "mxStart": 0.0, "mxEnd": 0.0,
+            "myStart": 0.0, "myEnd": 0.0,
+            "mzStart": 0.0, "mzEnd": 0.0,
+            "qYI": 4.0, "qYJ": 4.0,
+            "qZI": 1.0, "qZJ": 3.0,
+            "distributedLoadsX": [{"qI": 2.0, "qJ": 2.0, "a": 0.0, "b": 3.0}],
+            "distributedLoadsY": [{"qI": 4.0, "qJ": 4.0, "a": 0.0, "b": 3.0}],
+            "distributedLoadsZ": [{"qI": 1.0, "qJ": 3.0, "a": 0.0, "b": 3.0}],
+            "pointLoadsY": [{"a": 1.5, "p": 6.0}],
+            "pointLoadsZ": [{"a": 1.0, "p": 4.0}]
+        }"##;
+        let ef3d: ElementForces3D = serde_json::from_str(json).unwrap();
+        let gaps = diagram_gaps_3d(&ef3d);
+        assert!(gaps.axial > 0.0);
+        assert!(gaps.shear_y > 0.0);
+        assert!(gaps.shear_z > 0.0);
+        assert!(gaps.moment_y > 0.0);
+        assert!(gaps.moment_z > 0.0);
+        assert_eq!(gaps.torsion, 0.0);
+
+        let mut bounds = vec![StationBound3D {
+            element_id: 42,
+            axial: 1.0,
+            shear_y: 1.0,
+            shear_z: 1.0,
+            torsion: 1.0,
+            moment_y: 1.0,
+            moment_z: 1.0,
+            gaps: None,
+        }];
+        with_gaps_3d(&mut bounds, &[ef3d]);
+        assert!(bounds[0].gaps.is_some());
+    }
+
+    #[test]
+    fn test_station_rows_sign() {
+        let json = r#"{
+            "nodes": {"1": {"id": 1, "x": 0.0, "y": 0.0, "z": 0.0}, "2": {"id": 2, "x": 3.0, "y": 0.0, "z": 0.0}},
+            "materials": {"1": {"id": 1, "e": 200.0, "nu": 0.3, "density": 7850.0}},
+            "sections": {"1": {"id": 1, "a": 0.01, "iy": 0.0001, "iz": 0.0002, "j": 0.00005}},
+            "elements": {
+                "1": {"id": 1, "nodeI": 1, "nodeJ": 2, "materialId": 1, "sectionId": 1, "type": "frame", "releaseMzStart": false, "releaseMzEnd": false, "releaseMyStart": false, "releaseMyEnd": false}
+            },
+            "supports": {}, "loads": []
+        }"#;
+        let input: SolverInput3D = serde_json::from_str(json).unwrap();
+        let rows = station_rows_3d(&input);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].0, 1);
+        let [n, vy, vz, t, my, mz] = rows[0].1;
+        assert!(n > 0.0);
+        assert!(vy > 0.0);
+        assert!(vz > 0.0);
+        assert!(t > 0.0);
+        assert!(my > 0.0);
+        assert!(mz > 0.0);
+    }
+
+
+    #[test]
+    fn test_mutants_issue_751_stations() {
+        assert!(scale(0.0, 5.0) <= 1e-15);
+        let s = scale(2.0, 3.0);
+        let exp = up(up(2.0 * T_NORM) * 3.0);
+        assert!((s - exp).abs() < 1e-12);
+
+        let d = Dist { qi: -5.0, qj: 3.0, a: 1.0, b: 5.0 };
+        assert_eq!(d.qmax(), 5.0);
+        assert!((d.slope() - 2.0).abs() < 1e-12);
+
+        let dl = vec![
+            DistributedLoadInfo { q_i: 1.0, q_j: 2.0, a: 0.0, b: 2.0 },
+            DistributedLoadInfo { q_i: 3.0, q_j: 4.0, a: 2.0, b: 2.0 + 1e-14 },
+        ];
+        let dists = dists_of(&dl);
+        assert_eq!(dists.len(), 1);
+        let kinks = load_end_kinks(&dists);
+        assert_eq!(kinks.len(), 2);
+
+        let stations = vec![0.0, 2.0];
+        let shape = Shape {
+            dists: vec![Dist { qi: 4.0, qj: 4.0, a: 0.0, b: 2.0 }],
+            events: vec![
+                Event { x: 1.0, kink: 4.0, jump: 2.0 },
+                Event { x: 0.0, kink: 2.0, jump: 0.0 },
+                Event { x: 2.0, kink: 0.0, jump: 1.0 },
+                Event { x: 5.0, kink: 8.0, jump: 8.0 },
+            ],
+            curvature: Dist::qmax,
+            lip: Box::new(|_, _h| 1.5),
+        };
+        let g = gap(&stations, &shape);
+        assert!(g > 0.0 && g.is_finite());
+
+        let json2d = r#"{
+            "elementId": 1, "length": 4.0,
+            "nStart": 0.0, "nEnd": 0.0, "vStart": 0.0, "vEnd": 0.0, "mStart": 0.0, "mEnd": 0.0,
+            "hingeStart": false, "hingeEnd": false,
+            "qI": 2.0, "qJ": 2.0,
+            "distributedLoads": [{"qI": 2.0, "qJ": 2.0, "a": 0.0, "b": 4.0}],
+            "distributedLoadsX": [{"qI": 1.0, "qJ": 1.0, "a": 0.0, "b": 4.0}],
+            "pointLoads": [{"a": 2.0, "p": 5.0}]
+        }"#;
+        let ef2d: ElementForces = serde_json::from_str(json2d).unwrap();
+        let gaps2d = diagram_gaps_2d(&ef2d);
+        assert!(gaps2d.axial > 0.0);
+        assert!(gaps2d.shear > 0.0);
+        assert!(gaps2d.moment > 0.0);
+
+        let mut b2d = vec![StationBound2D { element_id: 1, axial: 1.0, shear: 1.0, moment: 1.0, gaps: None }];
+        with_gaps_2d(&mut b2d, &[ef2d]);
+        assert!(b2d[0].gaps.is_some());
+
+        let json3d = r#"{
+            "elementId": 1, "length": 3.0,
+            "nStart": 0.0, "nEnd": 0.0, "vyStart": 0.0, "vyEnd": 0.0, "vzStart": 0.0, "vzEnd": 0.0,
+            "mxStart": 0.0, "mxEnd": 0.0, "myStart": 0.0, "myEnd": 0.0, "mzStart": 0.0, "mzEnd": 0.0,
+            "qYI": 2.0, "qYJ": 2.0, "qZI": 1.0, "qZJ": 1.0,
+            "distributedLoadsX": [{"qI": 1.0, "qJ": 1.0, "a": 0.0, "b": 3.0}],
+            "distributedLoadsY": [{"qI": 2.0, "qJ": 2.0, "a": 0.0, "b": 3.0}],
+            "distributedLoadsZ": [{"qI": 1.0, "qJ": 1.0, "a": 0.0, "b": 3.0}],
+            "pointLoadsY": [{"a": 1.5, "p": 4.0}],
+            "pointLoadsZ": [{"a": 1.0, "p": 3.0}]
+        }"#;
+        let ef3d: ElementForces3D = serde_json::from_str(json3d).unwrap();
+        let gaps3d = diagram_gaps_3d(&ef3d);
+        assert!(gaps3d.axial > 0.0);
+        assert!(gaps3d.shear_y > 0.0);
+        assert!(gaps3d.shear_z > 0.0);
+        assert!(gaps3d.moment_y > 0.0);
+        assert!(gaps3d.moment_z > 0.0);
+        assert_eq!(gaps3d.torsion, 0.0);
+
+        let mut b3d = vec![StationBound3D {
+            element_id: 1,
+            axial: 1.0, shear_y: 1.0, shear_z: 1.0,
+            torsion: 1.0, moment_y: 1.0, moment_z: 1.0,
+            gaps: None,
+        }];
+        with_gaps_3d(&mut b3d, &[ef3d]);
+        assert!(b3d[0].gaps.is_some());
+
+        let json_model3d = r#"{
+            "nodes": {"1": {"id": 1, "x": 0.0, "y": 0.0, "z": 0.0}, "2": {"id": 2, "x": 3.0, "y": 0.0, "z": 0.0}},
+            "materials": {"1": {"id": 1, "e": 200.0, "nu": 0.3, "density": 7850.0}},
+            "sections": {"1": {"id": 1, "a": 0.01, "iy": 0.0001, "iz": 0.0002, "j": 0.00005}},
+            "elements": {
+                "1": {"id": 1, "nodeI": 1, "nodeJ": 2, "materialId": 1, "sectionId": 1, "type": "frame", "releaseMzStart": false, "releaseMzEnd": false, "releaseMyStart": false, "releaseMyEnd": false}
+            },
+            "supports": {}, "loads": []
+        }"#;
+        let in3d: SolverInput3D = serde_json::from_str(json_model3d).unwrap();
+        let rows = station_rows_3d(&in3d);
+        assert_eq!(rows.len(), 1);
+        let [n, vy, vz, t, my, mz] = rows[0].1;
+        assert!(n > 0.0 && vy > 0.0 && vz > 0.0 && t > 0.0 && my > 0.0 && mz > 0.0);
+    }
+
+}

@@ -635,4 +635,96 @@ mod tests {
         let b = c.abs_bound().unwrap_or_else(|| panic!("{c:?}"));
         assert!((exact * 1e-9) <= b * (1.0 + 1e-6) && b < 1e-8, "{b}");
     }
+
+    #[test]
+    fn test_kantorovich_extra_boundaries() {
+        assert!(kantorovich_radius(1.0, -0.1, 0.1).is_none());
+        assert!(kantorovich_radius(1.0, 0.1, -0.1).is_none());
+        assert!(kantorovich_radius(-1.0, 0.1, 0.1).is_none());
+        assert!(kantorovich_radius(1.0, f64::INFINITY, 0.1).is_none());
+        assert!(kantorovich_radius(1.0, 0.1, f64::INFINITY).is_none());
+        assert!(kantorovich_radius(f64::INFINITY, 0.1, 0.1).is_none());
+        assert!(kantorovich_radius(1.0, 0.0, -0.5).is_none());
+    }
+
+    #[test]
+    fn test_add_sym_and_to_csc() {
+        let mut map: SymMap = BTreeMap::new();
+        add_sym(&mut map, 1, 0, Interval::point(5.0));
+        add_sym(&mut map, 0, 1, Interval::point(3.0));
+        assert!((map.get(&(0, 1)).unwrap().lo - 8.0).abs() < 1e-12);
+        add_sym(&mut map, 2, 2, Interval::point(4.0));
+        assert!((map.get(&(2, 2)).unwrap().lo - 4.0).abs() < 1e-12);
+
+        let (mat, vals) = to_csc(3, &map);
+        assert_eq!(mat.n, 3);
+        assert_eq!(vals.len(), 2);
+    }
+
+    #[test]
+    fn test_newton_step_and_norm_up() {
+        let sym_j = CscMatrix {
+            n: 2,
+            col_ptr: vec![0, 1, 2],
+            row_idx: vec![0, 1],
+            values: vec![2.0, 4.0],
+        };
+        let r = vec![Interval::point(1.0), Interval::point(2.0)];
+        let step = newton_step(&sym_j, &r, |x| vec![2.0 * x[0], 4.0 * x[1]]);
+        assert_eq!(step.len(), 2);
+        assert!((step[0] - 0.5).abs() < 1e-10);
+        assert!((step[1] - 0.5).abs() < 1e-10);
+
+        // Not positive definite fallback
+        let bad_j = CscMatrix {
+            n: 1,
+            col_ptr: vec![0, 1],
+            row_idx: vec![0],
+            values: vec![-1.0],
+        };
+        let step_bad = newton_step(&bad_j, &[Interval::point(1.0)], |x| vec![-x[0]]);
+        assert_eq!(step_bad, vec![0.0]);
+
+        // norm_up
+        assert!(norm_up(&[]).unwrap() <= 1e-15);
+        let ivs = vec![Interval { lo: -3.0, hi: 4.0 }, Interval { lo: 0.0, hi: 3.0 }];
+        let n = norm_up(&ivs).unwrap();
+        assert!(n >= 5.0 && n < 5.0000001);
+        assert!(norm_up(&[Interval { lo: f64::NAN, hi: 1.0 }]).is_none());
+    }
+
+
+    #[test]
+    fn test_mutants_issue_751_pdelta() {
+        assert!(kantorovich_radius(-1.0, 0.1, 0.1).is_none());
+        assert!(kantorovich_radius(1.0, -0.1, 0.1).is_none());
+        assert!(kantorovich_radius(1.0, 0.1, -0.1).is_none());
+        assert!(kantorovich_radius(1.0, 1.0, 0.6).is_none());
+        assert!(kantorovich_radius(f64::INFINITY, 0.1, 0.1).is_none());
+        assert!(kantorovich_radius(1.0, f64::INFINITY, 0.1).is_none());
+        assert!(kantorovich_radius(1.0, 0.1, f64::INFINITY).is_none());
+        let (rm, rp) = kantorovich_radius(2.0, 1.0, 0.2).unwrap();
+        assert!(rm > 0.0 && rm < 1.0);
+        assert!(rp > 0.5 && rp <= 1.0);
+
+        let mut map: std::collections::BTreeMap<(usize, usize), Interval> = std::collections::BTreeMap::new();
+        add_sym(&mut map, 1, 0, Interval::point(5.0));
+        add_sym(&mut map, 0, 1, Interval::point(3.0));
+        assert!((map.get(&(0, 1)).unwrap().lo - 8.0).abs() < 1e-12);
+        add_sym(&mut map, 2, 2, Interval::point(4.0));
+        assert!((map.get(&(2, 2)).unwrap().lo - 4.0).abs() < 1e-12);
+
+        let sym_j = CscMatrix {
+            n: 2,
+            col_ptr: vec![0, 1, 2],
+            row_idx: vec![0, 1],
+            values: vec![2.0, 4.0],
+        };
+        let r = vec![Interval::point(1.0), Interval::point(2.0)];
+        let step = newton_step(&sym_j, &r, |x| vec![2.0 * x[0], 4.0 * x[1]]);
+        assert_eq!(step.len(), 2);
+        assert!((step[0] - 0.5).abs() < 1e-10);
+        assert!((step[1] - 0.5).abs() < 1e-10);
+    }
+
 }
