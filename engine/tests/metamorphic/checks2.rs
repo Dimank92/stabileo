@@ -303,12 +303,14 @@ fn superposition(a: &Ana2, c: &Case2, base: &Resp, cond: &Conditioning) -> Verdi
         let rk = run(a, &c.with_loads(scale_loads_2d(&la, k)))?.without_stress().flat();
         let r0 = match run(a, &c.with_loads(vec![])) {
             Ok(r) => r.without_stress().flat(),
+            Err(e) if crate::generated::strict() => return Err(format!("zero-load solve: {e}")),
             Err(_) => Flat::lin_comb(0.0, &ra, 0.0, &ra),
         };
         Ok((ra, rb, rab, rk, r0))
     })();
     let (ra, rb, rab, rk, r0) = match r {
         Ok(x) => x,
+        Err(e) if crate::generated::strict() => return Verdict::Fail(format!("load subset: {e}")),
         Err(e) => return Verdict::Refused(format!("load subset: {e}")),
     };
     let da = Flat::lin_comb(1.0, &ra, -1.0, &r0);
@@ -377,11 +379,16 @@ fn reciprocity(a: &Ana2, c: &Case2, cond: &Conditioning, rng: &mut Rng) -> Verdi
         let ra = run(a, &ca)?;
         let rb = run(a, &cb)?;
         c0.probes = vec![nb, na];
-        let r0a = run(a, &c0).ok();
+        let r0a = match run(a, &c0) {
+            Ok(r) => Some(r),
+            Err(e) if crate::generated::strict() => return Err(format!("zero-load solve: {e}")),
+            Err(_) => None,
+        };
         Ok((ra, rb, r0a))
     })();
     let (ra, rb, r0) = match r {
         Ok(x) => x,
+        Err(e) if crate::generated::strict() => return Verdict::Fail(e),
         Err(e) => return Verdict::Refused(e),
     };
     // Settlement baseline: only matters for static analyses; dynamic ones

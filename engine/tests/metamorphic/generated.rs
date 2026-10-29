@@ -1018,3 +1018,148 @@ fn coverage_rejects_missing_or_renamed_adapters() {
         assert_coverage(&Tally::default(), &["linear"], spatial, 0, Some("linear"));
     }
 }
+
+fn corrupt_zero_load_response<const FAULT: usize>(
+    mut response: crate::response::Resp,
+) -> Result<crate::response::Resp, String> {
+    match FAULT {
+        0 => response.0.clear(),
+        1 => {
+            response.0.pop().unwrap();
+        }
+        2 => response.0[0].v[0] = f64::NAN,
+        3 => return Err("zero-load adapter error".into()),
+        4 => panic!("zero-load adapter panic"),
+        _ => unreachable!(),
+    }
+    Ok(response)
+}
+
+#[test]
+fn strict_2d_rejects_failed_zero_load_solves() {
+    fn faulty<const FAULT: usize>(c: &Case2) -> Result<crate::response::Resp, String> {
+        let a = ana2::rows()
+            .into_iter()
+            .find(|a| a.name == "linear")
+            .unwrap();
+        let response = (a.run)(c)?;
+        if c.s.loads.is_empty() {
+            corrupt_zero_load_response::<FAULT>(response)
+        } else {
+            Ok(response)
+        }
+    }
+    let _strict = Strict::enter();
+    let c = Case2::new(
+        "zero-load",
+        serde_json::from_value(model(1, false)).unwrap(),
+    );
+    let mut a = ana2::rows()
+        .into_iter()
+        .find(|a| a.name == "linear")
+        .unwrap();
+    let invariants = ["superposition", "reciprocity"];
+    let t = Tally::default();
+    checks2::check_case(
+        &checks2::Ctx {
+            tally: &t,
+            rng_seed: 1,
+        },
+        &c,
+        std::slice::from_ref(&a),
+        &invariants,
+    );
+    for inv in invariants {
+        assert_eq!(t.symbol(a.name, inv), "✓", "{}", t.report());
+    }
+    for run in [
+        faulty::<0>,
+        faulty::<1>,
+        faulty::<2>,
+        faulty::<3>,
+        faulty::<4>,
+    ] {
+        a.run = run;
+        let t = Tally::default();
+        checks2::check_case(
+            &checks2::Ctx {
+                tally: &t,
+                rng_seed: 1,
+            },
+            &c,
+            std::slice::from_ref(&a),
+            &invariants,
+        );
+        for inv in invariants {
+            assert_eq!(t.symbol(a.name, inv), "✗", "{}", t.report());
+        }
+        assert!(
+            t.failures().iter().all(|f| f.contains("zero-load solve:")),
+            "{}",
+            t.report()
+        );
+    }
+}
+
+#[test]
+fn strict_3d_rejects_failed_zero_load_solves() {
+    fn faulty<const FAULT: usize>(c: &Case3) -> Result<crate::response::Resp, String> {
+        let a = ana3::rows()
+            .into_iter()
+            .find(|a| a.name == "linear")
+            .unwrap();
+        let response = (a.run)(c)?;
+        if c.s.loads.is_empty() {
+            corrupt_zero_load_response::<FAULT>(response)
+        } else {
+            Ok(response)
+        }
+    }
+    let _strict = Strict::enter();
+    let c = Case3::new("zero-load", serde_json::from_value(model(1, true)).unwrap());
+    let mut a = ana3::rows()
+        .into_iter()
+        .find(|a| a.name == "linear")
+        .unwrap();
+    let invariants = ["superposition", "reciprocity"];
+    let t = Tally::default();
+    checks3::check_case(
+        &checks3::Ctx {
+            tally: &t,
+            rng_seed: 1,
+        },
+        &c,
+        std::slice::from_ref(&a),
+        &invariants,
+    );
+    for inv in invariants {
+        assert_eq!(t.symbol(a.name, inv), "✓", "{}", t.report());
+    }
+    for run in [
+        faulty::<0>,
+        faulty::<1>,
+        faulty::<2>,
+        faulty::<3>,
+        faulty::<4>,
+    ] {
+        a.run = run;
+        let t = Tally::default();
+        checks3::check_case(
+            &checks3::Ctx {
+                tally: &t,
+                rng_seed: 1,
+            },
+            &c,
+            std::slice::from_ref(&a),
+            &invariants,
+        );
+        for inv in invariants {
+            assert_eq!(t.symbol(a.name, inv), "✗", "{}", t.report());
+        }
+        assert!(
+            t.failures().iter().all(|f| f.contains("zero-load solve:")),
+            "{}",
+            t.report()
+        );
+    }
+}
