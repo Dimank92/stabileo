@@ -99,6 +99,9 @@ jobs:
               - 'Cargo.toml'
               - 'Cargo.lock'
             ci_scripts:
+              - 'scripts/tests/**'
+              - 'Makefile'
+              - 'Dockerfile'
               - '.github/scripts/**'
               - '.github/workflows/ci.yml'
 
@@ -846,7 +849,6 @@ jobs:
       - check-migrations
       - wasm
       - research-wasm
-      - docker-smoke
       - site-e2e
       - web-unit
       - web-build
