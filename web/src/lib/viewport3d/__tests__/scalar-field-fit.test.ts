@@ -51,9 +51,9 @@ it('fits displaced corners at the chosen scale and preserves explicit cropping',
     THREE, camera, container: { clientWidth: 600, clientHeight: 400 },
     controls: { target: new THREE.Vector3(), enableRotate: true }, renderer: {},
     xy: [0, 0, 1, 1], displacement: [-3, -2, 4, 5], deformScale: 2,
-    view: null as number[] | null, projection: 'plan', invalidate: vi.fn(),
+    view: null as number[] | null, projection: 'plan', invalidate: vi.fn(), scalarFieldScale: () => '',
   };
-  const api = runInNewContext(`let pendingFit = false; ${boundsJs}; ${js}; ({ fit, bounds })`, context);
+  const api = runInNewContext(`let pendingFit = false; let zoomText = ''; ${boundsJs}; ${js}; ({ fit, bounds })`, context);
   expect(api.bounds()).toEqual([-6, -4, 9, 11]);
   api.fit();
   camera.updateMatrixWorld();
