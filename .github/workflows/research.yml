@@ -60,7 +60,22 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
+      # The budget keeps research from growing the product's routes; a change with no research code shipped to the browser is not measured.
+      - name: Measure only a change that touches research code
+        id: scope
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          RESEARCH_PATHS: '^(research/.*\.(json|csv)$|web/src/components/research/|web/public/research-|web/vite\.research-viewer\.config\.ts$)'
+          NOT_SHIPPED: '^research/tools/'
+        run: |
+          if [ -z "$BASE" ] || git diff --name-only "$BASE" HEAD | grep -E "$RESEARCH_PATHS" | grep -qvE "$NOT_SHIPPED"; then
+            echo research=true >> "$GITHUB_OUTPUT"
+          else
+            echo research=false >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.scope.outputs.research == 'true'
         with:
           ref: main
           path: route-main
@@ -68,6 +83,7 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
       - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
       - name: Build main and the candidate with the same pinned toolchain and measurement script
+        if: steps.scope.outputs.research == 'true'
         run: |
           cp web/scripts/check-research-route-size.mjs web/scripts/research-route-budget.mjs route-main/web/scripts/
           nix develop . -c sh -c 'cd route-main/web && npm ci && node scripts/check-research-route-size.mjs --baseline /tmp/route-main.json --update'
@@ -190,3 +206,19 @@ jobs:
           assert not extra, extra
           print(len(m["files_sha256"]), "reference files match MANIFEST.json")
           PY
+
+  koiter:
+    name: Roorda frame (Ferrari and Sigmund 2025) groundwork
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: research/stability/ferrari-sigmund-2025
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Toolchain from rust-toolchain.toml
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Buckling, energy derivatives and every replay frame
+        run: cargo test --release --locked -- --nocapture
