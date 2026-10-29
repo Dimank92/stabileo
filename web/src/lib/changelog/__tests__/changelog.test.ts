@@ -91,8 +91,8 @@ describe('the changelog page', () => {
   it('is drawn by its own view, with no article blocks or questions to keep in step', () => {
     expect(changelogPage.view).toBe('changelog');
     for (const l of LOCALES) {
-      expect(changelogPage.i18n[l].blocks).toEqual([]);
-      expect(changelogPage.i18n[l].faq).toEqual([]);
+      expect(changelogPage.i18n[l]!.blocks).toEqual([]);
+      expect(changelogPage.i18n[l]!.faq).toEqual([]);
     }
   });
 });
