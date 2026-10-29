@@ -47,6 +47,15 @@ def main():
     spec = importlib.util.spec_from_file_location("catalog", os.path.join(HERE, "catalog.py"))
     catalog = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(catalog)
+    urls = []
+    catalog.get_json = lambda url: urls.append(url) or {"license": {"spdx_id": "MIT"}}
+    errors = []
+    catalog.check_links(base[0], errors)
+    assert not errors, errors
+    assert urls == [c["url"].replace("https://github.com/", "https://api.github.com/repos/")
+                    + "/license?ref=" + c["commit"] for c in base[0]["code"]], urls
+    assert base[0]["code"][0]["commit"] == json.loads((Path(CATALOG).parent / base[0]["implementation"] / "reference-results/MANIFEST.json").read_text())["reference_code"]["commit"]
+    print("ok   licence requests use pinned commits, including the reproduced manifest revision")
     marked = copy.deepcopy(base)
     marked[0]["crossref"]["title"] = "A <i>phase-field</i> method"
     assert json.loads(catalog.export_text(marked))["papers"][0]["crossref"]["title"] == "A phase-field method"
@@ -82,6 +91,8 @@ def main():
         "published claim without comparison": lambda p: p.update(status="published-figures-compared", reproduced_published_results=True),
         "interactive without page": lambda p: p.update(status="interactive"),
         "interactive missing page": lambda p: p.update(status="interactive", page="web/src/components/research/Missing.svelte"),
+        "missing code commit": lambda p: p["code"][0].pop("commit"),
+        "mutable code ref": lambda p: p["code"][0].update(commit="main"),
         "unknown area": lambda p: p.update(area="astrology"),
         "unknown status": lambda p: p.update(status="certified"),
         "missing summary": lambda p: p.pop("summary"),
