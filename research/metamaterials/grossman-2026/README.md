@@ -54,9 +54,10 @@ tension) acting on the change of its bond vector.
 - **Solver.** The engine's sparse Cholesky (`dedaliano_engine::linalg`) on K + delta I,
   delta starts at 1e-10 max diag K, with up to 128 refinement steps against K.
   If the residual fails acceptance, retry at 1e-12 and 1e-14 max diag K, then return an error if still unconverged.
-  Acceptance requires ||r||∞ ≤ 1e-12 ||b||∞; loads no larger than assembly
-  roundoff (8 ε max diag K) instead use that absolute bound. After exhausting
-  refinement at the smallest shift, a residual within assembly roundoff is also accepted.
+  The matrix is normalized by max diag K and each nonzero load by its infinity norm.
+  Acceptance requires a finite solution and a normalized residual ||r||∞ ≤ 1e-12
+  after at least three refinement steps, including for arbitrarily small loads.
+  Zero loads return zero displacement. No absolute-roundoff fallback is used.
   Null-mode displacements are non-unique. Finite-strip ν is indeterminate unless
   K − 1e-13 max diag K I admits Cholesky factorization.
 
@@ -67,6 +68,8 @@ two-dimensional, central forces only, unit lattice spacing and k = 1 unless stat
 
 `cargo test --release` runs `tests/validation.rs`: 29 named checks, each with a stated tolerance,
 written to `target/VALIDATION.json` and compared with the committed `VALIDATION.json`.
+The paper checks also generate `target/PUBLISHED_COMPARISON.json`, including source links;
+the same test checks the committed comparison for freshness in CI.
 The nonlinear-energy curvature check uses central differences at strains 0.01 and 0.005,
 with Richardson extrapolation removing the leading step-size error. This avoids amplifying
 prestress-energy cancellation at a 1e-4 step; freshness tolerances remain unchanged.

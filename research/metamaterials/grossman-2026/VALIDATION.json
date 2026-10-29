@@ -36,7 +36,7 @@
       "category": "independent",
       "metric": "nonaffinity",
       "name": "triangular lattice: no nonaffine displacement",
-      "observed": 3.687353471061644e-32,
+      "observed": 4.136259084379458e-32,
       "passed": true,
       "tolerance": 1e-18
     },
@@ -84,7 +84,7 @@
       "category": "independent",
       "metric": "max relative difference",
       "name": "foam eta = 0.3: e^T C e A equals the second difference of the relaxed nonlinear energy",
-      "observed": 5.542210391544173e-8,
+      "observed": 5.5422102114166433e-8,
       "passed": true,
       "tolerance": 0.00001
     },
@@ -92,7 +92,7 @@
       "category": "independent",
       "metric": "max relative difference",
       "name": "foam eta = 0.3 in tension: e^T C e A equals the second difference of the relaxed nonlinear energy",
-      "observed": 2.2496444268039355e-8,
+      "observed": 2.2496451807513632e-8,
       "passed": true,
       "tolerance": 0.00001
     },
@@ -100,7 +100,7 @@
       "category": "independent",
       "metric": "max relative difference",
       "name": "frame invariance: C of the rotated foam is C rotated",
-      "observed": 1.3919162193977043e-15,
+      "observed": 4.871706767891969e-16,
       "passed": true,
       "tolerance": 1e-9
     },
@@ -108,15 +108,15 @@
       "category": "independent",
       "metric": "max G / k",
       "name": "dilution z = 3 (5 samples, 20 x 20): shear modulus vanishes",
-      "observed": 2.01562874611879e-16,
+      "observed": 1.0989932061295234e-16,
       "passed": true,
       "tolerance": 1e-6
     },
     {
       "category": "independent",
-      "metric": "0.1 - min G / k",
+      "metric": "max(0, 0.1 - min G / k)",
       "name": "dilution z = 5.4 (5 samples, 20 x 20): every shear modulus at least 0.1 k",
-      "observed": -0.18767444566498234,
+      "observed": 0.0,
       "passed": true,
       "tolerance": 0.0
     },
@@ -124,7 +124,7 @@
       "category": "independent",
       "metric": "max |du| / max |u|",
       "name": "foam strip (eta 0.3): displacements equal the production engine's solve_2d",
-      "observed": 1.931214269698026e-14,
+      "observed": 3.016417244188902e-14,
       "passed": true,
       "tolerance": 1e-8
     },
@@ -132,7 +132,7 @@
       "category": "independent",
       "metric": "max |dN| / max |N|",
       "name": "foam strip (eta 0.3): bond forces equal the engine's axial forces",
-      "observed": 5.748616446376212e-14,
+      "observed": 7.767019554214963e-14,
       "passed": true,
       "tolerance": 1e-8
     },
@@ -140,7 +140,7 @@
       "category": "independent",
       "metric": "nu - 1/3",
       "name": "equilateral strip 13 x 52 (paper's protocol): finite-size bias of nu",
-      "observed": 0.03794923154323521,
+      "observed": 0.03794923154324492,
       "passed": true,
       "tolerance": 0.05
     },
@@ -148,7 +148,7 @@
       "category": "independent",
       "metric": "absolute difference",
       "name": "equilateral strips 26 x 104 and 52 x 208: Richardson extrapolation of nu = 1/3",
-      "observed": 0.0026835828608462453,
+      "observed": 0.002683582860841749,
       "passed": true,
       "tolerance": 0.005
     },
@@ -158,6 +158,7 @@
       "name": "Supplemental Eq. (9) = periodic network with equal-weight springs (7 lattices x 37 angles)",
       "observed": 7.105427357601002e-15,
       "passed": true,
+      "source": "https://doi.org/10.1103/17sg-gzhl — Supplemental Eq. (9) = periodic network with equal-weight springs (7 lattices x 37 angles)",
       "tolerance": 1e-9
     },
     {
@@ -182,30 +183,34 @@
       "name": "Fig. 7 calculation line (741 points) = equal-weight Young's modulus x triangle area",
       "observed": 0.0006025970505327827,
       "passed": true,
+      "source": "https://doi.org/10.1103/17sg-gzhl — Fig. 7 calculation line (741 points) = equal-weight Young's modulus x triangle area",
       "tolerance": 0.01
     },
     {
       "category": "paper",
       "metric": "max |nu difference|",
       "name": "Eq. (23) honeycomb, k_radial = 1e-3 (l = 0.05 ... 0.95)",
-      "observed": 0.0033500744879865207,
+      "observed": 0.0033500744879860767,
       "passed": true,
+      "source": "https://doi.org/10.1103/17sg-gzhl — Eq. (23) honeycomb, k_radial = 1e-3 (l = 0.05 ... 0.95)",
       "tolerance": 0.005
     },
     {
       "category": "paper",
       "metric": "max |nu difference|",
       "name": "Eq. (23) honeycomb, k_radial = 1e-6 (l = 0.05 ... 0.95)",
-      "observed": 3.364489741808363e-6,
+      "observed": 3.3644897416973407e-6,
       "passed": true,
+      "source": "https://doi.org/10.1103/17sg-gzhl — Eq. (23) honeycomb, k_radial = 1e-6 (l = 0.05 ... 0.95)",
       "tolerance": 0.00001
     },
     {
       "category": "paper",
       "metric": "max absolute difference",
       "name": "Fig. 9 at eta = 0: B = sqrt(3)/2, G = sqrt(3)/4",
-      "observed": 0.0026954037844385548,
+      "observed": 0.002695403784438666,
       "passed": true,
+      "source": "https://doi.org/10.1103/17sg-gzhl — Fig. 9 at eta = 0: B = sqrt(3)/2, G = sqrt(3)/4",
       "tolerance": 0.005
     },
     {
@@ -214,23 +219,26 @@
       "name": "foam: mean periodic nu inside every error bar of Fig. 5's simulations (eta 0 ... 0.45, 10 markers)",
       "observed": 0.0,
       "passed": true,
+      "source": "https://doi.org/10.1103/17sg-gzhl — foam: mean periodic nu inside every error bar of Fig. 5's simulations (eta 0 ... 0.45, 10 markers)",
       "tolerance": 0.0
     },
     {
       "category": "paper",
       "metric": "|eta_0 - 0.46|",
       "name": "foam: nu crosses zero near eta = 0.46 (text p. 6)",
-      "observed": 0.01360542509506163,
+      "observed": 0.013605425095061685,
       "passed": true,
+      "source": "https://doi.org/10.1103/17sg-gzhl — foam: nu crosses zero near eta = 0.46 (text p. 6)",
       "tolerance": 0.02
     },
     {
       "category": "paper",
-      "metric": "mean nu(0.5)",
+      "metric": "max(0, mean nu(0.5) + 0.05)",
       "name": "foam: auxetic as eta -> 0.5 (text: nu = -0.1); ours at most -0.05",
-      "observed": -0.14760823298376496,
+      "observed": 0.0,
       "passed": true,
-      "tolerance": -0.05
+      "source": "https://doi.org/10.1103/17sg-gzhl — foam: auxetic as eta -> 0.5 (text: nu = -0.1); ours at most -0.05",
+      "tolerance": 0.0
     }
   ]
 }

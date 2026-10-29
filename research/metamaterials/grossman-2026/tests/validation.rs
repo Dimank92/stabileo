@@ -22,6 +22,8 @@ fn dir() -> PathBuf {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 struct Check {
     category: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    source: Option<String>,
     name: String,
     metric: String,
     tolerance: f64,
@@ -34,8 +36,8 @@ struct Checks(Vec<Check>);
 
 impl Checks {
     fn at_most(&mut self, name: &str, metric: &str, observed: f64, tolerance: f64) {
-        assert!(observed.is_finite() && tolerance.is_finite());
-        self.0.push(Check { category: "independent".into(), name: name.into(), metric: metric.into(), tolerance, observed, passed: observed <= tolerance });
+        assert!(observed.is_finite() && tolerance.is_finite() && observed >= 0.0 && tolerance >= 0.0);
+        self.0.push(Check { category: "independent".into(), source: None, name: name.into(), metric: metric.into(), tolerance, observed, passed: observed <= tolerance });
     }
 }
 
@@ -76,7 +78,7 @@ fn inside_error_bar(mean: f64, lo: f64, hi: f64) -> bool {
 // Labels, declared tolerances and pass/fail are exact: noise must never hide a failed check.
 fn records_match(a: &[Check], b: &[Check]) -> bool {
     a.len() == b.len() && a.iter().zip(b).all(|(a, b)| {
-        a.category == b.category && a.name == b.name && a.metric == b.metric
+        a.category == b.category && a.source == b.source && a.name == b.name && a.metric == b.metric
             && a.tolerance == b.tolerance && a.passed == b.passed
             && a.observed.is_finite() && b.observed.is_finite()
             && (a.observed - b.observed).abs() <= 1e-12 + 1e-8 * a.observed.abs().max(b.observed.abs())
@@ -232,7 +234,7 @@ fn part_a(c: &mut Checks) {
         rigid = finite_min(rigid, periodic(hi, 20).isotropic.shear);
     }
     c.at_most("dilution z = 3 (5 samples, 20 x 20): shear modulus vanishes", "max G / k", floppy, 1e-6);
-    c.at_most("dilution z = 5.4 (5 samples, 20 x 20): every shear modulus at least 0.1 k", "0.1 - min G / k", 0.1 - rigid, 0.0);
+    c.at_most("dilution z = 5.4 (5 samples, 20 x 20): every shear modulus at least 0.1 k", "max(0, 0.1 - min G / k)", (0.1 - rigid).max(0.0), 0.0);
 
     // A8. Strip: our assembly against the production engine's 2D truss solve (same model).
     let mut fs = spec(tri(1.0, 1.0));
@@ -359,7 +361,8 @@ fn part_b(c: &mut Checks) {
         nus.push(periodic(s, 26).isotropic.poisson);
     }
     let m5 = nus.iter().sum::<f64>() / nus.len() as f64;
-    c.at_most("foam: auxetic as eta -> 0.5 (text: nu = -0.1); ours at most -0.05", "mean nu(0.5)", m5, -0.05);
+    assert!(m5.is_finite());
+    c.at_most("foam: auxetic as eta -> 0.5 (text: nu = -0.1); ours at most -0.05", "max(0, mean nu(0.5) + 0.05)", (m5 + 0.05).max(0.0), 0.0);
 }
 
 fn main_checks() -> Checks {
@@ -370,6 +373,7 @@ fn main_checks() -> Checks {
     for ch in &mut c.0[independent..] {
         if !ch.name.starts_with("lattice (1, 0.5), theta = 0") {
             ch.category = "paper".into();
+            ch.source = Some(format!("https://doi.org/10.1103/17sg-gzhl — {}", ch.name));
         }
     }
     c
@@ -378,17 +382,22 @@ fn main_checks() -> Checks {
 #[test]
 fn validation() {
     let c = main_checks();
-    let json = serde_json::to_string_pretty(&serde_json::json!({ "checks": c.0 })).unwrap();
-    let out = dir().join("target").join("VALIDATION.json");
-    std::fs::create_dir_all(out.parent().unwrap()).unwrap();
-    std::fs::write(&out, &json).unwrap();
+    let published: Vec<Check> = c.0.iter().filter(|ch| ch.category == "paper").cloned().collect();
+    for (file, checks) in [("VALIDATION.json", &c.0), ("PUBLISHED_COMPARISON.json", &published)] {
+        let json = serde_json::to_string_pretty(&serde_json::json!({ "checks": checks })).unwrap();
+        let out = dir().join("target").join(file);
+        std::fs::create_dir_all(out.parent().unwrap()).unwrap();
+        std::fs::write(&out, &json).unwrap();
+    }
     for ch in &c.0 {
         println!("{} {} [{}: {:.3e} <= {:.1e}]", if ch.passed { "ok  " } else { "FAIL" }, ch.name, ch.metric, ch.observed, ch.tolerance);
     }
     assert!(c.0.iter().all(|ch| ch.passed), "a validation check failed");
-    let committed: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(dir().join("VALIDATION.json")).unwrap_or_else(|_| "{}".into())).unwrap();
-    let committed: Vec<Check> = serde_json::from_value(committed["checks"].clone()).unwrap();
-    assert!(records_match(&committed, &c.0), "VALIDATION.json is stale: copy target/VALIDATION.json over it");
+    for (file, checks) in [("VALIDATION.json", &c.0), ("PUBLISHED_COMPARISON.json", &published)] {
+        let committed = read_json(file);
+        let committed: Vec<Check> = serde_json::from_value(committed["checks"].clone()).unwrap();
+        assert!(records_match(&committed, checks), "{file} is stale: copy target/{file} over it");
+    }
 }
 
 #[test]
@@ -429,7 +438,7 @@ fn record_comparison_covers_every_field_and_near_zero_noise() {
     noisy[0].observed = 5e-13;
     assert!(records_match(&original, &noisy));
     assert!(records_match(&noisy, &original));
-    for field in ["category", "name", "metric", "tolerance", "observed", "passed"] {
+    for field in ["category", "source", "name", "metric", "tolerance", "observed", "passed"] {
         let mut changed = serde_json::to_value(&original).unwrap();
         changed[0][field] = match field {
             "tolerance" => serde_json::json!(2e-9),
