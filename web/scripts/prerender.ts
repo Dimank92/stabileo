@@ -245,7 +245,7 @@ async function publicPaths(): Promise<string[]> {
   }
   // Stabileo Research: the gallery and each runnable paper (web/src/components/research).
   const research = ['/research', '/research/fracture/shauer-2025', '/research/metamaterials/grossman-2026'];
-  return ['/', ...pages, '/blog', ...slugs.map((s) => `/blog/${s}`), ...research, '/tools', '/tools/simply-supported-beam', '/tools/cantilever-beam', '/tools/column-buckling'];
+  return ['/', ...pages, '/blog', ...slugs.map((s) => `/blog/${s}`), ...research, '/tools', '/tools/simply-supported-beam', '/tools/cantilever-beam', '/tools/column-buckling', '/tools/continuous-beam', '/tools/portal-frame', '/tools/truss-2d', '/tools/influence-line', '/tools/beam-natural-frequency'];
 }
 
 /**
