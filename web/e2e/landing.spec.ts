@@ -603,7 +603,7 @@ test.describe('@landing landing page', () => {
       await expect(page.locator('.landing')).toHaveCount(0);
 
       const h = await readHead(page);
-      expect(h.meta['og:locale:alternate']).toEqual(['es_AR', 'pt_BR']);
+      expect(h.meta['og:locale:alternate']).toEqual(ogAlternates('en'));
       expect(one(h, 'og:locale')).toBe('en_US');
     });
 
