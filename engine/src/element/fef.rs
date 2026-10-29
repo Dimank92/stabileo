@@ -777,6 +777,120 @@ mod tests {
         assert!((fef[2] - (-7.5)).abs() < 1e-6);
         assert!((fef[5] - 7.5).abs() < 1e-6);
     }
+
+    #[test]
+    fn test_fef_distributed_torsion_warping_exhaustive() {
+        let l = 6.0;
+        let t_i = 10.0;
+        let t_j = 20.0;
+        let fef = fef_distributed_torsion_warping(t_i, t_j, l, 2.1e11, 1e-6, 8.0e10, 1e-4);
+
+        let expected_3 = l * (7.0 * t_i + 3.0 * t_j) / 20.0;
+        let expected_6 = l * l * (3.0 * t_i + 2.0 * t_j) / 60.0;
+        let expected_10 = l * (3.0 * t_i + 7.0 * t_j) / 20.0;
+        let expected_13 = -l * l * (2.0 * t_i + 3.0 * t_j) / 60.0;
+
+        assert!((fef[3] - expected_3).abs() < 1e-12);
+        assert!((fef[6] - expected_6).abs() < 1e-12);
+        assert!((fef[10] - expected_10).abs() < 1e-12);
+        assert!((fef[13] - expected_13).abs() < 1e-12);
+
+        for idx in [0, 1, 2, 4, 5, 7, 8, 9, 11, 12] {
+            assert_eq!(fef[idx], 0.0, "fef[{}] should be 0.0", idx);
+        }
+
+        let l2 = 4.0;
+        let ti2 = 15.0;
+        let tj2 = 5.0;
+        let fef2 = fef_distributed_torsion_warping(ti2, tj2, l2, 1.0, 1.0, 1.0, 1.0);
+        let exp_3_2 = 4.0 * (7.0 * 15.0 + 3.0 * 5.0) / 20.0;
+        let exp_6_2 = 16.0 * (3.0 * 15.0 + 2.0 * 5.0) / 60.0;
+        let exp_10_2 = 4.0 * (3.0 * 15.0 + 7.0 * 5.0) / 20.0;
+        let exp_13_2 = -16.0 * (2.0 * 15.0 + 3.0 * 5.0) / 60.0;
+        assert!((fef2[3] - exp_3_2).abs() < 1e-12);
+        assert!((fef2[6] - exp_6_2).abs() < 1e-12);
+        assert!((fef2[10] - exp_10_2).abs() < 1e-12);
+        assert!((fef2[13] - exp_13_2).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_expand_fef_12_to_14() {
+        let f12 = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0];
+        let f14 = expand_fef_12_to_14(&f12);
+        let expected = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 0.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 0.0];
+        assert_eq!(f14, expected);
+    }
+
+    #[test]
+    fn test_fef_partial_distributed_2d_thresholds() {
+        let res_zero = fef_partial_distributed_2d(10.0, 20.0, 2.0, 2.0, 5.0, 0.0);
+        assert_eq!(res_zero, [0.0; 6]);
+
+        let res_sub_eps = fef_partial_distributed_2d(10.0, 20.0, 2.0, 2.0 + 1e-13, 5.0, 0.0);
+        assert_eq!(res_sub_eps, [0.0; 6]);
+
+        let res_active = fef_partial_distributed_2d(10.0, 20.0, 1.0, 3.0, 5.0, 0.0);
+        assert!(res_active[1].abs() > 1e-3);
+        assert!(res_active[2].abs() > 1e-3);
+        assert!(res_active[4].abs() > 1e-3);
+        assert!(res_active[5].abs() > 1e-3);
+    }
+
+    #[test]
+    fn test_fef_thermal_2d_thresholds() {
+        let e = 2.0e11;
+        let a = 0.01;
+        let iz = 1e-4;
+        let alpha = 1.2e-5;
+        let dt_u = 20.0;
+        let dt_g = 15.0;
+
+        let h = 0.3;
+        let res = fef_thermal_2d(e, a, iz, 4.0, dt_u, dt_g, alpha, h);
+        let expected_fx = e * a * alpha * dt_u;
+        let expected_mz = e * iz * alpha * dt_g / h;
+        assert_eq!(res, [-expected_fx, 0.0, -expected_mz, expected_fx, 0.0, expected_mz]);
+
+        let res_zero_h = fef_thermal_2d(e, a, iz, 4.0, dt_u, dt_g, alpha, 0.0);
+        assert_eq!(res_zero_h, [-expected_fx, 0.0, 0.0, expected_fx, 0.0, 0.0]);
+
+        let res_tiny_h = fef_thermal_2d(e, a, iz, 4.0, dt_u, dt_g, alpha, 1e-13);
+        assert_eq!(res_tiny_h, [-expected_fx, 0.0, 0.0, expected_fx, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_fef_thermal_3d_thresholds() {
+        let e = 2.0e11;
+        let a = 0.01;
+        let iy = 2e-4;
+        let iz = 1e-4;
+        let alpha = 1.2e-5;
+        let dt_u = 25.0;
+        let dt_gy = 10.0;
+        let dt_gz = 15.0;
+        let hy = 0.4;
+        let hz = 0.5;
+
+        let res = fef_thermal_3d(e, a, iy, iz, 6.0, dt_u, dt_gy, dt_gz, alpha, hy, hz);
+        let exp_fx = e * a * alpha * dt_u;
+        let exp_mz = e * iz * alpha * dt_gy / hy;
+        let exp_my = e * iy * alpha * dt_gz / hz;
+
+        let exp_full = [-exp_fx, 0.0, 0.0, 0.0, -exp_my, -exp_mz, exp_fx, 0.0, 0.0, 0.0, exp_my, exp_mz];
+        assert_eq!(res, exp_full);
+
+        let res_zero_hy = fef_thermal_3d(e, a, iy, iz, 6.0, dt_u, dt_gy, dt_gz, alpha, 1e-13, hz);
+        assert_eq!(res_zero_hy[5], 0.0);
+        assert_eq!(res_zero_hy[11], 0.0);
+        assert_eq!(res_zero_hy[4], -exp_my);
+        assert_eq!(res_zero_hy[10], exp_my);
+
+        let res_zero_hz = fef_thermal_3d(e, a, iy, iz, 6.0, dt_u, dt_gy, dt_gz, alpha, hy, 1e-13);
+        assert_eq!(res_zero_hz[4], 0.0);
+        assert_eq!(res_zero_hz[10], 0.0);
+        assert_eq!(res_zero_hz[5], -exp_mz);
+        assert_eq!(res_zero_hz[11], exp_mz);
+    }
 }
 
 /// Consistent axial nodal forces of a trapezoid on [a,b], per unit member length.

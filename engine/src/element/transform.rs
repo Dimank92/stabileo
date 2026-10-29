@@ -453,4 +453,165 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_frame_transform_3d_exhaustive() {
+        let ex = [0.6, 0.8, 0.0];
+        let ey = [-0.8, 0.6, 0.0];
+        let ez = [0.0, 0.0, 1.0];
+
+        let t = frame_transform_3d(&ex, &ey, &ez);
+        assert_eq!(t.len(), 144);
+
+        // Check each 3x3 block on the diagonal
+        for block in 0..4 {
+            let offset = block * 3;
+            assert_eq!(t[(offset + 0) * 12 + (offset + 0)], ex[0]);
+            assert_eq!(t[(offset + 0) * 12 + (offset + 1)], ex[1]);
+            assert_eq!(t[(offset + 0) * 12 + (offset + 2)], ex[2]);
+
+            assert_eq!(t[(offset + 1) * 12 + (offset + 0)], ey[0]);
+            assert_eq!(t[(offset + 1) * 12 + (offset + 1)], ey[1]);
+            assert_eq!(t[(offset + 1) * 12 + (offset + 2)], ey[2]);
+
+            assert_eq!(t[(offset + 2) * 12 + (offset + 0)], ez[0]);
+            assert_eq!(t[(offset + 2) * 12 + (offset + 1)], ez[1]);
+            assert_eq!(t[(offset + 2) * 12 + (offset + 2)], ez[2]);
+        }
+
+        // Check orthogonality T * T^T = I
+        for i in 0..12 {
+            for j in 0..12 {
+                let dot: f64 = (0..12).map(|k| t[i * 12 + k] * t[j * 12 + k]).sum();
+                let exp = if i == j { 1.0 } else { 0.0 };
+                assert!((dot - exp).abs() < 1e-12, "T*T^T failed at ({}, {})", i, j);
+            }
+        }
+    }
+
+    #[test]
+    fn test_frame_transform_3d_warping_exhaustive() {
+        let ex = [0.0, 0.0, 1.0];
+        let ey = [1.0, 0.0, 0.0];
+        let ez = [0.0, 1.0, 0.0];
+
+        let t = frame_transform_3d_warping(&ex, &ey, &ez);
+        assert_eq!(t.len(), 196);
+        let n = 14;
+
+        // Check warping DOFs (6, 6) and (13, 13) are 1.0
+        assert_eq!(t[6 * n + 6], 1.0);
+        assert_eq!(t[13 * n + 13], 1.0);
+
+        // Check other elements in rows/columns 6 and 13 are 0.0
+        for i in 0..14 {
+            if i != 6 {
+                assert_eq!(t[6 * n + i], 0.0);
+                assert_eq!(t[i * n + 6], 0.0);
+            }
+            if i != 13 {
+                assert_eq!(t[13 * n + i], 0.0);
+                assert_eq!(t[i * n + 13], 0.0);
+            }
+        }
+
+        // Check Node I blocks
+        for block in 0..2 {
+            let offset = block * 3;
+            assert_eq!(t[(offset + 0) * n + (offset + 0)], ex[0]);
+            assert_eq!(t[(offset + 0) * n + (offset + 1)], ex[1]);
+            assert_eq!(t[(offset + 0) * n + (offset + 2)], ex[2]);
+
+            assert_eq!(t[(offset + 1) * n + (offset + 0)], ey[0]);
+            assert_eq!(t[(offset + 1) * n + (offset + 1)], ey[1]);
+            assert_eq!(t[(offset + 1) * n + (offset + 2)], ey[2]);
+
+            assert_eq!(t[(offset + 2) * n + (offset + 0)], ez[0]);
+            assert_eq!(t[(offset + 2) * n + (offset + 1)], ez[1]);
+            assert_eq!(t[(offset + 2) * n + (offset + 2)], ez[2]);
+        }
+
+        // Check Node J blocks (offset 7 and 10)
+        for block in 0..2 {
+            let offset = 7 + block * 3;
+            assert_eq!(t[(offset + 0) * n + (offset + 0)], ex[0]);
+            assert_eq!(t[(offset + 0) * n + (offset + 1)], ex[1]);
+            assert_eq!(t[(offset + 0) * n + (offset + 2)], ex[2]);
+
+            assert_eq!(t[(offset + 1) * n + (offset + 0)], ey[0]);
+            assert_eq!(t[(offset + 1) * n + (offset + 1)], ey[1]);
+            assert_eq!(t[(offset + 1) * n + (offset + 2)], ey[2]);
+
+            assert_eq!(t[(offset + 2) * n + (offset + 0)], ez[0]);
+            assert_eq!(t[(offset + 2) * n + (offset + 1)], ez[1]);
+            assert_eq!(t[(offset + 2) * n + (offset + 2)], ez[2]);
+        }
+
+        // Check orthogonality T * T^T = I
+        for i in 0..14 {
+            for j in 0..14 {
+                let dot: f64 = (0..14).map(|k| t[i * n + k] * t[j * n + k]).sum();
+                let exp = if i == j { 1.0 } else { 0.0 };
+                assert!((dot - exp).abs() < 1e-12, "T_warp*T_warp^T failed at ({}, {})", i, j);
+            }
+        }
+    }
+
+    #[test]
+    fn test_orthonormal_frame_parallel_fallbacks() {
+        // Case 1: ex is parallel to ey_ref, with |ex[0]| < 0.9 (e.g. ex = [0, 0, 1])
+        let ex_z = [0.0, 0.0, 1.0];
+        let ey_ref_z = [0.0, 0.0, 1.0];
+        let (ey1, ez1) = orthonormal_frame(&ex_z, &ey_ref_z);
+        assert_eq!(ey1, [1.0, 0.0, 0.0]);
+        assert_eq!(ez1, [0.0, 1.0, 0.0]);
+
+        // Case 2: ex is parallel to ey_ref, with |ex[0]| >= 0.9 (e.g. ex = [1, 0, 0])
+        let ex_x = [1.0, 0.0, 0.0];
+        let ey_ref_x = [1.0, 0.0, 0.0];
+        let (ey2, ez2) = orthonormal_frame(&ex_x, &ey_ref_x);
+        assert_eq!(ey2, [0.0, 1.0, 0.0]);
+        assert_eq!(ez2, [0.0, 0.0, 1.0]);
+    }
+
+    #[test]
+    fn test_default_ey_ref_vertical_and_horizontal() {
+        // Near-vertical +Z
+        let ex_vert_up = [0.0, 0.0, 1.0];
+        let ey_up = default_ey_ref(&ex_vert_up);
+        assert_eq!(ey_up, [0.0, -1.0, 0.0]);
+
+        // Near-vertical -Z
+        let ex_vert_dn = [0.0, 0.0, -1.0];
+        let ey_dn = default_ey_ref(&ex_vert_dn);
+        assert_eq!(ey_dn, [0.0, 1.0, 0.0]);
+
+        // Horizontal +X
+        let ex_horiz = [1.0, 0.0, 0.0];
+        let ey_h = default_ey_ref(&ex_horiz);
+        assert_eq!(ey_h, [0.0, 1.0, 0.0]);
+    }
+
+    #[test]
+    fn test_compute_local_axes_3d_custom_ref_and_degeneracy() {
+        // Explicit non-zero local_y reference vector along +Z for a +X beam
+        let (ex, ey, ez) = compute_local_axes_3d(
+            0.0, 0.0, 0.0, 5.0, 0.0, 0.0,
+            Some(0.0), Some(0.0), Some(2.0),
+            None, false,
+        );
+        assert_eq!(ex, [1.0, 0.0, 0.0]);
+        assert_eq!(ey, [0.0, 0.0, 1.0]);
+        assert_eq!(ez, [0.0, -1.0, 0.0]);
+
+        // Zero-magnitude explicit local_y reference falls back gracefully
+        let (ex_deg, ey_deg, ez_deg) = compute_local_axes_3d(
+            0.0, 0.0, 0.0, 5.0, 0.0, 0.0,
+            Some(0.0), Some(0.0), Some(0.0),
+            None, false,
+        );
+        assert_eq!(ex_deg, [1.0, 0.0, 0.0]);
+        assert_eq!(ey_deg, [0.0, 1.0, 0.0]);
+        assert_eq!(ez_deg, [0.0, 0.0, 1.0]);
+    }
 }

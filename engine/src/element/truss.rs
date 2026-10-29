@@ -118,4 +118,72 @@ mod tests {
         assert!((k[0] - ea_l).abs() < 1e-6);
         assert!((k[1]).abs() < 1e-10); // No coupling
     }
+
+    #[test]
+    fn test_truss_local_stiffness_3d_exhaustive() {
+        let e = 210e9;
+        let a = 0.005;
+        let l = 4.0;
+        let ea_l = e * a / l;
+
+        let k = truss_local_stiffness_3d(e, a, l);
+        assert_eq!(k.len(), 36);
+
+        // Check non-zero terms
+        assert_eq!(k[0 * 6 + 0], ea_l);
+        assert_eq!(k[0 * 6 + 3], -ea_l);
+        assert_eq!(k[3 * 6 + 0], -ea_l);
+        assert_eq!(k[3 * 6 + 3], ea_l);
+
+        // All other 32 terms must be 0.0
+        for i in 0..6 {
+            for j in 0..6 {
+                if !((i == 0 || i == 3) && (j == 0 || j == 3)) {
+                    assert_eq!(k[i * 6 + j], 0.0, "k[{}, {}] should be 0", i, j);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_truss_global_stiffness_3d_exhaustive() {
+        let e = 200e6;
+        let a = 0.002;
+        let l = 5.0;
+        let dx = 3.0;
+        let dy = 0.0;
+        let dz = 4.0;
+        let ea_l = e * a / l;
+
+        let k = truss_global_stiffness_3d(e, a, l, dx, dy, dz);
+        assert_eq!(k.len(), 36);
+
+        let dir = [0.6, 0.0, 0.8];
+        for i in 0..3 {
+            for j in 0..3 {
+                let val = ea_l * dir[i] * dir[j];
+                assert!((k[i * 6 + j] - val).abs() < 1e-9);
+                assert!((k[i * 6 + (j + 3)] - (-val)).abs() < 1e-9);
+                assert!((k[(i + 3) * 6 + j] - (-val)).abs() < 1e-9);
+                assert!((k[(i + 3) * 6 + (j + 3)] - val).abs() < 1e-9);
+            }
+        }
+
+        // Fully 3D skewed truss
+        let k3d = truss_global_stiffness_3d(100.0, 2.0, 3.0, 1.0, 2.0, 2.0);
+        let ea_l_3d = 100.0 * 2.0 / 3.0;
+        let dir3d = [1.0 / 3.0, 2.0 / 3.0, 2.0 / 3.0];
+        for i in 0..6 {
+            for j in 0..6 {
+                assert_eq!(k3d[i * 6 + j], k3d[j * 6 + i], "Symmetry check at ({}, {})", i, j);
+            }
+        }
+        for i in 0..3 {
+            for j in 0..3 {
+                let exp = ea_l_3d * dir3d[i] * dir3d[j];
+                assert!((k3d[i * 6 + j] - exp).abs() < 1e-12);
+                assert!((k3d[i * 6 + (j + 3)] - (-exp)).abs() < 1e-12);
+            }
+        }
+    }
 }

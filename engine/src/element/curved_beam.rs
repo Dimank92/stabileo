@@ -410,3 +410,183 @@ fn intersect_lines(
         origin_a[2] + s * dir_a[2],
     ]
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_intersect_lines_all_branches() {
+        // Case A: XY dominant (det_01)
+        let o_a = [0.0, 0.0, 0.0];
+        let d_a = [1.0, 0.0, 0.0];
+        let o_b = [5.0, 5.0, 0.0];
+        let d_b = [0.0, 1.0, 0.0];
+        let rhs = [5.0, 5.0, 0.0];
+        let p_xy = intersect_lines(o_a, d_a, o_b, d_b, rhs);
+        assert!((p_xy[0] - 5.0).abs() < 1e-10);
+        assert!((p_xy[1] - 0.0).abs() < 1e-10);
+        assert!((p_xy[2] - 0.0).abs() < 1e-10);
+
+        // Case B: XZ dominant (det_02)
+        let o_b_xz = [4.0, 0.0, 6.0];
+        let d_b_xz = [0.0, 0.0, 1.0];
+        let rhs_xz = [4.0, 0.0, 6.0];
+        let p_xz = intersect_lines(o_a, d_a, o_b_xz, d_b_xz, rhs_xz);
+        assert!((p_xz[0] - 4.0).abs() < 1e-10);
+        assert!((p_xz[1] - 0.0).abs() < 1e-10);
+        assert!((p_xz[2] - 0.0).abs() < 1e-10);
+
+        // Case C: YZ dominant (det_12)
+        let d_a_y = [0.0, 1.0, 0.0];
+        let o_b_yz = [0.0, 3.0, 7.0];
+        let d_b_yz = [0.0, 0.0, 1.0];
+        let rhs_yz = [0.0, 3.0, 7.0];
+        let p_yz = intersect_lines(o_a, d_a_y, o_b_yz, d_b_yz, rhs_yz);
+        assert!((p_yz[0] - 0.0).abs() < 1e-10);
+        assert!((p_yz[1] - 3.0).abs() < 1e-10);
+        assert!((p_yz[2] - 0.0).abs() < 1e-10);
+
+        // Case D: Degenerate parallel lines fallback to midpoint
+        let d_b_parallel = [1.0, 0.0, 0.0];
+        let rhs_par = [0.0, 2.0, 0.0];
+        let p_par = intersect_lines(o_a, d_a, [0.0, 2.0, 0.0], d_b_parallel, rhs_par);
+        assert!((p_par[0] - 0.0).abs() < 1e-10);
+        assert!((p_par[1] - 1.0).abs() < 1e-10);
+        assert!((p_par[2] - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_expand_straight_with_hinges() {
+        let input = CurvedBeamInput {
+            node_start: 10,
+            node_end: 20,
+            node_mid: 99,
+            material_id: 1,
+            section_id: 2,
+            hinge_start: true,
+            hinge_end: true,
+            num_segments: 4,
+        };
+
+        // Collinear start, mid, end triggers expand_straight fallback
+        let p_start = [0.0, 0.0, 0.0];
+        let p_mid = [2.0, 0.0, 0.0];
+        let p_end = [4.0, 0.0, 0.0];
+
+        let exp = expand_curved_beam(&input, p_start, p_mid, p_end, 100, 200);
+
+        assert!(exp.section_frame.is_none());
+        assert_eq!(exp.new_nodes.len(), 3);
+        assert_eq!(exp.new_nodes[0], (100, 1.0, 0.0, 0.0));
+        assert_eq!(exp.new_nodes[1], (101, 2.0, 0.0, 0.0));
+        assert_eq!(exp.new_nodes[2], (102, 3.0, 0.0, 0.0));
+
+        assert_eq!(exp.new_elements.len(), 4);
+        // Only first element has hinge_start
+        assert_eq!(exp.new_elements[0], (200, 10, 100, 1, 2, true, false));
+        assert_eq!(exp.new_elements[1], (201, 100, 101, 1, 2, false, false));
+        assert_eq!(exp.new_elements[2], (202, 101, 102, 1, 2, false, false));
+        // Only last element has hinge_end
+        assert_eq!(exp.new_elements[3], (203, 102, 20, 1, 2, false, true));
+    }
+
+    #[test]
+    fn test_expand_curved_beam_circular_arc() {
+        let input = CurvedBeamInput {
+            node_start: 1,
+            node_end: 2,
+            node_mid: 3,
+            material_id: 5,
+            section_id: 7,
+            hinge_start: false,
+            hinge_end: false,
+            num_segments: 4,
+        };
+
+        let r = 5.0;
+        let p_start = [r, 0.0, 0.0];
+        let p_mid = [r * (std::f64::consts::FRAC_PI_4).cos(), r * (std::f64::consts::FRAC_PI_4).sin(), 0.0];
+        let p_end = [0.0, r, 0.0];
+
+        let exp = expand_curved_beam(&input, p_start, p_mid, p_end, 50, 60);
+
+        assert!(exp.section_frame.is_some());
+        let frame = exp.section_frame.unwrap();
+        assert!((frame.normal[2].abs() - 1.0).abs() < 1e-10); // Arc in XY plane, normal along Z
+
+        assert_eq!(exp.new_nodes.len(), 3);
+        for node in &exp.new_nodes {
+            let dist = (node.1 * node.1 + node.2 * node.2 + node.3 * node.3).sqrt();
+            assert!((dist - r).abs() < 1e-10, "Node {:?} not on circle of radius {}", node, r);
+        }
+
+        // Test ArcSectionFrame local_y perpendicular to segment
+        let seg_start = [exp.new_nodes[0].1, exp.new_nodes[0].2, exp.new_nodes[0].3];
+        let seg_end = [exp.new_nodes[1].1, exp.new_nodes[1].2, exp.new_nodes[1].3];
+        let ly = frame.local_y(seg_start, seg_end);
+        let seg_dx = seg_end[0] - seg_start[0];
+        let seg_dy = seg_end[1] - seg_start[1];
+        let seg_dz = seg_end[2] - seg_start[2];
+        let dot_prod = ly[0] * seg_dx + ly[1] * seg_dy + ly[2] * seg_dz;
+        assert!(dot_prod.abs() < 1e-10, "local_y must be perpendicular to segment");
+    }
+
+    #[test]
+    fn test_expand_curved_beam_reverse_arc_direction() {
+        let input = CurvedBeamInput {
+            node_start: 1,
+            node_end: 2,
+            node_mid: 3,
+            material_id: 1,
+            section_id: 1,
+            hinge_start: false,
+            hinge_end: false,
+            num_segments: 4,
+        };
+
+        let r = 5.0;
+        let p_start = [r, 0.0, 0.0];
+        let p_mid = [0.0, -r, 0.0]; // mid goes through -Y
+        let p_end = [0.0, r, 0.0];
+
+        let exp = expand_curved_beam(&input, p_start, p_mid, p_end, 10, 20);
+        assert_eq!(exp.new_nodes.len(), 3);
+        // Middle node (index 1) must be in the negative Y hemisphere
+        assert!(exp.new_nodes[1].2 < 0.0, "Arc must traverse through p_mid: y={}", exp.new_nodes[1].2);
+    }
+
+    #[test]
+    fn test_check_curved_beam_sizes_limits() {
+        let valid_beam = CurvedBeamInput {
+            node_start: 1,
+            node_end: 2,
+            node_mid: 3,
+            material_id: 1,
+            section_id: 1,
+            hinge_start: false,
+            hinge_end: false,
+            num_segments: 10,
+        };
+        assert!(check_curved_beam_sizes(&[valid_beam.clone()], 100, 100).is_ok());
+
+        // Exceed MAX_CURVED_BEAM_SEGMENTS
+        let mut huge_seg = valid_beam.clone();
+        huge_seg.num_segments = MAX_CURVED_BEAM_SEGMENTS + 1;
+        let err1 = check_curved_beam_sizes(&[huge_seg], 100, 100);
+        assert!(err1.is_err());
+        assert!(err1.unwrap_err().contains("exceeds the maximum"));
+
+        // Exceed MAX_CURVED_BEAM_SEGMENTS_TOTAL
+        let many_beams = vec![valid_beam.clone(); (MAX_CURVED_BEAM_SEGMENTS_TOTAL / 10) + 2];
+        let err2 = check_curved_beam_sizes(&many_beams, 100, 100);
+        assert!(err2.is_err());
+        assert!(err2.unwrap_err().contains("segments in total exceed"));
+
+        // Overflow node/element ids
+        let err3 = check_curved_beam_sizes(&[valid_beam], usize::MAX - 2, 100);
+        assert!(err3.is_err());
+        assert!(err3.unwrap_err().contains("too large to expand"));
+    }
+}

@@ -774,4 +774,162 @@ mod tests {
             "Axial force: got {} expected {}", f_axial[3], expected_n
         );
     }
+
+    #[test]
+    fn test_concrete_hognestad_all_regimes() {
+        let fc = 30.0;
+        let eps_c0 = 0.002;
+        let eps_cu = 0.004;
+        let ft = 2.5;
+
+        // 1. Uncracked tension (strain <= eps_cr)
+        let mut state = FiberMaterialState::new();
+        let eps_cr = ft / (2.0 * fc / eps_c0);
+        assert!((eps_cr - 8.333333333333334e-5_f64).abs() < 1e-10);
+        let (sigma_t1, et_t1) = concrete_hognestad_response(fc, eps_c0, eps_cu, ft, 4.0e-5, &mut state);
+        let exp_et = 2.0 * fc / eps_c0; // 30000.0
+        let exp_sigma_t1 = exp_et * 4.0e-5;
+        assert!((sigma_t1 - exp_sigma_t1).abs() < 1e-6);
+        assert!((et_t1 - exp_et).abs() < 1e-6);
+        assert!(!state.cracked);
+
+        // 2. Cracked tension (strain > eps_cr)
+        let (sigma_t2, et_t2) = concrete_hognestad_response(fc, eps_c0, eps_cu, ft, 1.0e-4, &mut state);
+        assert_eq!(sigma_t2, 0.0);
+        assert_eq!(et_t2, 1e-6);
+        assert!(state.cracked);
+
+        // 3. Subsequent tension while already cracked
+        let (sigma_t3, et_t3) = concrete_hognestad_response(fc, eps_c0, eps_cu, ft, 2.0e-5, &mut state);
+        assert_eq!(sigma_t3, 0.0);
+        assert_eq!(et_t3, 1e-6);
+
+        // 4. Zero tensile strength ft = 0.0
+        let mut state_no_ft = FiberMaterialState::new();
+        let (sigma_no_ft, et_no_ft) = concrete_hognestad_response(fc, eps_c0, eps_cu, 0.0, 1.0e-5, &mut state_no_ft);
+        assert_eq!(sigma_no_ft, 0.0);
+        assert_eq!(et_no_ft, 1e-6);
+        assert!(state_no_ft.cracked);
+
+        // 5. Parabolic compression ascending (strain between -eps_c0 and 0)
+        let mut state_c = FiberMaterialState::new();
+        let strain_c = -0.001;
+        let (sigma_c, et_c) = concrete_hognestad_response(fc, eps_c0, eps_cu, ft, strain_c, &mut state_c);
+        let r = 0.001 / eps_c0; // 0.5
+        let exp_sigma_c = -fc * (2.0 * r - r * r); // -30 * (1 - 0.25) = -22.5
+        let exp_et_c = fc * (2.0 - 2.0 * r) / eps_c0; // 30 * 1.0 / 0.002 = 15000.0
+        assert!((sigma_c - exp_sigma_c).abs() < 1e-6);
+        assert!((et_c - exp_et_c).abs() < 1e-6);
+        assert_eq!(state_c.max_compression_strain, strain_c);
+
+        // 6. At peak compression strain (-eps_c0)
+        let (sigma_peak, et_peak) = concrete_hognestad_response(fc, eps_c0, eps_cu, ft, -eps_c0, &mut state_c);
+        assert!((sigma_peak - (-fc)).abs() < 1e-6);
+        assert!(et_peak.abs() < 1e-6);
+
+        // 7. Linear descending branch (between -eps_cu and -eps_c0)
+        let strain_desc = -0.003;
+        let (sigma_desc, et_desc) = concrete_hognestad_response(fc, eps_c0, eps_cu, ft, strain_desc, &mut state_c);
+        let exp_desc_sigma = -fc * (1.0 - (0.003 - eps_c0) / (eps_cu - eps_c0)); // -30 * 0.5 = -15.0
+        let exp_desc_et = -(fc / (eps_cu - eps_c0)); // -15000.0
+        assert!((sigma_desc - exp_desc_sigma).abs() < 1e-6);
+        assert!((et_desc - exp_desc_et).abs() < 1e-6);
+
+        // 8. Crushed compression (strain <= -eps_cu)
+        let (sigma_crush, et_crush) = concrete_hognestad_response(fc, eps_c0, eps_cu, ft, -eps_cu, &mut state_c);
+        assert_eq!(sigma_crush, 0.0);
+        assert_eq!(et_crush, 1e-6);
+
+        let (sigma_crush2, et_crush2) = concrete_hognestad_response(fc, eps_c0, eps_cu, ft, -0.006, &mut state_c);
+        assert_eq!(sigma_crush2, 0.0);
+        assert_eq!(et_crush2, 1e-6);
+    }
+
+    #[test]
+    fn test_gauss_lobatto_all_orders_exhaustive() {
+        let l = 6.0;
+
+        for n in 2..=7 {
+            let pts = gauss_lobatto_points(n, l);
+            assert_eq!(pts.len(), n, "Order {} should produce {} points", n, n);
+
+            // First point at 0, last point at L
+            assert!((pts[0].0 - 0.0).abs() < 1e-12);
+            assert!((pts[n - 1].0 - l).abs() < 1e-12);
+
+            // Weights sum to L
+            let w_sum: f64 = pts.iter().map(|(_, w)| w).sum();
+            assert!((w_sum - l).abs() < 1e-10, "Order {}: weights sum to {} instead of {}", n, w_sum, l);
+
+            // Symmetry check
+            for i in 0..n {
+                let mirror_pos = l - pts[n - 1 - i].0;
+                assert!((pts[i].0 - mirror_pos).abs() < 1e-10, "Order {} position symmetry failed at {}", n, i);
+                assert!((pts[i].1 - pts[n - 1 - i].1).abs() < 1e-10, "Order {} weight symmetry failed at {}", n, i);
+            }
+        }
+
+        // Test fallback (e.g. 8 points maps to 3 points)
+        let fallback_pts = gauss_lobatto_points(8, l);
+        let pts3 = gauss_lobatto_points(3, l);
+        assert_eq!(fallback_pts.len(), 3);
+        for i in 0..3 {
+            assert_eq!(fallback_pts[i].0, pts3[i].0);
+            assert_eq!(fallback_pts[i].1, pts3[i].1);
+        }
+    }
+
+    #[test]
+    fn test_steel_bilinear_hardening_and_compression() {
+        let e = 200_000.0;
+        let fy = 250.0;
+        let alpha = 0.02;
+
+        // Test alpha >= 1.0 (pure elastic fallback)
+        let mut state_elastic = FiberMaterialState::new();
+        let (s_el, t_el) = steel_bilinear_response(e, fy, 1.0, 0.005, &mut state_elastic);
+        assert_eq!(s_el, e * 0.005);
+        assert_eq!(t_el, e);
+
+        // Compression yielding
+        let mut state = FiberMaterialState::new();
+        let eps_comp_yield = -0.004; // Below -fy/E = -0.00125
+        let (sigma_comp, tangent_comp) = steel_bilinear_response(e, fy, alpha, eps_comp_yield, &mut state);
+        assert!(sigma_comp < -fy, "Should yield in compression: {}", sigma_comp);
+        let e_h = alpha * e / (1.0 - alpha);
+        let exp_tangent = e * e_h / (e + e_h);
+        assert!((tangent_comp - exp_tangent).abs() < 1e-6);
+        assert!(state.plastic_strain < 0.0);
+        assert!(state.back_stress < 0.0);
+
+        // Unloading from plastic state is elastic
+        let eps_unload = -0.0035;
+        let (_, tangent_unload) = steel_bilinear_response(e, fy, alpha, eps_unload, &mut state);
+        assert_eq!(tangent_unload, e);
+    }
+
+    #[test]
+    fn test_section_response_2d_bending_and_fibers() {
+        let b = 0.2;
+        let h = 0.4;
+        let e = 200_000.0;
+        let n_layers = 20;
+
+        let section = rectangular_fiber_section(b, h, n_layers, FiberMaterial::Elastic { e });
+        let mut state = SectionState::new(section.fibers.len());
+
+        // Combined axial + bending: eps_0 = 0.0005, kappa = 0.002
+        let ([n, m], [ea, es, _es2, ei]) = section_response_2d(
+            &section, &[0.0005, 0.002], &mut state,
+        );
+
+        let expected_ea = e * 1000.0 * b * h;
+        let expected_ei = e * 1000.0 * b * h * h * h / 12.0;
+
+        assert!((ea - expected_ea).abs() / expected_ea < 0.01);
+        assert!((ei - expected_ei).abs() / expected_ei < 0.05);
+        assert!(es.abs() < 1e-4); // Symmetric rectangular section has zero centroid coupling
+        assert!((n - expected_ea * 0.0005).abs() / (expected_ea * 0.0005) < 0.01);
+        assert!((m - expected_ei * 0.002).abs() / (expected_ei * 0.002) < 0.05);
+    }
 }

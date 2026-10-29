@@ -400,4 +400,113 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_frame_local_stiffness_3d_warping_exhaustive() {
+        let e = 210e9;
+        let a = 0.01;
+        let iy = 1e-4;
+        let iz = 2e-4;
+        let j = 5e-5;
+        let cw = 1e-6;
+        let l = 4.0;
+        let g = 80e9;
+
+        let k14 = frame_local_stiffness_3d_warping(e, a, iy, iz, j, cw, l, g, Hinge3D::default(), 0.0, 0.0);
+        let k12 = frame_local_stiffness_3d(e, a, iy, iz, j, l, g, Hinge3D::default(), 0.0, 0.0);
+
+        assert_eq!(k14.len(), 196);
+
+        // Check symmetry of 14x14
+        for i in 0..14 {
+            for jj in 0..14 {
+                assert!(
+                    (k14[i * 14 + jj] - k14[jj * 14 + i]).abs() < 1e-3,
+                    "k14 not symmetric at ({}, {})", i, jj
+                );
+            }
+            assert!(k14[i * 14 + i] > 0.0, "diagonal term at {} must be positive", i);
+        }
+
+        // Verify non-torsion 12x12 mapping into 14x14
+        let map = [0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12];
+        for i in [0, 1, 2, 4, 5, 6, 7, 8, 10, 11] { // indices in k12 excluding torsion (3, 9)
+            for jj in [0, 1, 2, 4, 5, 6, 7, 8, 10, 11] {
+                assert_eq!(
+                    k14[map[i] * 14 + map[jj]],
+                    k12[i * 12 + jj],
+                    "Mismatch between k14 and k12 at ({}, {})", map[i], map[jj]
+                );
+            }
+        }
+
+        // Verify the 4x4 torsion-warping block at [3, 6, 10, 13]
+        let tw = torsion_warping_block(g * j, e * cw, l, l * l, l * l * l);
+        let idx = [3, 6, 10, 13];
+        for i in 0..4 {
+            for jj in 0..4 {
+                assert_eq!(
+                    k14[idx[i] * 14 + idx[jj]],
+                    tw[i * 4 + jj],
+                    "Torsion-warping block mismatch at sub-indices ({}, {})", i, jj
+                );
+            }
+        }
+
+        // Warping DOFs (6, 13) only couple with torsion DOFs (3, 10)
+        for &w_dof in &[6, 13] {
+            for col in 0..14 {
+                if !idx.contains(&col) {
+                    assert_eq!(k14[w_dof * 14 + col], 0.0);
+                    assert_eq!(k14[col * 14 + w_dof], 0.0);
+                }
+            }
+        }
+
+        // Torsion release zeroing torsion and warping terms
+        let h_rel = Hinge3D { release_t_start: true, ..Default::default() };
+        let k14_rel = frame_local_stiffness_3d_warping(e, a, iy, iz, j, cw, l, g, h_rel, 0.0, 0.0);
+        for &i in &idx {
+            for &jj in &idx {
+                assert_eq!(k14_rel[i * 14 + jj], 0.0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_frame_local_stiffness_3d_hinges_and_shear() {
+        let e = 200e6;
+        let a = 0.01;
+        let iy = 1e-4;
+        let iz = 2e-4;
+        let j = 5e-5;
+        let l = 3.0;
+        let g = 200e6 / 2.6;
+
+        // Timoshenko shear deformation phi_y > 0, phi_z > 0
+        let k_shear = frame_local_stiffness_3d(e, a, iy, iz, j, l, g, Hinge3D::default(), 0.1, 0.2);
+        for i in 0..12 {
+            for jj in 0..12 {
+                assert!((k_shear[i * 12 + jj] - k_shear[jj * 12 + i]).abs() < 1e-3);
+            }
+            assert!(k_shear[i * 12 + i] > 0.0);
+        }
+
+        // Torsion release at start collapses torsion stiffness
+        let h_t = Hinge3D { release_t_start: true, ..Default::default() };
+        let k_t = frame_local_stiffness_3d(e, a, iy, iz, j, l, g, h_t, 0.0, 0.0);
+        assert_eq!(k_t[3 * 12 + 3], 0.0);
+        assert_eq!(k_t[3 * 12 + 9], 0.0);
+        assert_eq!(k_t[9 * 12 + 3], 0.0);
+        assert_eq!(k_t[9 * 12 + 9], 0.0);
+
+        // Moment releases
+        let h_mz = Hinge3D { release_mz_start: true, release_mz_end: true, ..Default::default() };
+        let k_mz = frame_local_stiffness_3d(e, a, iy, iz, j, l, g, h_mz, 0.0, 0.0);
+        // Transverse shear in Y and bending in Z collapse
+        assert_eq!(k_mz[1 * 12 + 1], 0.0);
+        assert_eq!(k_mz[5 * 12 + 5], 0.0);
+        assert_eq!(k_mz[7 * 12 + 7], 0.0);
+        assert_eq!(k_mz[11 * 12 + 11], 0.0);
+    }
 }
