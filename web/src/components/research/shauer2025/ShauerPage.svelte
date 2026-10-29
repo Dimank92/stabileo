@@ -238,7 +238,11 @@
   }
 
   const actions = {
-    goToStep: (s: number) => playback.seek(s),
+    goToStep: (s: number) => {
+      backToReplay();
+      playback.setCount(replay?.frames.length ?? 0);
+      playback.seek(s);
+    },
     showTab,
     setParams: (p: Record<string, number | string | boolean>) => {
       playback.interact();
@@ -473,7 +477,7 @@
           <figcaption>Reaction force against imposed top displacement</figcaption>
           <LineChart series={forceSeries} xLabel="top displacement u (mm)" yLabel="F (kN)" marker={frame ? frame.step.displacement : null} markerLabel={frame ? `step ${frame.step.step}` : ''} labels={forceLabels} height={Math.max(170, forceH - 190)} />
           {#if residualSeries.length}
-            <LineChart series={residualSeries} xLabel="top displacement u (mm)" yLabel="|F − F_ref| (kN)" log rules={[{ y: 1e-5, text: 'staggered tolerance' }]} marker={frame ? frame.step.displacement : null} height={110} />
+            <LineChart series={residualSeries} xLabel="top displacement u (mm)" yLabel="|F − F_ref| (kN)" log rules={[{ y: 1e-5, text: 'force comparison tolerance' }]} marker={frame ? frame.step.displacement : null} height={110} />
           {/if}
           {#if !showsReference}<p class="rs-note">The reference curve is shown only for the reference parameters.</p>{/if}
         </figure>
