@@ -30,6 +30,7 @@ fn hit(id: &str, issue: u32, message: &str) -> StructuredDiagnostic {
 const NL_MATERIAL: &str = "Material-nonlinear results are approximate: the model is a whole-member secant rather than plasticity, so the response jumps at first yield (NL-5). Check the collapse load factor with plastic collapse";
 const THERMAL_ALPHA: &str = "These temperature loads state no coefficient of thermal expansion, so α = 12·10⁻⁶ /°C (steel's) was assumed; for another material the thermal forces scale with its real α (concrete about 10·10⁻⁶, aluminium 23·10⁻⁶): give the load its material's `alpha`";
 const THERMAL_DEPTH: &str = "These temperature gradients state no section depth, so the depth of the section's equivalent solid rectangle, √(12·I/A), was assumed; that is exact only for a solid rectangle (an I section or a tube is shallower than that rectangle, so its gradient moment came out too low, by about 30 % for an IPE): give the load the section's real depth";
+const MITC4_DISTORTED: &str = "MITC4 shell elements on distorted meshes exhibit severe in-plane shear locking under bending (MacNeal-Harder: up to 92 % too stiff); refine to near-rectangular elements or verify in-plane deflections";
 
 /// A frame thermal load solved with a default the input did not state (FR-4, #407 fixed the
 /// fixed α and depth: a load now carries them). Not a defect, but a result built on a guess
@@ -88,10 +89,48 @@ pub fn loads_3d(loads: &[SolverLoad3D]) -> Vec<StructuredDiagnostic> {
     }))
 }
 
-/// The warnings a 3D model carries whatever its loads. None is open now: curved shells (SH-6),
-/// warped MITC9 (SH-7) and arches (SP-15) are fixed. Kept as the place a model-level finding goes.
-pub fn model_3d(_input: &SolverInput3D) -> Vec<StructuredDiagnostic> {
-    Vec::new()
+/// Returns the IDs of MITC4 quads that are distorted (high skew, low Jacobian ratio, or high aspect ratio combined with skew).
+fn distorted_mitc4_quads(input: &SolverInput3D) -> Vec<usize> {
+    if input.quads.is_empty() {
+        return Vec::new();
+    }
+    let node_by_id: std::collections::HashMap<usize, &SolverNode3D> =
+        crate::ordered::values(&input.nodes).map(|n| (n.id, n)).collect();
+
+    let mut distorted = Vec::new();
+    for q in crate::ordered::values(&input.quads) {
+        let coords: Option<[[f64; 3]; 4]> = (|| {
+            let mut c = [[0.0; 3]; 4];
+            for (i, &nid) in q.nodes.iter().enumerate() {
+                let node = node_by_id.get(&nid).copied()?;
+                c[i] = [node.x, node.y, node.z];
+            }
+            Some(c)
+        })();
+
+        if let Some(coords) = coords {
+            let qm = crate::element::quad::quad_quality_metrics(&coords);
+            // MacNeal-Harder (1985) benchmark shows severe in-plane locking on trapezoidal and
+            // parallelogram meshes (max_skew = 45°, jacobian_ratio ≈ 0.79).
+            if qm.max_skew > 15.0 || qm.jacobian_ratio < 0.7 || (qm.aspect_ratio > 4.0 && (qm.max_skew > 5.0 || qm.jacobian_ratio < 0.85)) {
+                distorted.push(q.id);
+            }
+        }
+    }
+    distorted
+}
+
+/// The warnings a 3D model carries whatever its loads: distorted MITC4 shells (SH-17, #798).
+pub fn model_3d(input: &SolverInput3D) -> Vec<StructuredDiagnostic> {
+    let mut out = Vec::new();
+    let distorted = distorted_mitc4_quads(input);
+    if !distorted.is_empty() {
+        let mut d = hit("SH-17", 798, MITC4_DISTORTED);
+        d.element_ids = distorted;
+        d.element_kind = Some(ElementKind::Quad);
+        out.push(d);
+    }
+    out
 }
 
 /// The known-issue warnings that apply to a 2D result of `analysis` on `input`.

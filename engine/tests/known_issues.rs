@@ -4,7 +4,7 @@
 use crate::common;
 use common::{make_3d_beam, make_beam};
 use dedaliano_engine::known_issues::{for_3d, Analysis};
-use dedaliano_engine::solver::linear::{prepare_static_2d, solve_2d};
+use dedaliano_engine::solver::linear::{prepare_static_2d, solve_2d, solve_3d};
 use dedaliano_engine::solver::constraints::{solve_constrained_2d, ConstrainedInput};
 use dedaliano_engine::solver::ssi::{solve_ssi_2d, SSIInput, SoilSpring};
 use dedaliano_engine::solver::material_nonlinear::solve_nonlinear_material_2d;
@@ -149,4 +149,80 @@ fn a_direct_constrained_solve_carries_its_warnings_once() {
     with.constraints = vec![tie];
     let r = solve_2d(&with).unwrap();
     assert_eq!(assumed(&r.structured_diagnostics), vec!["alpha".to_string()]);
+}
+
+fn make_quad_mesh_model(distorted: bool) -> SolverInput3D {
+    let mut input = SolverInput3D {
+        nodes: HashMap::new(),
+        materials: HashMap::from([("1".to_string(), SolverMaterial { id: 1, e: 200_000.0, nu: 0.3 })]),
+        sections: HashMap::new(),
+        elements: HashMap::new(),
+        supports: HashMap::new(),
+        loads: vec![],
+        constraints: vec![],
+        left_hand: None,
+        plates: HashMap::new(),
+        quads: HashMap::new(),
+        quad9s: HashMap::new(),
+        solid_shells: HashMap::new(),
+        curved_shells: HashMap::new(),
+        curved_beams: vec![],
+        connectors: HashMap::new(),
+        masses: Default::default(),
+        solver_options: None,
+    };
+    let dx = if distorted { 0.1 } else { 0.0 };
+    let nodes_data = [
+        (1, 0.0, 0.0, 0.0),
+        (2, 1.0 - dx, 0.0, 0.0),
+        (3, 2.0, 0.0, 0.0),
+        (4, 0.0, 0.2, 0.0),
+        (5, 1.0 + dx, 0.2, 0.0),
+        (6, 2.0, 0.2, 0.0),
+    ];
+    for (id, x, y, z) in nodes_data {
+        input.nodes.insert(id.to_string(), SolverNode3D { id, x, y, z });
+    }
+    input.quads.insert("1".to_string(), SolverQuadElement { id: 1, nodes: [1, 2, 5, 4], material_id: 1, thickness: 0.1 });
+    input.quads.insert("2".to_string(), SolverQuadElement { id: 2, nodes: [2, 3, 6, 5], material_id: 1, thickness: 0.1 });
+
+    let fixed_sup = |nid| SolverSupport3D {
+        node_id: nid,
+        rx: true, ry: true, rz: true,
+        rrx: true, rry: true, rrz: true,
+        kx: None, ky: None, kz: None,
+        krx: None, kry: None, krz: None,
+        dx: None, dy: None, dz: None,
+        drx: None, dry: None, drz: None,
+        normal_x: None, normal_y: None, normal_z: None,
+        is_inclined: None, rw: None, kw: None,
+    };
+    input.supports.insert("1".to_string(), fixed_sup(1));
+    input.supports.insert("4".to_string(), fixed_sup(4));
+
+    input.loads.push(SolverLoad3D::Nodal(SolverNodalLoad3D { node_id: 3, fx: 0.0, fy: 1.0, fz: 0.0, mx: 0.0, my: 0.0, mz: 0.0, bw: None }));
+    input.loads.push(SolverLoad3D::Nodal(SolverNodalLoad3D { node_id: 6, fx: 0.0, fy: 1.0, fz: 0.0, mx: 0.0, my: 0.0, mz: 0.0, bw: None }));
+
+    input
+}
+
+#[test]
+fn mitc4_distorted_quad_elements_are_flagged_with_known_issue_sh17() {
+    let regular = make_quad_mesh_model(false);
+    let diags_reg = for_3d(&regular, Analysis::Linear);
+    assert!(!ids(&diags_reg).contains(&"SH-17".to_string()), "regular rectangular quads should not carry SH-17");
+
+    let distorted = make_quad_mesh_model(true);
+    let diags_dist = for_3d(&distorted, Analysis::Linear);
+    assert!(ids(&diags_dist).contains(&"SH-17".to_string()), "distorted quads must carry known issue SH-17");
+
+    let diag = diags_dist.iter().find(|d| d.code == DiagnosticCode::KnownIssue && d.phase.as_deref() == Some("SH-17")).expect("SH-17 diagnostic");
+    assert_eq!(diag.severity, Severity::Warning);
+    assert_eq!(diag.value, Some(798.0));
+    assert_eq!(diag.element_kind, Some(ElementKind::Quad));
+    assert!(diag.element_ids.contains(&1) || diag.element_ids.contains(&2));
+
+    // Also verify that solving linear 3D attaches SH-17 to results
+    let r = solve_3d(&distorted).expect("linear 3d solve");
+    assert!(ids(&r.structured_diagnostics).contains(&"SH-17".to_string()), "solve_3d must attach SH-17 to result diagnostics");
 }
