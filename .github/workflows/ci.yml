@@ -26,7 +26,7 @@ env:
 #
 # Self-hosted runners (six on Stabileo's stabileo-ci-1, an AX102 running Arch Linux;
 # dotfiles servers/runners-stabileo.sh, labels `self-hosted`, `stabileo`): Lint Repo,
-# Lint Engine, Engine Suite, Engine Metamorphic, WASM, Research WASM and Results Snapshot
+# Lint Engine, both Engine Suite shards, Engine Metamorphic, WASM, Research WASM and Results Snapshot
 # run there when STABILEO_SELF_HOSTED is 'true', only for merge_group and pushes to main.
 # Every pull_request, including fork PRs, stays on GitHub; forks cannot trigger merge_group.
 # Each runner keeps its own CARGO_TARGET_DIR; checkout explicitly cleans each job's workspace.
@@ -34,10 +34,11 @@ env:
 # installer, rust-cache, magic-nix-cache (runner users are not trusted Nix users) and free-disk.
 # Engine Gates and both Web Unit shards stay on GitHub: their timing budgets have failed
 # beside other busy jobs on the shared host. Research validation and route budgets stay there too.
-# Web Build, E2E Site, all ten E2E shards, e2e-flaky and Determinism use the same trusted
-# event/variable gate below. Their Linux e2e shell supplies pinned Playwright browsers,
-# libraries and fallback fonts; no browser downloads, apt or sudo on the Arch host.
-# Determinism includes Chromium, Firefox and WebKit (the pin packages all three on Linux).
+# Web Build, E2E Site, all ten E2E shards and e2e-flaky use the same trusted
+# event/variable gate below. Their Linux e2e shell supplies pinned Rust and Playwright
+# browsers, libraries and fallback fonts; no browser downloads, apt or sudo on the Arch host.
+# Chromium and Firefox passed the Linux host preflight; Nix WebKit did not start.
+# Determinism stays on GitHub to check Chromium, Firefox and WebKit.
 # Run scripts/ci/check-playwright-nix.sh on the host before enabling the variable.
 # Docker build smoke stays on GitHub because Docker is not guaranteed on stabileo-ci-1.
 # Other jobs remain on GitHub. Unset or 'false', the variable sends every job to GitHub.
@@ -761,18 +762,14 @@ jobs:
         with:
           clean: true
           persist-credentials: false
-      - if: runner.environment == 'github-hosted'
-        uses: ./.github/actions/free-disk
-      - if: runner.environment == 'github-hosted'
-        uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
-      - if: runner.environment == 'github-hosted'
-        uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
+      - uses: ./.github/actions/free-disk
+      - uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
+      - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.npm
           key: ${{ runner.os }}-npm-${{ hashFiles('web/package-lock.json') }}
-      - if: runner.environment == 'github-hosted'
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: pw-all-${{ runner.os }}-${{ hashFiles('web/package-lock.json') }}
@@ -783,22 +780,11 @@ jobs:
           name: wasm
           path: web/src/lib/wasm
       - name: Install dependencies
-        run: |
-          if [ "${{ runner.environment }}" = self-hosted ]; then
-            nix develop .#e2e -c make web.deps NIX_RUN=
-          else
-            make web.deps
-          fi
+        run: make web.deps
       - name: Install browser system dependencies
-        if: runner.environment == 'github-hosted'
         run: nix develop --command bash -c "cd web && npx playwright install-deps chromium firefox webkit"
       - name: Bit-identical in Node and every browser
-        run: |
-          if [ "${{ runner.environment }}" = self-hosted ]; then
-            nix develop .#e2e -c make test.web.determinism NIX_RUN=
-          else
-            make test.web.determinism
-          fi
+        run: make test.web.determinism
       - name: Upload determinism artifacts
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

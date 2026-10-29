@@ -99,7 +99,8 @@
         devShells.e2e = assert pkgs.lib.assertMsg (playwright.version == playwrightVersion)
           "Playwright npm/Nix versions differ: update nixpkgs-playwright with package-lock.json";
           pkgs.mkShell {
-            packages = [ pkgs.nodejs_22 pkgs.git pkgs.gnumake pkgs.bash pkgs.python3 ];
+            # Web Build checks third-party notices via cargo metadata; use the repository pin.
+            packages = [ rustToolchain pkgs.nodejs_22 pkgs.git pkgs.gnumake pkgs.bash pkgs.python3 ];
             shellHook = pkgs.lib.optionalString pkgs.stdenv.isLinux ''
               export PLAYWRIGHT_BROWSERS_PATH="${playwright.browsers}"
               export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
