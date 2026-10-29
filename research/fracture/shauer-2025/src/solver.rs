@@ -313,6 +313,7 @@ impl Solver {
             let ku = self.elastic.matrix.sym_mat_vec(&self.u);
             residual = norm(&ku.iter().zip(&rhs).map(|(a, b)| a - b).collect::<Vec<_>>());
         }
+        converged = residual < tol;
         self.failed = !converged;
         if converged && self.problem.controls.irreversibility == Irreversibility::History {
             for e in 0..self.coords.len() {
@@ -357,6 +358,23 @@ mod tests {
     use crate::examples::bar_reference;
 
     #[test]
+    fn converges_on_final_permitted_iteration() {
+        let mut unlimited = Solver::new(bar_reference()).unwrap();
+        let expected = unlimited.advance().unwrap().unwrap();
+        assert!(expected.converged);
+        let mut problem = bar_reference();
+        problem.controls.max_iterations = expected.iterations;
+        let mut limited = Solver::new(problem).unwrap();
+        let actual = limited.advance().unwrap().unwrap();
+        assert!(actual.converged);
+        assert_eq!(actual.iterations, expected.iterations);
+        assert_eq!(actual.residual, expected.residual);
+        assert_eq!(limited.u, unlimited.u);
+        assert_eq!(limited.d, unlimited.d);
+        assert!(limited.advance().unwrap().is_some());
+    }
+
+    #[test]
     fn failed_step_residual_describes_returned_fields() {
         for max_iterations in [1, 2] {
             let mut problem = bar_reference();
@@ -381,6 +399,7 @@ mod tests {
         let mut problem = bar_reference();
         problem.controls.irreversibility = Irreversibility::History;
         problem.controls.max_iterations = 1;
+        problem.controls.tolerance = 1e-30;
         let mut solver = Solver::new(problem).unwrap();
         let before = solver.history.clone();
         let step = solver.advance().unwrap().unwrap();

@@ -197,6 +197,13 @@
       "tolerance": 1e-8
     },
     {
+      "metric": "max absolute difference / max |u|",
+      "name": "ex3: nodal displacement at the peak step 56",
+      "observed": 1.1185547443359639e-10,
+      "passed": true,
+      "tolerance": 1e-8
+    },
+    {
       "metric": "max absolute difference",
       "name": "ex3: nodal damage at the last step 98, reference or its mirror image",
       "observed": 4.112774565356858e-10,

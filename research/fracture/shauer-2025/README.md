@@ -18,7 +18,7 @@ code is not validation against experiments and not an engineering certification.
 | Claim | Evidence |
 |---|---|
 | The reference code runs here and its outputs are recorded | `reference-results/` + `MANIFEST.json` (versions, commit, SHA-256) |
-| The Rust implementation reproduces the reference code on its three examples | `tests/reference.rs`, 29 checks, all passing; `VALIDATION.json` |
+| The Rust implementation reproduces the reference code on its three examples | `tests/reference.rs`, 30 checks, all passing; `VALIDATION.json` |
 | It reproduces the numbers **published in the paper** | **Not established.** The paper's full text was not accessible (Elsevier, no institutional access). No published number has been compared. |
 | Its physics are correct beyond what the reference does | Partly: patch test, rigid modes and the 1D AT2 homogeneous solution (`tests/properties.rs`). No experimental comparison. |
 
@@ -76,9 +76,9 @@ Agreement (from `VALIDATION.json`; full list there):
 - Example 2, up to the peak: force differs by 1.5606483340127005e-12 relative and
   maximum damage by 4.198952507776388e-12 relative. Example 3's force differs by
   3.99638935610333e-11 relative up to the peak; maximum damage is not compared there.
-- Nodal displacement is compared only at example 1 step 50 and example 2 step 56:
-  maximum absolute differences divided by max |u| are 1.605198387714803e-10 and
-  8.491098239482427e-11. Example 3 has damage-field checks only, not displacement checks.
+- Nodal displacement is compared at example 1 step 50 and examples 2 and 3 step 56:
+  maximum absolute differences divided by max |u| are 1.605198387714803e-10,
+  8.491098239482427e-11 and 1.1185547443359639e-10, respectively (tolerance 1e-8).
 - Including fracture: maximum force differences are 2.194403730101718e-7 kN (ex. 2)
   and 1.033201445777704e-6 kN (ex. 3). The comparison tolerances are 1e-5 and 1e-4 kN;
   these are not mathematical error bounds implied by the staggered residual tolerance.
