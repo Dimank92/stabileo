@@ -146,8 +146,8 @@ impl Solver {
     pub fn new(problem: Problem) -> Result<Solver, String> {
         problem.material.validate()?;
         let c = &problem.controls;
-        if !(c.dt > 0.0 && c.total_time > 0.0 && c.tolerance > 0.0 && c.max_iterations > 0) {
-            return Err("controls: need dt > 0, total_time > 0, tolerance > 0, max_iterations > 0".into());
+        if !([c.dt, c.total_time, c.tolerance].iter().all(|v| v.is_finite() && *v > 0.0) && c.max_iterations > 0) {
+            return Err("controls: need finite positive dt, total_time, tolerance, max_iterations > 0".into());
         }
         let n = problem.mesh.n_nodes();
         for bc in &problem.dirichlet {
@@ -356,6 +356,21 @@ impl Solver {
 mod tests {
     use super::*;
     use crate::examples::bar_reference;
+
+    #[test]
+    fn rejects_nonfinite_or_nonpositive_controls() {
+        for value in [f64::INFINITY, f64::NEG_INFINITY, f64::NAN, 0.0, -1.0] {
+            for control in 0..3 {
+                let mut problem = bar_reference();
+                match control {
+                    0 => problem.controls.dt = value,
+                    1 => problem.controls.total_time = value,
+                    _ => problem.controls.tolerance = value,
+                }
+                assert!(Solver::new(problem).is_err(), "control {control}: {value}");
+            }
+        }
+    }
 
     #[test]
     fn converges_on_final_permitted_iteration() {

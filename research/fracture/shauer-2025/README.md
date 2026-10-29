@@ -42,7 +42,15 @@ Unknowns: displacement **u** (bilinear Q4, 2 dofs per node) and damage d (Q4, 1 
   in example 2). The Rust code reproduces this by default and offers Miehe's history field
   H = max over converged steps of ψ⁺ as an option (`Irreversibility::History`), tested to keep
   damage under full unloading. Neither enforces 0 ≤ d ≤ 1 at nodes: on coarse meshes the
-  consistent N N term can give small negative nodal values (seen: -3e-7).
+  consistent N N term can give negative nodal values. The recorded Python reference outputs
+  (`reference-results/ex*_steps.csv`, verified against the manifest hashes) have minimum nodal
+  damage 3.076336950017797e-08 in example 1, -0.0031224948220514573 in example 2,
+  and -0.06024191772700118 in example 3. These undershoots are present in the reference
+  code’s unconstrained AT2 discretization too; they are not silently clamped in the solver.
+  Negative damage is outside the physical interval: evaluating (1-d)^2 at the example 3
+  minimum gives about 1.124, above intact stiffness. Assembly evaluates degradation at
+  quadrature points using interpolated damage, so this nodal value does not establish a
+  12.4% assembled-stiffness error.
 - Alternating scheme per load step: assemble elasticity with the current d and apply Dirichlet
   conditions; from the second pass on, stop when ‖K(d) u - f‖₂ < tol (absolute); otherwise solve
   for u, then for d. Dirichlet values scale linearly with a pseudo time t += dt, stopping when
