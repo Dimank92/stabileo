@@ -25,6 +25,7 @@
   import PlasticPage from './plastic-collapse/PlasticPage.svelte';
   import NavierPage from './navier1823/NavierPage.svelte';
   import LeePage from './lee1968/LeePage.svelte';
+  import ArchPage from './dadeppo1975/ArchPage.svelte';
   import SpringsPage from './grossman2026/SpringsPage.svelte';
   import '../landing/landing.css';
   import '../blog/blog.css';
@@ -39,6 +40,7 @@
     '/research/benchmarks/plastic-collapse': { title: 'Classic plastic collapse — Stabileo Research', description: 'First version: a portal frame compared with beam, sway and combined mechanism hand calculations.' },
     '/research/benchmarks/navier-plate': { title: 'Navier plate — Stabileo Research', description: 'First version: a simply supported plate compared with the Navier Fourier series.' },
     '/research/benchmarks/lee-frame-1968': { title: 'Lee frame (1968) — Stabileo Research', description: 'First version: pinned Lee frame with the production arc-length solver. Provisional reference, zero reviews.' },
+    '/research/benchmarks/dadeppo-arch-1975': { title: 'DaDeppo–Schmidt deep arch (1975) — Stabileo Research', description: 'First version: a clamped–hinged circular arch traced by the production arc-length solver.' },
     '/research': {
       title: 'Stabileo Research — computational mechanics you can run',
       description:
@@ -99,6 +101,8 @@
     <NavierPage />
   {:else if route === '/research/benchmarks/lee-frame-1968'}
     <LeePage />
+  {:else if route === '/research/benchmarks/dadeppo-arch-1975'}
+    <ArchPage />
   {:else}
     <section class="sec sec--ink">
       <div class="wrap" style="padding-top: 7rem; padding-bottom: 4rem">

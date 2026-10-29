@@ -118,3 +118,6 @@ production WASM wrapper and shared Stabileo viewer. Stage: first-version; 0 revi
 `engine/tests/benchmarks/plastic_collapse.json` (test data only); its published
 `results/stabileo_results.json` is allowed web replay data. Stage: first-version,
 0 reviews. The page reports hand mechanism bounds separately from the solver result.
+## First-version engine benchmark
+
+`benchmarks/dadeppo-arch-1975/` is one 215° clamped–hinged arch solved by the production corotational arc-length solver. Its shared case lives in `engine/tests/benchmarks/dadeppo_arch.json`; the web reads only that engine-owned input and the published replay `research/benchmarks/dadeppo-arch-1975/results/stabileo_results.json`. Stage: first-version, 0 reviews. See its README for the corrected normalization (PR²/EI = 8.97), source, reproduction commands and limitations.

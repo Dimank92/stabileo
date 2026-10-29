@@ -49,3 +49,5 @@ mod tower_fixture_test;
 mod cqc_1981;
 #[path = "../lee_frame.rs"]
 mod lee_frame;
+#[path = "../benchmarks/dadeppo_arch.rs"]
+mod dadeppo_arch;
