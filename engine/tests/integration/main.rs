@@ -42,3 +42,5 @@ mod winkler;
 
 #[path = "../benchmarks/newmark_1959.rs"]
 mod newmark_1959;
+#[path = "../benchmarks/plastic_collapse.rs"]
+mod plastic_collapse_benchmark;

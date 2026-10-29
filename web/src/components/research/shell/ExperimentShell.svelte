@@ -16,6 +16,7 @@
 
   type Props = {
     paperId: string;
+    citationAuthors?: string;
     name: string;
     lead: string;
     /** Passed / total of the validation checks, when the experiment has them. */
@@ -31,13 +32,13 @@
     wide?: boolean;
     compactHeader?: boolean;
   };
-  let { paperId, name, lead, checks = null, verification = null, actions, sourcePath, article, app, wide = false, compactHeader = false }: Props = $props();
+  let { paperId, citationAuthors, name, lead, checks = null, verification = null, actions, sourcePath, article, app, wide = false, compactHeader = false }: Props = $props();
   provideExperiment(actions);
 
   const paper = catalog.papers.find((p) => p.id === paperId)!;
   const commit = BUILD_COMMIT;
   const s = $derived(rs());
-  const authors = paper.crossref.authors.join(', ');
+  const authors = $derived(citationAuthors ?? paper.crossref.authors.join(', '));
 
 </script>
 
@@ -47,7 +48,7 @@
       <p class="rs-crumb"><PublicLink to="/research">{s.research}</PublicLink> / {fieldName(paper.area)}</p>
       <h1 lang={researchLocale()}>{name}</h1>
       <p class="rs-cite">
-        {s.afterAuthors} {authors}, “{paper.crossref.title}”, <em>{paper.crossref.venue}</em> ({paper.crossref.year}),
+        {s.afterAuthors} {authors}, “{paper.crossref.title}”{#if paper.crossref.venue}, <em>{paper.crossref.venue}</em>{/if} ({paper.crossref.year}),
         <a href="https://doi.org/{paper.doi}" rel="noreferrer" target="_blank">{"doi:"}{paper.doi}</a>.
       </p>
       <VerificationSummary

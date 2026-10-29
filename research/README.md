@@ -109,3 +109,10 @@ production Newmark average acceleration. Shared input and native tests live unde
 `engine/tests/benchmarks/newmark_1959.*`; published native replay data is
 `benchmarks/newmark-1959/results/stabileo_results.json`. The page uses the existing
 production WASM wrapper and shared Stabileo viewer. Stage: first-version; 0 reviews.
+## First-version engine benchmarks
+
+`benchmarks/plastic-collapse/` documents one Horne-style portal using the production
+3D plastic-collapse solver. Its shared case lives in
+`engine/tests/benchmarks/plastic_collapse.json` (test data only); its published
+`results/stabileo_results.json` is allowed web replay data. Stage: first-version,
+0 reviews. The page reports hand mechanism bounds separately from the solver result.

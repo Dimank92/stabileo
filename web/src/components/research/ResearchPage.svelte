@@ -22,6 +22,7 @@
   import { fs } from './fairclough2026/i18n';
   import NewmarkPage from './newmark1959/NewmarkPage.svelte';
   import CqcPage from './cqc1981/CqcPage.svelte';
+  import PlasticPage from './plastic-collapse/PlasticPage.svelte';
   import SpringsPage from './grossman2026/SpringsPage.svelte';
   import '../landing/landing.css';
   import '../blog/blog.css';
@@ -33,6 +34,7 @@
   const PAGES: Record<string, { title: string; description: string }> = {
     '/research/benchmarks/newmark-1959': { title: 'Newmark (1959) — Stabileo Research', description: 'First version: production Newmark average acceleration against the exact SDOF step response.' },
     '/research/benchmarks/cqc-1981': { title: 'SRSS vs CQC (1981) — Stabileo Research', description: 'First version: closely spaced building modes compared with a closed-form reference.' },
+    '/research/benchmarks/plastic-collapse': { title: 'Classic plastic collapse — Stabileo Research', description: 'First version: a portal frame compared with beam, sway and combined mechanism hand calculations.' },
     '/research': {
       title: 'Stabileo Research — computational mechanics you can run',
       description:
@@ -87,6 +89,8 @@
     <NewmarkPage />
   {:else if route === '/research/benchmarks/cqc-1981'}
     <CqcPage />
+  {:else if route === '/research/benchmarks/plastic-collapse'}
+    <PlasticPage />
   {:else}
     <section class="sec sec--ink">
       <div class="wrap" style="padding-top: 7rem; padding-bottom: 4rem">
