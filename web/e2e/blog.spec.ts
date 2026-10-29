@@ -59,6 +59,7 @@ test.describe('@smoke blog', () => {
     await boot(page, '/es/changelog/', 'es');
 
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Historial de cambios de Stabileo');
+    await expect(page.locator('nav .nav-links a[data-nav="changelog"]')).toHaveAttribute('aria-current', 'page');
     const weeks = page.getByTestId('changelog-entry');
     await expect(weeks).toHaveCount(CHANGELOG.length);
     await expect(weeks.first()).toHaveAttribute('data-date', CHANGELOG[0].date);

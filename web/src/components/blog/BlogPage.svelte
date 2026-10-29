@@ -185,7 +185,7 @@
 <div class="landing blog" bind:this={pageEl}>
   <!-- `slug`, not `post`: an unknown slug is still inside a post's address,
        and that reader needs the way back to the index more than anyone. -->
-  <SiteHeader current={standing ? null : 'blog'} />
+  <SiteHeader current={standing?.view === 'changelog' ? 'changelog' : standing ? null : 'blog'} />
 
   {#if standing?.view === 'changelog' && standingBody}
     <ChangelogView eyebrow={standingBody.eyebrow} title={standingBody.title} lead={standingBody.lead} />
