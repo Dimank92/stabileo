@@ -569,10 +569,17 @@
         {/if}
 
       <div class="pro-viz-row">
-        <label class="pro-viz-check">
-          <input type="checkbox" checked={uiStore.showLoads3D} onchange={onToggleLoads} />
-          {t('pro.showLoads')}
-        </label>
+        {#if resultsStore.diagramType === 'deformed'}
+          <label class="pro-viz-check">
+            <input type="checkbox" bind:checked={resultsStore.showDeformedValues} data-testid="pr-show-displacements" />
+            {t('results.showDisplacements')}
+          </label>
+        {:else}
+          <label class="pro-viz-check">
+            <input type="checkbox" checked={uiStore.showLoads3D} onchange={onToggleLoads} />
+            {t('pro.showLoads')}
+          </label>
+        {/if}
       </div>
       <div class="pro-viz-row">
         <label class="pro-viz-check">

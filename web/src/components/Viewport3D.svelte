@@ -1580,9 +1580,9 @@
     uiStore.unitSystem;
     resultsStore.modalResult3D;
     resultsStore.activeModeIndex;
-    // Quick/exact, and the displacement labels "show values" adds.
+    // Quick/exact, and the displacement labels "show displacements" adds.
     deformedView.exact;
-    resultsStore.showDiagramValues;
+    resultsStore.showDeformedValues;
     // A time-history instant is drawn through the deformed view; scrubbing re-syncs it.
     timeHistoryView.step;
     timeHistoryView.shown;

@@ -13870,5 +13870,6 @@ const pt: Translations = {
   "clipboard.spaceInPlane": "A cópia é de um modelo 3D: copie de novo em 2D para colar aqui.",
   "sel.copyTitle": "Copiar a seleção (Ctrl+C)",
   "sel.pasteTitle": "Colar a cópia e escolher onde (Ctrl+V)",
+  "results.showDisplacements": "Mostrar deslocamentos",
 };
 export default pt;

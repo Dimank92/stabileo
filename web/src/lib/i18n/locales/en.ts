@@ -14230,5 +14230,6 @@ const en: Record<string, string> = {
   "clipboard.spaceInPlane": "The copy comes from a 3D model: copy it again in 2D to paste it here.",
   "sel.copyTitle": "Copy the selection (Ctrl+C)",
   "sel.pasteTitle": "Paste the copy and choose where (Ctrl+V)",
+  "results.showDisplacements": "Show displacements",
 };
 export default en;

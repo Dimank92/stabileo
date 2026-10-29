@@ -193,10 +193,16 @@
         </div>
       {/if}
       {#if resultsStore.diagramType === 'deformed'}
-        <label class="checkbox-item">
-          <input type="checkbox" bind:checked={resultsStore.animateDeformed} />
-          <span>{t('results.animate')}</span>
-        </label>
+        <div class="deformed-checks">
+          <label class="checkbox-item">
+            <input type="checkbox" bind:checked={resultsStore.animateDeformed} />
+            <span>{t('results.animate')}</span>
+          </label>
+          <label class="checkbox-item">
+            <input type="checkbox" bind:checked={resultsStore.showDeformedValues} data-testid="deformed-values" />
+            <span>{t('results.showDisplacements')}</span>
+          </label>
+        </div>
         {#if resultsStore.animateDeformed}
           <div class="input-group">
             <label>{t('results.speed')}:</label>
@@ -488,6 +494,7 @@
     letter-spacing: 0.05em;
   }
 
+  .deformed-checks { display: flex; gap: 14px; flex-wrap: wrap; }
   .checkbox-item {
     display: flex;
     align-items: center;

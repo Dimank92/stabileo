@@ -268,7 +268,7 @@
     }
   });
   $effect(() => { resultsStore.deformedScale; resultsStore.diagramScale; invalidate(); });
-  $effect(() => { resultsStore.showDiagramValues; resultsStore.drawPositiveTowardLocalAxes; invalidate(); });
+  $effect(() => { resultsStore.showDiagramValues; resultsStore.showDeformedValues; resultsStore.drawPositiveTowardLocalAxes; invalidate(); });
   $effect(() => { resultsStore.colorMapKind; invalidate(); });
   $effect(() => { resultsStore.showReactions; resultsStore.showConstraintForces; invalidate(); });
   // Despiece controls must redraw the canvas immediately (no mouse-move needed).
@@ -1688,7 +1688,7 @@
    */
   function drawDeformedValues(scale: number) {
     const res = resultsStore.results;
-    if (!ctx || !res || !valuesNow()) return;
+    if (!ctx || !res || !(exportFrame ? exportFrame.options.values : resultsStore.showDeformedValues)) return;
     const byId = new Map(res.displacements.map((d) => [d.nodeId, d]));
     const picks = nodesToLabel(res.displacements.map((d) => ({ nodeId: d.nodeId, ux: d.ux, uy: 0, uz: d.uz })));
     ctx.font = 'bold 11px sans-serif';

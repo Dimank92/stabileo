@@ -14219,5 +14219,6 @@ const es: Record<string, string> = {
   "clipboard.spaceInPlane": "Lo copiado es de un modelo 3D: copialo de nuevo en 2D para pegarlo acá.",
   "sel.copyTitle": "Copiar lo seleccionado (Ctrl+C)",
   "sel.pasteTitle": "Pegar lo copiado y elegir dónde (Ctrl+V)",
+  "results.showDisplacements": "Mostrar desplazamientos",
 };
 export default es;
