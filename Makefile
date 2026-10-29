@@ -12,7 +12,7 @@
        services services.stop postgres.start postgres.stop \
        inst inst.check inst.claim inst.release inst.list ports \
        docker.build docker.up docker.down cloud-init.render \
-       check-pins check.changelog check.test-targets worktree worktree-prune hooks \
+       check-pins check.changelog check.test-targets check.wasm-reproducible worktree worktree-prune hooks \
        fmt check clean
 
 NIX_RUN = nix develop --command
@@ -345,6 +345,10 @@ format: format.backend fmt
 ## Build the WASM engine for the frontend (a copy from the cache when these sources were built before)
 wasm:
 	$(NIX_RUN) scripts/wasm-cached.sh
+
+## Verify the engine WASM build is reproducible: build twice cleanly and assert byte-identical binaries
+check.wasm-reproducible:
+	$(NIX_RUN) scripts/check-wasm-reproducible.sh
 
 ## A new worktree ready to test in seconds: make worktree NAME=fix-x [BASE=main]
 worktree:

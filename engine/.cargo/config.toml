@@ -2,6 +2,9 @@
 linker = "clang"
 rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "codegen-units=1"]
+
 # There used to be an `[unstable] build-std` here "for a JS-backed Instant::now() in WASM", with an
 # engine/rust-toolchain.toml selecting a floating nightly so that cargo would read it. The clocks
 # the engine reads in WASM are gated off (`solver/linear.rs`, `now_micros`), so std needs no

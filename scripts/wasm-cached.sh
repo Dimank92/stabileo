@@ -13,7 +13,25 @@ cd "$(git rev-parse --show-toplevel)"
 
 cache_root=${XDG_CACHE_HOME:-$HOME/.cache}/stabileo/wasm
 out=web/src/lib/wasm
-build() { (cd engine && wasm-pack build --target web --out-dir ../web/src/lib/wasm --no-opt); }
+build() {
+  local top
+  top=$(git rev-parse --show-toplevel)
+  local cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+  local commit_time
+  commit_time=$(git log -1 --format=%ct 2>/dev/null || echo "1700000000")
+  export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$commit_time}"
+  export STABILEO_GIT_COMMIT="${STABILEO_GIT_COMMIT:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}"
+
+  local sep=$'\x1f'
+  local flags="-C${sep}codegen-units=1${sep}--remap-path-prefix=${top}=stabileo${sep}--remap-path-prefix=${cargo_home}=/cargo"
+  if [ -n "${CARGO_TARGET_DIR:-}" ]; then
+    flags="${flags}${sep}--remap-path-prefix=${CARGO_TARGET_DIR}=/target"
+  fi
+  if sysroot=$(rustc --print sysroot 2>/dev/null); then
+    [ -n "$sysroot" ] && flags="${flags}${sep}--remap-path-prefix=${sysroot}=/rustc"
+  fi
+  (cd engine && CARGO_ENCODED_RUSTFLAGS="$flags" wasm-pack build --target web --out-dir ../web/src/lib/wasm --no-opt)
+}
 
 if [ "${STABILEO_WASM_CACHE:-1}" = 0 ] || [ -n "$(git status --porcelain -- engine Cargo.lock Cargo.toml rust-toolchain.toml)" ]; then
   build
