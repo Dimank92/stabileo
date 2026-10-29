@@ -29,8 +29,10 @@
     app: Snippet;
     /** One column with the app first and not sticky (e.g. while an embedded editor is shown). */
     wide?: boolean;
+    /** Keep the title above the experiment and put detailed context in the article. */
+    introInArticle?: boolean;
   };
-  let { paperId, name, lead, checks = null, verification = null, actions, sourcePath, article, app, wide = false }: Props = $props();
+  let { paperId, name, lead, checks = null, verification = null, actions, sourcePath, article, app, wide = false, introInArticle = false }: Props = $props();
   provideExperiment(actions);
 
   const paper = catalog.papers.find((p) => p.id === paperId)!;
@@ -40,11 +42,7 @@
 
 </script>
 
-<section class="sec sec--ink rs-shell">
-  <div class="wrap rs-shell-wrap">
-    <header class="rs-shell-head">
-      <p class="rs-crumb"><PublicLink to="/research">{s.research}</PublicLink> / {fieldName(paper.area)}</p>
-      <h1 lang={researchLocale()}>{name}</h1>
+{#snippet introduction()}
       <p class="rs-cite">
         {s.afterAuthors} {authors}, “{paper.crossref.title}”, <em>{paper.crossref.venue}</em> ({paper.crossref.year}),
         <a href="https://doi.org/{paper.doi}" rel="noreferrer" target="_blank">{"doi:"}{paper.doi}</a>.
@@ -54,9 +52,18 @@
         published={verification?.published ?? { kind: 'none', why: s.notComparedWhy }}
       />
       <p class="rs-lead" lang={researchLocale()}>{lead}</p>
+{/snippet}
+
+<section class="sec sec--ink rs-shell">
+  <div class="wrap rs-shell-wrap">
+    <header class="rs-shell-head">
+      <p class="rs-crumb"><PublicLink to="/research">{s.research}</PublicLink> / {fieldName(paper.area)}</p>
+      <h1 lang={researchLocale()}>{name}</h1>
+      {#if !introInArticle}{@render introduction()}{/if}
     </header>
     <div class="rs-shell-grid" class:rs-wide={wide}>
       <article class="rs-shell-article rs-prose" lang={researchLocale()}>
+        {#if introInArticle}{@render introduction()}{/if}
         {@render article()}
         <h2 id="cite">{s.citeThis}</h2>
         <p class="rs-citebox">
