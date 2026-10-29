@@ -113,6 +113,16 @@ def main():
             assert errors, change
     print("ok   validates status-specific evidence and strips display title markup")
 
+    for host in ["github.com", "gitlab.com", "zenodo.org", "doi.org"]:
+        code, out = run(mutated(lambda p: p["code"][0].update(url=f"https://{host}/example")), "--offline")
+        assert code == 0, out
+    for url in ["javascript:alert(1)", "data:text/html,test", "http://github.com/example",
+                "https://unknown.example/repo", "https://github.com.evil.example/repo",
+                "https://github.com@evil.example/repo", "https://github.com:invalid/repo", None]:
+        code, out = run(mutated(lambda p: p["code"][0].update(url=url)), "--offline")
+        assert code != 0 and "code URL must use HTTPS" in out, (url, out)
+        print("ok   rejects code URL", repr(url))
+
     cases = {
         "string boolean": lambda p: p.update(reproduced_published_results="false"),
         "integer boolean": lambda p: p.update(reproduced_published_results=1),
