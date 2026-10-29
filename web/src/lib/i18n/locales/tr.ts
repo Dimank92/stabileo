@@ -234,6 +234,7 @@ const tr: Translations = {
   'landing.navPricing': 'Fiyatlandırma',
   'landing.navBlog': 'Blog',
   'landing.navChangelog': 'Değişiklikler',
+  'landing.navPaper': 'Makale',
   'landing.navResearch': 'Araştırma',
   'landing.ebHero': 'ÜCRETSİZ VE AÇIK · YAPI ANALİZİ',
   'landing.heroH': 'Yapı analizi, bir tarayıcı sekmesinde.',

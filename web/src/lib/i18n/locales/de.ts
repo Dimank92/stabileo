@@ -234,6 +234,7 @@ const de: Translations = {
   'landing.navPricing': 'Preise',
   'landing.navBlog': 'Blog',
   'landing.navChangelog': 'Änderungen',
+  'landing.navPaper': 'Fachartikel',
   'landing.navResearch': 'Forschung',
   'landing.ebHero': 'KOSTENLOS UND OFFEN · TRAGWERKSBERECHNUNG',
   'landing.heroH': 'Tragwerksberechnung in einem Browser-Tab.',

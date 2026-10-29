@@ -234,6 +234,7 @@ const fr: Translations = {
   'landing.navPricing': 'Tarifs',
   'landing.navBlog': 'Blog',
   'landing.navChangelog': 'Nouveautés',
+  'landing.navPaper': 'Article',
   'landing.navResearch': 'Recherche',
   'landing.ebHero': 'LIBRE ET OUVERT · CALCUL DE STRUCTURES',
   'landing.heroH': 'Le calcul de structures, dans un onglet du navigateur.',
