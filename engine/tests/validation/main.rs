@@ -11,3 +11,5 @@ mod three_d;
 
 #[path = "../benchmarks/navier_plate.rs"]
 mod navier_plate;
+#[path = "../research_benchmarks.rs"]
+mod research_benchmarks;
