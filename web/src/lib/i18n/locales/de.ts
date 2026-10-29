@@ -389,12 +389,9 @@ const de: Translations = {
 
   // ─── Extra tooltips (ToolbarProject, ToolbarConfig) ───
   'project.exportExcelTooltip': 'Excel-Bericht mit allen Blättern exportieren (Modell + Ergebnisse)',
-  'project.exportPdfTooltip': 'Druckbaren PDF-Bericht erzeugen',
 
   // ─── CalcReportDialog ───
   'project.exportDxfTooltip': 'Nach AutoCAD DXF mit Diagrammen exportieren',
-  'project.exportSvgTooltip': 'Vektorgrafik als SVG exportieren',
-  'project.exportPngTooltip': 'PNG-Screenshot exportieren',
   'project.exportCsvTooltip': 'Ergebnistabelle als CSV exportieren',
   'project.openDedTooltip': 'Projektdatei öffnen (.ded / .json)',
   'project.openDxfTooltip': 'Geometrie aus AutoCAD DXF-Datei importieren',
@@ -1920,7 +1917,6 @@ const de: Translations = {
   'report.printBtn': 'Drucken / PDF',
   'report.docTitle': '{name} — Berechnungsbericht',
   'report.coverSubtitle': 'Statischer Berechnungsbericht',
-  'report.coverCode': 'Nachweis nach CIRSOC 201',
   'report.coverFooter': 'Stabileo — Tragwerksanalyse',
   'report.modelData': '1. Modelldaten',
   'report.view3d': '3D-Ansicht',
@@ -2376,7 +2372,6 @@ const de: Translations = {
   'pro.noSlabs': 'Keine Decken (Quads) mit Spannungsergebnissen im Modell.',
   'pro.driftTitle': 'Stockwerksdrift — CIRSOC 103 §5.2.8',
   'pro.driftLimit': 'Grenzwert',
-  'pro.solveFirst': 'Berechne zuerst die Struktur',
   'pro.noVerifiableElems': 'Keine nachweisbaren Elemente gefunden. Stelle sicher, dass die Materialien f\'c <= 80 MPa (Beton) oder fy > 80 MPa (Stahl) haben und die Querschnitte Eigenschaften besitzen.',
   'pro.verifyPrompt': 'Klicke "Elemente nachweisen" um den Nachweis CIRSOC 201 / 301 auszuführen',
   'pro.wasmNotice': 'Erfordert WASM-Neukompilierung — die Nachweise {code} werden aktiviert, sobald die Prüfungen im nativen Motor kompiliert sind.',

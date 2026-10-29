@@ -24,6 +24,7 @@
 import { test, expect, PRO_URL, clickStage, ribbonCmd } from './fixtures';
 import { insertGenerated, pickGenerator, placeButton } from './generator-helpers';
 import type { Page } from '@playwright/test';
+import { OFFERED_LOCALES } from '../src/lib/i18n/offered';
 
 const STAGE_OF = { generators: 'model', steel: 'design', connections: 'design' } as const;
 
@@ -60,7 +61,7 @@ test.describe('a stored locale the app no longer offers', () => {
     // One representative: the barrier is `isOfferedLocale`, which does not know which code it is refusing.
     await bootWithStoredLocale(page, 'it');
     const settled = await activeLocale(page);
-    expect(['es', 'en', 'pt', 'de', 'fr', 'tr'], `settled on ${settled}`).toContain(settled);
+    expect(OFFERED_LOCALES, `settled on ${settled}`).toContain(settled);
   });
 
   test('leaves the metallic panel reading as ONE language, not a mixture', async ({ page }) => {
