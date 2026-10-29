@@ -182,14 +182,22 @@ fn buckling_741_certificate_contains_reported_and_reference_factors() {
     assert!(lo > 4688.9203 && hi < 4688.9204);
     assert!(exact_pencil_positive(&sys.k_ff, &sys.neg_kg_csc, 4644.4835783707595));
     assert!(!exact_pencil_positive(&sys.k_ff, &sys.neg_kg_csc, 4688.92209616787));
-    if let BucklingCertificate::Certified { lambda_lower, lambda_upper, lambda_computed } = out.certificate {
-        let upper = lambda_upper.unwrap();
-        assert!(lambda_lower <= hi && lo <= upper, "reference [{lo}, {hi}] outside [{lambda_lower}, {upper}]");
-        assert!(exact_pencil_positive(&sys.k_ff, &sys.neg_kg_csc, lambda_lower));
-        assert!(!exact_pencil_positive(&sys.k_ff, &sys.neg_kg_csc, upper));
-        assert!(lambda_lower <= lambda_computed && lambda_computed <= upper, "reported {lambda_computed} outside [{lambda_lower}, {upper}]");
-    } else if let BucklingCertificate::Uncertified { reason } = out.certificate {
-        assert!(reason.contains("exceeds certified upper bound"), "{reason}");
+
+    let ref_mid = (lo + hi) / 2.0;
+    let rel_err = (out.results.modes[0].load_factor - ref_mid).abs() / ref_mid;
+    assert!(rel_err < 1e-6, "reported factor {} relative error {rel_err} exceeds 1e-6 from reference {ref_mid}", out.results.modes[0].load_factor);
+
+    match out.certificate {
+        BucklingCertificate::Certified { lambda_lower, lambda_upper, lambda_computed } => {
+            let upper = lambda_upper.unwrap();
+            assert!(lambda_lower <= hi && lo <= upper, "reference [{lo}, {hi}] outside [{lambda_lower}, {upper}]");
+            assert!(exact_pencil_positive(&sys.k_ff, &sys.neg_kg_csc, lambda_lower));
+            assert!(!exact_pencil_positive(&sys.k_ff, &sys.neg_kg_csc, upper));
+            assert!(lambda_lower <= lambda_computed && lambda_computed <= upper, "reported {lambda_computed} outside [{lambda_lower}, {upper}]");
+        }
+        BucklingCertificate::Uncertified { reason } => {
+            panic!("buckling factor #741 must be certified within certified enclosure, but got uncertified: {reason}");
+        }
     }
 }
 
@@ -239,9 +247,9 @@ fn generated_buckling_enclosures(cases: u64) {
             }
         }
     }
-    assert!(certified.iter().all(|&n| n > 0), "no certificates: {certified:?}");
-    assert!(refused > 0);
     eprintln!("{cases} generated pairs: certified {certified:?}, refused {refused}");
+    assert!(certified.iter().all(|&n| n > 0), "no certificates: {certified:?}");
+    assert_eq!(refused, 0, "expected zero refusals with accurate Rayleigh quotient eigen-solve, got {refused}");
 }
 
 #[test]

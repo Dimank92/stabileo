@@ -170,6 +170,49 @@ fn generalized_eigen_cholesky(a: &[f64], b: &[f64], n: usize, max_iter: usize) -
     }
     result.vectors = transformed;
 
+    // Refine eigenvalues via Rayleigh quotient on original A and B:
+    // lambda = x^T A x / (x^T B x). Due to stationarity of the Rayleigh quotient at eigenvectors,
+    // an O(eps) error in the eigenvector yields an O(eps^2) error in the eigenvalue.
+    // This removes the drift caused by explicit inversion and matrix products in C = L^-1 A L^-T.
+    for col in 0..n {
+        let mut num = 0.0;
+        let mut den = 0.0;
+        for i in 0..n {
+            let xi = result.vectors[i * n + col];
+            let mut a_xi = 0.0;
+            let mut b_xi = 0.0;
+            for j in 0..n {
+                let xj = result.vectors[j * n + col];
+                a_xi += a[i * n + j] * xj;
+                b_xi += b[i * n + j] * xj;
+            }
+            num += xi * a_xi;
+            den += xi * b_xi;
+        }
+        if den.abs() > 1e-15 {
+            result.values[col] = num / den;
+        }
+    }
+
+    // Re-sort eigenvalues and corresponding eigenvector columns ascending
+    let mut pairs: Vec<(f64, usize)> = result
+        .values
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(i, v)| (v, i))
+        .collect();
+    pairs.sort_by(|x, y| x.0.partial_cmp(&y.0).unwrap_or(std::cmp::Ordering::Equal));
+    let sorted_vals: Vec<f64> = pairs.iter().map(|(v, _)| *v).collect();
+    let mut sorted_vecs = vec![0.0; n * n];
+    for (new_col, &(_, old_col)) in pairs.iter().enumerate() {
+        for row in 0..n {
+            sorted_vecs[row * n + new_col] = result.vectors[row * n + old_col];
+        }
+    }
+    result.values = sorted_vals;
+    result.vectors = sorted_vecs;
+
     Some(result)
 }
 
