@@ -584,18 +584,13 @@
   }
 
   let showLanding = $state(shouldShowLanding());
-  let showTools = $state(routeKind().kind === 'tools');
-  let tools = $state<typeof import('./components/tools/ToolsPage.svelte').default | null>(null);
+  let showExperiment = $state(['research', 'tools'].includes(routeKind().kind));
+  let experiment = $state<typeof import('./components/research/ExperimentPage.svelte').default | null>(null);
   $effect(() => {
-    if (showTools && !tools) void import('./components/tools/load-page').then(m => m.loadToolsPage()).then(page => tools = page);
-  });
-  let showResearch = $state(routeKind().kind === 'research');
-  let research = $state<typeof import('./components/research/ResearchPage.svelte').default | null>(null);
-  $effect(() => {
-    if (showResearch && !research) {
-      void import('./components/research/load-page')
-        .then((m) => m.loadResearchPage())
-        .then((page) => (research = page));
+    if (showExperiment && !experiment) {
+      void import('./components/research/load-experiment')
+        .then((m) => m.loadExperimentPage())
+        .then((page) => (experiment = page));
     }
   });
   let showBlog = $state(typeof window !== 'undefined' && isBlogRoute(location.pathname));
@@ -622,18 +617,16 @@
     }
     showLanding = false;
     showBlog = false;
-    showResearch = false;
-    showTools = false;
+    showExperiment = false;
   }
 
   function syncRouteState() {
-    showTools = routeKind().kind === 'tools';
-    showResearch = routeKind().kind === 'research';
+    showExperiment = ['research', 'tools'].includes(routeKind().kind);
     adoptLocaleFromPath();
     showBlog = isBlogRoute(location.pathname);
     blogPath = publicRoute(location.pathname).path;
     showLanding = shouldShowLanding();
-    if (!showLanding && !showBlog && !showResearch && !showTools) {
+    if (!showLanding && !showBlog && !showExperiment) {
       const nextMode = pathToMode(location.pathname);
       currentAppMode = nextMode;
       if (nextMode === 'educativo') {
@@ -798,7 +791,7 @@
     importText = '';
   }
 
-  const editorActive = $derived(!showLanding && !showBlog && !showResearch && !showTools);
+  const editorActive = $derived(!showLanding && !showBlog && !showExperiment);
   provideEditorActivity(() => editorActive);
 
   let pendingPaste = $state<{ inPlace: boolean; started: boolean } | null>(null);
@@ -1170,7 +1163,7 @@
    * copies or reloads is the wrong one.
    */
   $effect(() => {
-    if (showLanding || showBlog || showResearch || showTools || typeof window === 'undefined') return;
+    if (showLanding || showBlog || showExperiment || typeof window === 'undefined') return;
     replaceAppUrl(uiStore.appMode, modelStore.model.name);
   });
 
@@ -1413,12 +1406,10 @@
 
 <svelte:window onkeydown={handleProKeydown} onclick={handleProBarClickOutside} onpaste={handleProPaste} />
 
-{#if showTools}
-  {#if tools}{@const Tools = tools}<Tools path={blogPath} />{/if}
-{:else if showResearch}
-  {#if research}
-    {@const Research = research}
-    <Research path={blogPath} />
+{#if showExperiment}
+  {#if experiment}
+    {@const Experiment = experiment}
+    <Experiment path={blogPath} />
   {/if}
 {:else if showBlog}
   <BlogPage path={blogPath} />
@@ -1444,7 +1435,7 @@
       </div>
 {/snippet}
 
-<div class="app-container" class:embed-mode={uiStore.embedMode} class:hidden-behind-landing={showLanding || showBlog || showResearch || showTools}>
+<div class="app-container" class:embed-mode={uiStore.embedMode} class:hidden-behind-landing={showLanding || showBlog || showExperiment}>
   <header class="app-header" class:has-autosave={showAutosaveBanner}>
     <div class="logo">
       <button class="logo-home" onclick={() => { history.pushState(null, '', '/'); syncRouteState(); }} title={t('app.backHome')}>
@@ -2159,7 +2150,7 @@
     </footer>
   {/if}
 
-  {#if !uiStore.embedMode && !showLanding && !showBlog && !showResearch && !showTools}
+  {#if !uiStore.embedMode && !showLanding && !showBlog && !showExperiment}
     <WhatsNewNotice />
   {/if}
 

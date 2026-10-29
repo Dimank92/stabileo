@@ -20,7 +20,7 @@
       "limitDisplacementRelativeError": 0.039186128623547985,
       "limitLoadRelativeError": 0.0014511216767316333,
       "limitPointReached": true,
-      "maxEquilibriumPathError": 0.000022874501192424383,
+      "maxEquilibriumPathError": 0.00002287450119172802,
       "maxEquilibriumPathErrorStep": 700,
       "measuredLimitDisplacement": 0.88073575276165,
       "measuredLimitLoad": 15649.999940493539,
@@ -73,7 +73,7 @@
       "caseId": "von-mises-truss",
       "metric": "max absolute load residual / reference upper limit load",
       "name": "equilibrium path at every recorded step",
-      "observed": 0.000022874501192424383,
+      "observed": 0.00002287450119172802,
       "passed": true,
       "step": 700,
       "tolerance": 0.05

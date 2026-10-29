@@ -58,6 +58,35 @@ compares the results without rewriting files. `check` exits nonzero when the reg
 output, validation or manifest differs from the committed evidence; the separately reported
 `validationPassed` flag remains false while a benchmark is known to fail.
 
+### Reproduction platform and PR #857 evidence refresh
+
+The committed evidence is generated with Rust 1.99.1 on **x86_64 Linux** (the CI
+platform). The exact JSON comparison is platform-specific: it is not a portable
+floating-point parity test. Use that platform for `generate` and `check`; use the
+unchanged tolerances in the WASM parity checker for browser/native agreement.
+
+The previous evidence from `7508e0fe6` reproduces exactly on aarch64 macOS with
+Rust 1.99.1, but fails the exact comparison on x86_64 Linux. Reproduction with the
+same source and locked dependencies on both platforms isolated the cause to
+platform floating-point rounding. There is **no intervening engine numerical
+commit or PR**: `git diff 7508e0fe6 b46891eb5 -- engine/src` is empty. The wave-two
+reference correction (#852) changed only this README within this paper's
+directory; it did not change the native harness, case input or validation schema.
+
+The Linux refresh changes 1,434 numeric leaves in `native-results.json`: 723
+rotations (`ry`), 699 horizontal displacements (`ux`), and 12 control displacements.
+The largest absolute change is 5.551115123125783e-17. Some relative changes are
+larger only in symmetry residuals near zero (for example an apex rotation around
+6.5e-22 changes by 1.34e-23). All load factors, loads, step counts, iterations,
+convergence flags, prefix checks, limit points, and validation verdicts are
+unchanged. `VALIDATION.json` changes only the von Mises maximum normalized path
+error and its repeated check value, from 0.000022874501192424383 to
+0.00002287450119172802 (absolute change 6.963627265967054e-16). `MANIFEST.json`
+updates the two corresponding hashes; the shared input hash is unchanged.
+The regenerated files pass exact checks on both Debian bookworm and Ubuntu 24.04
+x86_64 Linux. No solver code, input, comparison rule or tolerance was changed.
+The historical shallow-toggle axial-reference failure remains visible.
+
 For each case, native output records overall convergence, total iterations, final load factor, all
 step records, final nodal displacements, and a displacement frame for every step. Frame `k` comes
 from an independent production rerun with `maxSteps=k`; all `k` step records must exactly equal the
