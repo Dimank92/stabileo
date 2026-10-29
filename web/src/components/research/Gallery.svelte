@@ -3,6 +3,9 @@
    * /research: the experiments that run here first, then what is being built, then the
    * catalogue (research/papers.yaml, exported to papers.json and checked against Crossref in CI).
    */
+  import { navierStrings } from './navier1823/strings';
+  import { researchLocale } from './i18n';
+  const navier = $derived(navierStrings(researchLocale()));
   import catalog from '../../../../research/papers.json';
   import PublicLink from '../landing/PublicLink.svelte';
   import { isHttpUrl } from './urls';
@@ -43,17 +46,17 @@
     <ul class="rs-g-run">
       {#each run as { e, p } (e.paperId)}
         <li class="rs-g-runcard">
-          <PublicLink to={e.path} class="rs-g-thumb" aria-label={e.paperId === "grossman-2026" ? s.springsTitle : s.shauerTitle}>
+          <PublicLink to={e.path} class="rs-g-thumb" aria-label={e.paperId === "navier-plate" ? navier.title : e.paperId === "grossman-2026" ? s.springsTitle : s.shauerTitle}>
             {#if !thumbFailed[e.paperId]}
-              <img src="{base}{e.thumbnail}" width="640" height="400" loading="lazy" decoding="async" alt={s[e.paperId === "grossman-2026" ? "springsAlt" : "damageAlt"]} onerror={() => (thumbFailed = { ...thumbFailed, [e.paperId]: true })} />
+              <img src="{base}{e.thumbnail}" width="640" height="400" loading="lazy" decoding="async" alt={e.paperId === "navier-plate" ? navier.field : s[e.paperId === "grossman-2026" ? "springsAlt" : "damageAlt"]} onerror={() => (thumbFailed = { ...thumbFailed, [e.paperId]: true })} />
             {:else}
               <span class="rs-g-thumb-icon"><FieldIcon field={p.area} size={96} /></span>
             {/if}
           </PublicLink>
           <div class="rs-g-runbody">
-            <div class="rs-g-meta"><span>{fieldName(p.area)}</span><span class="rs-g-status rs-g-{p.status}">{statusName(p.status)}</span></div>
-            <h3><PublicLink to={e.path}>{e.paperId === "grossman-2026" ? s.springsTitle : s.shauerTitle}</PublicLink></h3>
-            <p class="rs-g-hook">{e.paperId === "grossman-2026" ? s.springsHook : s.shauerHook}</p>
+            <div class="rs-g-meta"><span>{fieldName(p.area)}</span><span class="rs-g-status rs-g-{p.status}">{e.paperId === "navier-plate" ? navier.stage : statusName(p.status)}</span></div>
+            <h3><PublicLink to={e.path}>{e.paperId === "navier-plate" ? navier.title : e.paperId === "grossman-2026" ? s.springsTitle : s.shauerTitle}</PublicLink></h3>
+            <p class="rs-g-hook">{e.paperId === "navier-plate" ? navier.lead : e.paperId === "grossman-2026" ? s.springsHook : s.shauerHook}</p>
             <p class="rs-g-by">{p.crossref.title}. {authors(p.crossref.authors)}, <em>{p.crossref.venue}</em>, {p.crossref.year}.</p>
             <div class="rs-g-actions">
               <PublicLink to={e.path} class="btn btn-primary btn-sm">{s.readRun}</PublicLink>

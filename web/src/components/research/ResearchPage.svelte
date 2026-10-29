@@ -11,6 +11,7 @@
   import PublicLink from '../landing/PublicLink.svelte';
   import Gallery from './Gallery.svelte';
   import ShauerPage from './shauer2025/ShauerPage.svelte';
+  import NavierPage from './navier1823/NavierPage.svelte';
   import SpringsPage from './grossman2026/SpringsPage.svelte';
   import '../landing/landing.css';
   import '../blog/blog.css';
@@ -20,6 +21,7 @@
   const route = $derived(path.replace(/\/+$/, '') || '/research');
 
   const PAGES: Record<string, { title: string; description: string }> = {
+    '/research/benchmarks/navier-plate': { title: 'Navier plate — Stabileo Research', description: 'First version: a simply supported plate compared with the Navier Fourier series.' },
     '/research': {
       title: 'Stabileo Research — computational mechanics you can run',
       description:
@@ -53,6 +55,8 @@
     <ShauerPage />
   {:else if route === '/research/metamaterials/grossman-2026'}
     <SpringsPage />
+  {:else if route === '/research/benchmarks/navier-plate'}
+    <NavierPage />
   {:else}
     <section class="sec sec--ink">
       <div class="wrap" style="padding-top: 7rem; padding-bottom: 4rem">
