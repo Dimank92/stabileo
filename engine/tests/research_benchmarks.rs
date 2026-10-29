@@ -16,6 +16,23 @@ fn relative(actual: f64, reference: f64, tolerance: f64) {
         "actual={actual:.15}, reference={reference:.15}, relative error={error:.9}, tolerance={tolerance}");
 }
 
+#[test]
+fn signed_response_checks_reject_reversals() {
+    for (response, reference) in [
+        ("downward cantilever displacement", -0.0036),
+        ("positive moment displacement", 0.009),
+        ("positive moment rotation", 0.003),
+        ("in-plane shell displacement", 0.1081),
+        ("out-of-plane shell displacement", 0.4321),
+    ] {
+        relative(reference, reference, 0.02);
+        assert!(
+            std::panic::catch_unwind(|| relative(-reference, reference, 0.02)).is_err(),
+            "reversed {response} must fail"
+        );
+    }
+}
+
 // Analytical Euler–Bernoulli adaptation in validation/benchmarks/patch_tests.rs;
 // NOT the paper’s solid/shell mesh or material. PL³/(3EI), ML²/(2EI), ML/(EI).
 // Existing assert_close divides by max(reference, 1), so does not enforce 2% here.
@@ -43,9 +60,8 @@ fn macneal_frame_shear_and_moment() {
                 .iter()
                 .find(|d| d.node_id == n + 1)
                 .unwrap()
-                .uz
-                .abs(),
-            0.0036,
+                .uz,
+            -0.0036,
             0.02,
         );
     }
@@ -66,8 +82,9 @@ fn macneal_frame_shear_and_moment() {
     );
     let r = linear::solve_2d(&input).unwrap();
     let d = r.displacements.iter().find(|d| d.node_id == 5).unwrap();
-    relative(d.uz.abs(), 0.009, 0.02);
-    relative(d.ry.abs(), 0.003, 0.02);
+    // The 2D beam convention gives positive uz and ry for positive tip my.
+    relative(d.uz, 0.009, 0.02);
+    relative(d.ry, 0.003, 0.02);
 }
 
 fn macneal_quad(mesh: usize, in_plane: bool) -> SolverInput3D {
@@ -117,7 +134,6 @@ fn macneal_displacement(mesh: usize, in_plane: bool) {
             }
         })
         .sum::<f64>()
-        .abs()
         / 2.;
     relative(value, if in_plane { 0.1081 } else { 0.4321 }, 0.02);
 }
@@ -270,6 +286,45 @@ fn ferrari_roorda_closed_form() {
 // P(y)=2EA(1-L/L0)y/L, L²=a²+y². The page uses frame elements; the
 // analytical reference omits bending. Rerun prefixes to recover apex uz,
 // because control_displacement is a different DOF.
+fn checked_path_residual(v: f64, load: f64, exact: f64, limit_p: f64) -> f64 {
+    assert!(v.is_finite(), "non-finite path displacement: {v}");
+    assert!(load.is_finite(), "non-finite path load: {load}");
+    assert!(exact.is_finite(), "non-finite analytical force: {exact}");
+    let residual = (load - exact).abs() / limit_p;
+    assert!(residual.is_finite(), "non-finite path residual: {residual}");
+    residual
+}
+
+#[test]
+#[should_panic(expected = "non-finite path displacement")]
+fn path_check_rejects_nan_away_from_peak() {
+    // The finite peak would pass even if max silently discarded the later NaN.
+    let samples = [(1., 2., 2.), (f64::NAN, 1., f64::NAN)];
+    let mut max_error = 0.0_f64;
+    for (v, load, exact) in samples {
+        max_error = max_error.max(checked_path_residual(v, load, exact, 2.));
+    }
+    assert!(max_error <= 0.05);
+}
+
+#[test]
+fn path_check_rejects_nonfinite_values() {
+    assert_eq!(checked_path_residual(1., 2., 2., 2.), 0.);
+    for (v, load, exact, limit_p) in [
+        (f64::INFINITY, 2., 2., 2.),
+        (1., f64::NAN, 2., 2.),
+        (1., 2., f64::NAN, 2.),
+        // Finite operands can still produce an infinite residual.
+        (1., f64::MAX, -f64::MAX, 2.),
+        (1., 2., 2., 0.),
+    ] {
+        assert!(
+            std::panic::catch_unwind(|| checked_path_residual(v, load, exact, limit_p)).is_err(),
+            "non-finite path sample or residual must fail"
+        );
+    }
+}
+
 fn riks_check(
     mut input: ArcLengthInput,
     apex: usize,
@@ -304,7 +359,7 @@ fn riks_check(
         let y = h - v;
         let l = a.hypot(y);
         let exact = 2. * ea * (1. - l / a.hypot(h)) * y / l;
-        max_error = max_error.max((load - exact).abs() / limit_p);
+        max_error = max_error.max(checked_path_residual(v, load, exact, limit_p));
         samples.push((load, v));
     }
     let peak = samples
