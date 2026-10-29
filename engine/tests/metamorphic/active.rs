@@ -9,6 +9,7 @@ use serde_json::json;
 
 #[test]
 fn taut_cable_invariance() {
+    let _strict = crate::generated::Strict::enter();
     let t2 = Tally::default();
     let t3 = Tally::default();
     let a2: Vec<_> = ana2::rows()
@@ -19,6 +20,8 @@ fn taut_cable_invariance() {
         .into_iter()
         .filter(|a| a.name == "cable solver")
         .collect();
+    assert_cable_adapters(&a2.iter().map(|a| a.name).collect::<Vec<_>>());
+    assert_cable_adapters(&a3.iter().map(|a| a.name).collect::<Vec<_>>());
     for seed in 0..16 {
         let mut v = model(seed, false);
         let l = v["nodes"]["2"]["x"].as_f64().unwrap();
@@ -73,11 +76,88 @@ fn taut_cable_invariance() {
             &["rotation", "relabel", "reversal", "units"],
         );
     }
-    for t in [&t2, &t3] {
-        for ((_, inv), c) in t.cells.lock().unwrap().iter() {
-            assert_eq!(c.pass, 16, "active cable {inv}: {c:?}");
-        }
-    }
+    assert_cable_cells(&t2, &["mirror", "relabel", "reversal", "units"]);
+    assert_cable_cells(&t3, &["rotation", "relabel", "reversal", "units"]);
     crate::finish("active_cable_2d", &t2);
     crate::finish("active_cable_3d", &t3);
+}
+
+fn assert_cable_adapters(names: &[&str]) {
+    assert_eq!(names, &["cable solver"]);
+}
+
+fn assert_cable_cells(t: &Tally, invs: &[&str]) {
+    let cells = t.cells.lock().unwrap();
+    assert_eq!(cells.len(), 4);
+    for inv in invs {
+        let c = cells
+            .get(&("cable solver".into(), inv.to_string()))
+            .expect("missing cable cell");
+        assert_eq!(c.pass, 16, "active cable {inv}: {c:?}");
+        assert_eq!(c.refused + c.unrep + c.inconclusive + c.fails.len(), 0);
+        assert!(c.ignored.is_empty());
+    }
+}
+
+#[test]
+fn cable_coverage_rejects_missing_adapters_and_cells() {
+    for names in [vec![], vec!["cable solver", "cable solver"]] {
+        assert!(std::panic::catch_unwind(|| assert_cable_adapters(&names)).is_err());
+    }
+    assert!(std::panic::catch_unwind(|| assert_cable_cells(
+        &Tally::default(),
+        &["mirror", "relabel", "reversal", "units"]
+    ))
+    .is_err());
+}
+
+#[test]
+fn cable_checks_reject_empty_responses() {
+    let _strict = crate::generated::Strict::enter();
+    let c2 = Case2::new(
+        "empty cable",
+        serde_json::from_value(model(1, false)).unwrap(),
+    );
+    let c3 = Case3::new(
+        "empty cable",
+        serde_json::from_value(model(1, true)).unwrap(),
+    );
+    let mut a2 = ana2::rows()
+        .into_iter()
+        .find(|a| a.name == "cable solver")
+        .unwrap();
+    let mut a3 = ana3::rows()
+        .into_iter()
+        .find(|a| a.name == "cable solver")
+        .unwrap();
+    a2.run = |_| Ok(crate::response::Resp::default());
+    a3.run = |_| Ok(crate::response::Resp::default());
+    let t2 = Tally::default();
+    let t3 = Tally::default();
+    checks2::check_case(
+        &checks2::Ctx {
+            tally: &t2,
+            rng_seed: 1,
+        },
+        &c2,
+        &[a2],
+        &["mirror", "relabel", "reversal", "units"],
+    );
+    checks3::check_case(
+        &checks3::Ctx {
+            tally: &t3,
+            rng_seed: 1,
+        },
+        &c3,
+        &[a3],
+        &["rotation", "relabel", "reversal", "units"],
+    );
+    for t in [&t2, &t3] {
+        let cells = t.cells.lock().unwrap();
+        assert_eq!(cells.len(), 4);
+        for cell in cells.values() {
+            assert_eq!(cell.pass, 0);
+            assert_eq!(cell.fails.len(), 1);
+        }
+    }
 }

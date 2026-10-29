@@ -52,7 +52,13 @@ pub(crate) fn model(seed: u64, spatial: bool) -> Value {
     v
 }
 
-struct Strict(bool);
+pub(crate) struct Strict(bool);
+
+impl Strict {
+    pub(crate) fn enter() -> Self {
+        Self(STRICT.with(|s| s.replace(true)))
+    }
+}
 
 impl Drop for Strict {
     fn drop(&mut self) {
@@ -61,7 +67,7 @@ impl Drop for Strict {
 }
 
 fn sweep(count: u64, only: Option<&str>) {
-    let _strict = Strict(STRICT.with(|s| s.replace(true)));
+    let _strict = Strict::enter();
     let inv3: Vec<_> = crate::INV_3D
         .iter()
         .copied()
@@ -378,6 +384,24 @@ fn gap_2d(c: &Case2) -> Result<crate::response::Resp, String> {
     if !r.converged || r.gap_status.len() != 1 || r.gap_status[0].status != "closed" {
         return Err(format!("active contact not exercised: {:?}", r.gap_status));
     }
+    let base = dedaliano_engine::solver::linear::solve_2d(&c.s)?;
+    let node = *c.probes.last().unwrap();
+    let base_ux = base
+        .displacements
+        .iter()
+        .find(|d| d.node_id == node)
+        .unwrap()
+        .ux;
+    let active_ux = r
+        .results
+        .displacements
+        .iter()
+        .find(|d| d.node_id == node)
+        .unwrap()
+        .ux;
+    if !gap_changes_displacement(base_ux, active_ux, r.gap_status[0].force) {
+        return Err("active gap has no physical effect".into());
+    }
     Ok(crate::response::static_2d(&r.results))
 }
 
@@ -395,6 +419,24 @@ fn gap_3d(c: &Case3) -> Result<crate::response::Resp, String> {
     let r = contact::solve_contact_3d(&input)?;
     if !r.converged || r.gap_status.len() != 1 || r.gap_status[0].status != "closed" {
         return Err(format!("active contact not exercised: {:?}", r.gap_status));
+    }
+    let base = dedaliano_engine::solver::linear::solve_3d(&c.s)?;
+    let node = *c.probes.last().unwrap();
+    let base_ux = base
+        .displacements
+        .iter()
+        .find(|d| d.node_id == node)
+        .unwrap()
+        .ux;
+    let active_ux = r
+        .results
+        .displacements
+        .iter()
+        .find(|d| d.node_id == node)
+        .unwrap()
+        .ux;
+    if !gap_changes_displacement(base_ux, active_ux, r.gap_status[0].force) {
+        return Err("active gap has no physical effect".into());
     }
     Ok(crate::response::static_3d(&r.results))
 }
@@ -589,13 +631,19 @@ fn assert_coverage(t: &Tally, names: &[&str], spatial: bool, count: u64, only: O
     } else {
         crate::INV_2D.to_vec()
     };
+    let expected: Vec<_> = matrix
+        .iter()
+        .filter(|(name, _)| only.map_or(true, |only| *name == only))
+        .collect();
+    let actual: std::collections::BTreeSet<_> = names.iter().copied().collect();
+    assert_eq!(actual.len(), names.len(), "duplicate adapters");
+    assert_eq!(
+        actual,
+        expected.iter().map(|(name, _)| *name).collect(),
+        "adapter/matrix mismatch"
+    );
     let cells = t.cells.lock().unwrap();
-    for name in names {
-        let mask = matrix
-            .iter()
-            .find(|(n, _)| n == name)
-            .expect("missing expected analysis")
-            .1;
+    for (name, mask) in expected {
         assert_eq!(mask.len(), invs.len());
         for (inv, expected) in invs.iter().zip(mask.chars()) {
             let cell = cells
@@ -625,68 +673,181 @@ fn assert_coverage(t: &Tally, names: &[&str], spatial: bool, count: u64, only: O
     }
 }
 
+pub(crate) struct ResponseShape {
+    pub nodes: Vec<usize>,
+    pub supports: Vec<usize>,
+    pub elements: Vec<usize>,
+    pub path: Vec<usize>,
+    pub probe: Option<usize>,
+    pub frequencies: usize,
+    pub spatial: bool,
+}
+
+impl ResponseShape {
+    pub(crate) fn of_2d(c: &Case2) -> Self {
+        Self {
+            nodes: c.s.nodes.values().map(|n| n.id).collect(),
+            supports: c.s.supports.values().map(|s| s.node_id).collect(),
+            elements: c.s.elements.values().map(|e| e.id).collect(),
+            path: c.path.clone().unwrap_or_default(),
+            probe: c.probes.first().copied(),
+            frequencies: c.p.freqs.len(),
+            spatial: false,
+        }
+    }
+    pub(crate) fn of_3d(c: &Case3) -> Self {
+        Self {
+            nodes: c.s.nodes.values().map(|n| n.id).collect(),
+            supports: c.s.supports.values().map(|s| s.node_id).collect(),
+            elements: c.s.elements.values().map(|e| e.id).collect(),
+            path: c.path.clone().unwrap_or_default(),
+            probe: c.probes.first().copied(),
+            frequencies: c.p.freqs.len(),
+            spatial: true,
+        }
+    }
+}
+
 pub(crate) fn validate_response(
     name: &str,
     r: &crate::response::Resp,
-    nodes: &[usize],
-    spatial: bool,
+    shape: &ResponseShape,
 ) -> Result<(), String> {
-    if r.0.is_empty()
-        || r.0
-            .iter()
-            .any(|i| i.v.is_empty() || i.v.iter().any(|v| !v.is_finite()))
-    {
-        return Err(format!("{name}: empty or nonfinite response"));
+    use std::collections::BTreeMap;
+    let mut actual = BTreeMap::new();
+    for i in &r.0 {
+        if i.v.is_empty()
+            || i.v.iter().any(|v| !v.is_finite())
+            || actual
+                .insert((i.node, i.elem, i.tag.clone()), i.v.len())
+                .is_some()
+        {
+            return Err(format!("{name}: empty, nonfinite or duplicate response"));
+        }
     }
-    let require = |node, tag: &str, width| -> Result<(), String> {
-        let items: Vec<_> =
-            r.0.iter()
-                .filter(|i| i.node == node && i.tag == tag)
-                .collect();
-        if items.len() != 1 || items[0].v.len() != width {
-            return Err(format!("{name}: invalid response shape for {node:?}/{tag}"));
-        }
-        Ok(())
+    let mut expected = BTreeMap::new();
+    let mut add = |node, elem, tag: String, width| {
+        expected.insert((node, elem, tag), width);
     };
-    let width = if spatial { 3 } else { 2 };
-    if name.starts_with("time history") {
-        let rotations = name == "time history";
-        if r.0.len() != nodes.len() * 61 * if rotations { 2 } else { 1 } {
-            return Err(format!("{name}: time-step count"));
-        }
-        for &node in nodes {
-            for k in 0..=60 {
-                require(Some(node), &format!("u_t{k:03}"), width)?;
-                if rotations {
-                    require(
-                        Some(node),
-                        &format!("{}_t{k:03}", if spatial { "r" } else { "ry" }),
-                        if spatial { 3 } else { 1 },
-                    )?;
+    let w = if shape.spatial { 3 } else { 2 };
+    let rw = if shape.spatial { 3 } else { 1 };
+    let rot = if shape.spatial { "r" } else { "ry" };
+    match name {
+        "time history" | "time history (ground motion)" => {
+            for &n in &shape.nodes {
+                for k in 0..=60 {
+                    add(Some(n), None, format!("u_t{k:03}"), w);
+                    if name == "time history" {
+                        add(Some(n), None, format!("{rot}_t{k:03}"), rw);
+                    }
                 }
             }
         }
-    } else if ["modal", "certified modal"].contains(&name) {
-        require(None, "total_mass", 1)?;
-        for k in 0..6 {
-            require(None, &format!("f{k:02}"), 1)?;
+        "modal" | "certified modal" => {
+            add(None, None, "total_mass".into(), 1);
+            for k in 0..6 {
+                add(None, None, format!("f{k:02}"), 1);
+            }
+            for k in 0..5 {
+                let f = |k| {
+                    r.0.iter()
+                        .find(|i| {
+                            i.node.is_none() && i.elem.is_none() && i.tag == format!("f{k:02}")
+                        })
+                        .and_then(|i| i.v.first())
+                        .copied()
+                };
+                if let (Some(a), Some(b)) = (f(k), f(k + 1)) {
+                    if b > a * (1.0 + 1e-3) {
+                        add(
+                            None,
+                            None,
+                            format!("meff{k:02}"),
+                            if shape.spatial { 6 } else { 3 },
+                        );
+                    }
+                }
+            }
         }
-    } else if ![
-        "buckling",
-        "harmonic",
-        "plastic collapse",
-        "kinematic check",
-        "moving loads",
-        "influence line",
-    ]
-    .contains(&name)
-    {
-        for &node in nodes {
-            require(Some(node), "u", width)?;
+        "buckling" => {
+            for k in 0..3 {
+                add(None, None, format!("lambda{k}"), 1);
+            }
         }
-        if r.0.iter().filter(|i| i.tag == "u").count() != nodes.len() {
-            return Err(format!("{name}: node count"));
+        "harmonic" => {
+            for k in 0..shape.frequencies {
+                for part in ["re", "im"] {
+                    add(shape.probe, None, format!("H_{part}{k}"), w);
+                }
+            }
         }
+        "plastic collapse" => add(None, None, "collapse_factor".into(), 1),
+        "kinematic check" => {
+            for tag in ["mechanisms", "degree", "solvable"] {
+                add(None, None, tag.into(), 1);
+            }
+        }
+        "moving loads" => {
+            for &e in &shape.elements {
+                for tag in if shape.spatial {
+                    vec!["N", "My", "Mz", "Vy", "Vz"]
+                } else {
+                    vec!["N", "M", "V"]
+                } {
+                    add(None, Some(e), tag.into(), 2);
+                }
+            }
+        }
+        "influence line" => {
+            for &e in &shape.path {
+                for k in 0..=4 {
+                    add(None, Some(e), format!("IL_t{:04}", k * 250), 1);
+                }
+            }
+        }
+        _ => {
+            for &n in &shape.nodes {
+                add(Some(n), None, "u".into(), w);
+                if name != "spectral" {
+                    add(Some(n), None, rot.into(), rw);
+                }
+            }
+            if name == "spectral" {
+                add(None, None, "base_shear".into(), 1);
+                if !shape.spatial {
+                    for &e in &shape.elements {
+                        for tag in ["N", "V", "M"] {
+                            add(None, Some(e), tag.into(), 1);
+                        }
+                    }
+                }
+            } else if !["staged (loads in two stages)", "creep & shrinkage (t = t0)"]
+                .contains(&name)
+            {
+                for &n in shape
+                    .supports
+                    .iter()
+                    .filter(|_| !["SSI (no soil springs)", "fiber nonlinear"].contains(&name))
+                {
+                    add(Some(n), None, "R".into(), w);
+                    add(Some(n), None, "RM".into(), rw);
+                }
+                for &e in &shape.elements {
+                    for (tag, width) in [
+                        ("N", 2),
+                        ("V", if shape.spatial { 4 } else { 2 }),
+                        ("M", if shape.spatial { 6 } else { 2 }),
+                    ] {
+                        add(None, Some(e), tag.into(), width);
+                    }
+                }
+            }
+        }
+    }
+    if actual.is_empty() || actual != expected {
+        return Err(format!(
+            "{name}: response shape mismatch: expected {expected:?}, got {actual:?}"
+        ));
     }
     Ok(())
 }
@@ -746,34 +907,47 @@ fn active_foundation_changes_displacements() {
 
 #[test]
 fn response_shape_rejects_missing_data() {
-    let _strict = Strict(STRICT.with(|s| s.replace(true)));
-    for spatial in [false, true] {
-        let response = if spatial {
-            let c = Case3::new("shape", serde_json::from_value(model(1, true)).unwrap());
-            (ana3::rows()
+    let _strict = Strict::enter();
+    let c2 = Case2::new("shape", serde_json::from_value(model(1, false)).unwrap());
+    let c3 = Case3::new("shape", serde_json::from_value(model(1, true)).unwrap());
+    for (shape, responses) in [
+        (
+            ResponseShape::of_2d(&c2),
+            ana2::rows()
                 .into_iter()
-                .find(|a| a.name == "time history")
-                .unwrap()
-                .run)(&c)
-            .unwrap()
-        } else {
-            let c = Case2::new("shape", serde_json::from_value(model(1, false)).unwrap());
-            (ana2::rows()
+                .map(|a| (a.name, (a.run)(&c2).unwrap()))
+                .collect::<Vec<_>>(),
+        ),
+        (
+            ResponseShape::of_3d(&c3),
+            ana3::rows()
                 .into_iter()
-                .find(|a| a.name == "time history")
-                .unwrap()
-                .run)(&c)
-            .unwrap()
-        };
-        validate_response("time history", &response, &[1, 2, 3], spatial).unwrap();
-        for mutation in 0..3 {
-            let mut bad = response.clone();
-            match mutation {
-                0 => bad.0.clear(),
-                1 => bad.0.retain(|i| i.node != Some(3)),
-                _ => bad.0.retain(|i| !i.tag.ends_with("060")),
+                .map(|a| (a.name, (a.run)(&c3).unwrap()))
+                .collect::<Vec<_>>(),
+        ),
+    ] {
+        for (name, response) in responses {
+            validate_response(name, &response, &shape).unwrap();
+            assert!(validate_response(name, &crate::response::Resp::default(), &shape).is_err());
+            for k in 0..response.0.len() {
+                let mut bad = response.clone();
+                bad.0.remove(k);
+                assert!(
+                    validate_response(name, &bad, &shape).is_err(),
+                    "{name}: missing item {k}"
+                );
+                let mut bad = response.clone();
+                bad.0[k].v.push(0.0);
+                assert!(
+                    validate_response(name, &bad, &shape).is_err(),
+                    "{name}: wrong width {k}"
+                );
             }
-            assert!(validate_response("time history", &bad, &[1, 2, 3], spatial).is_err());
+            let mut bad = response.clone();
+            bad.0.retain(|i| !["R", "RM"].contains(&i.tag.as_str()));
+            if bad.0.len() != response.0.len() {
+                assert!(validate_response(name, &bad, &shape).is_err());
+            }
         }
     }
 }
@@ -788,9 +962,59 @@ fn coverage_rejects_vacuous_cells() {
             "mutation",
             crate::tally::Verdict::NotApplicable,
         );
-        assert!(
-            std::panic::catch_unwind(|| assert_coverage(&t, &["linear"], spatial, 1, None))
-                .is_err()
-        );
+        assert!(std::panic::catch_unwind(|| assert_coverage(
+            &t,
+            &["linear"],
+            spatial,
+            1,
+            Some("linear")
+        ))
+        .is_err());
+    }
+}
+
+fn gap_changes_displacement(base: f64, active: f64, force: f64) -> bool {
+    base < 0.0
+        && active < 0.0
+        && active.abs() < base.abs() * 0.99
+        && force.is_finite()
+        && force < 0.0
+}
+
+#[test]
+fn active_gap_changes_displacements() {
+    for seed in 0..128 {
+        let c2 = Case2::new("gap", serde_json::from_value(model(seed, false)).unwrap());
+        let c3 = Case3::new("gap", serde_json::from_value(model(seed, true)).unwrap());
+        gap_2d(&c2).unwrap();
+        gap_3d(&c3).unwrap();
+    }
+    assert!(!gap_changes_displacement(-1.0, -1.0, -1.0));
+    assert!(!gap_changes_displacement(-1.0, -0.5, 0.0));
+    assert!(!gap_changes_displacement(-1.0, -1.5, -1.0));
+}
+
+#[test]
+fn coverage_rejects_missing_or_renamed_adapters() {
+    for spatial in [false, true] {
+        let matrix = if spatial { MATRIX_3D } else { MATRIX_2D };
+        let names: Vec<_> = matrix.iter().map(|(n, _)| *n).collect();
+        for renamed in [false, true] {
+            let mut bad = names.clone();
+            if renamed {
+                bad[0] = "renamed";
+            } else {
+                bad.remove(0);
+            }
+            assert!(std::panic::catch_unwind(|| assert_coverage(
+                &Tally::default(),
+                &bad,
+                spatial,
+                0,
+                None
+            ))
+            .is_err());
+        }
+        assert_coverage(&Tally::default(), &["linear"], spatial, 0, Some("linear"));
     }
 }

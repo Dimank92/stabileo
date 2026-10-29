@@ -38,7 +38,7 @@ fn run(a: &Ana2, c: &Case2) -> Result<Resp, String> {
     guarded(|| {
         let r = (a.run)(c)?;
         if crate::generated::strict() {
-            crate::generated::validate_response(a.name, &r, &c.s.nodes.values().map(|n| n.id).collect::<Vec<_>>(), false)?;
+            crate::generated::validate_response(a.name, &r, &crate::generated::ResponseShape::of_2d(c))?;
         }
         Ok(r)
     })
