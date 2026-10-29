@@ -26,9 +26,12 @@ export function inputFor(c: Case): SolverInput3D {
 }
 
 export function compare(c: Case, displacements: Record<string, number>[]): Result {
-  const value = Math.abs(displacements.find(d => d.nodeId === c.measurement.node)?.[c.measurement.component] ?? NaN);
+  // Signed, as in the engine test: the roof and the pinched cylinder deflect downward, the
+  // hemisphere outward, so a response in the wrong direction fails instead of passing on magnitude.
+  const value = displacements.find(d => d.nodeId === c.measurement.node)?.[c.measurement.component] ?? NaN;
   if (!Number.isFinite(value)) throw new Error(`Missing or non-finite displacement: ${c.id}`);
-  const error = Math.abs(value / c.reference - 1);
+  const direction = c.id.startsWith('hemisphere') ? 1 : -1;
+  const error = Math.abs(value / (direction * c.reference) - 1);
   return { id: c.id, value, error, pass: error < c.tolerance, displacement: displacements };
 }
 

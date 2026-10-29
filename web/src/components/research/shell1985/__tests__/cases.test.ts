@@ -18,8 +18,11 @@ describe('shell obstacle course evidence', () => {
     for (const c of cases) {
       expect(() => compare(c, [])).toThrow();
       expect(() => compare(c, [{ nodeId: c.measurement.node, [c.measurement.component]: NaN }])).toThrow();
-      expect(compare(c, [{ nodeId: c.measurement.node, [c.measurement.component]: -c.reference }]).pass).toBe(true);
-      expect(compare(c, [{ nodeId: c.measurement.node, [c.measurement.component]: .85 * c.reference }]).pass).toBe(false);
+      const direction = c.id.startsWith('hemisphere') ? 1 : -1;
+      expect(compare(c, [{ nodeId: c.measurement.node, [c.measurement.component]: direction * c.reference }]).pass).toBe(true);
+      // A response of the right size in the wrong direction fails.
+      expect(compare(c, [{ nodeId: c.measurement.node, [c.measurement.component]: -direction * c.reference }]).pass).toBe(false);
+      expect(compare(c, [{ nodeId: c.measurement.node, [c.measurement.component]: .85 * direction * c.reference }]).pass).toBe(false);
     }
   });
   it('preserves connectivity and projects all three displacement components', () => {
@@ -55,8 +58,8 @@ describe('shell obstacle course evidence', () => {
     expect(rows).toHaveLength(cases.length);
     expect(rows.every(r => r.value !== null && Number.isFinite(r.value))).toBe(true);
     const roof = rows.find(r => r.id === 'roof-16')!;
-    expect(roof.value).toBeGreaterThan(.25);
-    expect(roof.value).toBeLessThan(.26);
+    expect(roof.value).toBeLessThan(-.25); // downward: signed, like the engine test
+    expect(roof.value).toBeGreaterThan(-.26);
     expect(roof.pass).toBe(false);
   }, 120_000);
 });
