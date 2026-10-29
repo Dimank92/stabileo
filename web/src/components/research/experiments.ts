@@ -52,6 +52,16 @@ export const EXPERIMENTS: Experiment[] = [
     editor: true,
     code: 'https://github.com/lambdaclass/stabileo/tree/main/research/metamaterials/grossman-2026',
   },
+  {
+    paperId: 'zmyslony-2026',
+    path: '/research/mechanics/biggins-2026',
+    name: 'Snapping arches by curvature patterning',
+    hook: 'Production buckling modes and a shallow-arch equilibrium jump, checked against published thresholds.',
+    thumbnail: 'research-thumbs/biggins-2026.webp',
+    thumbnailAlt: 'Arch equilibrium',
+    thumbnailQuery: '',
+    code: 'https://github.com/lambdaclass/stabileo/tree/main/research/mechanics/biggins-2026',
+  },
 ];
 
 /** The "Coming next" row; set false to hide it. */

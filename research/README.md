@@ -19,6 +19,7 @@ The plan every page and contribution follows is [DESIGN.md](DESIGN.md).
 | `metamaterials/grossman-2026/` | Spring networks after Grossman & Boudaoud (2026): moduli, auxetic foam, honeycomb, against the paper's published values |
 | `stability/ferrari-sigmund-2025/` | Roorda-frame buckling and energy derivatives; Koiter reproduction in progress |
 | `form-finding/pastrana-2026/` | Four-cable forward FDM, pinned jax_fdm comparison and production truss check |
+| `mechanics/biggins-2026/` | Centered curvature-patterned shallow arches, using production frame buckling modes |
 | `templates/` | Starting point for a new paper entry |
 | `tools/` | Catalog checker and other research-only tooling |
 
