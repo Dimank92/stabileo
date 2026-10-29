@@ -4,6 +4,7 @@ import { copyFileSync, cpSync, existsSync, readFileSync } from 'fs';
 import { execSync } from 'child_process';
 import { resolve } from 'path';
 import { PUBLIC_KEY_PREFIXES } from './src/lib/i18n/public-prefixes';
+import { isComplete } from './src/lib/i18n/offered';
 
 /**
  * Stub out the WASM glue module when it hasn't been built yet.
@@ -43,7 +44,11 @@ function publicI18nPlugin(): Plugin {
     load(resolved) {
       if (resolved !== '\0' + id) return null;
       let out = '';
-      for (const loc of ['en', 'es', 'pt']) {
+      for (const loc of ['en', 'es', 'pt', 'de', 'fr', 'tr']) {
+        if (!isComplete(loc)) {
+          out += `export const ${loc} = {};\n`;
+          continue;
+        }
         const file = resolve(__dirname, 'src/lib/i18n/locales', `${loc}.ts`);
         this.addWatchFile(file);
         const lines = readFileSync(file, 'utf8').split('\n').filter((l) => {
