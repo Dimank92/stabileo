@@ -70,48 +70,46 @@ fn sweep(count: u64, only: Option<&str>) {
     let start = std::time::Instant::now();
     let t2 = Tally::default();
     let t3 = Tally::default();
-    let mut a2: Vec<_> = ana2::rows()
-        .into_iter()
-        .filter(|a| only.map_or(true, |n| a.name == n))
-        .collect();
-    let mut a3: Vec<_> = ana3::rows()
-        .into_iter()
-        .filter(|a| only.map_or(true, |n| a.name == n))
-        .collect();
-    if only.is_none() {
-        a2.push(ana2::Ana2 {
-            name: "Winkler (active)",
-            law: ana2::Law::Linear,
-            axis_bound: false,
-            iter_tol: 0.0,
-            full_static: false,
-            run: foundation_2d,
-        });
-        a3.push(ana3::Ana3 {
-            name: "Winkler (active)",
-            law: ana2::Law::Linear,
-            motion: ana3::Motion::Any,
-            iter_tol: 0.0,
-            full_static: false,
-            run: foundation_3d,
-        });
-        a2.push(ana2::Ana2 {
-            name: "contact (active gap)",
-            law: ana2::Law::Nonlinear,
-            axis_bound: true,
-            iter_tol: 1e-10,
-            full_static: false,
-            run: gap_2d,
-        });
-        a3.push(ana3::Ana3 {
-            name: "contact (active gap)",
-            law: ana2::Law::Nonlinear,
-            motion: ana3::Motion::AxisPerm,
-            iter_tol: 1e-10,
-            full_static: false,
-            run: gap_3d,
-        });
-    }
+    let mut a2 = ana2::rows();
+    let mut a3 = ana3::rows();
+    a2.push(ana2::Ana2 {
+        name: "Winkler (active)",
+        law: ana2::Law::Linear,
+        axis_bound: false,
+        iter_tol: 0.0,
+        full_static: false,
+        run: foundation_2d,
+    });
+    a3.push(ana3::Ana3 {
+        name: "Winkler (active)",
+        law: ana2::Law::Linear,
+        motion: ana3::Motion::Any,
+        iter_tol: 0.0,
+        full_static: false,
+        run: foundation_3d,
+    });
+    a2.push(ana2::Ana2 {
+        name: "contact (active gap)",
+        law: ana2::Law::Nonlinear,
+        axis_bound: true,
+        iter_tol: 1e-10,
+        full_static: false,
+        run: gap_2d,
+    });
+    a3.push(ana3::Ana3 {
+        name: "contact (active gap)",
+        law: ana2::Law::Nonlinear,
+        motion: ana3::Motion::AxisPerm,
+        iter_tol: 1e-10,
+        full_static: false,
+        run: gap_3d,
+    });
+    a2.retain(|a| only.map_or(true, |name| a.name == name));
+    a3.retain(|a| only.map_or(true, |name| a.name == name));
+    assert!(
+        !a2.is_empty() || !a3.is_empty(),
+        "unknown generated analysis: {only:?}"
+    );
     for k in 0..count {
         let before = t2.failures().len() + t3.failures().len();
         let seed = crate::seed().wrapping_add(k);
@@ -244,22 +242,20 @@ fn sweep(count: u64, only: Option<&str>) {
             .unwrap();
         }
     }
-    for t in [&t2, &t3] {
-        for ((a, inv), cell) in t.cells.lock().unwrap().iter() {
-            assert_eq!(
-                cell.refused + cell.unrep + cell.inconclusive,
-                0,
-                "coverage lost: {a} × {inv}: {cell:?}"
-            );
-            if ["units", "relabel", "reversal"].contains(&inv.as_str()) {
-                assert_eq!(
-                    cell.pass + cell.fails.len(),
-                    count as usize,
-                    "coverage lost: {a} × {inv}"
-                );
-            }
-        }
-    }
+    assert_coverage(
+        &t2,
+        &a2.iter().map(|a| a.name).collect::<Vec<_>>(),
+        false,
+        count,
+        only,
+    );
+    assert_coverage(
+        &t3,
+        &a3.iter().map(|a| a.name).collect::<Vec<_>>(),
+        true,
+        count,
+        only,
+    );
     let failures: Vec<_> = t2.failures().into_iter().chain(t3.failures()).collect();
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
@@ -272,7 +268,7 @@ fn generated_fast() {
 #[test]
 #[ignore = "large deterministic seed sweep"]
 fn metamorphic_nightly_generated() {
-    sweep(4096, None);
+    sweep(4096, crate::only().as_deref());
 }
 
 fn foundation_2d(c: &Case2) -> Result<crate::response::Resp, String> {
@@ -453,7 +449,7 @@ fn reflection_3d(a: &ana3::Ana3, c: &Case3) -> crate::tally::Verdict {
         return Verdict::NotApplicable;
     }
     let check = || -> Result<(), String> {
-        let mut expected = (a.run)(c)?;
+        let mut expected = checks3::run(a, c)?;
         let mut tc = c.clone();
         for n in tc.s.nodes.values_mut() {
             (n.x, n.y, n.z) = (-n.x, -n.y, -n.z);
@@ -498,7 +494,7 @@ fn reflection_3d(a: &ana3::Ana3, c: &Case3) -> crate::tally::Verdict {
                 _ => {}
             }
         }
-        let got = (a.run)(&tc)?;
+        let got = checks3::run(a, &tc)?;
         let cond = dedaliano_engine::metamorphic::conditioning::of_3d(&c.s)?;
         let rel = checks2::rel_for(a.name, a.iter_tol, &cond);
         compare_with_floor(
@@ -513,5 +509,288 @@ fn reflection_3d(a: &ana3::Ana3, c: &Case3) -> crate::tally::Verdict {
     match check() {
         Ok(()) => Verdict::Pass(0.0),
         Err(e) => Verdict::Fail(e),
+    }
+}
+
+const MATRIX_2D: &[(&str, &str)] = &[
+    ("linear", "PPPPPPPP---"),
+    ("linear (dense reference)", "PPPPPPPP-P-"),
+    ("linear (sparse path)", "PPPPPPPP-P-"),
+    ("linear (PCG)", "PPPPPPPP-P-"),
+    ("constrained", "PPPPPPPP-P-"),
+    ("certified linear", "PPPPPPPP-P-"),
+    ("load combinations", "PPPPPPPP-P-"),
+    ("staged (one stage)", "PPPPPPPP-P-"),
+    ("staged (loads in two stages)", "PPPPPPP--P-"),
+    ("Winkler (no foundation)", "PPPPPPPP-P-"),
+    ("contact (no gaps)", "PPPPPPP--P-"),
+    ("SSI (no soil springs)", "PPPPPPP--P-"),
+    ("creep & shrinkage (t = t0)", "PPPPPPP--P-"),
+    ("P-Delta", "PPPPP------"),
+    ("corotational", "IIPPP------"),
+    ("material nonlinear", "PPPPP------"),
+    ("fiber nonlinear", "PPPPP------"),
+    ("cable solver", "-PPPP------"),
+    ("modal", "PPPPP-----P"),
+    ("certified modal", "PPPPP------"),
+    ("buckling", "PPPPPP-----"),
+    ("time history", "PPPPPPP----"),
+    ("spectral", "-PPPP------"),
+    ("harmonic", "PPPPPPP----"),
+    ("plastic collapse", "PPPPPP-----"),
+    ("kinematic check", "PPPPP------"),
+    ("moving loads", "-PPPP------"),
+    ("influence line", "-PPPP------"),
+    ("Winkler (active)", "PPPPPPP----"),
+    ("contact (active gap)", "--PPP------"),
+];
+
+const MATRIX_3D: &[(&str, &str)] = &[
+    ("linear", "PPPPPPP---P"),
+    ("linear (sparse path)", "PPPPPPP-P-P"),
+    ("linear (PCG)", "PPPPPPP-P-P"),
+    ("constrained", "PPPPPPP-P-P"),
+    ("certified linear", "PPPPPPP-P-P"),
+    ("load combinations", "PPPPPPP-P-P"),
+    ("staged (one stage)", "PPPPPPP-P-P"),
+    ("staged (loads in two stages)", "PPPPPP--P-P"),
+    ("Winkler (no foundation)", "PPPPPPP-P-P"),
+    ("contact (no gaps)", "PPPPPP--P-P"),
+    ("SSI (no soil springs)", "PPPPPP--P-P"),
+    ("creep & shrinkage (t = t0)", "PPPPPP--P-P"),
+    ("P-Delta", "PPPP------P"),
+    ("corotational", "IPPP------P"),
+    ("material nonlinear", "PPPP------P"),
+    ("fiber nonlinear", "PPPP------P"),
+    ("cable solver", "PPPP-------"),
+    ("modal", "PPPP-----PP"),
+    ("certified modal", "PPPP------P"),
+    ("buckling", "PPPPP-----P"),
+    ("time history", "PPPPPP----P"),
+    ("time history (ground motion)", "PPPP------P"),
+    ("spectral", "PPPP------P"),
+    ("harmonic", "PPPPPP----P"),
+    ("plastic collapse", "PPPPP-----P"),
+    ("kinematic check", "PPPP------P"),
+    ("moving loads", "PPPP-------"),
+    ("influence line", "PPPP-------"),
+    ("Winkler (active)", "PPPPPP----P"),
+    ("contact (active gap)", "-PPP-------"),
+];
+
+fn assert_coverage(t: &Tally, names: &[&str], spatial: bool, count: u64, only: Option<&str>) {
+    let matrix = if spatial { MATRIX_3D } else { MATRIX_2D };
+    let invs: Vec<_> = if spatial {
+        crate::INV_3D
+            .iter()
+            .copied()
+            .chain(["reflection"])
+            .collect()
+    } else {
+        crate::INV_2D.to_vec()
+    };
+    let cells = t.cells.lock().unwrap();
+    for name in names {
+        let mask = matrix
+            .iter()
+            .find(|(n, _)| n == name)
+            .expect("missing expected analysis")
+            .1;
+        assert_eq!(mask.len(), invs.len());
+        for (inv, expected) in invs.iter().zip(mask.chars()) {
+            let cell = cells
+                .get(&(name.to_string(), inv.to_string()))
+                .cloned()
+                .unwrap_or_default();
+            assert_eq!(
+                cell.refused + cell.unrep + cell.inconclusive,
+                0,
+                "coverage lost: {name} × {inv}: {cell:?}"
+            );
+            if expected == 'I' && only.is_none() {
+                assert_eq!(
+                    cell.ignored.iter().copied().collect::<Vec<_>>(),
+                    vec!["ignored(#761)"]
+                );
+                assert_eq!(cell.pass + cell.fails.len(), 0);
+            } else {
+                assert!(cell.ignored.is_empty(), "unexpected ignore: {name} × {inv}");
+                assert_eq!(
+                    cell.pass + cell.fails.len(),
+                    if expected == '-' { 0 } else { count as usize },
+                    "coverage lost: {name} × {inv}"
+                );
+            }
+        }
+    }
+}
+
+pub(crate) fn validate_response(
+    name: &str,
+    r: &crate::response::Resp,
+    nodes: &[usize],
+    spatial: bool,
+) -> Result<(), String> {
+    if r.0.is_empty()
+        || r.0
+            .iter()
+            .any(|i| i.v.is_empty() || i.v.iter().any(|v| !v.is_finite()))
+    {
+        return Err(format!("{name}: empty or nonfinite response"));
+    }
+    let require = |node, tag: &str, width| -> Result<(), String> {
+        let items: Vec<_> =
+            r.0.iter()
+                .filter(|i| i.node == node && i.tag == tag)
+                .collect();
+        if items.len() != 1 || items[0].v.len() != width {
+            return Err(format!("{name}: invalid response shape for {node:?}/{tag}"));
+        }
+        Ok(())
+    };
+    let width = if spatial { 3 } else { 2 };
+    if name.starts_with("time history") {
+        let rotations = name == "time history";
+        if r.0.len() != nodes.len() * 61 * if rotations { 2 } else { 1 } {
+            return Err(format!("{name}: time-step count"));
+        }
+        for &node in nodes {
+            for k in 0..=60 {
+                require(Some(node), &format!("u_t{k:03}"), width)?;
+                if rotations {
+                    require(
+                        Some(node),
+                        &format!("{}_t{k:03}", if spatial { "r" } else { "ry" }),
+                        if spatial { 3 } else { 1 },
+                    )?;
+                }
+            }
+        }
+    } else if ["modal", "certified modal"].contains(&name) {
+        require(None, "total_mass", 1)?;
+        for k in 0..6 {
+            require(None, &format!("f{k:02}"), 1)?;
+        }
+    } else if ![
+        "buckling",
+        "harmonic",
+        "plastic collapse",
+        "kinematic check",
+        "moving loads",
+        "influence line",
+    ]
+    .contains(&name)
+    {
+        for &node in nodes {
+            require(Some(node), "u", width)?;
+        }
+        if r.0.iter().filter(|i| i.tag == "u").count() != nodes.len() {
+            return Err(format!("{name}: node count"));
+        }
+    }
+    Ok(())
+}
+
+fn foundation_changed(base: &crate::response::Resp, active: &crate::response::Resp) -> bool {
+    let mut norm = 0.0_f64;
+    let mut delta = 0.0_f64;
+    for item in base.0.iter().filter(|i| i.tag == "u") {
+        let Some(got) = active.node_vec(item.node.unwrap(), "u") else {
+            return false;
+        };
+        if got.len() != item.v.len() {
+            return false;
+        }
+        for (a, b) in item.v.iter().zip(got) {
+            norm = norm.max(a.abs());
+            delta = delta.max((a - b).abs());
+        }
+    }
+    norm > 0.0 && delta > norm * 0.01
+}
+
+#[test]
+fn active_foundation_changes_displacements() {
+    for seed in 0..128 {
+        let c2 = Case2::new(
+            "foundation",
+            serde_json::from_value(model(seed, false)).unwrap(),
+        );
+        let c3 = Case3::new(
+            "foundation",
+            serde_json::from_value(model(seed, true)).unwrap(),
+        );
+        let a2 = ana2::rows()
+            .into_iter()
+            .find(|a| a.name == "Winkler (no foundation)")
+            .unwrap();
+        let a3 = ana3::rows()
+            .into_iter()
+            .find(|a| a.name == "Winkler (no foundation)")
+            .unwrap();
+        for (base, active) in [
+            ((a2.run)(&c2).unwrap(), foundation_2d(&c2).unwrap()),
+            ((a3.run)(&c3).unwrap(), foundation_3d(&c3).unwrap()),
+        ] {
+            assert!(
+                foundation_changed(&base, &active),
+                "foundation ignored: seed={seed}"
+            );
+            assert!(
+                !foundation_changed(&base, &base),
+                "bypassed foundation must be rejected"
+            );
+        }
+    }
+}
+
+#[test]
+fn response_shape_rejects_missing_data() {
+    let _strict = Strict(STRICT.with(|s| s.replace(true)));
+    for spatial in [false, true] {
+        let response = if spatial {
+            let c = Case3::new("shape", serde_json::from_value(model(1, true)).unwrap());
+            (ana3::rows()
+                .into_iter()
+                .find(|a| a.name == "time history")
+                .unwrap()
+                .run)(&c)
+            .unwrap()
+        } else {
+            let c = Case2::new("shape", serde_json::from_value(model(1, false)).unwrap());
+            (ana2::rows()
+                .into_iter()
+                .find(|a| a.name == "time history")
+                .unwrap()
+                .run)(&c)
+            .unwrap()
+        };
+        validate_response("time history", &response, &[1, 2, 3], spatial).unwrap();
+        for mutation in 0..3 {
+            let mut bad = response.clone();
+            match mutation {
+                0 => bad.0.clear(),
+                1 => bad.0.retain(|i| i.node != Some(3)),
+                _ => bad.0.retain(|i| !i.tag.ends_with("060")),
+            }
+            assert!(validate_response("time history", &bad, &[1, 2, 3], spatial).is_err());
+        }
+    }
+}
+
+#[test]
+fn coverage_rejects_vacuous_cells() {
+    for spatial in [false, true] {
+        let t = Tally::default();
+        t.record(
+            "linear",
+            "rotation",
+            "mutation",
+            crate::tally::Verdict::NotApplicable,
+        );
+        assert!(
+            std::panic::catch_unwind(|| assert_coverage(&t, &["linear"], spatial, 1, None))
+                .is_err()
+        );
     }
 }

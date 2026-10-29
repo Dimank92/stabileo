@@ -35,7 +35,13 @@ pub fn rel_for(ana_name: &str, iter_tol: f64, c: &Conditioning) -> f64 {
 }
 
 fn run(a: &Ana2, c: &Case2) -> Result<Resp, String> {
-    guarded(|| (a.run)(c))
+    guarded(|| {
+        let r = (a.run)(c)?;
+        if crate::generated::strict() {
+            crate::generated::validate_response(a.name, &r, &c.s.nodes.values().map(|n| n.id).collect::<Vec<_>>(), false)?;
+        }
+        Ok(r)
+    })
 }
 
 fn judge(res: Result<dedaliano_engine::metamorphic::compare::Report, String>, rel: f64) -> Verdict {

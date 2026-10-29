@@ -34,8 +34,14 @@ pub struct Ctx<'a> {
     pub rng_seed: u64,
 }
 
-fn run(a: &Ana3, c: &Case3) -> Result<Resp, String> {
-    guarded(|| (a.run)(c))
+pub(crate) fn run(a: &Ana3, c: &Case3) -> Result<Resp, String> {
+    guarded(|| {
+        let r = (a.run)(c)?;
+        if crate::generated::strict() {
+            crate::generated::validate_response(a.name, &r, &c.s.nodes.values().map(|n| n.id).collect::<Vec<_>>(), true)?;
+        }
+        Ok(r)
+    })
 }
 
 fn judge(res: Result<Report, String>, rel: f64) -> Verdict {
