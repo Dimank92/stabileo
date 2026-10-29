@@ -1,5 +1,23 @@
 import type { Translations } from '../types';
 const pt: Translations = {
+  // Shared scalar-field viewer
+  "scalarViewer.view": "Vista",
+  "scalarViewer.viewOptions": "Opções de vista",
+  "scalarViewer.close": "Fechar",
+  "scalarViewer.fit": "Ajustar à extensão",
+  "scalarViewer.plan": "2D (planta, órbita bloqueada)",
+  "scalarViewer.orbit": "3D (órbita)",
+  "scalarViewer.switchProjection": "Alternar entre a vista em planta e a órbita em 3D",
+  "scalarViewer.viewer": "Visualizador do Stabileo",
+  "scalarViewer.position": "pos:",
+  "scalarViewer.zoom": "zoom:",
+  "scalarViewer.model": "modelo:",
+  "scalarViewer.bars": "{nodes} nós, {cells} barras",
+  "scalarViewer.elements": "{nodes} nós, {cells} elementos",
+  "scalarViewer.openEditor": "Abrir no editor",
+  "scalarViewer.soon": " (em breve)",
+  "scalarViewer.editorNote": "A abertura de experimentos no editor chega com o modo pesquisa",
+
   'account.signIn': 'Entrar',
   'account.register': 'Criar conta',
   'account.signInTitle': 'Entrar no Stabileo',
