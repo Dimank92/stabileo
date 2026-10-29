@@ -1948,7 +1948,7 @@
         {:else}
           <Viewport3D />
         {/if}
-        {#if uiStore.appMode === 'pro'}<PlacementHud />{/if}
+        {#if uiStore.appMode === 'pro' || uiStore.appMode === 'basico'}<PlacementHud />{/if}
         <!-- Instruction for the armed-but-unanswered stress mode. Inside the
              viewport container because it points at the canvas it belongs to. -->
         <!--
