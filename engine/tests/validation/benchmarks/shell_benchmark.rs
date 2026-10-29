@@ -8078,3 +8078,55 @@ fn benchmark_curved_shell_cross_family_comparison() {
     println!("  Curved shell:    disp={cs_8:.6e}, ratio={cs_ratio:.4}");
     println!("  Improvement:     {:.1}×", cs_ratio / mitc4_ratio.max(1e-10));
 }
+
+// Research /benchmarks/shell-obstacle-course (#809): strict page tolerance, not
+// the older capability floors above. MacNeal & Harder (1985); NAFEMS TNSB Rev 3
+// (1990), LE3 for the hemisphere with 18° hole. Page source: this file's
+// benchmark_scordelis_lo_convergence, benchmark_pinched_cylinder_8x8, and
+// benchmark_hemisphere_hole_convergence; numerical paper table/page unverified.
+fn research_shell_accuracy(value: f64, reference: f64) {
+    let error = (value/reference-1.).abs();
+    assert!(value.is_finite() && error < 0.02,
+        "value={value:.15}, reference={reference:.15}, relative error={error}");
+}
+
+#[test]
+#[ignore = "known wrong result: #810"]
+fn research_roof_6() { research_shell_accuracy(scordelis_lo_solve(6, 6), 0.3024); }
+
+#[test]
+#[ignore = "known wrong result: #810"]
+fn research_roof_8() { research_shell_accuracy(scordelis_lo_solve(8, 8), 0.3024); }
+
+#[test]
+#[ignore = "known wrong result: #810"]
+fn research_roof_12() { research_shell_accuracy(scordelis_lo_solve(12, 12), 0.3024); }
+
+#[test]
+#[ignore = "known wrong result: #810"]
+fn research_roof_16() { research_shell_accuracy(scordelis_lo_solve(16, 16), 0.3024); }
+
+#[test]
+#[ignore = "known wrong result: #810"]
+fn research_cylinder_6() { research_shell_accuracy(pinched_cylinder_solve(6, 6), 1.8248e-05); }
+
+#[test]
+#[ignore = "known wrong result: #810"]
+fn research_cylinder_8() { research_shell_accuracy(pinched_cylinder_solve(8, 8), 1.8248e-05); }
+
+#[test]
+#[ignore = "known wrong result: #810"]
+fn research_cylinder_12() { research_shell_accuracy(pinched_cylinder_solve(12, 12), 1.8248e-05); }
+
+#[test]
+#[ignore = "known wrong result: #810"]
+fn research_cylinder_16() { research_shell_accuracy(pinched_cylinder_solve(16, 16), 1.8248e-05); }
+
+#[test]
+fn research_hemisphere_4() { research_shell_accuracy(hemisphere_hole_solve(4, 4), 0.185); }
+
+#[test]
+fn research_hemisphere_8() { research_shell_accuracy(hemisphere_hole_solve(8, 8), 0.185); }
+
+#[test]
+fn research_hemisphere_16() { research_shell_accuracy(hemisphere_hole_solve(16, 16), 0.185); }

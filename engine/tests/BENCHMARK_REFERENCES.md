@@ -263,3 +263,77 @@
 | SRSS vs CQC | RSA | Spectral solver | DONE | Similar for separated modes |
 | P-delta amplification | Nonlinear | P-delta solver | DONE | AF ≈ 1/(1-P/Pcr) |
 | Corotational convergence | Nonlinear | Corotational | DONE | Large displacement OK |
+
+## Research pages: production-engine CI coverage
+
+The complete [inventory](RESEARCH_INVENTORY.md) records models, quantities, sources,
+tolerances, existing matches, exclusions and audited PR commits. All new checks
+are modules of the **validation** test binary (which engine CI already runs), not
+research-only crates or formula-only `reference` tests. `R::` below means
+`research_benchmarks::`; `S::` means `benchmarks::shell_benchmark::`.
+
+| Research page | Engine test | Status |
+|---|---|---|
+| MacNeal–Harder #797: frame tip shear (1/2/4/8), moment displacement/rotation | `R::macneal_frame_shear_and_moment` | pass |
+| MacNeal–Harder #797: regular MITC4, both load directions | `R::macneal_regular_in`, `R::macneal_regular_out` | pass |
+| MacNeal–Harder #797: trapezoidal MITC4, both directions | `R::macneal_trapezoidal_in`, `R::macneal_trapezoidal_out` | ignored #798 |
+| MacNeal–Harder #797: parallelogram MITC4, both directions | `R::macneal_parallelogram_in`, `R::macneal_parallelogram_out` | ignored #798 |
+| Riks/Crisfield #803: shallow toggle | `R::riks_shallow_toggle` | ignored — new finding (axial-reference mismatch / incomplete path) |
+| Riks/Crisfield #803: Von Mises peak load, displacement, every path step | `R::riks_von_mises_truss` | pass |
+| Shell obstacle #809: Scordelis–Lo, 6²/8²/12²/16² | `S::research_roof_6`, `_8`, `_12`, `_16` | ignored #810 |
+| Shell obstacle #809: pinched cylinder, 6²/8²/12²/16² | `S::research_cylinder_6`, `_8`, `_12`, `_16` | ignored #810 |
+| Shell obstacle #809: hemisphere with hole, 4²/8²/16² | `S::research_hemisphere_4`, `_8`, `_16` | pass |
+| Mattiasson #834: PL²/EI=1, signed u/L and v/L | `R::mattiasson_1` | pass |
+| Mattiasson #834: PL²/EI=2/5/10 | `R::mattiasson_2`, `_5`, `_10` | ignored — new finding (provisional references / nonconvergence) |
+| Mattiasson #834: end moment, convergence/rotation only | `benchmarks::corotational_benchmarks_extended::validation_corotational_cantilever_end_moment` (existing) | pass |
+| Ferrari–Sigmund #836: Roorda λ1, ten elements/member | `R::ferrari_roorda_numerical` | pass |
+| Ferrari–Sigmund #836: reported closed form, forty/member | `R::ferrari_roorda_closed_form` | pass |
+| Arches #835: first two thermal buckling modes, published 70% threshold | `R::arches::production_modes_and_published_threshold` | pass |
+| Gridshell #837: exported frame volume and equilibrium | `R::fairclough_frame_equilibrium` | pass |
+| Supplemental #818 (not the Roorda page result) | `R::buckling_818_exact_reference` | ignored #818 |
+
+The continuous Fairclough volume **13.8394 ±0.00005** is an isolated Clarabel
+optimization result, not a production-engine output. The engine test uses the
+page's **0.2% frame discretization** and **1e-8 equilibrium** bounds. Its fixture
+contains only curve coordinates and section areas from PR #837, not displacements,
+forces or an optimizer dependency. Ferrari's **2.431355677** is pinned as a page
+regression separately from the paper's rounded **2.4313 ±0.0001**.
+
+The MacNeal frame checks above enforce true relative error; the older shared
+`assert_close` helper's `max(reference,1)` denominator was too permissive for these
+small displacements. No existing assertions or engine implementations were changed.
+No issue-specific containment exists on audited main for #798/#810/#818; therefore
+there are no passing warning tests pretending those results are contained.
+
+### New findings from the page-level assertions
+
+These failures already have evidence on the PR pages but lacked engine CI accuracy
+checks. They are tagged `new finding` pending reference/model/solver triage, not
+claimed as newly proven engine implementation defects. In particular, preserve the
+Mattiasson page's warning that its Table 1 transcription is unverified.
+
+| Case | Reference | Observed | Difference / failure |
+|---|---|---|---|
+| Mattiasson parameter 2 | u/L=.1632, v/L=.4929 | .159191217090994, .495808283572916 | u −2.456%; v +.590% (2% target) |
+| Mattiasson parameter 5 | u/L=.4054, v/L=.6647 | .385315745120409, .722972888603782 | u −4.954%; v +8.767% (2% target) |
+| Mattiasson parameter 10 | u/L=.5584, v/L=.6854 at full load | .055782722292224, .302243546485185 at load factor .1 | nonconverged; partial response is not accepted |
+| Riks shallow toggle | peak P=95.98504891452458 at v=.04228900098628047 | final/highest P=48.749999866981085 at v=.0024736193991736002 | limit not reached; peak −49.211%; maximum path residual / reference peak .384231488168260 (5% target) |
+
+### Verification of this audit
+
+All Cargo invocations used `CARGO_TARGET_DIR=/private/tmp/claude-501/codex-bench-target`,
+`CARGO_BUILD_JOBS=2`, `nice cargo test -p dedaliano-engine --test validation`.
+
+| Filter / options | Result |
+|---|---|
+| `research_benchmarks -- --nocapture` | 9 passed, 9 ignored |
+| `benchmarks::shell_benchmark -- --test-threads=2` | 69 passed, 8 ignored (includes three new hemisphere checks) |
+| `benchmarks::corotational_benchmarks -- --test-threads=2` | 13 passed |
+| `research -- --ignored --nocapture --test-threads=2` | All 17 deliberately failed the intended accuracy/convergence assertions; no unexpected passes |
+
+This adds 29 tests: **12 active, 17 ignored** (13 known-issue cases and four new
+findings). The ignored #818 case returned 4691.397553909858 against 4688.920345,
+a relative error of 0.000528311 versus the required 0.000001.
+`python3 -I scripts/check-test-targets.py` passes: all files belong to one binary.
+`make check.changelog NIX_RUN=` passes with local Python; plain
+`make check.changelog` could not open Nix's cache lock under the sandbox.
