@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * /paper: the JAIE 2026 paper in full, set as a paper (KaTeX), between Blog and Research in the
- * site header, with its PDF.
+ * /paper: the JAIE 2026 paper in full, in English, set as its LaTeX article (KaTeX), between Blog and
+ * Research in the site header, with the typeset PDF and the Spanish original.
  *
  *   npx playwright test --grep "@smoke paper"
  */
@@ -17,7 +17,7 @@ test.describe('@smoke paper', () => {
     await expect(link).toHaveText('Paper');
     await link.click();
     await expect(page).toHaveURL(/\/es\/paper\/$/);
-    await expect(page.locator('[data-testid="paper"] h1')).toHaveText('Desarrollo de un agente estructural de cálculo sobre un solver verificado');
+    await expect(page.locator('[data-testid="paper"] h1')).toContainText('Developing a structural calculation agent on top of a verified solver');
   });
 
   test('renders the whole paper: sections, equations, tables, figures and references', async ({ page }) => {
@@ -35,19 +35,25 @@ test.describe('@smoke paper', () => {
       await img.scrollIntoViewIfNeeded();
       await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true);
     }
-    const cite = paper.locator('sup.pp-cite a[href="#ref-6"]').first();
+    await expect(paper.locator('figure.pp-table figcaption').first()).toContainText('Table 1:');
+    const cite = paper.locator('.pp-cite a[href="#ref-6"]').first();
     await cite.click();
     await expect(page).toHaveURL(/#ref-6$/);
-    const href = await page.getByTestId('paper-download').getAttribute('href');
-    const pdf = await page.request.get(href!);
-    expect(pdf.status()).toBe(200);
-    expect((await pdf.body()).subarray(0, 5).toString()).toBe('%PDF-');
+    for (const id of ['paper-download', 'paper-original']) {
+      const href = await page.getByTestId(id).getAttribute('href');
+      const pdf = await page.request.get(href!);
+      expect(pdf.status(), id).toBe(200);
+      expect((await pdf.body()).subarray(0, 5).toString(), id).toBe('%PDF-');
+    }
   });
 
-  test('in English it keeps the Spanish text and says so', async ({ page }) => {
+  test('in Spanish the page around it is Spanish, the paper English, and the original is offered', async ({ page }) => {
+    await page.goto('/es/paper/');
+    await expect(page.locator('[data-testid="paper"]')).toHaveAttribute('lang', 'en');
+    await expect(page.getByText('Esta es la traducción al inglés; el original en castellano se puede descargar.')).toBeVisible();
+    await expect(page.getByTestId('paper-download')).toHaveText('Descargar PDF');
+    await expect(page.getByTestId('paper-original')).toHaveText('Original en castellano (PDF)');
     await page.goto('/en/paper/');
-    await expect(page.locator('[data-testid="paper"]')).toHaveAttribute('lang', 'es');
-    await expect(page.getByText('The paper is written in Spanish; its abstract is in English.')).toBeVisible();
     await expect(page.getByTestId('paper-download')).toHaveText('Download PDF');
     await expect(page.locator('nav.site-header [data-nav="paper"][aria-current="page"]')).toHaveCount(1);
   });

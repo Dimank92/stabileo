@@ -1,14 +1,15 @@
 <script lang="ts">
   /**
-   * /paper: the JAIE 2026 paper in full, set as the paper is (`lib/paper/jaie-2026.ts`), with its
-   * PDF. Its own chunk (Root.svelte, App.svelte), so KaTeX is not loaded by the landing or the blog.
+   * /paper: the JAIE 2026 paper in full, in English, set as its LaTeX article is (`lib/paper/`), with
+   * that PDF and the Spanish original. Its own chunk (Root.svelte, App.svelte), so KaTeX is not
+   * loaded by the landing or the blog.
    */
   import { applyPageMeta, restorePageMeta } from '../../lib/page-meta';
   import { publicI18n } from '../../lib/i18n/store.svelte';
   import SiteHeader from '../site/SiteHeader.svelte';
   import LandingFooter from '../landing/LandingFooter.svelte';
   import PaperText from './PaperText.svelte';
-  import { PAPER, BODY, REFERENCES, LABELS, PDF_HREF } from '../../lib/paper/jaie-2026';
+  import { PAPER, BODY, REFERENCES, LABELS, PDF_HREF, ORIGINAL_PDF_HREF } from '../../lib/paper/jaie-2026';
   import { ps } from './i18n';
   import katex from 'katex';
   import '../landing/landing.css';
@@ -28,34 +29,33 @@
   <main class="pp-wrap">
     <div class="pp-bar">
       <p class="pp-venue">{s.venue}{#if s.language}<br /><span class="pp-lang">{s.language}</span>{/if}</p>
-      <a class="pp-download" href={PDF_HREF} download data-testid="paper-download">{s.download}</a>
+      <div class="pp-actions">
+        <a class="pp-download" href={PDF_HREF} download data-testid="paper-download">{s.download}</a>
+        <a class="pp-original" href={ORIGINAL_PDF_HREF} download data-testid="paper-original">{s.original}</a>
+      </div>
     </div>
 
-    <article class="pp-sheet" lang="es" data-testid="paper">
+    <article class="pp-sheet" lang="en" data-testid="paper">
       <header class="pp-front">
-        <h1 class="pp-title">{PAPER.title}</h1>
+        <h1 class="pp-title">{PAPER.title}<sup class="pp-thanks">*</sup></h1>
         <p class="pp-authors">
-          {#each PAPER.authors as a, i (a.email)}{#if i > 0}{' '}{/if}{a.name}&nbsp;<sup>({a.marks})</sup>{/each}
+          {#each PAPER.authors as a, i (a.email)}{#if i > 0}{', '}{/if}<span class="pp-author">{a.name}<sup>{a.marks}</sup></span>{/each}
         </p>
-        {#each PAPER.affiliations as [mark, name] (mark)}<p class="pp-affiliation">({mark}) {name}</p>{/each}
-        <p class="pp-emails">{PAPER.authors.map((a) => a.email).join(' · ')}</p>
+        {#each PAPER.affiliations as [mark, name] (mark)}<p class="pp-affiliation"><sup>{mark}</sup>{name}</p>{/each}
+        <p class="pp-emails">{#each PAPER.authors as a, i (a.email)}{#if i > 0}{', '}{/if}<a href="mailto:{a.email}">{a.email}</a>{/each}</p>
       </header>
 
-      <p class="pp-keywords"><strong>{LABELS.keywords}</strong> {PAPER.keywords}</p>
       <section class="pp-abstract">
-        <h2 class="pp-abstract-h">{LABELS.resumen}</h2>
-        <p>{PAPER.resumen}</p>
-      </section>
-      <section class="pp-abstract" lang="en">
         <h2 class="pp-abstract-h">{LABELS.abstract}</h2>
-        <p><em>{PAPER.abstract}</em></p>
+        <p>{PAPER.abstract}</p>
+        <p class="pp-keywords"><strong>{LABELS.keywords}</strong> {PAPER.keywords}</p>
       </section>
 
       {#each BODY as b, i (i)}
         {#if b.k === 'h1'}
-          <h2 class="pp-h1" id="sec-{b.n.replace(/\.$/, '')}"><span class="pp-num">{b.n}</span> <PaperText t={b.t} /></h2>
+          <h2 class="pp-h1" id="sec-{b.n}"><span class="pp-num">{b.n}</span><PaperText t={b.t} /></h2>
         {:else if b.k === 'h2'}
-          <h3 class="pp-h2" id="sec-{b.n.replace(/\.$/, '')}"><span class="pp-num">{b.n}</span> <PaperText t={b.t} /></h3>
+          <h3 class="pp-h2" id="sec-{b.n}"><span class="pp-num">{b.n}</span><PaperText t={b.t} /></h3>
         {:else if b.k === 'p'}
           <p><PaperText t={b.t} /></p>
         {:else if b.k === 'ol'}
@@ -66,19 +66,19 @@
             <span class="pp-eq-n">({b.n})</span>
           </div>
         {:else if b.k === 'table'}
-          <figure class="pp-table" id="tabla-{b.n}">
+          <figure class="pp-table" id="table-{b.n}">
+            <figcaption><strong>{LABELS.table} {b.n}:</strong> <PaperText t={b.caption} /></figcaption>
             <div class="pp-table-scroll">
               <table>
                 <thead><tr>{#each b.head as h, j (j)}<th><PaperText t={h} /></th>{/each}</tr></thead>
                 <tbody>{#each b.rows as row, r (r)}<tr>{#each row as cell, j (j)}<td><PaperText t={cell} /></td>{/each}</tr>{/each}</tbody>
               </table>
             </div>
-            <figcaption>{LABELS.table} {b.n}. {b.caption}</figcaption>
           </figure>
         {:else if b.k === 'figure'}
-          <figure class="pp-figure" id="figura-{b.n}">
+          <figure class="pp-figure" id="figure-{b.n}">
             <img src={b.src} width={b.width} height={b.height} alt={b.caption} loading="lazy" decoding="async" />
-            <figcaption>{LABELS.figure} {b.n}. {b.caption}</figcaption>
+            <figcaption><strong>{LABELS.figure} {b.n}:</strong> <PaperText t={b.caption} /></figcaption>
           </figure>
         {/if}
       {/each}
@@ -87,16 +87,11 @@
       <ol class="pp-refs">
         {#each REFERENCES as r, i (i)}
           {@const link = url(r)}
-          <li id="ref-{i + 1}">{#if link}{r.slice(0, r.length - link.length)}<a href={link} rel="noopener">{link}</a>{:else}{r}{/if}</li>
+          <li id="ref-{i + 1}"><span class="pp-ref-n">[{i + 1}]</span><span>{#if link}{r.slice(0, r.length - link.length)}<a href={link} rel="noopener">{link}</a>{:else}{r}{/if}</span></li>
         {/each}
       </ol>
 
-      <h2 class="pp-h1 pp-unnumbered">{LABELS.authors}</h2>
-      <div class="pp-author-data">
-        {#each PAPER.authors as a (a.email)}
-          <p><strong>{a.name}</strong><br />{a.affiliation}<br /><a href="mailto:{a.email}">{a.email}</a></p>
-        {/each}
-      </div>
+      <p class="pp-footnote"><sup>*</sup>{PAPER.note}</p>
     </article>
   </main>
   <LandingFooter />

@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import katex from 'katex';
-import { PAPER, BODY, REFERENCES, PDF_HREF, type PaperBlock } from '../jaie-2026';
+import { PAPER, BODY, REFERENCES, PDF_HREF, ORIGINAL_PDF_HREF, type PaperBlock } from '../jaie-2026';
+import { paperLatex } from '../latex';
 import { segments } from '../inline';
 
 const PUBLIC = resolve(__dirname, '../../../../public');
@@ -16,13 +17,13 @@ const texts = (): string[] =>
     : [],
   );
 
-describe('the JAIE 2026 paper', () => {
+describe('the JAIE 2026 paper, in English', () => {
   it('has sections 1 to 9 in order, each subsection under its section', () => {
-    expect(of('h1').map((h) => h.n)).toEqual(['1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.']);
+    expect(of('h1').map((h) => h.n)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9']);
     let section = '';
     for (const b of BODY) {
       if (b.k === 'h1') section = b.n;
-      if (b.k === 'h2') expect(b.n.startsWith(section), b.n).toBe(true);
+      if (b.k === 'h2') expect(b.n.startsWith(`${section}.`), b.n).toBe(true);
     }
   });
 
@@ -30,8 +31,8 @@ describe('the JAIE 2026 paper', () => {
     for (const k of ['eq', 'table', 'figure'] as const) expect(of(k).map((b) => b.n), k).toEqual([1, 2, 3, 4]);
     const prose = texts().join(' ');
     for (const n of [1, 2, 3, 4]) {
-      expect(prose, `Tabla ${n}`).toMatch(new RegExp(`Tabla ${n}\\b`));
-      expect(prose, `Figura ${n}`).toMatch(new RegExp(`Figura ${n}\\b`));
+      expect(prose, `Table ${n}`).toMatch(new RegExp(`Table ${n}\\b`));
+      expect(prose, `Figure ${n}`).toMatch(new RegExp(`Figure ${n}\\b`));
     }
   });
 
@@ -52,15 +53,23 @@ describe('the JAIE 2026 paper', () => {
   it('keeps every table rectangular and every figure and the PDF in public/', () => {
     for (const t of of('table')) for (const row of t.rows) expect(row.length, `Tabla ${t.n}`).toBe(t.head.length);
     for (const f of of('figure')) expect(existsSync(resolve(PUBLIC, f.src.slice(1))), f.src).toBe(true);
-    expect(existsSync(resolve(PUBLIC, PDF_HREF.slice(1)))).toBe(true);
+    for (const pdf of [PDF_HREF, ORIGINAL_PDF_HREF]) expect(existsSync(resolve(PUBLIC, pdf.slice(1))), pdf).toBe(true);
   });
 
   it('carries the front matter: four authors with their affiliations, keywords and both abstracts', () => {
     expect(PAPER.authors).toHaveLength(4);
     const marks = new Set(PAPER.affiliations.map(([m]) => m));
-    for (const a of PAPER.authors) for (const m of a.marks.split(', ')) expect(marks.has(m), a.name).toBe(true);
+    for (const a of PAPER.authors) for (const m of a.marks.split(',')) expect(marks.has(m), a.name).toBe(true);
     expect(PAPER.keywords.split(', ')).toHaveLength(4);
-    expect(PAPER.resumen.length).toBeGreaterThan(800);
     expect(PAPER.abstract.length).toBeGreaterThan(800);
+  });
+
+  it('writes numbers the English way: no decimal commas left from the Spanish', () => {
+    const plain = texts().flatMap((t) => segments(t).filter((x) => x.k === 'text').map((x) => (x as { t: string }).t));
+    for (const t of plain) expect(t, t.slice(0, 60)).not.toMatch(/\d,\d{1,2}(?!\d)/);
+  });
+
+  it('has its PDF typeset from the current text (run `make paper.pdf` after changing it)', () => {
+    expect(readFileSync(resolve(__dirname, '../jaie-2026.tex'), 'utf8')).toBe(paperLatex());
   });
 });
