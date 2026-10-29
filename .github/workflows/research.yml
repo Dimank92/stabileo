@@ -66,7 +66,7 @@ jobs:
         id: scope
         env:
           BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
-          RESEARCH_PATHS: '^(research/|web/src/components/research/|web/public/research-|web/vite\.research-viewer\.config\.ts$)'
+          RESEARCH_PATHS: '^(research/.*\.(json|csv)$|web/src/components/research/|web/public/research-|web/vite\.research-viewer\.config\.ts$)'
           NOT_SHIPPED: '^research/tools/'
         run: |
           if [ -z "$BASE" ] || git diff --name-only "$BASE" HEAD | grep -E "$RESEARCH_PATHS" | grep -qvE "$NOT_SHIPPED"; then

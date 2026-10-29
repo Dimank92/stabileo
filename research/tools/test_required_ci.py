@@ -43,11 +43,11 @@ shipped = re.compile(scope['env']['RESEARCH_PATHS'])
 not_shipped = re.compile(scope['env']['NOT_SHIPPED'])
 class pattern:
     search = staticmethod(lambda path: shipped.search(path) and not not_shipped.search(path))
-for path in ['research/papers.yaml', 'web/src/components/research/ResearchPage.svelte', 'web/public/research-wasm/x.wasm',
+for path in ['research/papers.json', 'research/fracture/shauer-2025/reference-results/ex2_steps.csv', 'web/src/components/research/ResearchPage.svelte', 'web/public/research-wasm/x.wasm',
              'web/vite.research-viewer.config.ts']:
     assert pattern.search(path), path
 for path in ['web/src/components/blog/ChangelogView.svelte', 'web/src/lib/changelog/index.ts', 'web/scripts/prerender.ts',
-             'web/src/components/site/site-nav.ts', 'engine/src/lib.rs', 'research/tools/test_required_ci.py',
+             'web/src/components/site/site-nav.ts', 'engine/src/lib.rs', 'research/tools/test_required_ci.py', 'research/README.md', 'research/CLAUDE.md',
              '.github/workflows/research.yml']:
     assert not pattern.search(path), path
 assert '[ -z "$BASE" ]' in scope['run']

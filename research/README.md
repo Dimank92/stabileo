@@ -55,9 +55,9 @@ pinned Nix toolchain and the same measurement script. Each installs its own lock
 The main build writes a temporary baseline; the candidate compares against it with a 128-byte
 per-route tolerance. No baseline from this PR is accepted or checked in.
 
-The budget measures a change that touches research code shipped to the browser: `research/` (except
-`research/tools/`), `web/src/components/research/`, `web/public/research-*` and
-`web/vite.research-viewer.config.ts`, plus every push to main. A product change with none of these
+The budget measures a change that touches research code or data shipped to the browser: the JSON and
+CSV files under `research/` (outside `research/tools/`), `web/src/components/research/`,
+`web/public/research-*` and `web/vite.research-viewer.config.ts`, plus every push to main. A product change with none of these
 (a landing section, a nav item) grows the routes on purpose and is reviewed as product; it is not measured.
 
 The script measures uncompressed dependency bytes for `/en/`, `/es/`, `/pt/` and every `/app/*`
