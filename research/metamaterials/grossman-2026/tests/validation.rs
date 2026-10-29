@@ -72,12 +72,14 @@ fn inside_error_bar(mean: f64, lo: f64, hi: f64) -> bool {
     mean >= lo - 0.003 && mean <= hi + 0.003
 }
 
+// Only computed observations receive a bounded cross-platform roundoff allowance.
+// Labels, declared tolerances and pass/fail are exact: noise must never hide a failed check.
 fn records_match(a: &[Check], b: &[Check]) -> bool {
     a.len() == b.len() && a.iter().zip(b).all(|(a, b)| {
         a.category == b.category && a.name == b.name && a.metric == b.metric
             && a.tolerance == b.tolerance && a.passed == b.passed
             && a.observed.is_finite() && b.observed.is_finite()
-            && (a.observed - b.observed).abs() <= 1e-12 + 1e-8 * b.observed.abs()
+            && (a.observed - b.observed).abs() <= 1e-12 + 1e-8 * a.observed.abs().max(b.observed.abs())
     })
 }
 
@@ -410,4 +412,31 @@ fn changed_records_are_rejected() {
     checks.0 = original.clone();
     checks.0[0].observed += 1e-13;
     assert!(records_match(&original, &checks.0));
+}
+
+#[test]
+fn record_comparison_covers_every_field_and_near_zero_noise() {
+    let mut checks = Checks::default();
+    checks.at_most("example", "difference", 0.0, 1e-9);
+    let original = checks.0;
+    let mut noisy = original.clone();
+    noisy[0].observed = 5e-13;
+    assert!(records_match(&original, &noisy));
+    assert!(records_match(&noisy, &original));
+    for field in ["category", "name", "metric", "tolerance", "observed", "passed"] {
+        let mut changed = serde_json::to_value(&original).unwrap();
+        changed[0][field] = match field {
+            "tolerance" => serde_json::json!(2e-9),
+            "observed" => serde_json::json!(2e-12),
+            "passed" => serde_json::json!(false),
+            _ => serde_json::json!("changed"),
+        };
+        let changed: Vec<Check> = serde_json::from_value(changed).unwrap();
+        assert!(!records_match(&original, &changed), "{field}");
+    }
+    for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        noisy[0].observed = invalid;
+        assert!(!records_match(&original, &noisy));
+    }
+    assert!(!records_match(&original, &[]));
 }

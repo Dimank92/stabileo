@@ -8,6 +8,8 @@
    * the article call `apply`, which drives the app.
    */
   import { onDestroy, onMount, untrack } from 'svelte';
+  import { EditorLoad } from './editor-load.svelte';
+  import { uniaxial } from './moduli';
   import { evidence } from './evidence';
   import { Simulation } from './simulation.svelte';
   import results from '../../../../../research/metamaterials/grossman-2026/results/stabileo_results.json';
@@ -93,10 +95,11 @@
       theta: stripTheta, cells, phi, psi,
     });
     if (untrack(() => simulation.error)) {
-      editorSrc = null;
+      editor.attempted = false;
+      editor.src = null;
       editorStrip = null;
-      editorLoading = false;
-      editorError = null;
+      editor.loading = false;
+      editor.error = null;
     }
   }
 
@@ -190,33 +193,6 @@
     if (p.strain !== undefined) strain = p.strain;
   }
 
-  // ---- 2x2 algebra on C (exx, eyy, exy; tensor shear) for directional moduli -------------
-  function inv3(m: number[][]): number[][] | null {
-    const det = m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
-    const s = Math.max(...m.flat().map(Math.abs));
-    if (!(Math.abs(det) > 1e-20 * s * s * s)) return null;
-    const r = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
-    for (let i = 0; i < 3; i++)
-      for (let j = 0; j < 3; j++) {
-        const [a, b, c, d] = [(j + 1) % 3, (j + 2) % 3, (i + 1) % 3, (i + 2) % 3];
-        r[i][j] = (m[a][c] * m[b][d] - m[a][d] * m[b][c]) / det;
-      }
-    return r;
-  }
-  /** Young's modulus and Poisson's ratio under uniaxial stress along direction `a`. */
-  function uniaxial(c: number[][], a: number): [number, number] | null {
-    const [co, si] = [Math.cos(a), Math.sin(a)];
-    // Strain along the load direction n and across it t, as linear forms of the stress state.
-    const m = c.map((row, i) => row.map((v) => (i === 2 ? v / 2 : v)));
-    const s = inv3(m);
-    if (!s) return null;
-    // Stress = n n^T: (sxx, syy, sxy) = (co^2, si^2, co si).
-    const sig = [co * co, si * si, co * si];
-    const e = [0, 1, 2].map((i) => s[i][0] * sig[0] + s[i][1] * sig[1] + s[i][2] * sig[2]);
-    const enn = e[0] * co * co + e[1] * si * si + 2 * e[2] * co * si;
-    const ett = e[0] * si * si + e[1] * co * co - 2 * e[2] * co * si;
-    return enn > 0 ? [1 / enn, -ett / enn] : null;
-  }
   /** Supplemental Eq. (9) of the paper, as printed. */
   function eq9(f: number, p: number, t: number): number {
     const s3 = Math.sqrt(3);
@@ -308,31 +284,20 @@
   $effect(() => {
     if (tabId !== tab) showTab(tabId === 'edit' ? 'edit' : tabId === 'params' ? 'params' : 'experiment');
   });
-  let editorSrc = $state<string | null>(null);
-  let editorLoading = $state(false);
+  const editor = new EditorLoad();
   let editorStrip = $state.raw<StripResult | null>(null);
-  let editorError = $state<string | null>(null);
   const labelParams = (): StripLabel => solved!.label;
   const e2e = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('e2e') === '1';
 
   async function loadEditor() {
     if (!strip) return;
-    editorError = null;
-    editorLoading = true;
     const current = simulation.result;
+    const currentStrip = strip;
     editorStrip = strip;
-    // Test builds with ?e2e=1: the strip handed to the editor, so a spec can compare the
-    // production engine's bar forces with ours.
     if (e2e) (window as unknown as { __springsEditorStrip?: StripResult }).__springsEditorStrip = strip;
-    try {
-      const url = await embeddedEditorUrl(strip, labelParams(), e2e);
-      if (simulation.result === current) editorSrc = url;
-      else editorLoading = false;
-    } catch (e) {
-      editorError = e instanceof Error ? e.message : String(e);
-      editorLoading = false;
-    }
+    await editor.load(() => embeddedEditorUrl(currentStrip, labelParams(), e2e), () => simulation.result === current);
   }
+
   function showTab(t: 'experiment' | 'params' | 'edit') {
     touch();
     tab = t;
@@ -340,7 +305,7 @@
   }
   // The editor loads the first time its tab is shown (once a strip exists).
   $effect(() => {
-    if (tab === 'edit' && strip && !editorSrc && !editorLoading) void loadEditor();
+    if (tab === 'edit' && strip && !editor.attempted) void loadEditor();
   });
   async function openFullEditor() {
     if (!strip) return;
@@ -499,11 +464,11 @@
               1000 × the experiment’s (E·A/L = 1000 k kN/m).{#if prestress > 0} Prestress is not carried over.{/if}
               {#if strip && editorStrip && strip !== editorStrip}<button class="link" type="button" onclick={loadEditor}>Load the experiment’s current network</button>{/if}
             </p>
-            {#if editorError}<p class="warnt">{editorError}</p>{/if}
+            {#if editor.error}<p class="warnt" role="alert">{editor.error} <button type="button" onclick={loadEditor}>Retry loading editor</button></p>{/if}
             <div class="sp-frame">
-              {#if editorLoading}<div class="sp-frame-loading">Loading the Stabileo editor…</div>{/if}
-              {#if editorSrc}
-                <iframe src={editorSrc} title="Stabileo editor (production engine)" onload={() => (editorLoading = false)}></iframe>
+              {#if editor.loading}<div class="sp-frame-loading">Loading the Stabileo editor…</div>{/if}
+              {#if editor.src}
+                <iframe src={editor.src} title="Stabileo editor (production engine)" onload={() => (editor.loading = false)}></iframe>
               {/if}
             </div>
           </div>
@@ -522,6 +487,7 @@
         <div class="sp-viewer" data-nodes={strip?.nodes.length ?? 0}>
           {#if strip}
                           <StabileoViewer
+                oninteract={touch}
                 xy={xy}
                 cells={bars}
                 cellSize={2}

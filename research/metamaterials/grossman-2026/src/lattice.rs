@@ -111,7 +111,9 @@ impl UnitCell {
             let (wj, sj) = (j.rem_euclid(n2i), j.div_euclid(n2i));
             (((wi + n1i * wj) as usize) * nb + b, [si as i32, sj as i32])
         };
-        let mut nodes = vec![[0.0; 2]; n1 * n2 * nb];
+        let node_count = n1.checked_mul(n2).and_then(|n| n.checked_mul(nb)).ok_or("periodic node count overflow")?;
+        let bond_count = n1.checked_mul(n2).and_then(|n| n.checked_mul(self.bonds.len())).ok_or("periodic bond count overflow")?;
+        let mut nodes = vec![[0.0; 2]; node_count];
         for j in 0..n2 as i64 {
             for i in 0..n1 as i64 {
                 for b in 0..nb {
@@ -119,7 +121,7 @@ impl UnitCell {
                 }
             }
         }
-        let mut bonds = Vec::new();
+        let mut bonds = Vec::with_capacity(bond_count);
         for j in 0..n2 as i64 {
             for i in 0..n1 as i64 {
                 for c in &self.bonds {
@@ -140,8 +142,13 @@ impl UnitCell {
     /// [0, width] x [0, height] (with a 1e-9 tolerance), and every bond whose two ends are kept.
     /// The paper builds its strips this way (Sec. V A: rotate the base vectors, then trim).
     pub fn clip(&self, width: f64, height: f64, theta: f64) -> Result<Network, String> {
-        if !(width > 0.0 && height > 0.0) {
-            return Err("strip dimensions must be positive".into());
+        self.clip_bounded(width, height, theta, usize::MAX, usize::MAX)
+    }
+
+    /// Bound the candidate grid before allocation (conservative for rotated/clipped samples).
+    pub fn clip_bounded(&self, width: f64, height: f64, theta: f64, max_nodes: usize, max_bonds: usize) -> Result<Network, String> {
+        if !(width > 0.0 && height > 0.0 && width.is_finite() && height.is_finite() && theta.is_finite()) {
+            return Err("strip dimensions must be finite and positive; angle must be finite".into());
         }
         let (c, s) = (theta.cos(), theta.sin());
         let rot = |p: [f64; 2]| [c * p[0] - s * p[1], s * p[0] + c * p[1]];
@@ -160,13 +167,19 @@ impl UnitCell {
                 hi[k] = hi[k].max(f[k]);
             }
         }
+        if lo.iter().chain(hi.iter()).any(|v| !v.is_finite() || v.abs() > (i64::MAX / 4) as f64) {
+            return Err("strip dimensions overflow".into());
+        }
         let (i0, i1) = (lo[0].floor() as i64 - 2, hi[0].ceil() as i64 + 2);
         let (j0, j1) = (lo[1].floor() as i64 - 2, hi[1].ceil() as i64 + 2);
         let nb = self.basis.len();
         let ni = (i1 - i0 + 1) as usize;
         let nj = (j1 - j0 + 1) as usize;
-        if ni.saturating_mul(nj).saturating_mul(nb) > 4_000_000 {
-            return Err("strip too large".into());
+        let candidates = ni.checked_mul(nj).ok_or("strip dimensions overflow")?;
+        let nodes_bound = candidates.checked_mul(nb).ok_or("strip node count overflow")?;
+        let bonds_bound = candidates.checked_mul(self.bonds.len()).ok_or("strip bond count overflow")?;
+        if nodes_bound > max_nodes.min(4_000_000) || bonds_bound > max_bonds {
+            return Err("strip candidate grid exceeds node or bond limits".into());
         }
         let tol = 1e-9;
         let mut index = vec![usize::MAX; ni * nj * nb];

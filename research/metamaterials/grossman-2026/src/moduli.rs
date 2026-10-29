@@ -50,17 +50,39 @@ pub fn invert(m: &[[f64; 3]; 3]) -> Option<[[f64; 3]; 3]> {
 /// Uniaxial stress along the x axis: Young's modulus and Poisson's ratio -e_yy / e_xx.
 /// None when the network has no stiffness against that load.
 pub fn uniaxial_x(c: &[[f64; 3]; 3]) -> Option<(f64, f64)> {
-    // Compliance in (sxx, syy, sxy) -> (exx, eyy, exy): with tensor shear, sxy = C[2][.] e / 2,
-    // so invert the matrix that maps e to (sxx, syy, sxy).
-    let mut m = *c;
-    for j in 0..3 {
-        m[2][j] *= 0.5;
+    // Rank-revealing elimination of C e = (1, 0, 0). A free shear strain is
+    // harmless, but incompatible loads or ambiguous axial/transverse strains are not.
+    let scale = c.iter().flatten().map(|v| v.abs()).fold(0.0, f64::max);
+    if !scale.is_finite() || scale == 0.0 { return None; }
+    let mut a = [[0.0; 4]; 3];
+    for i in 0..3 { for j in 0..3 { a[i][j] = c[i][j] / scale; } }
+    a[0][3] = 1.0;
+    let mut pivots = Vec::new();
+    for col in 0..3 {
+        let row = pivots.len();
+        let best = (row..3).max_by(|&i, &j| a[i][col].abs().total_cmp(&a[j][col].abs()))?;
+        if a[best][col].abs() <= 1e-12 { continue; }
+        a.swap(row, best);
+        let pivot = a[row][col];
+        for j in 0..4 { a[row][j] /= pivot; }
+        for i in 0..3 {
+            if i == row { continue; }
+            let factor = a[i][col];
+            for j in 0..4 { a[i][j] -= factor * a[row][j]; }
+        }
+        pivots.push(col);
     }
-    let s = invert(&m)?;
-    if !(s[0][0] > 0.0) {
-        return None;
+    for row in pivots.len()..3 { if a[row][3].abs() > 1e-12 { return None; } }
+    let mut e = [0.0; 3];
+    for (row, &col) in pivots.iter().enumerate() { e[col] = a[row][3]; }
+    for free in (0..3).filter(|col| !pivots.contains(col)) {
+        let mut null = [0.0; 3];
+        null[free] = 1.0;
+        for (row, &col) in pivots.iter().enumerate() { null[col] = -a[row][free]; }
+        if null[0].abs() > 1e-12 || null[1].abs() > 1e-12 { return None; }
     }
-    Some((1.0 / s[0][0], -s[1][0] / s[0][0]))
+    if !(e[0] > 0.0) { return None; }
+    Some((scale / e[0], -e[1] / e[0]))
 }
 
 /// Uniaxial stress along direction `theta`.

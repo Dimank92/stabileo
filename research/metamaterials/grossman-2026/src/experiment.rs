@@ -39,6 +39,7 @@ fn hookean() -> SpringLaw {
 
 /// Limits for the browser; native runs can call the library directly.
 pub const MAX_NODES: usize = 60_000;
+pub const MAX_BONDS: usize = 240_000;
 
 impl NetworkSpec {
     fn check(&self) -> Result<(), String> {
@@ -75,12 +76,19 @@ impl NetworkSpec {
 
     pub fn periodic(&self, n1: usize, n2: usize) -> Result<Network, String> {
         self.check()?;
-        self.finish(self.lattice.cell()?.periodic(n1, n2)?)
+        let cell = self.lattice.cell()?;
+        let cells = n1.checked_mul(n2).ok_or("periodic dimensions overflow")?;
+        let nodes = cells.checked_mul(cell.basis.len()).ok_or("periodic node count overflow")?;
+        let bonds = cells.checked_mul(cell.bonds.len()).ok_or("periodic bond count overflow")?;
+        if nodes > MAX_NODES || bonds > MAX_BONDS {
+            return Err(format!("network exceeds limits ({MAX_NODES} nodes, {MAX_BONDS} bonds)"));
+        }
+        self.finish(cell.periodic(n1, n2)?)
     }
 
     pub fn strip(&self, width: f64, height: f64, theta: f64) -> Result<Network, String> {
         self.check()?;
-        self.finish(self.lattice.cell()?.clip(width, height, theta)?)
+        self.finish(self.lattice.cell()?.clip_bounded(width, height, theta, MAX_NODES, MAX_BONDS)?)
     }
 }
 

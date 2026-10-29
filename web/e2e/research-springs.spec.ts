@@ -42,3 +42,51 @@ test.describe('@smoke research springs', () => {
     expect(worst / scale).toBeLessThan(1e-6);
   });
 });
+
+test.describe('@smoke research springs review regressions', () => {
+  for (const interaction of ['pointer', 'wheel', 'keyboard camera']) {
+    test(`viewer ${interaction} stops the live sweep`, async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await page.goto('/en/research/metamaterials/grossman-2026/');
+      const viewer = page.locator('.sp-viewer');
+      await expect(viewer.locator('canvas').first()).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Pause sweep' })).toBeVisible();
+      if (interaction === 'pointer') await viewer.locator('canvas').first().click();
+      else if (interaction === 'wheel') {
+        await viewer.hover();
+        await page.mouse.wheel(0, 100);
+      } else {
+        const camera = viewer.getByRole('button').first();
+        await camera.focus();
+        await page.keyboard.press('Enter');
+      }
+      await expect(page.getByRole('button', { name: 'Pause sweep' })).toHaveCount(0);
+      const eta = page.locator('input[aria-label="Disorder eta"]');
+      const value = await eta.inputValue();
+      await page.waitForTimeout(500); // several 140 ms sweep ticks
+      expect(await eta.inputValue()).toBe(value);
+    });
+  }
+  test('failed encoder attempts once and exposes a manual retry', async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.assign(window, { __encoderAttempts: 0 });
+      Object.defineProperty(window, 'CompressionStream', { value: class {
+        constructor() {
+          const w = window as unknown as { __encoderAttempts: number };
+          w.__encoderAttempts++;
+          throw new Error('raw-deflate unavailable');
+        }
+      } });
+    });
+    await page.goto('/en/research/metamaterials/grossman-2026/?eta=0.3');
+    await expect(page.locator('.sp-viewer canvas').first()).toBeVisible();
+    await page.getByRole('tab', { name: 'Edit in Stabileo' }).click();
+    await expect(page.getByRole('alert')).toContainText('raw-deflate unavailable');
+    await page.waitForTimeout(500);
+    const attempts = () => page.evaluate(() => (window as unknown as { __encoderAttempts: number }).__encoderAttempts);
+    expect(await attempts()).toBe(1);
+    await page.getByRole('button', { name: 'Retry loading editor' }).click();
+    await expect.poll(attempts).toBe(2);
+    await expect(page.getByRole('alert')).toContainText('raw-deflate unavailable');
+  });
+});

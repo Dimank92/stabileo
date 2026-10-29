@@ -62,6 +62,15 @@ two-dimensional, central forces only, unit lattice spacing and k = 1 unless stat
 
 `cargo test --release` runs `tests/validation.rs`: 29 named checks, each with a stated tolerance,
 written to `target/VALIDATION.json` and compared with the committed `VALIDATION.json`.
+To refresh the evidence after an intentional change, run `cargo test --release --locked`,
+inspect all 29 checks (a stale-record assertion may fail), then copy `target/VALIDATION.json`
+to `VALIDATION.json` and rerun. Computed observations allow absolute roundoff of 1e-12 plus
+relative roundoff of 1e-8; categories, names, metrics, declared tolerances and pass/fail flags
+must match exactly. Non-finite observations are always rejected.
+
+JSON network specs are bounded before construction: 60,000 nodes and 240,000 bonds,
+using checked counts. For clipped strips the bound applies conservatively to the candidate
+cell grid, including padding and nodes outside the rotated rectangle.
 
 Independent of the paper:
 - equilateral triangular lattice: B, G, nu = 1/3, isotropy, zero nonaffinity (1e-10; observed 1e-16);
