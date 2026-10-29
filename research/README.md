@@ -18,6 +18,7 @@ The plan every page and contribution follows is [DESIGN.md](DESIGN.md).
 | `optimization/andreassen-2011/` | MBB topology optimization, unmodified Octave reference capture and Rust SIMP/OC implementation |
 | `metamaterials/grossman-2026/` | Spring networks after Grossman & Boudaoud (2026): moduli, auxetic foam, honeycomb, against the paper's published values |
 | `stability/ferrari-sigmund-2025/` | Roorda-frame buckling and energy derivatives; Koiter reproduction in progress |
+| `form-finding/pastrana-2026/` | Four-cable forward FDM, pinned jax_fdm comparison and production truss check |
 | `templates/` | Starting point for a new paper entry |
 | `tools/` | Catalog checker and other research-only tooling |
 

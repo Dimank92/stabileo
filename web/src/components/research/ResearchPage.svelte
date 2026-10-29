@@ -13,6 +13,7 @@
   import TopoptPage from './andreassen2011/TopoptPage.svelte';
   import ShauerPage from './shauer2025/ShauerPage.svelte';
   import FerrariPage from './ferrari2025/FerrariPage.svelte';
+  import FormPage from './pastrana2026/FormPage.svelte';
   import SpringsPage from './grossman2026/SpringsPage.svelte';
   import '../landing/landing.css';
   import '../blog/blog.css';
@@ -41,7 +42,7 @@
   };
 
   $effect(() => {
-    const meta = route === '/research/stability/ferrari-sigmund-2025' ? { title: rs().ferrariTitle, description: rs().ferrariLead } : PAGES[route];
+    const meta = route === '/research/stability/ferrari-sigmund-2025' ? { title: rs().ferrariTitle, description: rs().ferrariLead } : route === '/research/form-finding/pastrana-2026' ? { title: rs().formTitle, description: rs().formLead } : PAGES[route];
     if (meta) applyPageMeta({ title: meta.title, description: meta.description, locale: publicI18n.locale, path: route });
     return () => restorePageMeta();
   });
@@ -60,6 +61,8 @@
     <SpringsPage />
   {:else if route === '/research/stability/ferrari-sigmund-2025'}
     <FerrariPage />
+  {:else if route === '/research/form-finding/pastrana-2026'}
+    <FormPage />
   {:else}
     <section class="sec sec--ink">
       <div class="wrap" style="padding-top: 7rem; padding-bottom: 4rem">

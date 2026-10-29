@@ -462,6 +462,7 @@ jobs:
           workspaces: |
             research/fracture/shauer-2025/wasm
             research/metamaterials/grossman-2026/wasm
+            research/form-finding/pastrana-2026/wasm
           shared-key: research-wasm
       - name: Install web dependencies (the research viewer bundle is built with Vite)
         run: make web.deps
@@ -471,6 +472,8 @@ jobs:
         run: nix develop --command node research/fracture/shauer-2025/wasm/check.mjs web/public/research-wasm/shauer-2025 research/fracture/shauer-2025/reference-results/ex2_steps.csv
       - name: The spring-network bundle gives the exact lattice answers (Node)
         run: nix develop --command node research/metamaterials/grossman-2026/wasm/check.mjs web/public/research-wasm/grossman-2026
+      - name: Four-cable browser solver
+        run: nix develop --command node research/form-finding/pastrana-2026/wasm/check.mjs web/public/research-wasm/pastrana-2026
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: research-wasm

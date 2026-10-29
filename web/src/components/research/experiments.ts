@@ -21,6 +21,17 @@ export type Experiment = {
 export const EXPERIMENTS: Experiment[] = [
   { paperId: 'andreassen-2011', path: '/research/optimization/andreassen-2011', name: 'Topology optimization of an MBB beam', hook: 'Redistribute material using SIMP and compare both filters against the authors’ code.', thumbnail: 'research-thumbs/andreassen-2011.svg', thumbnailAlt: 'Material density of the optimized MBB beam', thumbnailQuery: '', code: 'https://github.com/lambdaclass/stabileo/tree/main/research/optimization/andreassen-2011' },
   {
+    paperId: 'pastrana-2026',
+    path: '/research/form-finding/pastrana-2026',
+    name: 'Four cables, one equilibrium',
+    hook: 'Forward force density method on the paper’s four-bar topology.',
+    thumbnail: 'research-thumbs/pastrana-2026.svg',
+    thumbnailAlt: 'Projection of our four-cable equilibrium result',
+    thumbnailQuery: '',
+    editor: true,
+    code: 'https://github.com/lambdaclass/stabileo/tree/main/research/form-finding/pastrana-2026',
+  },
+  {
     paperId: 'shauer-2025',
     path: '/research/fracture/shauer-2025',
     name: 'Phase-field fracture of a notched plate',
