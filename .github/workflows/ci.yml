@@ -180,6 +180,11 @@ jobs:
         uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
       - name: Shellcheck
         run: make test.ci-scripts
+      # Pull requests never run on the self-hosted runners, so the merge queue's browser shell
+      # (.#e2e: Playwright browsers from nix, version-locked to package-lock) is checked here on
+      # a GitHub-hosted runner whenever the tooling it depends on changes.
+      - name: Browser shell (.#e2e) launches Chromium and Firefox
+        run: nix develop .#e2e -c ./scripts/ci/check-playwright-nix.sh
 
   lint-engine:
     name: Lint Engine
