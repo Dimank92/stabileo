@@ -552,4 +552,180 @@ mod tests {
         // Undamped, above resonance: K − ω²M indefinite and C = 0: refused.
         assert!(certify_point(&k, &m, &[1.0, 1.0], (0.0, 0.0), 2.5, 0.0).is_err());
     }
+
+    #[test]
+    fn test_harmonic_certificate_is_certified() {
+        let uncert = HarmonicCertificate::Uncertified { reason: "reason".into() };
+        assert!(!uncert.is_certified());
+
+        let cert = HarmonicCertificate::Certified {
+            a0: 0.0,
+            a1: 0.0,
+            points: vec![],
+            peak_amplitude: Enclosure { lo: 0.0, hi: 1.0 },
+            max_reported_error: 0.0,
+            reported_within: true,
+        };
+        assert!(cert.is_certified());
+    }
+
+    #[test]
+    fn test_harmonic_target_lookup_and_guards() {
+        use crate::solver::dof::DofNumbering;
+        let mut map = std::collections::HashMap::new();
+        map.insert((1, 0), 0);
+        map.insert((2, 0), 1);
+        let dof = DofNumbering {
+            map,
+            n_free: 1,
+            n_total: 2,
+            dofs_per_node: 3,
+            node_order: vec![1, 2],
+        };
+
+        // Missing local DOF
+        assert_eq!(target(&dof, 1, None).unwrap_err(), "unknown response DOF");
+        // Free DOF
+        assert!(target(&dof, 1, Some(0)).is_ok());
+        // Restrained DOF (node 2) -> missing or restrained
+        assert_eq!(target(&dof, 2, Some(0)).unwrap_err(), "response DOF missing or restrained");
+        // Non-existent node 99 -> missing or restrained
+        assert_eq!(target(&dof, 99, Some(0)).unwrap_err(), "response DOF missing or restrained");
+    }
+
+    #[test]
+    fn test_harmonic_certify_point_validation() {
+        let k = diag(&[4.0, 9.0]);
+        let m = diag(&[1.0, 1.0]);
+        let f = [1.0, 1.0];
+        let a = (0.05, 0.01);
+
+        // Dimension mismatch in m
+        let m_bad = diag(&[1.0]);
+        assert_eq!(certify_point(&k, &m_bad, &f, a, 1.0, 0.0).err().as_deref(), Some("dimension mismatch"));
+        // Dimension mismatch in f
+        assert_eq!(certify_point(&k, &m, &[1.0], a, 1.0, 0.0).err().as_deref(), Some("dimension mismatch"));
+        // Negative or non-finite frequency
+        assert_eq!(certify_point(&k, &m, &f, a, -1.0, 0.0).err().as_deref(), Some("non-finite frequency or damping"));
+        assert_eq!(certify_point(&k, &m, &f, a, f64::NAN, 0.0).err().as_deref(), Some("non-finite frequency or damping"));
+        // Non-finite damping
+        assert_eq!(certify_point(&k, &m, &f, (f64::NAN, 0.01), 1.0, 0.0).err().as_deref(), Some("non-finite frequency or damping"));
+        assert_eq!(certify_point(&k, &m, &f, (0.05, f64::NAN), 1.0, 0.0).err().as_deref(), Some("non-finite frequency or damping"));
+        // Non-finite f
+        assert_eq!(certify_point(&k, &m, &[f64::NAN, 1.0], a, 1.0, 0.0).err().as_deref(), Some("non-finite K, M or f"));
+    }
+
+    #[test]
+    fn test_harmonic_certify_sweep_enclosures_and_validation() {
+        use crate::solver::harmonic::HarmonicResponsePoint;
+
+        let k = diag(&[4.0]);
+        let m = diag(&[1.0]);
+        let f = [1.0];
+        let a = (0.05, 0.01);
+
+        // Empty response points
+        let res_empty = HarmonicResult {
+            response_points: vec![],
+            peak_amplitude: 0.0,
+            peak_frequency: 0.0,
+            method: "direct".into(),
+            modes_used: 0,
+            n_dof: 1,
+            truncation_ratio: None,
+            warnings: vec![],
+        };
+        let c = certify_sweep(&k, &m, &f, a, 0, &res_empty);
+        assert!(!c.is_certified());
+
+        // Omega mismatch with frequency
+        let res_bad_omega = HarmonicResult {
+            response_points: vec![HarmonicResponsePoint {
+                frequency: 1.0,
+                omega: 1.0,
+                amplitude: 0.0,
+                phase: 0.0,
+                real: 0.0,
+                imag: 0.0,
+            }],
+            peak_amplitude: 0.0,
+            peak_frequency: 1.0,
+            method: "direct".into(),
+            modes_used: 0,
+            n_dof: 1,
+            truncation_ratio: None,
+            warnings: vec![],
+        };
+        let c = certify_sweep(&k, &m, &f, a, 0, &res_bad_omega);
+        assert!(!c.is_certified());
+
+        // Valid point
+        let omega = 2.0 * std::f64::consts::PI * 0.5;
+        let pt = certify_point(&k, &m, &f, a, omega, 0.0).unwrap();
+        let ur = pt.u_re[0];
+        let ui = pt.u_im[0];
+        let amp = (ur * ur + ui * ui).sqrt();
+
+        let res_good = HarmonicResult {
+            response_points: vec![HarmonicResponsePoint {
+                frequency: 0.5,
+                omega,
+                amplitude: amp,
+                phase: 0.0,
+                real: ur,
+                imag: ui,
+            }],
+            peak_amplitude: amp,
+            peak_frequency: 0.5,
+            method: "direct".into(),
+            modes_used: 0,
+            n_dof: 1,
+            truncation_ratio: None,
+            warnings: vec![],
+        };
+        let c = certify_sweep(&k, &m, &f, a, 0, &res_good);
+        assert!(c.is_certified());
+        if let HarmonicCertificate::Certified { reported_within, points, peak_amplitude, max_reported_error, .. } = c {
+            assert!(reported_within);
+            assert_eq!(points.len(), 1);
+            assert!(peak_amplitude.contains(amp));
+            assert!(max_reported_error >= 0.0);
+            assert!(points[0].real.contains(ur));
+            assert!(points[0].imag.contains(ui));
+            assert!(points[0].amplitude.contains(amp));
+        }
+
+        // Out-of-enclosure reported values: reported_within should be false
+        let res_outside = HarmonicResult {
+            response_points: vec![HarmonicResponsePoint {
+                frequency: 0.5,
+                omega,
+                amplitude: amp + 100.0,
+                phase: 0.0,
+                real: ur + 100.0,
+                imag: ui,
+            }],
+            peak_amplitude: amp + 100.0,
+            peak_frequency: 0.5,
+            method: "direct".into(),
+            modes_used: 0,
+            n_dof: 1,
+            truncation_ratio: None,
+            warnings: vec![],
+        };
+        let c = certify_sweep(&k, &m, &f, a, 0, &res_outside);
+        assert!(c.is_certified());
+        if let HarmonicCertificate::Certified { reported_within, .. } = c {
+            assert!(!reported_within);
+        }
+    }
+
+    #[test]
+    fn test_harmonic_cg_h_zero_rhs() {
+        let h = diag(&[4.0, 9.0]);
+        let wop = |x: &[f64]| x.to_vec();
+        let b = vec![0.0, 0.0];
+        let x = cg_h(&h, &wop, &b).unwrap();
+        assert_eq!(x, vec![0.0, 0.0]);
+    }
 }

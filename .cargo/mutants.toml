@@ -6,6 +6,12 @@
 # cannot be caught by soundness tests by design.
 exclude_re = [
     "estimate_lambda_min",
+    # Heuristics that only choose where to look (λ_max power iteration in dynamics)
+    "estimate_lambda_max",
+    # Gershgorin bound threshold: mu > 0 vs mu >= 0 (accepting mu = 0 yields failure later)
+    "replace > with >= in dense_gram_lower",
+    # Redundant n > 0 guard in residuals (prev is Some only when n > 0)
+    "replace match guard n > 0 with true in residuals",
     "certify/sparse\\.rs.*normalize",
     "certify/sparse\\.rs.*\\bdot\\b",
     "certify/linear\\.rs.*\\bnormalize\\b",

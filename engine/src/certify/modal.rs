@@ -823,4 +823,133 @@ mod tests {
         assert!(isolate_modes(&k, &kv, &m, &mv, sigma, &[modes[0].clone(), modes[0].clone()]).is_err());
         assert!(isolate_modes(&k, &kv, &m, &mv, sigma, &[modes[1].clone(), modes[0].clone()]).is_err());
     }
+
+    #[test]
+    fn test_modal_certificate_is_certified() {
+        let uncert = ModalCertificate::uncertified("reason");
+        assert!(!uncert.is_certified());
+
+        let cert = ModalCertificate::Certified {
+            modes: vec![],
+            complete_modes: 0,
+            cutoff_omega2: 0.0,
+            count_failure: None,
+        };
+        assert!(cert.is_certified());
+    }
+
+    #[test]
+    fn test_pivot_indices_elimination_and_degeneracy() {
+        let p1 = vec![1.0, 0.0, 5.0, 0.0];
+        let p2 = vec![2.0, 4.0, 1.0, 0.0];
+        let phis = [&p1, &p2];
+        let pivs = pivot_indices(&phis, 4);
+        assert_eq!(pivs, vec![2, 1]);
+
+        // Zero row returns empty
+        let z = vec![0.0, 0.0];
+        assert_eq!(pivot_indices(&[&z], 2), Vec::<usize>::new());
+
+        // Collinear rows: second eliminated row has zero pivot
+        let r1 = vec![2.0, 1.0];
+        let r2 = vec![4.0, 2.0];
+        assert_eq!(pivot_indices(&[&r1, &r2], 2), vec![0]);
+    }
+
+    #[test]
+    fn test_shifted_deleting_submatrix() {
+        let k = tridiag(3, 4.0, 0.0);
+        let m = tridiag(3, 1.0, 0.0);
+        let kv: Vec<Interval> = k.values.iter().map(|&x| Interval::point(x)).collect();
+        let mv: Vec<Interval> = m.values.iter().map(|&x| Interval::point(x)).collect();
+        let km = Pencil { k: &k, kv: &kv, m: &m, mv: &mv };
+        let pattern = union_pattern(&k, &m).unwrap();
+        let (a, vals) = shifted_deleting(&km, &pattern, 1.5, &[1]);
+        assert_eq!(a.n, 2);
+        // k_diag = 4, m_diag = 1 -> kv - mu*mv = 4.0 - 1.5 = 2.5
+        for &v in &a.values {
+            assert!((v - 2.5).abs() < 1e-12);
+        }
+        for iv in vals {
+            assert!(iv.lo <= 2.5 && 2.5 <= iv.hi);
+        }
+    }
+
+    #[test]
+    fn test_dense_gram_lower_and_gershgorin() {
+        // 2x2 diagonally dominant
+        let mid = [4.0, 0.5, 0.5, 4.0];
+        let iv = [
+            Interval::point(4.0),
+            Interval::point(0.5),
+            Interval::point(0.5),
+            Interval::point(4.0),
+        ];
+        let mu = dense_gram_lower(&mid, &iv, 2).unwrap();
+        assert!(mu > 0.0);
+
+        // Not positive definite / large off-diagonal
+        let bad_mid = [4.0, 5.0, 5.0, 4.0];
+        let bad_iv = [
+            Interval::point(4.0),
+            Interval::point(5.0),
+            Interval::point(5.0),
+            Interval::point(4.0),
+        ];
+        assert!(dense_gram_lower(&bad_mid, &bad_iv, 2).is_err());
+    }
+
+    #[test]
+    fn test_isolate_modes_input_validation() {
+        let k = tridiag(2, 2.0, -1.0);
+        let m = tridiag(2, 1.0, 0.0);
+        let kv: Vec<Interval> = k.values.iter().map(|&x| Interval::point(x)).collect();
+        let mv: Vec<Interval> = m.values.iter().map(|&x| Interval::point(x)).collect();
+        let sigma = 0.5;
+
+        // Empty modes
+        assert!(matches!(isolate_modes(&k, &kv, &m, &mv, sigma, &[]), Err(e) if e.contains("no modes")));
+
+        // Dimension mismatch
+        let bad_m = tridiag(3, 1.0, 0.0);
+        let bad_mv: Vec<Interval> = bad_m.values.iter().map(|&x| Interval::point(x)).collect();
+        assert!(matches!(isolate_modes(&k, &kv, &bad_m, &bad_mv, sigma, &[(1.0, vec![1.0, 1.0])]), Err(e) if e.contains("mismatch")));
+
+        // Non-positive eigenvalue
+        assert!(matches!(isolate_modes(&k, &kv, &m, &mv, sigma, &[(0.0, vec![1.0, 1.0])]), Err(e) if e.contains("non-positive")));
+        assert!(matches!(isolate_modes(&k, &kv, &m, &mv, sigma, &[(-1.0, vec![1.0, 1.0])]), Err(e) if e.contains("non-positive")));
+
+        // Non-finite eigenvector
+        assert!(matches!(isolate_modes(&k, &kv, &m, &mv, sigma, &[(1.0, vec![f64::NAN, 1.0])]), Err(e) if e.contains("non-positive")));
+    }
+
+    #[test]
+    fn test_certify_modes_enclosed_validation() {
+        let k = CscMatrix::from_triplets(2, &[0, 1], &[0, 1], &[4.0, 9.0]);
+        let m = CscMatrix::from_triplets(2, &[0, 1], &[0, 1], &[1.0, 1.0]);
+        let kv = vec![Interval::point(4.0), Interval::point(9.0)];
+        let mv = vec![Interval::point(1.0), Interval::point(1.0)];
+        let modes = vec![(4.0, vec![1.0, 0.0]), (9.0, vec![0.0, 1.0])];
+
+        // m.n mismatch
+        let m_bad = CscMatrix::from_triplets(1, &[0], &[0], &[1.0]);
+        assert_eq!(certify_modes_enclosed(&k, &kv, &m_bad, &mv, &modes).is_certified(), false);
+        // modes dimension mismatch
+        let modes_bad = vec![(4.0, vec![1.0])];
+        assert_eq!(certify_modes_enclosed(&k, &kv, &m, &mv, &modes_bad).is_certified(), false);
+        // kv length mismatch
+        let kv_bad = vec![Interval::point(4.0)];
+        assert_eq!(certify_modes_enclosed(&k, &kv_bad, &m, &mv, &modes).is_certified(), false);
+        // mv length mismatch
+        let mv_bad = vec![Interval::point(1.0)];
+        assert_eq!(certify_modes_enclosed(&k, &kv, &m, &mv_bad, &modes).is_certified(), false);
+        // empty modes
+        assert_eq!(certify_modes_enclosed(&k, &kv, &m, &mv, &[]).is_certified(), false);
+        // non-positive eigenvalue
+        let modes_neg = vec![(-1.0, vec![1.0, 0.0])];
+        assert_eq!(certify_modes_enclosed(&k, &kv, &m, &mv, &modes_neg).is_certified(), false);
+        // non-finite mode shape
+        let modes_nan = vec![(4.0, vec![f64::NAN, 0.0])];
+        assert_eq!(certify_modes_enclosed(&k, &kv, &m, &mv, &modes_nan).is_certified(), false);
+    }
 }

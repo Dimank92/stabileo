@@ -784,4 +784,127 @@ mod tests {
         let c = combine(&v, Some(&full));
         assert!(c.lo <= 1.0 && 1.0 <= c.hi && c.hi < 1.0 + 1e-12);
     }
+
+    #[test]
+    fn test_spectral_certificate_is_certified() {
+        let uncert = SpectralCertificate::uncertified("reason");
+        assert!(!uncert.is_certified());
+
+        let cert = SpectralCertificate::Certified {
+            modes: vec![],
+            displacements: vec![],
+            element_forces: vec![],
+            base_shear: Enclosure { lo: 0.0, hi: 1.0 },
+            max_displacement_error: 0.0,
+            max_force_error: 0.0,
+            base_shear_error: 0.0,
+            reported_within: true,
+        };
+        assert!(cert.is_certified());
+    }
+
+    #[test]
+    fn test_spectrum_range_validation_and_errors() {
+        assert_eq!(spectrum_range(&[], Interval::point(1.0)).unwrap(), Interval::ZERO);
+        let s = pts(&[(0.0, 1.0), (0.2, 2.5), (0.6, 2.5), (2.0, 0.5)]);
+        assert!(spectrum_range(&s, Interval::point(f64::NAN)).is_err());
+        assert!(spectrum_range(&pts(&[(f64::NAN, 1.0)]), Interval::point(0.1)).is_err());
+        assert!(spectrum_range(&pts(&[(0.1, f64::NAN)]), Interval::point(0.1)).is_err());
+        // Duplicate period refused
+        assert!(spectrum_range(&pts(&[(0.1, 1.0), (0.1, 2.0)]), Interval::point(0.1)).is_err());
+        // Exact boundary evaluation
+        let r_exact = spectrum_range(&s, Interval::new(0.2, 0.6)).unwrap();
+        assert!(r_exact.lo <= 2.5 && r_exact.hi >= 2.5);
+    }
+
+    #[test]
+    fn test_spectral_cqc_xi_and_scale() {
+        assert_eq!(cqc_xi(None, None).unwrap(), Some(0.05));
+        assert_eq!(cqc_xi(Some("SRSS"), None).unwrap(), None);
+        assert_eq!(cqc_xi(Some("CQC"), None).unwrap(), Some(0.05));
+        assert_eq!(cqc_xi(Some("CQC"), Some(0.02)).unwrap(), Some(0.02));
+
+        let spec_g = DesignSpectrum {
+            name: "test_g".into(),
+            points: pts(&[(0.0, 1.0)]),
+            in_g: Some(true),
+        };
+        let sc_g = scale(&spec_g, Some(1.2), Some(2.0));
+        assert!((sc_g.lo - 9.81 * 1.2 / 2.0).abs() < 1e-10);
+
+        let spec_nog = DesignSpectrum {
+            name: "test_nog".into(),
+            points: pts(&[(0.0, 1.0)]),
+            in_g: Some(false),
+        };
+        let sc_nog = scale(&spec_nog, None, None);
+        assert!((sc_nog.lo - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_spectral_mode_cores_dimension_and_validation() {
+        let k = CscMatrix::from_triplets(2, &[0, 1], &[0, 1], &[4.0, 9.0]);
+        let m = CscMatrix::from_triplets(2, &[0, 1], &[0, 1], &[1.0, 1.0]);
+        let m_bad = CscMatrix::from_triplets(1, &[0], &[0], &[1.0]);
+        let mr = vec![Interval::point(1.0), Interval::point(1.0)];
+        let mr_bad = vec![Interval::point(1.0)];
+        let spec = DesignSpectrum {
+            name: "test".into(),
+            points: pts(&[(0.0, 1.0), (1.0, 1.0)]),
+            in_g: Some(false),
+        };
+        let modes = vec![(4.0, vec![1.0, 0.0]), (9.0, vec![0.0, 1.0])];
+
+        let p_m_bad = Problem {
+            k: k.clone(),
+            m: m_bad,
+            modes: modes.clone(),
+            mr: mr.clone(),
+            spectrum: &spec,
+            scale: Interval::point(1.0),
+            cqc_xi: None,
+        };
+        assert_eq!(mode_cores(&p_m_bad).err().as_deref(), Some("dimension mismatch"));
+
+        let p_mr_bad = Problem {
+            k: k.clone(),
+            m: m.clone(),
+            modes: modes.clone(),
+            mr: mr_bad,
+            spectrum: &spec,
+            scale: Interval::point(1.0),
+            cqc_xi: None,
+        };
+        assert_eq!(mode_cores(&p_mr_bad).err().as_deref(), Some("dimension mismatch"));
+
+        let p_no_modes = Problem {
+            k: k.clone(),
+            m: m.clone(),
+            modes: vec![],
+            mr: mr.clone(),
+            spectrum: &spec,
+            scale: Interval::point(1.0),
+            cqc_xi: None,
+        };
+        assert_eq!(mode_cores(&p_no_modes).err().as_deref(), Some("no modes"));
+
+        let p_good = Problem {
+            k: k.clone(),
+            m: m.clone(),
+            modes: modes.clone(),
+            mr: mr.clone(),
+            spectrum: &spec,
+            scale: Interval::point(1.0),
+            cqc_xi: None,
+        };
+        let cores = mode_cores(&p_good).unwrap();
+        assert_eq!(cores.len(), 2);
+        assert_eq!(cores[0].bound.mode, 1);
+        assert_eq!(cores[1].bound.mode, 2);
+        assert!(cores[0].bound.omega2.contains(4.0));
+        assert!(cores[1].bound.omega2.contains(9.0));
+        assert!(cores[0].bound.sin_theta <= 1.0);
+        assert!(cores[0].e.is_finite() && cores[0].e >= 0.0);
+        assert!(cores[0].meff.is_finite() && cores[0].meff.lo >= 0.0);
+    }
 }

@@ -606,4 +606,217 @@ mod tests {
         assert!(!scheme_stability(0.1, 0.2).conditionally_stable);
         assert!(!scheme_stability(f64::NAN, 0.5).unconditionally_stable);
     }
+
+    #[test]
+    fn test_dynamics_guarded_claims_and_downgrade() {
+        let empty_cert = DynamicsCertificate {
+            scheme: "Newmark".into(),
+            beta: 0.25,
+            gamma: 0.5,
+            alpha: None,
+            dt: 0.01,
+            parameters: scheme_stability(0.25, 0.5),
+            stability_certified: false,
+            stability_reason: None,
+            mass_lambda_min_lower: None,
+            stiffness_lambda_min_lower: None,
+            lambda_max_upper: None,
+            dt_critical_lower: None,
+            rayleigh_nonnegative: true,
+            residual: None,
+            energy: None,
+            time_error_estimate: None,
+            residual_reason: None,
+        };
+        use super::super::finite::Guarded;
+        assert!(!empty_cert.claims());
+
+        let mut c = empty_cert.clone();
+        c.stability_certified = true;
+        assert!(c.claims());
+
+        let mut c = empty_cert.clone();
+        c.residual = Some(ResidualReport {
+            steps: 10,
+            max_abs_equation: 1e-6,
+            max_rel_equation: 1e-8,
+            max_rel_displacement_update: 1e-8,
+            max_rel_velocity_update: 1e-8,
+        });
+        assert!(c.claims());
+
+        let mut c = empty_cert.clone();
+        c.energy = Some(EnergyReport {
+            initial: [0.0, 1.0],
+            r#final: [0.0, 1.0],
+            external_work: [0.0, 1.0],
+            damping_dissipation: [0.0, 1.0],
+            imbalance: [0.0, 1.0],
+            relative_imbalance: 0.0,
+            identity_exact_for_scheme: true,
+        });
+        assert!(c.claims());
+
+        let mut c = empty_cert.clone();
+        c.mass_lambda_min_lower = Some(0.5);
+        assert!(c.claims());
+
+        let mut c = empty_cert.clone();
+        c.stiffness_lambda_min_lower = Some(1.2);
+        assert!(c.claims());
+
+        let mut c = empty_cert.clone();
+        c.lambda_max_upper = Some(100.0);
+        assert!(c.claims());
+
+        let mut c = empty_cert.clone();
+        c.dt_critical_lower = Some(0.005);
+        assert!(c.claims());
+
+        // Test downgrade
+        c.downgrade("test downgrade".into());
+        assert!(!c.claims());
+        assert_eq!(c.stability_reason, Some("test downgrade".into()));
+    }
+
+    #[test]
+    fn test_dynamics_residuals_validation_and_hht() {
+        let (r, c, v) = (vec![0], vec![0], vec![1.0]);
+        let m = CscMatrix::from_triplets(1, &r, &c, &v);
+        let k = CscMatrix::from_triplets(1, &r, &c, &v);
+
+        // Empty trajectory
+        let tr_empty = DynamicTrace {
+            k: k.clone(),
+            m: m.clone(),
+            a0: 0.0,
+            a1: 0.0,
+            dt: 0.01,
+            beta: 0.25,
+            gamma: 0.5,
+            alpha: None,
+            f: vec![],
+            u: vec![],
+            v: vec![],
+            a: vec![],
+        };
+        assert!(matches!(residuals(&tr_empty), Err(e) if e.contains("inconsistent trajectory")));
+
+        // Length mismatch
+        let mut tr_bad = tr_empty.clone();
+        tr_bad.f = vec![vec![0.0]];
+        tr_bad.u = vec![vec![0.0]];
+        tr_bad.v = vec![vec![0.0]];
+        // a is empty -> length mismatch
+        assert!(matches!(residuals(&tr_bad), Err(e) if e.contains("inconsistent trajectory")));
+
+        // Dimension mismatch
+        let mut tr_dim = tr_empty.clone();
+        tr_dim.f = vec![vec![0.0, 0.0]];
+        tr_dim.u = vec![vec![0.0, 0.0]];
+        tr_dim.v = vec![vec![0.0, 0.0]];
+        tr_dim.a = vec![vec![0.0, 0.0]];
+        assert!(matches!(residuals(&tr_dim), Err(e) if e.contains("dimension mismatch")));
+
+        // Valid 2-step trajectory with HHT-alpha
+        let tr_hht = DynamicTrace {
+            k: k.clone(),
+            m: m.clone(),
+            a0: 0.0,
+            a1: 0.0,
+            dt: 0.01,
+            beta: 0.25,
+            gamma: 0.5,
+            alpha: Some(-0.05),
+            f: vec![vec![1.0], vec![1.0]],
+            u: vec![vec![1.0], vec![1.0]],
+            v: vec![vec![0.0], vec![0.0]],
+            a: vec![vec![0.0], vec![0.0]],
+        };
+        let res = residuals(&tr_hht);
+        assert!(res.is_ok(), "{res:?}");
+    }
+
+    #[test]
+    fn test_dynamics_stability_validation_rules() {
+        let (r, c, v) = (vec![0], vec![0], vec![1.0]);
+        let m = CscMatrix::from_triplets(1, &r, &c, &v);
+        let k = CscMatrix::from_triplets(1, &r, &c, &v);
+
+        let mut cert = DynamicsCertificate {
+            scheme: "Newmark".into(),
+            beta: 0.25,
+            gamma: 0.5,
+            alpha: None,
+            dt: 0.01,
+            parameters: scheme_stability(0.25, 0.5),
+            stability_certified: false,
+            stability_reason: None,
+            mass_lambda_min_lower: None,
+            stiffness_lambda_min_lower: None,
+            lambda_max_upper: None,
+            dt_critical_lower: None,
+            rayleigh_nonnegative: false, // negative rayleigh
+            residual: None,
+            energy: None,
+            time_error_estimate: None,
+            residual_reason: None,
+        };
+
+        let tr = DynamicTrace {
+            k,
+            m,
+            a0: 0.0,
+            a1: 0.0,
+            dt: 0.01,
+            beta: 0.25,
+            gamma: 0.5,
+            alpha: Some(-0.1),
+            f: vec![vec![0.0], vec![0.0]],
+            u: vec![vec![0.0], vec![0.0]],
+            v: vec![vec![0.0], vec![0.0]],
+            a: vec![vec![0.0], vec![0.0]],
+        };
+        stability(&tr, &mut cert);
+        assert!(!cert.stability_certified);
+        assert!(cert.stability_reason.as_ref().unwrap().contains("Rayleigh"));
+    }
+
+    #[test]
+    fn test_certify_dynamics_validation_and_steps() {
+        use crate::solver::time_integration::DynamicTrace;
+
+        let k = CscMatrix::from_triplets(1, &[0], &[0], &[1.0]);
+        let m = CscMatrix::from_triplets(1, &[0], &[0], &[1.0]);
+        let mut tr = DynamicTrace {
+            k,
+            m,
+            a0: 0.0,
+            a1: 0.0,
+            beta: 0.25,
+            gamma: 0.5,
+            alpha: None,
+            dt: 0.01,
+            f: vec![vec![0.0], vec![0.0]],
+            u: vec![vec![0.0], vec![0.0]],
+            v: vec![vec![0.0], vec![0.0]],
+            a: vec![vec![0.0], vec![0.0]],
+        };
+
+        // dt <= 0.0
+        tr.dt = 0.0;
+        assert_eq!(certify_dynamics(&tr).stability_reason.as_deref(), Some("non-finite or non-positive scheme parameters"));
+        tr.dt = -0.01;
+        assert_eq!(certify_dynamics(&tr).stability_reason.as_deref(), Some("non-finite or non-positive scheme parameters"));
+        tr.dt = f64::NAN;
+        assert_eq!(certify_dynamics(&tr).stability_reason.as_deref(), Some("non-finite or non-positive scheme parameters"));
+
+        tr.dt = 0.01;
+        tr.beta = f64::NAN;
+        assert_eq!(certify_dynamics(&tr).stability_reason.as_deref(), Some("non-finite or non-positive scheme parameters"));
+
+        tr.beta = 0.25;
+        tr.gamma = f64::NAN;
+        assert_eq!(certify_dynamics(&tr).stability_reason.as_deref(), Some("non-finite or non-positive scheme parameters"));
+    }
 }
