@@ -66,6 +66,12 @@ export const EXPERIMENTS: Experiment[] = [
     code: 'https://github.com/lambdaclass/stabileo/tree/main/research/benchmarks/plastic-collapse',
   },
   {
+    paperId: 'navier-plate', path: '/research/benchmarks/navier-plate',
+    name: 'Navier plate: mesh convergence', hook: 'First version: uniform pressure, DKT and MITC4 against the Fourier series.',
+    thumbnail: 'research-thumbs/navier-plate.svg', thumbnailAlt: 'Computed MITC4 displacement contour', thumbnailQuery: '',
+    code: 'https://github.com/lambdaclass/stabileo/tree/main/research/benchmarks/navier-plate',
+  },
+  {
     paperId: 'shauer-2025',
     path: '/research/fracture/shauer-2025',
     name: 'Phase-field fracture of a notched plate',
