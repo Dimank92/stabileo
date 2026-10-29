@@ -11,6 +11,7 @@
   import PublicLink from '../landing/PublicLink.svelte';
   import Gallery from './Gallery.svelte';
   import ShauerPage from './shauer2025/ShauerPage.svelte';
+  import LeePage from './lee1968/LeePage.svelte';
   import SpringsPage from './grossman2026/SpringsPage.svelte';
   import '../landing/landing.css';
   import '../blog/blog.css';
@@ -20,6 +21,7 @@
   const route = $derived(path.replace(/\/+$/, '') || '/research');
 
   const PAGES: Record<string, { title: string; description: string }> = {
+    '/research/benchmarks/lee-frame-1968': { title: 'Lee frame (1968) — Stabileo Research', description: 'First version: pinned Lee frame with the production arc-length solver. Provisional reference, zero reviews.' },
     '/research': {
       title: 'Stabileo Research — computational mechanics you can run',
       description:
@@ -53,6 +55,8 @@
     <ShauerPage />
   {:else if route === '/research/metamaterials/grossman-2026'}
     <SpringsPage />
+  {:else if route === '/research/benchmarks/lee-frame-1968'}
+    <LeePage />
   {:else}
     <section class="sec sec--ink">
       <div class="wrap" style="padding-top: 7rem; padding-bottom: 4rem">

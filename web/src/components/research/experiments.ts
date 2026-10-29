@@ -19,6 +19,7 @@ export type Experiment = {
 };
 
 export const EXPERIMENTS: Experiment[] = [
+  { paperId: 'lee-frame-1968', path: '/research/benchmarks/lee-frame-1968', name: 'Lee frame (1968)', hook: 'First version · 0 reviews', thumbnail: 'research-thumbs/lee-frame-1968.svg', thumbnailAlt: 'Lee frame from the production engine', thumbnailQuery: '', code: 'https://github.com/lambdaclass/stabileo/tree/main/research/benchmarks/lee-frame-1968' },
   {
     paperId: 'shauer-2025',
     path: '/research/fracture/shauer-2025',
