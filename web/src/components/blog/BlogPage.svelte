@@ -18,7 +18,6 @@
   import PublicLink from '../landing/PublicLink.svelte';
   import LandingFooter from '../landing/LandingFooter.svelte';
   import BlogBlocks from './BlogBlocks.svelte';
-  import ChangelogView from './ChangelogView.svelte';
   import { findStandingPage } from '../../lib/blog/pages';
   import '../landing/landing.css';
   import './blog.css';
@@ -188,7 +187,9 @@
   <SiteHeader current={standing?.view === 'changelog' ? 'changelog' : standing ? null : 'blog'} />
 
   {#if standing?.view === 'changelog' && standingBody}
-    <ChangelogView eyebrow={standingBody.eyebrow} title={standingBody.title} lead={standingBody.lead} />
+    {#await import('./ChangelogView.svelte') then { default: ChangelogView }}
+      <ChangelogView eyebrow={standingBody.eyebrow} title={standingBody.title} lead={standingBody.lead} />
+    {/await}
   {:else if standing && standingBody}
     <article class="sec sec--ink post standing">
       <div class="wrap post-wrap">
