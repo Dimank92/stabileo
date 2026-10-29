@@ -1269,3 +1269,600 @@ pub fn plate_thickness_ratio(coords: &[[f64; 3]; 3], t: f64) -> f64 {
     let min_l = edges.iter().map(|e| norm3(e)).fold(f64::MAX, f64::min);
     if min_l > 1e-15 { t / min_l } else { f64::INFINITY }
 }
+
+
+#[cfg(test)]
+#[allow(clippy::all)]
+mod tests {
+    use super::*;
+
+    fn tri_flat() -> [[f64; 3]; 3] {
+        [[0.0, 0.0, 0.0], [3.0, 0.0, 0.0], [0.0, 4.0, 0.0]]
+    }
+
+    fn tri_2d() -> [(f64, f64); 3] {
+        [(0.0, 0.0), (3.0, 0.0), (0.0, 4.0)]
+    }
+
+    #[test]
+    fn test_twice_area() {
+        let p = tri_2d();
+        assert_eq!(twice_area(&p), 12.0);
+
+        let p_rev = [(0.0, 0.0), (0.0, 4.0), (3.0, 0.0)];
+        assert_eq!(twice_area(&p_rev), -12.0);
+
+        let p_trans = [(1.0, 2.0), (4.0, 2.0), (1.0, 6.0)];
+        assert_eq!(twice_area(&p_trans), 12.0);
+
+        let p_collinear = [(0.0, 0.0), (1.0, 1.0), (2.0, 2.0)];
+        assert_eq!(twice_area(&p_collinear), 0.0);
+    }
+
+    #[test]
+    fn test_cst_b_matrix_exact_entries() {
+        let p = tri_2d();
+        let (b, area) = cst_b_matrix(&p);
+        assert!((area - 6.0).abs() < 1e-12);
+
+        // two_a = 12.0.
+        // dnx = [(0 - 4)/12, (4 - 0)/12, (0 - 0)/12] = [-1/3, 1/3, 0]
+        // dny = [(0 - 3)/12, (0 - 0)/12, (3 - 0)/12] = [-1/4, 0, 1/4]
+        // Row 0: [dnx0, 0, dnx1, 0, dnx2, 0]
+        assert!((b[0] - (-1.0 / 3.0)).abs() < 1e-12);
+        assert_eq!(b[1], 0.0);
+        assert!((b[2] - (1.0 / 3.0)).abs() < 1e-12);
+        assert_eq!(b[3], 0.0);
+        assert_eq!(b[4], 0.0);
+        assert_eq!(b[5], 0.0);
+
+        // Row 1: [0, dny0, 0, dny1, 0, dny2]
+        assert_eq!(b[6], 0.0);
+        assert!((b[7] - (-0.25)).abs() < 1e-12);
+        assert_eq!(b[8], 0.0);
+        assert_eq!(b[9], 0.0);
+        assert_eq!(b[10], 0.0);
+        assert!((b[11] - 0.25).abs() < 1e-12);
+
+        // Row 2: [dny0, dnx0, dny1, dnx1, dny2, dnx2]
+        assert!((b[12] - (-0.25)).abs() < 1e-12);
+        assert!((b[13] - (-1.0 / 3.0)).abs() < 1e-12);
+        assert_eq!(b[14], 0.0);
+        assert!((b[15] - (1.0 / 3.0)).abs() < 1e-12);
+        assert!((b[16] - 0.25).abs() < 1e-12);
+        assert_eq!(b[17], 0.0);
+
+        // Rigid body translations give 0 strain
+        for u in [[1.0, 0.0, 1.0, 0.0, 1.0, 0.0], [0.0, 1.0, 0.0, 1.0, 0.0, 1.0]] {
+            for row in 0..3 {
+                let strain: f64 = (0..6).map(|col| b[row * 6 + col] * u[col]).sum();
+                assert!(strain.abs() < 1e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn test_cst_stiffness() {
+        let p = tri_2d();
+        let (e, nu, t) = (200e6, 0.3, 0.01);
+        let km = cst_stiffness(&p, e, nu, t);
+
+        // Symmetry
+        for i in 0..6 {
+            for j in 0..6 {
+                assert!((km[i * 6 + j] - km[j * 6 + i]).abs() < 1e-7);
+            }
+        }
+
+        // Rigid body modes have zero energy
+        // 1. Translation x: [1, 0, 1, 0, 1, 0]
+        let u_tx = [1.0, 0.0, 1.0, 0.0, 1.0, 0.0];
+        let e_tx: f64 = (0..6).map(|i| (0..6).map(|j| u_tx[i] * km[i * 6 + j] * u_tx[j]).sum::<f64>()).sum();
+        assert!(e_tx.abs() < 1e-6);
+
+        // 2. Translation y: [0, 1, 0, 1, 0, 1]
+        let u_ty = [0.0, 1.0, 0.0, 1.0, 0.0, 1.0];
+        let e_ty: f64 = (0..6).map(|i| (0..6).map(|j| u_ty[i] * km[i * 6 + j] * u_ty[j]).sum::<f64>()).sum();
+        assert!(e_ty.abs() < 1e-6);
+
+        // 3. In-plane rotation: u = -y, v = x
+        // Node 0 (0,0): [0, 0]
+        // Node 1 (3,0): [0, 3]
+        // Node 2 (0,4): [-4, 0]
+        let u_rot = [0.0, 0.0, 0.0, 3.0, -4.0, 0.0];
+        let e_rot: f64 = (0..6).map(|i| (0..6).map(|j| u_rot[i] * km[i * 6 + j] * u_rot[j]).sum::<f64>()).sum();
+        assert!(e_rot.abs() < 1e-6);
+
+        // Uniaxial stretch in x: u = [0, 0, 0.001, 0, 0, 0]
+        let u_x = [0.0, 0.0, 0.001, 0.0, 0.0, 0.0];
+        let f_x: Vec<f64> = (0..6).map(|i| (0..6).map(|j| km[i * 6 + j] * u_x[j]).sum()).collect();
+        // Self-equilibrium
+        assert!((f_x[0] + f_x[2] + f_x[4]).abs() < 1e-6);
+        assert!((f_x[1] + f_x[3] + f_x[5]).abs() < 1e-6);
+        assert!(f_x[2] > 0.0);
+
+        // Check exact entry km[0]:
+        // D_mem: coeff = 200e6 * 0.01 / 0.91 = 2197802.1978...
+        // D00 = coeff, D22 = coeff * 0.7 / 2 = 0.35 * coeff
+        // k00 = area * (b00 * (D00 * b00) + b20 * (D22 * b20))
+        // b00 = -1/3, b20 = -1/4
+        // k00 = 6.0 * coeff * (1/9 + 0.35 * 1/16) = 6.0 * coeff * (1/9 + 0.021875) = 6.0 * coeff * (19.15 / 144)
+        let coeff = e * t / (1.0 - nu * nu);
+        let expected_k00 = 6.0 * (coeff * (-1.0 / 3.0) * (-1.0 / 3.0) + coeff * (1.0 - nu) / 2.0 * (-0.25) * (-0.25));
+        assert!((km[0] - expected_k00).abs() < 1e-5);
+
+        // Linear scaling with E and t
+        let km2 = cst_stiffness(&p, 2.0 * e, nu, t);
+        for i in 0..36 {
+            assert!((km2[i] - 2.0 * km[i]).abs() < 1e-5);
+        }
+        let km_t2 = cst_stiffness(&p, e, nu, 2.0 * t);
+        for i in 0..36 {
+            assert!((km_t2[i] - 2.0 * km[i]).abs() < 1e-5);
+        }
+    }
+
+    #[test]
+    fn test_dkt_geometry() {
+        let p = tri_2d();
+        let g = dkt_geometry(&p);
+        assert_eq!(g.xij, [3.0, -3.0, 0.0]);
+        assert_eq!(g.yij, [0.0, 4.0, -4.0]);
+        assert_eq!(g.lij_sq, [9.0, 25.0, 16.0]);
+        assert_eq!(g.area, 6.0);
+    }
+
+    #[test]
+    fn test_dkt_b_matrix() {
+        let p = tri_2d();
+        let g = dkt_geometry(&p);
+
+        // Rigid tilt annihilation: w = 1.0 + 2.0*x - 3.0*y
+        // theta_x = dw/dy = -3.0
+        // theta_y = -dw/dx = -2.0
+        let mut u_rigid = [0.0; 9];
+        for (i, &(x, y)) in p.iter().enumerate() {
+            u_rigid[i * 3] = 1.0 + 2.0 * x - 3.0 * y;
+            u_rigid[i * 3 + 1] = -3.0;
+            u_rigid[i * 3 + 2] = -2.0;
+        }
+
+        for &(xi, eta) in &[(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0 / 3.0, 1.0 / 3.0), (0.2, 0.5)] {
+            let b = dkt_b_matrix(&p, &g, xi, eta);
+            for row in 0..3 {
+                let curv: f64 = (0..9).map(|col| b[row * 9 + col] * u_rigid[col]).sum();
+                assert!(curv.abs() < 1e-10, "rigid tilt gave curvature {curv} at ({xi}, {eta}) row {row}");
+            }
+        }
+
+        // Constant curvature: w = x^2, dw/dx = 2x, dw/dy = 0 -> theta_x = 0, theta_y = -2x
+        let mut u_curv_x = [0.0; 9];
+        for (i, &(x, _y)) in p.iter().enumerate() {
+            u_curv_x[i * 3] = x * x;
+            u_curv_x[i * 3 + 1] = 0.0;
+            u_curv_x[i * 3 + 2] = -2.0 * x;
+        }
+        let b_c = dkt_b_matrix(&p, &g, 1.0 / 3.0, 1.0 / 3.0);
+        let curv_xx: f64 = (0..9).map(|j| b_c[0 * 9 + j] * u_curv_x[j]).sum();
+        let curv_yy: f64 = (0..9).map(|j| b_c[1 * 9 + j] * u_curv_x[j]).sum();
+        assert!((curv_xx - (-2.0)).abs() < 1e-10, "curv_xx was {curv_xx}");
+        assert!(curv_yy.abs() < 1e-10, "curv_yy was {curv_yy}");
+
+        // Constant curvature in y: w = y^2 -> theta_x = 2y, theta_y = 0
+        let mut u_curv_y = [0.0; 9];
+        for (i, &(_x, y)) in p.iter().enumerate() {
+            u_curv_y[i * 3] = y * y;
+            u_curv_y[i * 3 + 1] = 2.0 * y;
+            u_curv_y[i * 3 + 2] = 0.0;
+        }
+        let curv_xx_y: f64 = (0..9).map(|j| b_c[0 * 9 + j] * u_curv_y[j]).sum();
+        let curv_yy_y: f64 = (0..9).map(|j| b_c[1 * 9 + j] * u_curv_y[j]).sum();
+        assert!(curv_xx_y.abs() < 1e-10, "curv_xx_y was {curv_xx_y}");
+        assert!((curv_yy_y - (-2.0)).abs() < 1e-10, "curv_yy_y was {curv_yy_y}");
+
+        // Constant twist: w = x*y -> theta_x = x, theta_y = -y
+        let mut u_twist = [0.0; 9];
+        for (i, &(x, y)) in p.iter().enumerate() {
+            u_twist[i * 3] = x * y;
+            u_twist[i * 3 + 1] = x;
+            u_twist[i * 3 + 2] = -y;
+        }
+        let curv_xx_t: f64 = (0..9).map(|j| b_c[0 * 9 + j] * u_twist[j]).sum();
+        let curv_yy_t: f64 = (0..9).map(|j| b_c[1 * 9 + j] * u_twist[j]).sum();
+        let curv_xy_t: f64 = (0..9).map(|j| b_c[2 * 9 + j] * u_twist[j]).sum();
+        assert!(curv_xx_t.abs() < 1e-10);
+        assert!(curv_yy_t.abs() < 1e-10);
+        assert!((curv_xy_t - (-2.0)).abs() < 1e-10, "curv_xy_t was {curv_xy_t}");
+    }
+
+    #[test]
+    fn test_dkt_stiffness() {
+        let p = tri_2d();
+        let (e, nu, t) = (200e6, 0.3, 0.01);
+        let kb = dkt_stiffness(&p, e, nu, t);
+
+        // Symmetry
+        for i in 0..9 {
+            for j in 0..9 {
+                assert!((kb[i * 9 + j] - kb[j * 9 + i]).abs() < 1e-7);
+            }
+        }
+
+        // Rigid body translation w = 1.0 has 0 energy
+        let u_w = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+        let e_w: f64 = (0..9).map(|i| (0..9).map(|j| u_w[i] * kb[i * 9 + j] * u_w[j]).sum::<f64>()).sum();
+        assert!(e_w.abs() < 1e-6);
+
+        // Rigid rotation w = 2x - 3y, theta_x = -3, theta_y = -2 has 0 energy
+        let mut u_rigid = [0.0; 9];
+        for (i, &(x, y)) in p.iter().enumerate() {
+            u_rigid[i * 3] = 2.0 * x - 3.0 * y;
+            u_rigid[i * 3 + 1] = -3.0;
+            u_rigid[i * 3 + 2] = -2.0;
+        }
+        let e_rigid: f64 = (0..9).map(|i| (0..9).map(|j| u_rigid[i] * kb[i * 9 + j] * u_rigid[j]).sum::<f64>()).sum();
+        assert!(e_rigid.abs() < 1e-6);
+
+        // Bending mode has positive energy
+        let mut u_bend = [0.0; 9];
+        for (i, &(x, _y)) in p.iter().enumerate() {
+            u_bend[i * 3] = x * x;
+            u_bend[i * 3 + 1] = 0.0;
+            u_bend[i * 3 + 2] = -2.0 * x;
+        }
+        let e_bend: f64 = (0..9).map(|i| (0..9).map(|j| u_bend[i] * kb[i * 9 + j] * u_bend[j]).sum::<f64>()).sum();
+        assert!(e_bend > 1.0);
+
+        // Cubic thickness scaling: doubling t multiplies kb by 8
+        let kb_t2 = dkt_stiffness(&p, e, nu, 2.0 * t);
+        for i in 0..81 {
+            assert!((kb_t2[i] - 8.0 * kb[i]).abs() < 1e-5);
+        }
+    }
+
+    #[test]
+    fn test_plate_local_stiffness_and_transform_3d() {
+        let coords = tri_flat();
+        let (e, nu, t) = (200e6, 0.3, 0.01);
+        let k = plate_local_stiffness(&coords, e, nu, t);
+
+        // 18x18 symmetry
+        for i in 0..18 {
+            for j in 0..18 {
+                assert!((k[i * 18 + j] - k[j * 18 + i]).abs() < 1e-7, "asymmetry at ({i}, {j})");
+            }
+        }
+
+        // Drilling DOFs exact checks:
+        // g_shear = e / (2 * (1 + nu)) = 200e6 / 2.6 = 76923076.92307692
+        // gamma = g_shear * t / 1000.0 = 769.2307692307693
+        // area = 6.0
+        // k[5 * 18 + 5] = gamma * (area / 6.0) = gamma * 1.0
+        let g_shear = e / (2.0 * (1.0 + nu));
+        let gamma = g_shear * t / 1000.0;
+        assert!((k[5 * 18 + 5] - gamma).abs() < 1e-6);
+        assert!((k[11 * 18 + 11] - gamma).abs() < 1e-6);
+        assert!((k[17 * 18 + 17] - gamma).abs() < 1e-6);
+        // Off-diagonal drilling: gamma * area / 12.0 = gamma * 0.5
+        assert!((k[5 * 18 + 11] - gamma * 0.5).abs() < 1e-6);
+
+        // Rigid in-plane rotation has ZERO energy, including drilling stabilization
+        // u = -y, v = x, theta_z = 1.0
+        let mut u_rot_in_plane = [0.0; 18];
+        for i in 0..3 {
+            let (x, y) = (coords[i][0], coords[i][1]);
+            u_rot_in_plane[i * 6 + 0] = -y;
+            u_rot_in_plane[i * 6 + 1] = x;
+            u_rot_in_plane[i * 6 + 5] = 1.0;
+        }
+        let e_drill: f64 = (0..18).map(|i| (0..18).map(|j| u_rot_in_plane[i] * k[i * 18 + j] * u_rot_in_plane[j]).sum::<f64>()).sum();
+        assert!(e_drill.abs() < 1e-5, "rigid rotation energy was {e_drill}");
+
+        // Transformation matrix: 18x18 orthogonal
+        let t_mat = plate_transform_3d(&coords);
+        for i in 0..18 {
+            for j in 0..18 {
+                let dot: f64 = (0..18).map(|k_idx| t_mat[i * 18 + k_idx] * t_mat[j * 18 + k_idx]).sum();
+                let expected = if i == j { 1.0 } else { 0.0 };
+                assert!((dot - expected).abs() < 1e-12, "T not orthogonal at ({i}, {j})");
+            }
+        }
+
+        // Tilted triangle transformation: check every block matches local axes
+        let tilted = [[0.0, 0.0, 1.0], [3.0, 0.0, 1.0], [0.0, 4.0, 5.0]];
+        let (ex, ey, ez) = local_axes(&tilted);
+        let t_tilt = plate_transform_3d(&tilted);
+        for blk in 0..6 {
+            let off = blk * 3;
+            // row 0
+            assert_eq!(t_tilt[(off + 0) * 18 + (off + 0)], ex[0]);
+            assert_eq!(t_tilt[(off + 0) * 18 + (off + 1)], ex[1]);
+            assert_eq!(t_tilt[(off + 0) * 18 + (off + 2)], ex[2]);
+            // row 1
+            assert_eq!(t_tilt[(off + 1) * 18 + (off + 0)], ey[0]);
+            assert_eq!(t_tilt[(off + 1) * 18 + (off + 1)], ey[1]);
+            assert_eq!(t_tilt[(off + 1) * 18 + (off + 2)], ey[2]);
+            // row 2
+            assert_eq!(t_tilt[(off + 2) * 18 + (off + 0)], ez[0]);
+            assert_eq!(t_tilt[(off + 2) * 18 + (off + 1)], ez[1]);
+            assert_eq!(t_tilt[(off + 2) * 18 + (off + 2)], ez[2]);
+        }
+    }
+
+    #[test]
+    fn test_plate_pressure_and_thermal_load() {
+        let coords = tri_flat();
+        let pressure = 5.0;
+        let fp = plate_pressure_load(&coords, pressure);
+        assert_eq!(fp.len(), 18);
+
+        // Flat in xy plane -> ez = [0, 0, 1], area = 6.0, total force = 30.0 in z
+        let mut total_z = 0.0;
+        for i in 0..3 {
+            assert!(fp[i * 6].abs() < 1e-12);
+            assert!(fp[i * 6 + 1].abs() < 1e-12);
+            assert!((fp[i * 6 + 2] - 10.0).abs() < 1e-12);
+            assert!(fp[i * 6 + 3].abs() < 1e-12);
+            assert!(fp[i * 6 + 4].abs() < 1e-12);
+            assert!(fp[i * 6 + 5].abs() < 1e-12);
+            total_z += fp[i * 6 + 2];
+        }
+        assert!((total_z - 30.0).abs() < 1e-12);
+
+        // Inclined triangle pressure
+        let tilted = [[0.0, 0.0, 0.0], [3.0, 0.0, 0.0], [0.0, 4.0, 3.0]];
+        let fp_tilt = plate_pressure_load(&tilted, 2.0);
+        assert_eq!(fp_tilt.len(), 18);
+        let (_, _, ez) = local_axes(&tilted);
+        // area = 0.5 * 3.0 * 5.0 = 7.5; total force = 15.0; per node = 5.0 * ez
+        for i in 0..3 {
+            assert!((fp_tilt[i * 6] - 5.0 * ez[0]).abs() < 1e-10);
+            assert!((fp_tilt[i * 6 + 1] - 5.0 * ez[1]).abs() < 1e-10);
+            assert!((fp_tilt[i * 6 + 2] - 5.0 * ez[2]).abs() < 1e-10);
+        }
+
+        // Thermal load
+        let (e, nu, t, alpha) = (200e6, 0.3, 0.01, 1.2e-5);
+
+        // Zero temperature change produces strictly zero load
+        let f_zero = plate_thermal_load(&coords, e, nu, t, alpha, 0.0, 0.0);
+        assert!(f_zero.iter().all(|&v| v == 0.0));
+
+        // Uniform temperature change:
+        // n_thermal = e * t * alpha * dt / (1 - nu) = 200e6 * 0.01 * 1.2e-5 * 25.0 / 0.7 = 600.0 / 0.7
+        // f_node0 = [area * dnx0 * N_T, area * dny0 * N_T] = [6 * (-1/3) * N_T, 6 * (-1/4) * N_T] = [-2 N_T, -1.5 N_T]
+        let f_unif = plate_thermal_load(&coords, e, nu, t, alpha, 25.0, 0.0);
+        let n_thermal = e * t * alpha * 25.0 / (1.0 - nu);
+        assert!((f_unif[0] - (-2.0 * n_thermal)).abs() < 1e-8);
+        assert!((f_unif[1] - (-1.5 * n_thermal)).abs() < 1e-8);
+        assert!((f_unif[6] - (2.0 * n_thermal)).abs() < 1e-8);
+        assert!(f_unif[7].abs() < 1e-8);
+        assert!(f_unif[12].abs() < 1e-8);
+        assert!((f_unif[13] - (1.5 * n_thermal)).abs() < 1e-8);
+
+        let sum_fx = f_unif[0] + f_unif[6] + f_unif[12];
+        let sum_fy = f_unif[1] + f_unif[7] + f_unif[13];
+        assert!(sum_fx.abs() < 1e-10, "sum_fx {sum_fx}");
+        assert!(sum_fy.abs() < 1e-10, "sum_fy {sum_fy}");
+        // Bending DOFs are zero
+        for &d in &BEND_DOFS {
+            assert!(f_unif[d].abs() < 1e-12);
+        }
+
+        // Linearity with dt_uniform
+        let f_unif2 = plate_thermal_load(&coords, e, nu, t, alpha, 50.0, 0.0);
+        for i in 0..18 {
+            assert!((f_unif2[i] - 2.0 * f_unif[i]).abs() < 1e-8);
+        }
+
+        // Temperature gradient: produces pure bending moments
+        let f_grad = plate_thermal_load(&coords, e, nu, t, alpha, 0.0, 15.0);
+        for &d in &MEM_DOFS {
+            assert!(f_grad[d].abs() < 1e-12);
+        }
+        for &d in &DRILL_DOFS {
+            assert!(f_grad[d].abs() < 1e-12);
+        }
+        let f_grad_neg = plate_thermal_load(&coords, e, nu, t, alpha, 0.0, -15.0);
+        for i in 0..18 {
+            assert!((f_grad[i] + f_grad_neg[i]).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn test_plate_stress_recovery_and_nodal() {
+        let coords = tri_flat();
+        let (e, nu, t, alpha) = (200e6, 0.3, 0.02, 1.2e-5);
+
+        // Uniaxial tension in x: eps = 0.001
+        let mut u_tens = [0.0; 18];
+        for i in 0..3 {
+            u_tens[i * 6] = 0.001 * coords[i][0];
+        }
+        let s_tens = plate_stress_recovery(&coords, e, nu, t, &u_tens, 0.0, 0.0, 0.0);
+        let expected_sxx = e * 0.001 / (1.0 - nu * nu);
+        let expected_syy = nu * expected_sxx;
+        assert!((s_tens.sigma_xx - expected_sxx).abs() / expected_sxx < 1e-5);
+        assert!((s_tens.sigma_yy - expected_syy).abs() / expected_syy < 1e-5);
+        assert!(s_tens.tau_xy.abs() < 1e-8);
+        assert!(s_tens.mx.abs() < 1e-8);
+        assert!(s_tens.my.abs() < 1e-8);
+
+        // Free thermal expansion: u = alpha * dt * x, v = alpha * dt * y -> stress must be zero!
+        let dt = 30.0;
+        let mut u_therm = [0.0; 18];
+        for i in 0..3 {
+            u_therm[i * 6] = alpha * dt * coords[i][0];
+            u_therm[i * 6 + 1] = alpha * dt * coords[i][1];
+        }
+        let s_free = plate_stress_recovery(&coords, e, nu, t, &u_therm, alpha, dt, 0.0);
+        assert!(s_free.sigma_xx.abs() < 1e-6);
+        assert!(s_free.sigma_yy.abs() < 1e-6);
+        assert!(s_free.von_mises < 1e-6);
+
+        // Node stresses under thermal gradient
+        let dt_grad = 20.0;
+        let node_stresses = plate_stress_at_nodes_thermal(&coords, e, nu, t, &[0.0; 18], alpha, 0.0, dt_grad);
+        assert_eq!(node_stresses.len(), 3);
+        for ns in &node_stresses {
+            assert!(ns.mx.abs() > 0.0);
+            assert!(ns.my.abs() > 0.0);
+            assert!(ns.von_mises > 0.0);
+        }
+
+        // Zero-thermal node stresses matches plate_stress_at_nodes
+        let n_unth = plate_stress_at_nodes(&coords, e, nu, t, &u_tens);
+        for i in 0..3 {
+            assert!((n_unth[i].sigma_xx - s_tens.sigma_xx).abs() < 1e-6);
+            assert!((n_unth[i].sigma_yy - s_tens.sigma_yy).abs() < 1e-6);
+        }
+    }
+
+    #[test]
+    fn test_plate_shear_stiffness_dkmt_and_thickness_ratio() {
+        let coords = tri_flat();
+        let (e, nu, t, kappa_s) = (200e6, 0.3, 0.05, 5.0 / 6.0);
+        let ks = plate_shear_stiffness_dkmt(&coords, e, nu, t, kappa_s);
+
+        // 9x9 symmetry
+        for i in 0..9 {
+            for j in 0..9 {
+                assert!((ks[i * 9 + j] - ks[j * 9 + i]).abs() < 1e-7);
+            }
+        }
+
+        // Exact check for entry ks[0, 0]:
+        // bs row 0 col w0 is dnx[0] = -1/3, row 1 col w0 is dny[0] = -1/4
+        // s = (-1/3)^2 + (-1/4)^2 = 1/9 + 1/16 = 25/144
+        // g = 200e6 / (2 * 1.3)
+        // ds = kappa_s * g * t
+        // area = 6.0
+        // expected ks[0] = ds * area * 25/144
+        let g = e / (2.0 * (1.0 + nu));
+        let ds = kappa_s * g * t;
+        let area = 6.0;
+        let expected_ks00 = ds * area * (25.0 / 144.0);
+        assert!((ks[0] - expected_ks00).abs() / expected_ks00 < 1e-10);
+
+        // Rigid translation: w = 1.0, theta = 0 -> zero shear energy
+        let u_trans = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+        let e_trans: f64 = (0..9).map(|i| (0..9).map(|j| u_trans[i] * ks[i * 9 + j] * u_trans[j]).sum::<f64>()).sum();
+        assert!(e_trans.abs() < 1e-8);
+
+        // Rigid rotation about y: w = x, theta_y = 1, theta_x = 0 -> gamma_xz = dw/dx - theta_y = 1 - 1 = 0
+        let mut u_rot_y = [0.0; 9];
+        for i in 0..3 {
+            u_rot_y[i * 3] = coords[i][0];
+            u_rot_y[i * 3 + 1] = 0.0;
+            u_rot_y[i * 3 + 2] = 1.0;
+        }
+        let e_rot_y: f64 = (0..9).map(|i| (0..9).map(|j| u_rot_y[i] * ks[i * 9 + j] * u_rot_y[j]).sum::<f64>()).sum();
+        assert!(e_rot_y.abs() < 1e-8, "e_rot_y {e_rot_y}");
+
+        // Rigid rotation about x: w = y, theta_x = -1, theta_y = 0 -> gamma_yz = dw/dy + theta_x = 1 - 1 = 0
+        let mut u_rot_x = [0.0; 9];
+        for i in 0..3 {
+            u_rot_x[i * 3] = coords[i][1];
+            u_rot_x[i * 3 + 1] = -1.0;
+            u_rot_x[i * 3 + 2] = 0.0;
+        }
+        let e_rot_x: f64 = (0..9).map(|i| (0..9).map(|j| u_rot_x[i] * ks[i * 9 + j] * u_rot_x[j]).sum::<f64>()).sum();
+        assert!(e_rot_x.abs() < 1e-8, "e_rot_x {e_rot_x}");
+
+        // Constant shear tests:
+        // Case A: theta_x = 1, w = 0, theta_y = 0 -> gamma_yz = 1.0, gamma_xz = 0.
+        // Strain energy = 1/2 * ds * area * 1.0^2
+        let expected_energy = 0.5 * ds * area;
+
+        let u_shear_x = [0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0];
+        let e_shear_x: f64 = 0.5 * (0..9).map(|i| (0..9).map(|j| u_shear_x[i] * ks[i * 9 + j] * u_shear_x[j]).sum::<f64>()).sum::<f64>();
+        assert!((e_shear_x - expected_energy).abs() / expected_energy < 1e-10, "e_shear_x {e_shear_x} vs {expected_energy}");
+
+        // Case B: theta_y = 1, w = 0, theta_x = 0 -> gamma_xz = -1.0, gamma_yz = 0.
+        let u_shear_y = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0];
+        let e_shear_y: f64 = 0.5 * (0..9).map(|i| (0..9).map(|j| u_shear_y[i] * ks[i * 9 + j] * u_shear_y[j]).sum::<f64>()).sum::<f64>();
+        assert!((e_shear_y - expected_energy).abs() / expected_energy < 1e-10, "e_shear_y {e_shear_y} vs {expected_energy}");
+
+        // Scaling tests
+        let ks_double_kappa = plate_shear_stiffness_dkmt(&coords, e, nu, t, 2.0 * kappa_s);
+        for i in 0..81 {
+            assert!((ks_double_kappa[i] - 2.0 * ks[i]).abs() < 1e-7);
+        }
+
+        let ks_double_t = plate_shear_stiffness_dkmt(&coords, e, nu, 2.0 * t, kappa_s);
+        for i in 0..81 {
+            assert!((ks_double_t[i] - 2.0 * ks[i]).abs() < 1e-7);
+        }
+
+        let ks_double_e = plate_shear_stiffness_dkmt(&coords, 2.0 * e, nu, t, kappa_s);
+        for i in 0..81 {
+            assert!((ks_double_e[i] - 2.0 * ks[i]).abs() < 1e-7);
+        }
+
+        // Full thick plate stiffness
+        let k_thick = plate_local_stiffness_thick(&coords, e, nu, t, kappa_s);
+        for i in 0..18 {
+            for j in 0..18 {
+                assert!((k_thick[i * 18 + j] - k_thick[j * 18 + i]).abs() < 1e-7);
+            }
+        }
+
+        // Thickness ratio
+        let r = plate_thickness_ratio(&coords, t);
+        assert!((r - (0.05 / 3.0)).abs() < 1e-10);
+
+        let degen = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]];
+        assert_eq!(plate_thickness_ratio(&degen, t), f64::INFINITY);
+    }
+
+    #[test]
+    fn test_plate_element_quality_and_mass() {
+        let coords = tri_flat();
+        let (aspect, skew, min_angle) = plate_element_quality(&coords);
+        // Triangle sides: 3, 4, 5. aspect = 5/3 = 1.66667
+        assert!((aspect - 5.0 / 3.0).abs() < 1e-5);
+        assert!(min_angle > 30.0 && min_angle < 40.0);
+        assert!(skew > 20.0 && skew < 30.0);
+
+        // Mass matrix
+        let rho = 7850.0;
+        let t = 0.01;
+        let mass = plate_consistent_mass(&coords, rho, t);
+        assert_eq!(mass.len(), 324); // 18x18
+        let m_node = rho * 6.0 * t / 3.0;
+        let i_rot = m_node * t * t / 12.0;
+
+        for node in 0..3 {
+            let base = node * 6;
+            assert!((mass[(base + 0) * 18 + (base + 0)] - m_node).abs() < 1e-7);
+            assert!((mass[(base + 1) * 18 + (base + 1)] - m_node).abs() < 1e-7);
+            assert!((mass[(base + 2) * 18 + (base + 2)] - m_node).abs() < 1e-7);
+            assert!((mass[(base + 3) * 18 + (base + 3)] - i_rot).abs() < 1e-7);
+            assert!((mass[(base + 4) * 18 + (base + 4)] - i_rot).abs() < 1e-7);
+            assert!((mass[(base + 5) * 18 + (base + 5)] - i_rot).abs() < 1e-7);
+        }
+    }
+
+    #[test]
+    fn test_plate_geometric_stiffness() {
+        let coords = tri_flat();
+        let (nxx, nyy, nxy) = (100.0, 50.0, 20.0);
+        let kg = plate_geometric_stiffness(&coords, nxx, nyy, nxy);
+
+        // Symmetry
+        for i in 0..18 {
+            for j in 0..18 {
+                assert!((kg[i * 18 + j] - kg[j * 18 + i]).abs() < 1e-7);
+            }
+        }
+
+        // Out-of-plane rigid translation (w = 1 at all nodes) has zero geometric energy
+        let mut u_trans_z = [0.0; 18];
+        u_trans_z[2] = 1.0;
+        u_trans_z[8] = 1.0;
+        u_trans_z[14] = 1.0;
+        let e_trans: f64 = (0..18).map(|i| (0..18).map(|j| u_trans_z[i] * kg[i * 18 + j] * u_trans_z[j]).sum::<f64>()).sum();
+        assert!(e_trans.abs() < 1e-8, "rigid z translation geometric energy was {e_trans}");
+    }
+}
+
