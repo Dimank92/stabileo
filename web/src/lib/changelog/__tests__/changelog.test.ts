@@ -6,7 +6,8 @@ import {
   CHANGELOG_AREAS,
   LATEST_CHANGES,
   AREA_LABELS,
-  changeDay,
+  changeStamp,
+  formatChangeWhen,
   changelogByMonth,
   entryAreas,
   formatChangeDate,
@@ -19,14 +20,21 @@ const LOCALES = ['es', 'en', 'pt'] as const;
 const SCREENSHOTS = resolve(__dirname, '../../../../public/screenshots');
 
 describe('the changelog', () => {
-  it('runs newest first, one entry per weekly report, each dated on a Friday', () => {
+  it('runs newest first: a month at a time from February to May, then one entry per weekly report on its Friday', () => {
     const dates = CHANGELOG.map((e) => e.date);
     expect([...dates].sort().reverse()).toEqual(dates);
     expect(new Set(dates).size).toBe(dates.length);
-    for (const date of dates) {
-      expect(date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-      const [y, m, d] = date.split('-').map(Number);
-      expect(new Date(Date.UTC(y, m - 1, d)).getUTCDay(), date).toBe(5);
+    expect(CHANGELOG.at(-1)!.date).toBe('2026-02-01');
+    for (const entry of CHANGELOG) {
+      expect(entry.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      const [y, m, d] = entry.date.split('-').map(Number);
+      if (entry.period === 'month') {
+        expect(d, entry.date).toBe(1);
+        expect(entry.date < '2026-06-01', entry.date).toBe(true);
+      } else {
+        expect(new Date(Date.UTC(y, m - 1, d)).getUTCDay(), entry.date).toBe(5);
+        expect(entry.date >= '2026-06-01', entry.date).toBe(true);
+      }
     }
   });
 
@@ -105,16 +113,20 @@ describe('the changelog helpers', () => {
 
   it('splits the history into months, newest first, keeping every week', () => {
     const months = changelogByMonth(CHANGELOG);
-    expect(months.map((m) => m.key)).toEqual(['2026-10', '2026-09', '2026-08', '2026-07', '2026-06']);
+    expect(months.map((m) => m.key)).toEqual(['2026-10', '2026-09', '2026-08', '2026-07', '2026-06', '2026-04', '2026-03', '2026-02']);
     expect(months.flatMap((m) => m.entries)).toEqual(CHANGELOG);
     expect(months[0].entries.map((e) => e.date)).toEqual(['2026-10-23', '2026-10-16', '2026-10-09', '2026-10-02']);
   });
 
-  it('names the day and the month for the timeline', () => {
-    expect(changeDay('2026-10-02', 'es')).toEqual({ day: '2', month: 'oct' });
-    expect(changeDay('2026-06-12', 'en')).toEqual({ day: '12', month: 'Jun' });
-    expect(formatChangeMonth('2026-10-01', 'es')).toBe('Octubre de 2026');
+  it('names the day and the month for a week, and the month alone for a monthly entry', () => {
+    const week = CHANGELOG.find((e) => e.date === '2026-10-02')!;
+    const month = CHANGELOG.find((e) => e.date === '2026-03-01')!;
+    expect(changeStamp(week, 'es')).toEqual({ big: '2', small: 'oct' });
+    expect(changeStamp(month, 'en')).toEqual({ big: 'Mar', small: null });
+    expect(formatChangeWhen(week, 'es')).toBe('2 de octubre de 2026');
+    expect(formatChangeWhen(month, 'es')).toBe('Marzo de 2026');
     expect(formatChangeMonth('2026-10-01', 'en')).toBe('October 2026');
     expect(formatChangeMonth('2026-10-01', 'pt')).toBe('Outubro de 2026');
+    expect(formatChangeMonth('2026-02-01', 'es', { capitalize: false })).toBe('febrero de 2026');
   });
 });

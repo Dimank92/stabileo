@@ -42,7 +42,7 @@ async function boot(page: Page, path: string, locale = 'en') {
 }
 
 test.describe('@smoke blog', () => {
-  test('the changelog page lists every week by month, and filters by area', async ({ page }) => {
+  test('the changelog page lists every entry since February by month, and filters by area', async ({ page }) => {
     await boot(page, '/es/changelog/', 'es');
 
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Historial de cambios de Stabileo');
@@ -54,7 +54,10 @@ test.describe('@smoke blog', () => {
     await expect(weeks.first().locator('li').first()).toHaveText(CHANGELOG[0].i18n.es.items[0]);
     await expect(page.getByRole('heading', { level: 2, name: 'Octubre de 2026' })).toBeVisible();
     const total = CHANGELOG.reduce((n, e) => n + e.areas.length, 0);
-    await expect(page.getByTestId('changelog-stats')).toContainText(`${CHANGELOG.length} semanas · ${total} cambios`);
+    await expect(page.getByTestId('changelog-stats')).toContainText(`${total} cambios · desde febrero de 2026`);
+    const first = weeks.last();
+    await expect(first).toHaveAttribute('data-date', '2026-02-01');
+    await expect(first.locator('time')).toHaveText(/feb\s*mes/);
 
     const shots = page.locator('.cl-shot img');
     await expect(shots).toHaveCount(CHANGELOG.filter((e) => e.shot).length);
@@ -66,7 +69,7 @@ test.describe('@smoke blog', () => {
     await page.getByRole('button', { name: /^Educativo/ }).click();
     await expect(weeks).toHaveCount(edu.length);
     await expect(weeks.first().getByRole('heading', { level: 4 })).toHaveText(['Educativo']);
-    await expect(page.getByTestId('changelog-stats')).toContainText(`${edu.length} semanas`);
+    await expect(page.getByTestId('changelog-stats')).toContainText(`${edu.reduce((n, e) => n + e.areas.filter((a) => a === 'edu').length, 0)} cambios`);
     await page.getByRole('button', { name: 'Todo' }).click();
     await expect(weeks).toHaveCount(CHANGELOG.length);
   });

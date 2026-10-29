@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tPublic as t, tpPublic as tp, publicI18n } from '../../lib/i18n/store.svelte';
-  import { LATEST_CHANGES, AREA_LABELS, entryAreas, formatChangeDate, itemsByArea } from '../../lib/changelog';
+  import { LATEST_CHANGES, AREA_LABELS, entryAreas, formatChangeWhen, itemsByArea } from '../../lib/changelog';
   import PublicLink from './PublicLink.svelte';
   import Shot from './Shot.svelte';
 
@@ -26,7 +26,7 @@
       <article class="changelog-feature" data-testid="changelog-week">
         <p class="changelog-kicker">
           <span class="changelog-new">{t('landing.changelogLatest')}</span>
-          <time datetime={latest.date}>{formatChangeDate(latest.date, locale)}</time>
+          <time datetime={latest.date}>{formatChangeWhen(latest, locale)}</time>
         </p>
         <h3 class="changelog-title">{latest.i18n[locale].title}</h3>
         {#each itemsByArea(latest, locale) as g (g.area)}
@@ -54,7 +54,7 @@
               </figure>
             {/if}
             <div class="changelog-mini-body">
-              <time class="changelog-date" datetime={entry.date}>{formatChangeDate(entry.date, locale)}</time>
+              <time class="changelog-date" datetime={entry.date}>{formatChangeWhen(entry, locale)}</time>
               <h3 class="changelog-title changelog-title--mini">{entry.i18n[locale].title}</h3>
               <p class="changelog-meta">
                 {#each entryAreas(entry) as a (a)}<span class="changelog-tag">{AREA_LABELS[locale][a]}</span>{/each}

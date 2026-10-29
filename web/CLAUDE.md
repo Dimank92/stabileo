@@ -322,7 +322,8 @@ Key test patterns:
 
 ## Changelog
 
-`src/lib/changelog/index.ts` holds what reached stabileo.com each week, newest first. The landing
+`src/lib/changelog/index.ts` holds what reached stabileo.com, newest first: one entry per month from
+the first commit (February 2026) to April, marked `period: 'month'`, then one per weekly report. The landing
 shows the newest week in full and the two before it as cards (`LandingChangelog.svelte`), and
 `/<locale>/changelog` draws them all on a timeline by month, with a filter by area
 (`src/components/blog/ChangelogView.svelte`). `src/lib/blog/pages/changelog.ts` only gives that page

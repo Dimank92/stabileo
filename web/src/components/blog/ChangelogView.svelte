@@ -4,7 +4,7 @@
     CHANGELOG,
     CHANGELOG_AREAS,
     AREA_LABELS,
-    changeDay,
+    changeStamp,
     changelogByMonth,
     formatChangeMonth,
     itemsByArea,
@@ -38,9 +38,9 @@
     <h1 class="display cl-title">{title}</h1>
     <p class="lead cl-lead">{lead}</p>
     <p class="cl-stats" data-testid="changelog-stats">
-      <span>{count(visible.length, 'changelog.weeks', 'changelog.weeksOne')}</span>
-      <span aria-hidden="true">·</span>
       <span>{count(changeCount, 'changelog.changes', 'changelog.changesOne')}</span>
+      <span aria-hidden="true">·</span>
+      <span>{tp('changelog.since', { month: formatChangeMonth(visible[visible.length - 1].date, locale, { capitalize: false }) })}</span>
       <span aria-hidden="true">·</span>
       <span>{t('changelog.everyFriday')}</span>
     </p>
@@ -88,12 +88,12 @@
         <section class="cl-month" id="m-{m.key}" aria-labelledby="m-{m.key}-h">
           <h2 class="cl-month-h" id="m-{m.key}-h">{formatChangeMonth(`${m.key}-01`, locale)}</h2>
           {#each m.entries as entry (entry.date)}
-            {@const day = changeDay(entry.date, locale)}
+            {@const stamp = changeStamp(entry, locale)}
             {@const groups = itemsByArea(entry, locale).filter((g) => !area || g.area === area)}
             <article class="cl-week" class:latest={entry === CHANGELOG[0]} data-testid="changelog-entry" data-date={entry.date}>
-              <time class="cl-date" datetime={entry.date}>
-                <span class="cl-day">{day.day}</span>
-                <span class="cl-mon">{day.month}</span>
+              <time class="cl-date" class:monthly={entry.period === 'month'} datetime={entry.period === 'month' ? entry.date.slice(0, 7) : entry.date}>
+                <span class="cl-day">{stamp.big}</span>
+                <span class="cl-mon">{stamp.small ?? t('changelog.wholeMonth')}</span>
               </time>
               <div class="cl-card">
                 <h3 class="cl-week-title">{entry.i18n[locale].title}</h3>
@@ -323,6 +323,11 @@
     font-family: var(--lp-display);
     font-size: 1.6rem;
     font-weight: 600;
+  }
+
+  .cl-date.monthly .cl-day {
+    font-size: 1.15rem;
+    text-transform: capitalize;
   }
 
   .cl-mon {

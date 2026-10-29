@@ -13,8 +13,10 @@ export type ChangelogShot = {
 };
 
 export type ChangelogEntry = {
-  /** The Friday of the weekly report that announced it, as YYYY-MM-DD. */
+  /** The Friday of the weekly report, or the first day of the month for a monthly entry. */
   date: string;
+  /** Before the weekly reports started in June 2026, the history is told a month at a time. */
+  period?: 'month';
   /** Areas of the items, in order: `items` in every language follows it. */
   areas: ChangelogArea[];
   shot?: ChangelogShot;
@@ -22,8 +24,9 @@ export type ChangelogEntry = {
 };
 
 /**
- * What reached stabileo.com each week, newest first. One entry per weekly report, dated with
- * the report's Friday, listing only what was merged to main that week.
+ * What reached stabileo.com, newest first. From June 2026 one entry per weekly report, dated with
+ * the report's Friday and listing only what was merged to main that week; before that, one entry
+ * per month, from the first commit on 10 February 2026.
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
@@ -619,6 +622,161 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
     },
   },
+  {
+    date: '2026-04-01',
+    period: 'month',
+    areas: ['site', 'engine', 'engine', 'app', 'app', 'app'],
+    i18n: {
+      es: {
+        title: 'Un visor 3D más fluido y un motor más robusto',
+        items: [
+          'Una landing rediseñada.',
+          'Cerca de mil tests nuevos de robustez, con correcciones de exactitud en el motor, los elementos y las restricciones, y avisos de inestabilidad antes de calcular.',
+          'Articulaciones en 3D liberadas eje por eje en cada extremo de barra.',
+          'El visor 3D se mueve con fluidez en modelos de más de mil nodos: los nodos se dibujan de una vez y la selección de barras es más rápida.',
+          'Los ejes quedaron unificados con Z hacia arriba en toda la app, y se corrigieron los momentos My y Mz en tensiones y verificaciones.',
+          'Correcciones en el guardado, los links compartidos y las exportaciones.',
+        ],
+      },
+      en: {
+        title: 'A smoother 3D viewer and a sturdier engine',
+        items: [
+          'A redesigned landing page.',
+          'Close to a thousand new robustness tests, with accuracy fixes in the engine, the elements and the constraints, and instability warnings before the analysis runs.',
+          'Hinges in 3D released axis by axis at each member end.',
+          'The 3D viewer moves smoothly on models with over a thousand nodes: nodes are drawn in one pass and picking members is faster.',
+          'Axes were unified with Z up across the app, and the My and Mz moments were fixed in stresses and design checks.',
+          'Fixes to saving, shared links and exports.',
+        ],
+      },
+      pt: {
+        title: 'Um visualizador 3D mais fluido e um motor mais robusto',
+        items: [
+          'Uma landing redesenhada.',
+          'Perto de mil testes novos de robustez, com correções de exatidão no motor, nos elementos e nas restrições, e avisos de instabilidade antes de calcular.',
+          'Articulações em 3D liberadas eixo por eixo em cada extremidade da barra.',
+          'O visualizador 3D se move com fluidez em modelos com mais de mil nós: os nós são desenhados de uma vez e a seleção de barras ficou mais rápida.',
+          'Os eixos foram unificados com Z para cima em todo o app, e os momentos My e Mz foram corrigidos nas tensões e verificações.',
+          'Correções no salvamento, nos links compartilhados e nas exportações.',
+        ],
+      },
+    },
+  },
+  {
+    date: '2026-03-01',
+    period: 'month',
+    areas: ['engine', 'engine', 'engine', 'engine', 'site', 'pro', 'pro', 'edu', 'basic', 'app'],
+    shot: {
+      base: '3d-frame',
+      w: 1600,
+      h: 876,
+      alt: {
+        es: 'Un pórtico espacial con su diagrama de momentos en 3D',
+        en: 'A space frame with its bending moment diagram in 3D',
+        pt: 'Um pórtico espacial com seu diagrama de momentos em 3D',
+      },
+    },
+    i18n: {
+      es: {
+        title: 'El motor en Rust, el modo PRO y el nombre Stabileo',
+        items: [
+          'El motor de cálculo se reescribió en Rust y corre en el navegador con WebAssembly. Antes de reemplazar al anterior, se comparó con él en 90 modelos.',
+          'Más de dos mil tests de validación contra soluciones de libros de texto y casos de referencia publicados.',
+          'Análisis no lineal geométrico y de material, dinámica modal, espectral y en el tiempo, placas y cáscaras, cables, construcción por etapas y fundaciones sobre resortes.',
+          'Un solver para matrices dispersas que acelera los modelos grandes: el análisis modal en 3D pasó a ser 11,8 veces más rápido.',
+          'El proyecto pasó a llamarse Stabileo, con dominio propio, landing y la interfaz en 14 idiomas.',
+          'El modo PRO, con verificación de hormigón armado según CIRSOC 201, cargas automáticas, diagnósticos e informe de cálculo.',
+          'Un flujo de hormigón armado con la combinación que gobierna cada barra, verificación automática, armado y nudos, y ejemplos grandes como un estadio de 1005 nodos.',
+          'El modo Educativo, con ejercicios guiados que se corrigen paso a paso.',
+          'El modo Básico suma la vista 3D y el pase de modelos de 3D a 2D.',
+          'Un asistente con IA que arma y edita modelos a partir de una conversación.',
+        ],
+      },
+      en: {
+        title: 'The engine in Rust, PRO mode and the Stabileo name',
+        items: [
+          'The analysis engine was rewritten in Rust and runs in the browser through WebAssembly. Before it replaced the old one, the two were compared on 90 models.',
+          'Over two thousand validation tests against textbook solutions and published reference cases.',
+          'Geometric and material nonlinear analysis, modal, spectral and time-history dynamics, plates and shells, cables, staged construction and foundations on springs.',
+          'A sparse matrix solver that speeds up large models: 3D modal analysis became 11.8 times faster.',
+          'The project was renamed Stabileo, with its own domain, a landing page and the interface in 14 languages.',
+          'PRO mode, with reinforced concrete checks to CIRSOC 201, automatic loads, diagnostics and a calculation report.',
+          'A reinforced concrete workflow with the governing combination for each member, automatic checks, detailing and joints, and large examples such as a 1005-node stadium.',
+          'Education mode, with guided exercises checked step by step.',
+          'Basic mode adds the 3D view and turning 3D models into 2D ones.',
+          'An AI assistant that builds and edits models from a conversation.',
+        ],
+      },
+      pt: {
+        title: 'O motor em Rust, o modo PRO e o nome Stabileo',
+        items: [
+          'O motor de cálculo foi reescrito em Rust e roda no navegador com WebAssembly. Antes de substituir o anterior, os dois foram comparados em 90 modelos.',
+          'Mais de dois mil testes de validação contra soluções de livros-texto e casos de referência publicados.',
+          'Análise não linear geométrica e de material, dinâmica modal, espectral e no tempo, placas e cascas, cabos, construção em etapas e fundações sobre molas.',
+          'Um solver para matrizes esparsas que acelera os modelos grandes: a análise modal em 3D ficou 11,8 vezes mais rápida.',
+          'O projeto passou a se chamar Stabileo, com domínio próprio, landing e a interface em 14 idiomas.',
+          'O modo PRO, com verificação de concreto armado segundo a CIRSOC 201, cargas automáticas, diagnósticos e relatório de cálculo.',
+          'Um fluxo de concreto armado com a combinação que governa cada barra, verificação automática, armação e nós, e exemplos grandes como um estádio de 1005 nós.',
+          'O modo Educativo, com exercícios guiados corrigidos passo a passo.',
+          'O modo Básico ganha a vista 3D e a passagem de modelos de 3D para 2D.',
+          'Um assistente com IA que monta e edita modelos a partir de uma conversa.',
+        ],
+      },
+    },
+  },
+  {
+    date: '2026-02-01',
+    period: 'month',
+    areas: ['basic', 'basic', 'basic', 'basic', 'engine', 'edu', 'app'],
+    shot: {
+      base: '2d-moments',
+      w: 1600,
+      h: 997,
+      alt: {
+        es: 'Un pórtico plano con su diagrama de momentos flectores en el modo Básico',
+        en: 'A plane frame with its bending moment diagram in Basic mode',
+        pt: 'Um pórtico plano com seu diagrama de momentos fletores no modo Básico',
+      },
+    },
+    i18n: {
+      es: {
+        title: 'El comienzo: un editor de estructuras en el navegador',
+        items: [
+          'La primera versión, el 10 de febrero: barras, apoyos y cargas en 2D, con reacciones, diagramas y deformada, sin instalar nada.',
+          'Cargas puntuales, distribuidas parciales y móviles, casos de carga, combinaciones y envolventes con sus dos curvas.',
+          'Secciones de acero y de hormigón con un constructor de perfiles, y tensiones en la sección por Navier, Jourawski y Von Mises.',
+          'Apoyos inclinados, resortes y asentamientos, y peso propio de las barras.',
+          'Un motor 3D con seis grados de libertad por nodo y su visor, además de P-Delta, pandeo y líneas de influencia en 2D.',
+          'Análisis cinemático didáctico, que explica barra por barra por qué una estructura es o no un mecanismo.',
+          'Interfaz para celulares, links compartidos que llevan el modelo, un recorrido guiado y atajos de teclado.',
+        ],
+      },
+      en: {
+        title: 'The beginning: a structural editor in the browser',
+        items: [
+          'The first version, on 10 February: members, supports and loads in 2D, with reactions, diagrams and the deflected shape, with nothing to install.',
+          'Point, partial distributed and moving loads, load cases, combinations and envelopes with both curves.',
+          'Steel and concrete sections with a section builder, and stresses in the section by Navier, Jourawski and Von Mises.',
+          'Inclined supports, springs and settlements, and member self-weight.',
+          'A 3D engine with six degrees of freedom per node and its viewer, plus P-Delta, buckling and influence lines in 2D.',
+          'A teaching kinematic analysis that explains, member by member, why a structure is or is not a mechanism.',
+          'A mobile interface, shared links that carry the model, a guided tour and keyboard shortcuts.',
+        ],
+      },
+      pt: {
+        title: 'O começo: um editor de estruturas no navegador',
+        items: [
+          'A primeira versão, em 10 de fevereiro: barras, apoios e cargas em 2D, com reações, diagramas e deformada, sem instalar nada.',
+          'Cargas pontuais, distribuídas parciais e móveis, casos de carga, combinações e envoltórias com suas duas curvas.',
+          'Seções de aço e de concreto com um construtor de perfis, e tensões na seção por Navier, Jourawski e Von Mises.',
+          'Apoios inclinados, molas e recalques, e peso próprio das barras.',
+          'Um motor 3D com seis graus de liberdade por nó e seu visualizador, além de P-Delta, flambagem e linhas de influência em 2D.',
+          'Análise cinemática didática, que explica barra por barra por que uma estrutura é ou não um mecanismo.',
+          'Interface para celulares, links compartilhados que levam o modelo, um tour guiado e atalhos de teclado.',
+        ],
+      },
+    },
+  },
 ];
 
 export const LATEST_CHANGES = CHANGELOG.slice(0, 3);
@@ -639,17 +797,19 @@ export function formatChangeDate(iso: string, locale: string): string {
   return localDay(iso).toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-export function changeDay(iso: string, locale: string): { day: string; month: string } {
-  const date = localDay(iso);
-  return {
-    day: String(date.getDate()),
-    month: date.toLocaleDateString(locale, { month: 'short' }).replace(/\.$/, ''),
-  };
+export function changeStamp(entry: ChangelogEntry, locale: string): { big: string; small: string | null } {
+  const date = localDay(entry.date);
+  const month = date.toLocaleDateString(locale, { month: 'short' }).replace(/\.$/, '');
+  return entry.period === 'month' ? { big: month, small: null } : { big: String(date.getDate()), small: month };
 }
 
-export function formatChangeMonth(iso: string, locale: string): string {
+export function formatChangeWhen(entry: ChangelogEntry, locale: string): string {
+  return entry.period === 'month' ? formatChangeMonth(entry.date, locale) : formatChangeDate(entry.date, locale);
+}
+
+export function formatChangeMonth(iso: string, locale: string, { capitalize = true } = {}): string {
   const text = localDay(iso).toLocaleDateString(locale, { year: 'numeric', month: 'long' });
-  return text.charAt(0).toLocaleUpperCase(locale) + text.slice(1);
+  return capitalize ? text.charAt(0).toLocaleUpperCase(locale) + text.slice(1) : text;
 }
 
 export function entryAreas(entry: ChangelogEntry): ChangelogArea[] {
