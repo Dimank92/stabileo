@@ -127,3 +127,7 @@ the process exit nonzero.
 `MANIFEST.json` records SHA-256 hashes of the shared case, native output, and validation report.
 This is code/reference agreement evidence, not experimental validation or an engineering
 certification.
+
+### Evidence comparison across machines
+
+The committed native results and VALIDATION.json are compared with a fresh run number by number to 1e-12 relative (every other field exactly): CI runners and the machine that generated the evidence can differ in the last bits of a float (observed: at most 5.6e-17 absolute). Inside one run, each recorded step is still reproduced bit for bit before its frame is stored.

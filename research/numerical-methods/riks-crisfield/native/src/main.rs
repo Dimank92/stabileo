@@ -403,6 +403,18 @@ fn reference_dir() -> PathBuf {
         .join("reference-results")
 }
 
+fn same_evidence(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::Number(x), Value::Number(y)) => match (x.as_f64(), y.as_f64()) {
+            (Some(x), Some(y)) => (x - y).abs() <= 1e-12 * x.abs().max(y.abs()).max(1.0),
+            _ => x == y,
+        },
+        (Value::Array(x), Value::Array(y)) => x.len() == y.len() && x.iter().zip(y).all(|(x, y)| same_evidence(x, y)),
+        (Value::Object(x), Value::Object(y)) => x.len() == y.len() && x.iter().all(|(k, v)| y.get(k).is_some_and(|w| same_evidence(v, w))),
+        _ => a == b,
+    }
+}
+
 fn execute(mode: &str) -> Result<bool, String> {
     let dir = reference_dir();
     let case_path = dir.join("arc_length_snap_through.json");
@@ -444,8 +456,11 @@ fn execute(mode: &str) -> Result<bool, String> {
             Ok(true)
         }
         "check" => {
-            let native_matches = read_json(&dir.join("native-results.json"))? == native_value;
-            let validation_matches = read_json(&dir.join("VALIDATION.json"))? == validation_value;
+            // Committed evidence comes from one machine and CI runs on others; the last bits of a
+            // float can differ between CPUs, so numbers must agree to 1e-12 relative and every
+            // other field exactly. Within a run, step records are still compared bit for bit.
+            let native_matches = same_evidence(&read_json(&dir.join("native-results.json"))?, &native_value);
+            let validation_matches = same_evidence(&read_json(&dir.join("VALIDATION.json"))?, &validation_value);
             let manifest_matches = read_json(&dir.join("MANIFEST.json"))? == manifest(&dir)?;
             let ok = native_matches && validation_matches && manifest_matches;
             println!(
