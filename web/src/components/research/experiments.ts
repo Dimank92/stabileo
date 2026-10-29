@@ -20,6 +20,14 @@ export type Experiment = {
 
 export const EXPERIMENTS: Experiment[] = [
   {
+    paperId: 'fairclough-2026',
+    path: '/research/optimisation/fairclough-2026',
+    name: 'Five-node gridshell', hook: 'Table 1: one fixed square under self-weight',
+    thumbnail: 'research-thumbs/fairclough-2026.svg',
+    thumbnailAlt: 'Four curved members from the Stabileo run', thumbnailQuery: '', editor: true,
+    code: 'https://github.com/lambdaclass/stabileo/tree/main/research/optimisation/fairclough-2026',
+  },
+  {
     paperId: 'shauer-2025',
     path: '/research/fracture/shauer-2025',
     name: 'Phase-field fracture of a notched plate',

@@ -1,0 +1,82 @@
+{
+  "checks": [
+    {
+      "metric": "absolute error or residual",
+      "name": "reference volume relative error",
+      "observed": 3.4789363612119928e-9,
+      "passed": true,
+      "tolerance": 1e-6
+    },
+    {
+      "metric": "absolute error or residual",
+      "name": "Table 1 printed volume absolute error",
+      "observed": 0.000026459671593315193,
+      "passed": true,
+      "tolerance": 0.00005
+    },
+    {
+      "metric": "absolute error or residual",
+      "name": "primal residual",
+      "observed": 4.471867428605699e-12,
+      "passed": true,
+      "tolerance": 1e-8
+    },
+    {
+      "metric": "absolute error or residual",
+      "name": "dual residual",
+      "observed": 3.982029258372694e-12,
+      "passed": true,
+      "tolerance": 1e-8
+    },
+    {
+      "metric": "absolute error or residual",
+      "name": "apex elevation reference error",
+      "observed": 1.4361926092831823e-9,
+      "passed": true,
+      "tolerance": 0.00001
+    },
+    {
+      "metric": "absolute error or residual",
+      "name": "active curved members",
+      "observed": 0.0,
+      "passed": true,
+      "tolerance": 0.0
+    },
+    {
+      "metric": "absolute error or residual",
+      "name": "force vector reference maximum error",
+      "observed": 3.6340321929451136e-6,
+      "passed": true,
+      "tolerance": 0.0001
+    },
+    {
+      "metric": "absolute error or residual",
+      "name": "independent SOC feasibility",
+      "observed": 3.9044323330017505e-12,
+      "passed": true,
+      "tolerance": 1e-8
+    },
+    {
+      "metric": "absolute error or residual",
+      "name": "reference centreline maximum coordinate error",
+      "observed": 5.393340662962487e-8,
+      "passed": true,
+      "tolerance": 0.0001
+    },
+    {
+      "metric": "absolute error or residual",
+      "name": "engine vertical force balance",
+      "observed": 9.07499439624628e-12,
+      "passed": true,
+      "tolerance": 1e-8
+    },
+    {
+      "metric": "absolute error or residual",
+      "name": "frame discretized volume relative error",
+      "observed": 0.0009660199530638902,
+      "passed": true,
+      "tolerance": 0.002
+    }
+  ],
+  "scope": "Table 1: five nodes, rho_g L/sigma=1.65 only"
+}

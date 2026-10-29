@@ -11,6 +11,8 @@
   import PublicLink from '../landing/PublicLink.svelte';
   import Gallery from './Gallery.svelte';
   import ShauerPage from './shauer2025/ShauerPage.svelte';
+  import FaircloughPage from './fairclough2026/FaircloughPage.svelte';
+  import { fs } from './fairclough2026/i18n';
   import SpringsPage from './grossman2026/SpringsPage.svelte';
   import '../landing/landing.css';
   import '../blog/blog.css';
@@ -38,7 +40,7 @@
   };
 
   $effect(() => {
-    const meta = PAGES[route];
+    const meta = route === '/research/optimisation/fairclough-2026' ? {title:fs().title,description:fs().lead} : PAGES[route];
     if (meta) applyPageMeta({ title: meta.title, description: meta.description, locale: publicI18n.locale, path: route });
     return () => restorePageMeta();
   });
@@ -53,6 +55,8 @@
     <ShauerPage />
   {:else if route === '/research/metamaterials/grossman-2026'}
     <SpringsPage />
+  {:else if route === '/research/optimisation/fairclough-2026'}
+    <FaircloughPage />
   {:else}
     <section class="sec sec--ink">
       <div class="wrap" style="padding-top: 7rem; padding-bottom: 4rem">

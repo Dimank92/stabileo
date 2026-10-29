@@ -365,6 +365,7 @@ web.run: wasm research.wasm
 research.wasm: web.deps
 	$(NIX_RUN) research/fracture/shauer-2025/wasm/build.sh
 	$(NIX_RUN) research/metamaterials/grossman-2026/wasm/build.sh
+	$(NIX_RUN) research/optimisation/fairclough-2026/wasm/build.sh
 
 # Builds from the installed dependencies (make web.deps), so CI never resolves away from the lockfile.
 web.build: wasm research.wasm
