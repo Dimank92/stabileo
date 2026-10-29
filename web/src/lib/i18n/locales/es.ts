@@ -3516,7 +3516,7 @@ const es: Record<string, string> = {
   'kin.classHiddenMechPos': 'La fórmula da g = {degree} > 0 (aparenta ser hiperestática), pero la verificación numérica (Paso 3) detectó {modes} modo(s) de mecanismo. Esto ocurre cuando las restricciones están mal distribuidas: una zona es hiperestática (tiene restricciones de sobra) mientras otra es hipostática (le faltan restricciones). El exceso de una zona no compensa el déficit de otra.',
   'kin.classIsostatic': 'Isostática — la cantidad de restricciones es exactamente la necesaria. No hay redundancia.',
   'kin.classHyperstatic': 'Hiperestática de grado {degree} — hay {degree} restricción(es) más de las que las ecuaciones de equilibrio pueden resolver.',
-  'kin.plural_s': 'es',
+  'kin.plural_s': 's',
   'kin.plural_n': 'n',
 
   // Diagnosis strings (shared 2D/3D)

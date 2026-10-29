@@ -115,3 +115,13 @@ describe('German, French and Turkish address the reader formally', () => {
     });
   }
 });
+
+describe('the kinematics plural ending glued to a word', () => {
+  const plural = (d: Record<string, string>, key: string) =>
+    d[key].replaceAll('{n}', '2').replaceAll('{s}', d['kin.plural_s']);
+
+  it('reads as a plural in Spanish and English', () => {
+    expect(plural(es as Record<string, string>, 'kinematic.mechanismDetected')).toBe('✗ Se detectaron 2 modos de mecanismo.');
+    expect(plural(en as Record<string, string>, 'kinematic.mechanismDetected')).toBe('✗ Detected 2 mechanism modes.');
+  });
+});
