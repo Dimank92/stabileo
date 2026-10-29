@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import { pickLanguage } from './fixtures';
+import type { StabileoTestActions, StabileoTestHooks } from '../src/lib/utils/e2e-hooks';
 
 /**
  * Stabileo Research: the gallery, and the phase-field page running its real simulation (the
@@ -136,6 +138,17 @@ test.describe('@smoke research review regressions', () => {
     await expect(run).toBeEnabled();
   });
 
+  test('article step links restore the reference replay after a custom load-step run', async ({ page }) => {
+    await page.locator('#p-dt').selectOption('0.06');
+    await page.getByRole('button', { name: 'Run', exact: true }).click();
+    await expect(page.locator('.rs-app')).toHaveAttribute('data-source', 'live');
+    expect(await page.evaluate(() => JSON.parse((window as unknown as { sentConfig: string }).sentConfig).controls.dt)).toBe(0.06);
+    await page.getByRole('button', { name: 'the peak load (step 56)', exact: true }).click();
+    await expect(page.locator('.rs-app')).toHaveAttribute('data-source', 'replay');
+    await expect(page.getByRole('slider', { name: 'Load step shown' })).toHaveValue('56');
+    await expect.poll(async () => Number(await page.locator('.rs-app').getAttribute('data-steps'))).toBeGreaterThan(70);
+  });
+
   test('live stress falls back to damage on returning to replay, including controls and legend', async ({ page }) => {
     await page.getByRole('button', { name: 'Run', exact: true }).click();
     await page.locator('#rs-tab-viewer').click();
@@ -184,4 +197,41 @@ test('@smoke destroying the research page aborts its replay fetch and ignores a 
   await page.evaluate(() => (window as unknown as { releaseReplay: () => void }).releaseReplay());
   await page.waitForTimeout(300);
   expect(await page.evaluate(() => (window as unknown as { replayTicks: number }).replayTicks)).toBe(0);
+});
+
+for (const locale of ['es', 'pt', 'en']) {
+  test(`@smoke research locale ${locale} preserves replay deep-link state`, async ({ page }) => {
+    const query = '?step=56&mesh=0&view=tip&deformed=0';
+    await page.goto(`/en/research/fracture/shauer-2025/${query}`);
+    await expect(page.getByRole('slider', { name: 'Load step shown' })).toHaveValue('56');
+    await pickLanguage(page, 'nav-lang', locale);
+    await expect(page).toHaveURL(new RegExp(`/${locale}/research/fracture/shauer-2025/\\?step=56&mesh=0&view=tip&deformed=0$`));
+    await expect(page.getByRole('slider', { name: 'Load step shown' })).toHaveValue('56');
+  });
+}
+
+test('@smoke research navigation preserves recent editor changes and undo history', async ({ page }) => {
+  await page.goto('/app/basic?e2e=1');
+  await page.waitForFunction(() => !!window.__stabileoActions);
+  const before = await page.evaluate(async () => {
+    const app = window as unknown as { __stabileo: StabileoTestHooks; __stabileoActions: StabileoTestActions };
+    await app.__stabileoActions.loadExample('portal-frame');
+    const id = app.__stabileo.nodeIds()[0];
+    const position = app.__stabileo.nodePos(id)!;
+    app.__stabileoActions.moveNode(id, position.x + 0.25, position.y, position.z);
+    return { id, position, edited: app.__stabileo.nodePos(id), undo: app.__stabileo.undoCount(), timeOrigin: performance.timeOrigin };
+  });
+  await page.locator('.logo-home').click();
+  await page.locator('.nav [data-nav="research"]').click();
+  await expect(page.getByRole('heading', { name: 'Stabileo Research' })).toBeVisible();
+  await page.locator('.nav-actions > button.btn-primary').click();
+  await expect(page.locator('.app-container')).toBeVisible();
+  const after = await page.evaluate((id) => {
+    const app = window as unknown as { __stabileo: StabileoTestHooks };
+    return { edited: app.__stabileo.nodePos(id), undo: app.__stabileo.undoCount(), timeOrigin: performance.timeOrigin };
+  }, before.id);
+  expect(after).toEqual({ edited: before.edited, undo: before.undo, timeOrigin: before.timeOrigin });
+  expect(after.undo).toBeGreaterThan(0);
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect.poll(() => page.evaluate((id) => (window as unknown as { __stabileo: StabileoTestHooks }).__stabileo.nodePos(id), before.id)).toEqual(before.position);
 });
