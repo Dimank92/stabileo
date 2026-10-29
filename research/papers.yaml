@@ -20,13 +20,12 @@ papers:
   - brittle fracture
   - staggered scheme
   - educational code
-  summary: 'A compact, self-contained Python finite element code for quasi-static brittle fracture with
-    the AT2 phase-field model: bilinear quadrilaterals, 2x2 Gauss quadrature, a damage-degraded elasticity
-    problem and a damage problem driven by the tensile part of the strain energy, solved alternately until
-    the elasticity residual falls below a tolerance. Examples are a bar in tension (compared with the
-    1D AT2 analytical response), a single-edge notched plate in tension and a three-point bending test.'
-  summary_source: reference-code
-  summary_note: phasefield-jr-py read in full at commit 61037c6; paper full text not accessed
+  summary: An educational single-file Python implementation of two-dimensional phase-field fracture
+    with linear quadrilateral elements. It provides sparse and dense examples of a bar in tension
+    and a single-edge notched plate, plus a sparse three-point bending example, with VTK output
+    and stress or reaction-force plots for comparison.
+  summary_source: repository-readme
+  summary_note: 'Code facts only; README at https://github.com/nathanshauer/phasefield-jr-py/blob/61037c6ce7833a4f92a3ec098a9d60fd477eff2b/README.md'
   code:
   - url: https://github.com/nathanshauer/phasefield-jr-py
     commit: 61037c6ce7833a4f92a3ec098a9d60fd477eff2b
@@ -739,38 +738,6 @@ papers:
   benchmarks: []
   implementation: null
   contacts: []
-- id: aage-2017
-  doi: 10.1038/nature23911
-  crossref:
-    title: Giga-voxel computational morphogenesis for structural design
-    authors:
-    - Niels Aage
-    - Erik Andreassen
-    - Boyan S. Lazarov
-    - Ole Sigmund
-    year: 2017
-    venue: Nature
-  area: optimization
-  keywords:
-  - topology optimization
-  - large-scale computing
-  - aircraft wing
-  summary: ''
-  summary_source: null
-  code: []
-  data: []
-  methods:
-  - topology optimization
-  - parallel multigrid
-  dependencies: []
-  complexity: high
-  relevance: Landmark large-scale topology optimization; context for the topology-optimization queue rather than
-    something to run in a browser. Crossref has no abstract, so no summary.
-  status: proposed
-  reproduced_published_results: false
-  benchmarks: []
-  implementation: null
-  contacts: []
 - id: hrennikoff-1941
   doi: 10.1115/1.4009129
   crossref:
@@ -1291,8 +1258,8 @@ papers:
   - convergence
   summary: Evaluates MITC shell elements on selected test problems using fundamental shell-analysis criteria.
     The reported results support their use for general engineering applications.
-  summary_source: publisher-abstract
-  summary_note: 'Publisher abstract: https://web.mit.edu/kjb/www/Principal_Publications/An_Evaluation_of_the_MITC_Shell_Elements.pdf'
+  summary_source: full-text
+  summary_note: 'Abstract in author-hosted full text: https://web.mit.edu/kjb/www/Principal_Publications/An_Evaluation_of_the_MITC_Shell_Elements.pdf'
   code: []
   data: []
   methods: *id019
