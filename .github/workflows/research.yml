@@ -204,6 +204,16 @@ jobs:
           nix develop -c node research/benchmarks/mattiasson-elastica/wasm/check.mjs /tmp/mattiasson-native.json
           nix develop -c sh -c 'cd web && npx vitest run src/components/research/mattiasson1981/__tests__/cases.test.ts'
 
+      - name: Compute shell obstacle course native results without changing regression bounds
+        run: |
+          SHELL_OBSTACLE_RESULTS=/tmp/shell-native nix develop -c cargo test --locked --release --manifest-path engine/Cargo.toml --test validation benchmark_scordelis_lo
+          SHELL_OBSTACLE_RESULTS=/tmp/shell-native nix develop -c cargo test --locked --release --manifest-path engine/Cargo.toml --test validation benchmark_pinched_cylinder
+          SHELL_OBSTACLE_RESULTS=/tmp/shell-native nix develop -c cargo test --locked --release --manifest-path engine/Cargo.toml --test validation benchmark_hemisphere_hole_convergence
+      - name: Compare shell obstacle course native and production WASM results
+        run: nix develop -c node research/benchmarks/shell-obstacle-course/wasm/check.mjs /tmp/shell-native
+      - name: Test shell measurement, projection and editor handoff
+        run: nix develop -c sh -c 'cd web && npx vitest run src/components/research/shell1985/__tests__/cases.test.ts'
+
   springs:
     name: Spring networks (Grossman 2026) validation
     runs-on: ubuntu-latest
@@ -298,15 +308,6 @@ jobs:
           persist-credentials: false
       - uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a
       - run: nix develop -c cargo test --locked --manifest-path research/optimisation/fairclough-2026/Cargo.toml
-      - name: Compute shell obstacle course native results without changing regression bounds
-        run: |
-          SHELL_OBSTACLE_RESULTS=/tmp/shell-native nix develop -c cargo test --locked --release --manifest-path engine/Cargo.toml --test validation benchmark_scordelis_lo
-          SHELL_OBSTACLE_RESULTS=/tmp/shell-native nix develop -c cargo test --locked --release --manifest-path engine/Cargo.toml --test validation benchmark_pinched_cylinder
-          SHELL_OBSTACLE_RESULTS=/tmp/shell-native nix develop -c cargo test --locked --release --manifest-path engine/Cargo.toml --test validation benchmark_hemisphere_hole_convergence
-      - name: Compare shell obstacle course native and production WASM results
-        run: nix develop -c node research/benchmarks/shell-obstacle-course/wasm/check.mjs /tmp/shell-native
-      - name: Test shell measurement, projection and editor handoff
-        run: nix develop -c sh -c 'cd web && npx vitest run src/components/research/shell1985/__tests__/cases.test.ts'
   riks-crisfield:
     name: Arc-length (Riks–Crisfield) native and WASM validation
     runs-on: ubuntu-latest

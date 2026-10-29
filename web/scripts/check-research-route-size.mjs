@@ -63,7 +63,11 @@ try {
       }
     }
     visit('index.html');
-    if (app) visit(appEntry, true);
+    if (app) {
+      visit(appEntry, true);
+      const loader = Object.keys(manifest).find(key => manifest[key].name === 'load-app');
+      if (loader) visit(loader, true);
+    }
     // Public fonts/images and emitted workers referenced by the selected bundles also count.
     // Iterating a Set visits newly added assets, so CSS reached through HTML is covered too.
     for (const file of files) {

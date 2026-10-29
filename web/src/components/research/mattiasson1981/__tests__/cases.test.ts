@@ -11,8 +11,8 @@ function output(): Output {
   return { converged: true, loadFactor: 1, results: { displacements: Object.values(c.input.nodes).map(n => ({ nodeId: n.id, ux: -c.reference![0] * c.length, uz: -c.reference![1] * c.length, ry: 0 })) } };
 }
 describe('Mattiasson evidence', () => {
-  it('preserves reference transcription and separates intermediate and regression cases', () => {
-    expect(cases.filter(c => c.reference).map(c => [c.parameter, c.reference])).toEqual([[1,[.0566,.3015]],[2,[.1632,.4929]],[5,[.4054,.6647]],[10,[.5584,.6854]]]);
+  it('uses independently checked elliptic-integral references and separates intermediate and regression cases', () => {
+    expect(cases.filter(c => c.reference).map(c => [c.parameter, c.reference])).toEqual([[1,[.056433,.301721]],[2,[.160642,.493457]],[5,[.387628,.713792]],[10,[.554996,.810609]]]);
     expect(cases.at(-1)!.input.loads[0].data.my).toBe(10000);
     expect(cases.at(-1)!.reference).toBeNull();
   });

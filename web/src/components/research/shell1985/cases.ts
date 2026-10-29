@@ -1,8 +1,16 @@
 import data from '../../../../../engine/tests/benchmarks/shell_obstacle_course.json';
 import type { SolverInput3D } from '../../../lib/engine/types-3d';
 
-export type Case = typeof data.cases[number];
-export const cases = data.cases;
+// Normalize numeric-keyed maps at the JSON boundary; otherwise every mesh produces
+// a distinct huge object union throughout the viewer and editor type checks.
+type Example = typeof data.cases[0];
+type WireInput = Example['input'];
+type NumericMapKeys = 'nodes' | 'materials' | 'supports' | 'quads';
+type Input = Omit<WireInput, NumericMapKeys> & {
+  [K in NumericMapKeys]: Record<string, NonNullable<WireInput[K][keyof WireInput[K]]>>;
+};
+export type Case = Omit<Example, 'input'> & { input: Input };
+export const cases = data.cases as Case[];
 export const nativeOnly = data.nativeOnly;
 export const tolerance = data.accuracyTolerance;
 export const groups = ['roof', 'cylinder', 'hemisphere'];

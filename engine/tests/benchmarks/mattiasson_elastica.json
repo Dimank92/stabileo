@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "paper": {
     "doi": "10.1002/nme.1620170113",
-    "locatorStatus": "Unverified numerical transcription; proposed."
+    "locatorStatus": "Exact elliptic-integral values independently checked in fix/845-elastica; original paper locator unverified."
   },
   "accuracyTolerance": 0.02,
   "accuracyPolicy": "Exploratory page target only: both signed normalized displacements must have relative error < 2%. No existing native assertion is replaced.",
@@ -598,8 +598,8 @@
         "connectors": {}
       },
       "reference": [
-        0.0566,
-        0.3015
+        0.056433,
+        0.301721
       ],
       "source": "BENCHMARK_REFERENCES.md: Mattiasson Elastica; attributed to Table 1, NOT checked against paper text.",
       "solver": {
@@ -1199,8 +1199,8 @@
         "connectors": {}
       },
       "reference": [
-        0.1632,
-        0.4929
+        0.160642,
+        0.493457
       ],
       "source": "BENCHMARK_REFERENCES.md: Mattiasson Elastica; attributed to Table 1, NOT checked against paper text.",
       "solver": {
@@ -2996,8 +2996,8 @@
         "connectors": {}
       },
       "reference": [
-        0.4054,
-        0.6647
+        0.387628,
+        0.713792
       ],
       "source": "BENCHMARK_REFERENCES.md: Mattiasson Elastica; attributed to Table 1, NOT checked against paper text.",
       "solver": {
@@ -5989,8 +5989,8 @@
         "connectors": {}
       },
       "reference": [
-        0.5584,
-        0.6854
+        0.554996,
+        0.810609
       ],
       "source": "BENCHMARK_REFERENCES.md: Mattiasson Elastica; attributed to Table 1, NOT checked against paper text.",
       "solver": {

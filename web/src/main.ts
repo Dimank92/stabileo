@@ -59,7 +59,7 @@ const target = document.getElementById('app')!;
 let app: ReturnType<typeof mount>;
 if (routeKind().kind === 'app') {
   await ensureLocale(i18n.locale);
-  const { default: App } = await import('./App.svelte');
+  const { default: App } = await import('./load-app').then(m => m.loadApplication());
   app = mount(App, { target });
   installTestHooks();
 } else {

@@ -163,3 +163,24 @@ export function comparisonHeadline(checks: ComparisonCheck[]): string {
     ? `Stabileo traces the snap-through: ${passed}/${checks.length} checks within ${tolerance.toFixed(0)}%`
     : `Snap-through checks: ${passed}/${checks.length} pass; worst difference ${worst.toFixed(1)}%`;
 }
+
+/** Rigid apex, pinned bases: derivative of axial plus minimized bending energy.
+ * Reference: fix/846-shallow-toggle, engine/tests/BENCHMARK_REFERENCES.md (#852).
+ * The axial-only helpers above describe the pin-jointed truss comparison.
+ */
+export function frameReferenceLoadAt(c: BenchmarkCase, displacement: number, rise = c.geometry.rise): number {
+  const a = c.geometry.halfSpan, y = rise - displacement;
+  const l0 = Math.hypot(a, rise), length = Math.hypot(a, y);
+  const beta = Math.atan2(y, a) - Math.atan2(rise, a);
+  const ei = Object.values(c.input.solver.materials)[0].e * 1000 * Object.values(c.input.solver.sections)[0].iz;
+  return 2 * axialRigidity(c) * (1 - length / l0) * y / length - 6 * ei * a * beta / (l0 * length * length);
+}
+
+export function compareFrameRun(c: BenchmarkCase, run: BenchmarkRun): ComparisonCheck[] {
+  const rise = 2 * c.geometry.halfSpan * run.parameters.riseSpan;
+  // Preserve the original force normalization and tolerance, without asserting a frame limit.
+  const scale = Math.abs(limitPoint(c.geometry.halfSpan, rise, axialRigidity(c), c.apex.referenceLoad).load);
+  const error = run.frames.reduce((worst, f) => Math.max(worst, Math.abs(f.load - frameReferenceLoadAt(c, f.displacement, rise)) / scale), 0);
+  const tolerance = c.tolerances.equilibriumPathNormalizedByLimitLoad;
+  return [{ id: 'equilibrium-path', label: 'Frame energy-reference residual / axial truss reference peak', reference: 0, observed: error, error, tolerance, passed: run.frames.length > 0 && error <= tolerance, reached: run.frames.length > 0 }];
+}

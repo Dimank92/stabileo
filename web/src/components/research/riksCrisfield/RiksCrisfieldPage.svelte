@@ -12,7 +12,7 @@
   import { num, qty } from '../shell/format';
   import { rs } from '../i18n';
   import PathChart, { type LimitMarker, type PathSeries } from './PathChart.svelte';
-  import { compareRun, comparisonHeadline, DEFAULT_PARAMETERS, inputFor, limitPoint, measuredLimitFrame, referencePath, type BenchmarkRun, type CaseFile, type RunParameters } from './benchmark';
+  import { compareFrameRun, frameReferenceLoadAt, compareRun, comparisonHeadline, DEFAULT_PARAMETERS, inputFor, limitPoint, measuredLimitFrame, referencePath, type BenchmarkRun, type CaseFile, type RunParameters } from './benchmark';
   import { nativeReplay } from './replay';
   import { ArcRunner } from './runner.svelte';
   import { editorSnapshot } from './editor';
@@ -40,9 +40,10 @@
   const source = $derived<Source>(live ? runner.origin : 'replay');
   const frames = $derived(shown.frames);
   const frame = $derived(frames[Math.min(playback.shown, frames.length - 1)] ?? null);
-  const checks = $derived(compareRun(currentCase, shown));
+  const isFrame = $derived(currentCase.id === 'shallow-toggle');
+  const checks = $derived(isFrame ? compareFrameRun(currentCase, shown) : compareRun(currentCase, shown));
   const checkCount = $derived({ passed: checks.filter((check) => check.passed).length, total: checks.length });
-  const headline = $derived(comparisonHeadline(checks));
+  const headline = $derived(isFrame ? `Frame energy reference: ${checkCount.passed}/${checkCount.total} checks pass` : comparisonHeadline(checks));
   const referenceLimit = $derived(limitPoint(currentCase.geometry.halfSpan, 2 * currentCase.geometry.halfSpan * shown.parameters.riseSpan, Object.values(currentCase.input.solver.materials)[0].e * 1000 * Object.values(currentCase.input.solver.sections)[0].a, currentCase.apex.referenceLoad));
 
   $effect(() => {
@@ -98,10 +99,11 @@
     return [loX - pad, loY - pad, hiX + pad, hiY + pad];
   });
   const pathSeries = $derived<PathSeries[]>([
-    { name: 'Closed-form reference', color: REFERENCE, reference: true, points: referencePath(currentCase, shown.parameters) },
+    { name: 'Closed-form reference', color: REFERENCE, reference: true, points: referencePath(currentCase, shown.parameters).map(([v, p]) => [v, isFrame ? frameReferenceLoadAt(currentCase, v, 2 * currentCase.geometry.halfSpan * shown.parameters.riseSpan) : p]) },
     { name: source === 'replay' ? 'Stabileo native replay' : 'Stabileo live WASM', color: STABILEO, points: frames.map((item) => [item.displacement, item.load]) },
   ]);
   const pathMarkers = $derived.by<LimitMarker[]>(() => {
+    if (isFrame) return [];
     const markers = [{ x: referenceLimit.displacement, y: referenceLimit.load, label: 'reference limit' }];
     if (checks[0].reached && frames.length) {
       const peak = measuredLimitFrame(frames)!;
@@ -169,7 +171,7 @@
 <ExperimentShell
   paperId="riks-1979"
   name="Arc-length snap-through: Riks and Crisfield"
-  lead="Two pinned bars are loaded at their apex until their vertical stiffness changes sign. Stabileo’s production spherical arc-length solver follows the equilibrium path through the limit point; the reference is the exact engineering-strain two-bar equilibrium, not a redrawn paper figure."
+  lead="Two-bar equilibrium paths with the production spherical arc-length solver. The shallow rigid-jointed frame is compared with its own energy derivative; the von Mises geometry is compared with the axial-only pin-jointed truss reference."
   checks={checkCount}
   referenceLabel={strings.againstBenchmark}
   {actions}
@@ -181,8 +183,8 @@
     <p>The method papers are E. Riks, <a href="https://doi.org/10.1016/0020-7683(79)90081-7" rel="noreferrer" target="_blank">“An incremental approach to the solution of snapping and buckling problems”</a> (1979), and M.A. Crisfield, <a href="https://doi.org/10.1016/0045-7949(81)90108-5" rel="noreferrer" target="_blank">“A fast incremental/iterative solution procedure that handles ‘snap-through’”</a> (1981). This page benchmarks the engine; it does not reproduce a numerical example from either paper.</p>
 
     <h2>The shared cases</h2>
-    <p>The shallow toggle is the model already used by the production arc-length validation test. The von Mises truss uses the geometry of the existing nonlinear engine benchmark. Both use frame elements, pinned supports and a vertical apex load. The case JSON is the single input to the native test, native/WASM parity check and this page.</p>
-    <p>For half-span <var>s</var>, initial rise <var>h</var>, deformed rise <var>y</var>, L = √(s² + y²), L₀ = √(s² + h²), and axial rigidity EA, the independent reference is P(y) = 2EA(1 − L/L₀)y/L. Its upper limit satisfies L³ = s²L₀. The page measures downward apex displacement v = h − y and downward load P = λP<sub>ref</sub>. <ExperimentLink tab="path">See both paths and their limit points</ExperimentLink>.</p>
+    <p>The shallow toggle is the rigid-jointed frame formerly used by the production arc-length validation test, with pinned bases and a rigid apex. The von Mises truss uses the geometry of the existing nonlinear engine benchmark. Both use frame elements, pinned supports and a vertical apex load. The case JSON is the single input to the native test, native/WASM parity check and this page.</p>
+    <p>For half-span <var>s</var>, initial rise <var>h</var>, deformed rise <var>y</var>, L = √(s² + y²), L₀ = √(s² + h²), and axial rigidity EA, the pin-jointed truss reference is P(y) = 2EA(1 − L/L₀)y/L. Its upper limit satisfies L³ = s²L₀. The page measures downward apex displacement v = h − y and downward load P = λP<sub>ref</sub>. <ExperimentLink tab="path">See the model-specific reference paths</ExperimentLink>.</p>
 
     <h2>How the replay and live run are produced</h2>
     <ol>
@@ -199,8 +201,8 @@
         <tbody>{#each checks as check (check.id)}<tr><td>{check.label}</td><td class="num"><Sci value={check.error} /></td><td class="num"><Sci value={check.tolerance} sig={1} /></td><td class={check.passed ? 'pass' : 'fail'}>{check.passed ? '✓ pass' : check.reached ? '✗ fail' : '✗ not reached'}</td></tr>{/each}</tbody>
       </table>
     </div>
-    <p>The axial reference omits frame bending; the shared case records this explicitly. Any disagreement is shown rather than fitted away.</p>
-    <p><strong>Known failing case:</strong> the unchanged shallow toggle stops before its analytical limit and its recorded path differs from the axial reference. This is consistent with the <a href="https://github.com/lambdaclass/stabileo/blob/main/docs/solver/nonlinear.md#5-path-following-arc_lengthrs" rel="noreferrer" target="_blank">documented arc-length validation gap</a>; the page does not claim that this case snaps through successfully.</p>
+    <p>For the von Mises geometry, the axial truss comparison omits frame bending; that model difference remains explicit. The shallow frame uses its own energy reference instead.</p>
+    <p><strong>Shallow-toggle correction (#852):</strong> this rigid-jointed frame has no limit point over inversion at the default geometry. Its reference is the derivative of U = EA(L−L₀)²/L₀ + 3EIβ²/L₀, with β = atan(y/s) − atan(h/s): P = 2EA(1−L/L₀)y/L − 6EI s β/(L₀L²). The frame curve and accuracy row use that reference. The former discrepancy came from comparing frame bending force with an axial-only truss formula; it is not evidence of a solver defect. The legacy native replay and validation artifacts retain the original comparison as historical evidence. <a href="https://github.com/lambdaclass/stabileo/pull/852">Reference derivation and independent energy check</a>.</p>
 
     <h2>Comparison with the papers</h2>
     <p>Not done. No published table, figure or limit load from Riks (1979) or Crisfield (1981) is claimed as reproduced. The bibliographic records and DOIs are checked against Crossref. The numerical references on this page are the closed-form equilibrium and the native production run.</p>
@@ -208,7 +210,7 @@
     <h2>Limitations</h2>
     <ul>
       <li>Arc-length analysis is two-dimensional. These symmetric two-bar cases do not test asymmetric bifurcation, shells or three-dimensional frames.</li>
-      <li>The reference is axial engineering-strain equilibrium. Frame bending and solver discretization can produce genuine differences.</li>
+      <li>The von Mises reference is axial engineering-strain equilibrium; its frame elements can add bending. The shallow-frame energy reference includes bending and applies to the symmetric rigid-apex model.</li>
       <li>Changing to an upward reference load explores another branch; an upper downward limit check is reported as not reached rather than passed.</li>
       <li>Prefix reruns make each displayed shape a production result, but they repeat computation. No intermediate unconverged iterate is displayed.</li>
     </ul>
@@ -250,7 +252,7 @@
           <figcaption>Downward load against downward apex displacement; orange halo = closed form, blue = production engine</figcaption>
           <PathChart series={pathSeries} limits={pathMarkers} current={frame ? { x: frame.displacement, y: frame.load } : null} xLabel="apex displacement v (m)" yLabel="load P (kN)" height={300} />
         </figure>
-        <div class="rs-table-scroll" role="region" aria-label="Reference and Stabileo limit values">
+        <div class="rs-table-scroll" role="region" aria-label="Reference and Stabileo comparison values">
           <table>
             <thead><tr><th>Check</th><th class="num">{strings.benchmark.reference}</th><th class="num">{strings.benchmark.stabileo}</th><th class="num">{strings.benchmark.error}</th><th>{strings.benchmark.result}</th></tr></thead>
             <tbody>{#each checks as check (check.id)}<tr><td>{check.label}</td><td class="num">{check.id === 'equilibrium-path' ? '0' : num(check.reference, { sig: 6 })}</td><td class="num">{check.id === 'equilibrium-path' || Number.isNaN(check.observed) ? '—' : num(check.observed, { sig: 6 })}</td><td class="num">{num(check.error * 100, { sig: 3 })}%</td><td class={check.passed ? 'pass' : 'fail'}>{check.passed ? 'pass' : check.reached ? 'fail' : 'not reached'}</td></tr>{/each}</tbody>

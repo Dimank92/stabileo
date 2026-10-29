@@ -1,3 +1,5 @@
+> Reference correction (#852): the shallow-toggle input here is a rigid-jointed frame with pinned bases, not a pin-jointed truss. At its default geometry it has no limit point over inversion. The web page now compares its native/live path against the derivative of U = EA(L−L0)²/L0 + 3EIβ²/L0, β = atan(y/a)−atan(h/a), giving P = 2EA(1−L/L0)y/L − 6EI a β/(L0 L²). See `fix/846-shallow-toggle:engine/tests/BENCHMARK_REFERENCES.md`. The native comparison code, committed validation files and table below preserve the original axial-only comparison as historical evidence; their shallow-toggle failures must not be interpreted as engine defects or frame limit-point checks. The axial-only formula describes a pin-jointed truss.
+
 # Riks/Crisfield production arc-length evidence
 
 This directory shares two complete production `ArcLengthInput` models between the native engine

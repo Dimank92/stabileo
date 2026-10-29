@@ -61,7 +61,7 @@ export const EXPERIMENTS: Experiment[] = [
     paperId: 'shell-obstacle-course', path: '/research/benchmarks/shell-obstacle-course',
     name: 'Shell obstacle course',
     hook: 'Refine the roof, cylinder and hemisphere; inspect live production-engine accuracy, including failures.',
-    thumbnail: '', thumbnailQuery: '',
+    thumbnail: 'research-thumbs/shell-obstacle-course.svg', thumbnailAlt: 'Geometry schematic of a curved shell benchmark', thumbnailQuery: '',
     code: 'https://github.com/lambdaclass/stabileo/tree/main/engine/tests/benchmarks',
   },
   {
@@ -139,6 +139,7 @@ export const EXPERIMENTS: Experiment[] = [
     name: 'Arc-length snap-through: Riks and Crisfield',
     hook: 'Follow two-bar trusses through their limit points with Stabileo’s production arc-length engine, checked against closed-form equilibrium paths.',
     thumbnail: 'research-thumbs/riks-crisfield.webp',
+    thumbnailAlt: 'Two-bar benchmark geometry and computed displacement',
     thumbnailQuery: 'case=von-mises-truss&tab=viewer',
     code: 'https://github.com/lambdaclass/stabileo/tree/main/research/numerical-methods/riks-crisfield',
   },
