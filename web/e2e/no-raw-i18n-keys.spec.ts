@@ -28,15 +28,19 @@ import steelEs from '../src/lib/i18n/locales/steel/es';
 import steelEn from '../src/lib/i18n/locales/steel/en';
 import steelPt from '../src/lib/i18n/locales/steel/pt';
 import { stepsEs, stepsEn, stepsPt } from '../src/lib/i18n/locales/steps';
+import fullDe from '../src/lib/i18n/locales/full/de';
+import fullFr from '../src/lib/i18n/locales/full/fr';
+import fullTr from '../src/lib/i18n/locales/full/tr';
 import { rawKeyIndex, findRawKeys } from '../src/lib/i18n/raw-keys';
 
 const INDEX = rawKeyIndex([
   { ...es, ...steelEs, ...stepsEs },
   { ...en, ...steelEn, ...stepsEn },
   { ...pt, ...steelPt, ...stepsPt },
+  fullDe, fullFr, fullTr,
 ] as Array<Record<string, string>>);
 
-const LOCALES = ['es', 'en', 'pt'] as const;
+const LOCALES = ['es', 'en', 'pt', 'de', 'fr', 'tr'] as const;
 
 /**
  * A fresh project's name, in each language, from the dictionaries: «New structure», «Nueva
@@ -46,6 +50,9 @@ const NEW_STRUCTURE: Record<(typeof LOCALES)[number], string> = {
   es: (es as Record<string, string>)['tabBar.newStructure'],
   en: (en as Record<string, string>)['tabBar.newStructure'],
   pt: (pt as Record<string, string>)['tabBar.newStructure'],
+  de: (fullDe as Record<string, string>)['tabBar.newStructure'] ?? (en as Record<string, string>)['tabBar.newStructure'],
+  fr: (fullFr as Record<string, string>)['tabBar.newStructure'] ?? (en as Record<string, string>)['tabBar.newStructure'],
+  tr: (fullTr as Record<string, string>)['tabBar.newStructure'] ?? (en as Record<string, string>)['tabBar.newStructure'],
 };
 
 /** The project tab names a fresh project in the reader's language. */

@@ -58,7 +58,8 @@ restoreRedirectedRoute();
 const target = document.getElementById('app')!;
 let app: ReturnType<typeof mount>;
 if (routeKind().kind === 'app') {
-  const [{ default: App }] = await Promise.all([import('./App.svelte'), ensureLocale(i18n.locale)]);
+  await ensureLocale(i18n.locale);
+  const { default: App } = await import('./App.svelte');
   app = mount(App, { target });
   installTestHooks();
 } else {

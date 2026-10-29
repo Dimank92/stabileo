@@ -36,16 +36,22 @@ export function registerDictionaries(full: Record<'es' | 'en' | 'pt', Translatio
   appDictionaries = true;
 }
 
-/** Resolves once `loc`'s whole dictionary is registered; at once for the bundled languages. */
+/** Resolves once `loc`'s whole dictionary is registered, or has failed to load and left English; at once for the bundled languages. */
 export function ensureLocale(loc: string): Promise<void> {
   const load = LAZY_LOCALES[loc];
   if (!load) return Promise.resolve();
   let pending = pendingLoads.get(loc);
   if (!pending) {
-    pending = load().then((m) => {
-      Object.assign(dicts[loc], m.default);
-      _revision++;
-    });
+    pending = load().then(
+      (m) => {
+        Object.assign(dicts[loc], m.default);
+        _revision++;
+      },
+      (err) => {
+        pendingLoads.delete(loc);
+        console.warn(`i18n: the ${loc} dictionary did not load; showing English until it does`, err);
+      },
+    );
     pendingLoads.set(loc, pending);
   }
   return pending;

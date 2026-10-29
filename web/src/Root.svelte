@@ -35,8 +35,8 @@
   let loading: Promise<void> | null = null;
 
   function loadApp() {
-    // A lazily loaded language must be registered before the first paint, or it paints in English.
-    loading ??= Promise.all([import('./App.svelte'), ensureLocale(i18n.locale)]).then(async ([m]) => {
+    // A lazily loaded language must be registered before the application's modules run: some name things as they load.
+    loading ??= ensureLocale(i18n.locale).then(() => import('./App.svelte')).then(async (m) => {
       app = m.default;
       // Tell main.ts the application is up: it installs the browser-test hooks then (in an
       // e2e build only), so that "the hooks are there" still means "the application is up".
