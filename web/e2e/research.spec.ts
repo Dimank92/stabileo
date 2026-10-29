@@ -252,6 +252,9 @@ for (const mode of ['basic', 'pro']) test(`@smoke research navigation preserves 
   });
   await page.keyboard.press('ControlOrMeta+c');
   await page.locator('.logo-home').click();
+  // The nav collapses into its menu at laptop widths; open it when it has.
+  const toggle = page.locator('.nav-toggle');
+  if (await toggle.isVisible()) await toggle.click();
   await page.locator('.nav [data-nav="research"]').click();
   await expect(page.getByRole('heading', { name: 'Stabileo Research' })).toBeVisible();
   for (const destination of ['/research/', '/blog/', '/']) {
