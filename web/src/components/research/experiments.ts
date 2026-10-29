@@ -133,6 +133,15 @@ export const EXPERIMENTS: Experiment[] = [
     code: 'https://github.com/lambdaclass/stabileo/tree/main/research/benchmarks/cqc-1981',
   },
 
+  {
+    paperId: 'riks-1979',
+    path: '/research/benchmarks/riks-crisfield',
+    name: 'Arc-length snap-through: Riks and Crisfield',
+    hook: 'Follow two-bar trusses through their limit points with Stabileo’s production arc-length engine, checked against closed-form equilibrium paths.',
+    thumbnail: 'research-thumbs/riks-crisfield.webp',
+    thumbnailQuery: 'case=von-mises-truss&tab=viewer',
+    code: 'https://github.com/lambdaclass/stabileo/tree/main/research/numerical-methods/riks-crisfield',
+  },
 ];
 
 /** The "Coming next" row; set false to hide it. */

@@ -26,6 +26,7 @@ The plan every page and contribution follows is [DESIGN.md](DESIGN.md).
 | `benchmarks/cqc-1981/` | First version, 0 reviews: close building modes, production modal + spectrum solvers versus closed form |
 | `benchmarks/navier-plate/` | First version: one simply supported plate, production DKT/MITC4 vs Navier series; published `results/stabileo_results.json` |
 | `benchmarks/lee-frame-1968/` | First-version pinned Lee frame, production arc-length replay and provisional limit-load comparison (0 reviews) |
+| `numerical-methods/riks-crisfield/` | Production arc-length benchmarks against closed-form snap-through paths, with native/WASM parity checks |
 | `templates/` | Starting point for a new paper entry |
 | `tools/` | Catalog checker and other research-only tooling |
 
@@ -36,7 +37,7 @@ The plan every page and contribution follows is [DESIGN.md](DESIGN.md).
 - A research crate may depend on `engine/` through a path dependency. The engine and the web
   application never import research code. The web allowlist is `research/papers.json`,
   `research/<field>/<paper>/VALIDATION.json`, and CSV/JSON files in that paper’s
-  `reference-results/`, plus `results/stabileo_results.json`; the engine has no exceptions. `tools/check_isolation.sh` enforces this.
+  `reference-results/`, plus `results/stabileo_results.json`; engine tests may read reference JSON case files; production engine code has no exception. `tools/check_isolation.sh` enforces this.
 - Research CI is `.github/workflows/research.yml`. Its offline checks (validation, reference hashes,
   catalogue, isolation, route budgets) are part of the required CI OK whenever research, web or engine
   files change; the online checks (Crossref, licences, links) run only as the standalone Research

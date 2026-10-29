@@ -28,6 +28,7 @@
   import LeePage from './lee1968/LeePage.svelte';
   import ArchPage from './dadeppo1975/ArchPage.svelte';
   import SpringsPage from './grossman2026/SpringsPage.svelte';
+  import RiksCrisfieldPage from './riksCrisfield/RiksCrisfieldPage.svelte';
   import '../landing/landing.css';
   import '../blog/blog.css';
   import './research.css';
@@ -60,6 +61,11 @@
       title: 'Auxetic spring networks (Grossman & Boudaoud 2026) — Stabileo Research',
       description:
         'Spring networks solved in the browser as trusses: the auxetic transition of a disordered lattice, a re-entrant honeycomb and ordered lattices, compared with the paper’s published values.',
+    },
+    '/research/benchmarks/riks-crisfield': {
+      title: 'Arc-length snap-through: Riks and Crisfield — Stabileo Research',
+      description:
+        'Stabileo’s production arc-length solver traces two-bar snap-through paths in the browser, checked against closed-form equilibrium and native Rust results.',
     },
   };
 
@@ -107,6 +113,8 @@
     <LeePage />
   {:else if route === '/research/benchmarks/dadeppo-arch-1975'}
     <ArchPage />
+  {:else if route === '/research/benchmarks/riks-crisfield'}
+    <RiksCrisfieldPage />
   {:else}
     <section class="sec sec--ink">
       <div class="wrap" style="padding-top: 7rem; padding-bottom: 4rem">
