@@ -195,6 +195,11 @@ export function setLocale(loc: string) {
 	}
 }
 
+/** A label set inside a sentence: lowercased by the language's own rules, except in German, whose nouns keep their capital. */
+export function inSentence(label: string, locale: string = _locale): string {
+	return locale === 'de' ? label : label.toLocaleLowerCase(locale);
+}
+
 /** Set of all translations for a given key (across every locale). */
 function allTranslations(key: string): Set<string> {
 	const s = new Set<string>();
