@@ -101,3 +101,10 @@ The Mattiasson engine benchmark (`benchmarks/mattiasson-elastica`) reads the
 engine-owned `engine/tests/benchmarks/mattiasson_elastica.json` through its native
 adapter and production WASM page. It publishes no research solver or imported
 research results. Reference transcriptions remain unverified and status proposed.
+## Newmark (1959), first version
+
+`benchmarks/newmark-1959/` documents one exact SDOF step-response benchmark using
+production Newmark average acceleration. Shared input and native tests live under
+`engine/tests/benchmarks/newmark_1959.*`; published native replay data is
+`benchmarks/newmark-1959/results/stabileo_results.json`. The page uses the existing
+production WASM wrapper and shared Stabileo viewer. Stage: first-version; 0 reviews.

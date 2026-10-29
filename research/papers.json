@@ -975,6 +975,47 @@
    ],
    "implementation": "benchmarks/mattiasson-elastica",
    "contacts": []
+  },
+  {
+   "id": "newmark-1959",
+   "doi": "10.1061/JMCEA3.0000098",
+   "crossref": {
+    "title": "A Method of Computation for Structural Dynamics",
+    "authors": [
+     "Nathan M. Newmark"
+    ],
+    "year": 1959,
+    "venue": "Journal of the Engineering Mechanics Division"
+   },
+   "area": "numerical-methods",
+   "keywords": [
+    "Newmark",
+    "average acceleration",
+    "SDOF",
+    "time history"
+   ],
+   "summary": "",
+   "summary_source": null,
+   "code": [],
+   "data": [],
+   "methods": [
+    "Newmark average acceleration, beta=1/4, gamma=1/2"
+   ],
+   "dependencies": [
+    "production Stabileo engine (WASM)"
+   ],
+   "complexity": "low",
+   "relevance": "Low effort: one constrained member and the existing production solver. High impact: exact response and visible period elongation.",
+   "status": "proposed",
+   "stage": "first-version",
+   "reviews": [],
+   "reproduced_published_results": false,
+   "benchmarks": [
+    "Undamped SDOF step response against closed form; period elongation across four time steps"
+   ],
+   "implementation": "benchmarks/newmark-1959",
+   "page": "web/src/components/research/newmark1959/NewmarkPage.svelte",
+   "contacts": []
   }
  ]
 }

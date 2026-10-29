@@ -54,6 +54,12 @@ export const EXPERIMENTS: Experiment[] = [
     code: 'https://github.com/lambdaclass/stabileo/tree/main/engine/tests/benchmarks',
   },
   {
+    paperId: 'newmark-1959', path: '/research/benchmarks/newmark-1959',
+    name: 'Newmark average acceleration', hook: 'One SDOF step response and period elongation. First version · 0 reviews.',
+    thumbnail: 'research-thumbs/newmark-1959.svg', thumbnailAlt: 'Production Newmark displacement history', thumbnailQuery: '',
+    code: 'https://github.com/lambdaclass/stabileo/tree/main/research/benchmarks/newmark-1959',
+  },
+  {
     paperId: 'shauer-2025',
     path: '/research/fracture/shauer-2025',
     name: 'Phase-field fracture of a notched plate',
