@@ -147,8 +147,10 @@ def check_entry(p, errors):
         if not page or not os.path.isfile(os.path.join(ROOT, "..", page)):
             errors.append(f"{pid}: interactive status needs an existing page")
     for c in p.get("code") or []:
-        if not {"url", "license"} <= set(c):
-            errors.append(f"{pid}: code entry needs url and license")
+        if not {"url", "license", "commit"} <= set(c):
+            errors.append(f"{pid}: code entry needs url, license and commit")
+        if not re.fullmatch(r"[0-9a-f]{40}", c.get("commit", "")):
+            errors.append(f"{pid}: code commit must be a full 40-character revision")
     for c in p.get("contacts") or []:
         if not c.get("source"):
             errors.append(f"{pid}: contact without a verifying source")
@@ -171,9 +173,13 @@ def check_links(p, errors):
         if not m:
             errors.append(f"{p['id']}: only GitHub repository links are checked; got {c['url']}")
             continue
-        repo = get_json(f"https://api.github.com/repos/{m[1]}/{m[2]}")
+        commit = c.get("commit", "")
+        if not re.fullmatch(r"[0-9a-f]{40}", commit):
+            errors.append(f"{p['id']}: licence check requires a pinned commit")
+            continue
+        repo = get_json(f"https://api.github.com/repos/{m[1]}/{m[2]}/license?ref={commit}")
         if repo is None:
-            errors.append(f"{p['id']}: {c['url']} does not exist")
+            errors.append(f"{p['id']}: {c['url']} has no detected licence at {commit}")
             continue
         spdx = (repo.get("license") or {}).get("spdx_id") or "none"
         if spdx == "NOASSERTION":

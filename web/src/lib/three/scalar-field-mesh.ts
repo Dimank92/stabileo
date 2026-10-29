@@ -136,18 +136,30 @@ function createLineField(xy: ArrayLike<number>, cells: ArrayLike<number>, lineWi
   group.add(lines);
   let hidden: ((cell: number) => boolean) | null = null;
 
+  // Allocate once: replacing these attributes after a render orphans GPU buffers.
+  const packedPosition = new Float32Array(n * 6);
+  const packedColour = new Float32Array(n * 6);
+  geometry.setPositions(packedPosition);
+  geometry.setColors(packedColour);
+  const positionBuffer = (geometry.getAttribute('instanceStart') as THREE.InterleavedBufferAttribute).data;
+  const colourBuffer = (geometry.getAttribute('instanceColorStart') as THREE.InterleavedBufferAttribute).data;
+  positionBuffer.setUsage(THREE.DynamicDrawUsage);
+  colourBuffer.setUsage(THREE.DynamicDrawUsage);
+
   function upload() {
-    const keep: number[] = [];
-    for (let c = 0; c < n; c++) if (!hidden?.(c)) keep.push(c);
-    const p = new Float32Array(keep.length * 6);
-    const k = new Float32Array(keep.length * 6);
-    keep.forEach((c, i) => {
-      p.set(position.subarray(6 * c, 6 * c + 6), 6 * i);
-      k.set(colour.subarray(6 * c, 6 * c + 6), 6 * i);
-    });
-    geometry.setPositions(p);
-    geometry.setColors(k);
-    lines.computeLineDistances();
+    let count = 0;
+    for (let c = 0; c < n; c++) {
+      if (hidden?.(c)) continue;
+      packedPosition.set(position.subarray(6 * c, 6 * c + 6), 6 * count);
+      packedColour.set(colour.subarray(6 * c, 6 * c + 6), 6 * count);
+      count++;
+    }
+    geometry.instanceCount = count;
+    positionBuffer.needsUpdate = true;
+    colourBuffer.needsUpdate = true;
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
+    // Solid lines do not use distance attributes (computeLineDistances reallocates them).
   }
 
   const tmp = new THREE.Color();

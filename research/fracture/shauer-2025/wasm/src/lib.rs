@@ -19,11 +19,7 @@ impl Simulation {
     #[wasm_bindgen(constructor)]
     pub fn new(config: &str) -> Result<Simulation, JsError> {
         let plate: NotchedPlate = serde_json::from_str(config).map_err(|e| JsError::new(&e.to_string()))?;
-        let problem = plate.problem().map_err(|e| JsError::new(&e))?;
-        if problem.mesh.n_nodes() > MAX_NODES {
-            return Err(JsError::new(&format!("mesh has {} nodes; the browser limit is {MAX_NODES}", problem.mesh.n_nodes())));
-        }
-        Ok(Simulation { solver: Solver::new(problem).map_err(|e| JsError::new(&e))? })
+        Ok(Simulation { solver: browser_solver(&plate).map_err(|e| JsError::new(&e))? })
     }
 
     #[wasm_bindgen(js_name = referenceConfig)]
@@ -64,5 +60,36 @@ impl Simulation {
             out.extend_from_slice(&s);
         }
         Ok(out)
+    }
+}
+
+// Check before problem() allocates nodes, connectivity or solver matrices. The notched square
+// duplicates the negative-x half of the notch row in addition to the rectangular grid.
+fn browser_solver(plate: &NotchedPlate) -> Result<Solver, String> {
+    let nodes = plate.mesh.nx.checked_add(1)
+        .zip(plate.mesh.ny.checked_add(1))
+        .and_then(|(x, y)| x.checked_mul(y))
+        .and_then(|n| n.checked_add(plate.mesh.nx / 2))
+        .ok_or("mesh node count overflows")?;
+    if nodes > MAX_NODES {
+        return Err(format!("mesh has {nodes} nodes; the browser limit is {MAX_NODES}"));
+    }
+    Solver::new(plate.problem()?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn oversized_configs_are_rejected_before_mesh_allocation() {
+        for (nx, ny) in [(400, 400), (usize::MAX, 80), (70, usize::MAX),
+                         (usize::MAX - 1, 80), (usize::MAX - 1, 0)] {
+            let mut plate = NotchedPlate::reference();
+            plate.mesh.nx = nx;
+            plate.mesh.ny = ny;
+            let error = browser_solver(&plate).err().expect("oversized mesh rejected");
+            assert!(error.contains("browser limit") || error.contains("overflows"), "{error}");
+        }
     }
 }

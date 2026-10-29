@@ -115,7 +115,11 @@ export class SimulationController {
     while (this.runs.size > CACHE_RUNS) this.runs.delete(this.runs.keys().next().value!);
     this.current = run;
     const msg: WorkerIn = { type: 'run', runId: id, config: key };
-    this.ensureWorker().postMessage(msg);
+    try {
+      this.ensureWorker().postMessage(msg);
+    } catch (error) {
+      this.failWorker(error instanceof Error ? error.message : String(error));
+    }
   }
 
   /** Stopping terminates the worker: a load step cannot be interrupted from outside. */

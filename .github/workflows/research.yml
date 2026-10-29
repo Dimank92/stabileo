@@ -1,7 +1,7 @@
 name: Research
 
 # Stabileo Research (research/): experimental, not part of the required checks, never on self-hosted
-# runners. Path-filtered so product changes do not run it and research changes run nothing else.
+# runners. Web entry/dependency changes also run the route budgets; research remains isolated.
 on:
   push:
     branches: [main]
@@ -9,22 +9,7 @@ on:
       - 'research/**'
       - '.github/workflows/research.yml'
       - 'engine/**'
-      - 'web/src/lib/engine/**'
-      - 'web/src/components/research/**'
-      - 'web/src/components/viewport/**'
-      - 'web/src/lib/three/**'
-      - 'web/src/lib/viewport3d/**'
-      - 'web/src/styles/**'
-      - 'web/src/components/ribbon/**'
-      - 'web/src/lib/geometry/coordinate-system.ts'
-      - 'web/package*.json'
-      - 'web/vite*.ts'
-      - 'web/scripts/*route*.mjs'
-      - 'web/src/App.svelte'
-      - 'web/src/Root.svelte'
-      - 'web/src/components/landing/**'
-      - 'web/src/components/site/**'
-      - 'web/src/lib/i18n/**'
+      - 'web/**'
       - 'Cargo.lock'
       - 'Cargo.toml'
       - 'flake.*'
@@ -35,22 +20,7 @@ on:
       - 'research/**'
       - '.github/workflows/research.yml'
       - 'engine/**'
-      - 'web/src/lib/engine/**'
-      - 'web/src/components/research/**'
-      - 'web/src/components/viewport/**'
-      - 'web/src/lib/three/**'
-      - 'web/src/lib/viewport3d/**'
-      - 'web/src/styles/**'
-      - 'web/src/components/ribbon/**'
-      - 'web/src/lib/geometry/coordinate-system.ts'
-      - 'web/package*.json'
-      - 'web/vite*.ts'
-      - 'web/scripts/*route*.mjs'
-      - 'web/src/App.svelte'
-      - 'web/src/Root.svelte'
-      - 'web/src/components/landing/**'
-      - 'web/src/components/site/**'
-      - 'web/src/lib/i18n/**'
+      - 'web/**'
       - 'Cargo.lock'
       - 'Cargo.toml'
       - 'flake.*'
@@ -136,6 +106,8 @@ jobs:
         run: rustup show active-toolchain || rustup toolchain install
       - name: Tests, including the validation against the reference outputs
         run: cargo test --release --locked -- --nocapture
+      - name: Browser configuration limits reject oversized meshes before allocation
+        run: cargo test --locked --manifest-path wasm/Cargo.toml
       - name: Reference outputs match their manifest
         run: |
           python3 - <<'PY'

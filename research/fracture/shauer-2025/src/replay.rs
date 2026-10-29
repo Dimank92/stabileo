@@ -34,8 +34,8 @@ pub struct Frame {
 
 pub fn encode(mesh: &Mesh, config: serde_json::Value, steps: &[StepResult], frames: &[(Vec<f64>, Vec<f64>)]) -> Result<Vec<u8>, String> {
     let n = mesh.nodes.len();
-    if n > u16::MAX as usize {
-        return Err("replay: more than 65535 nodes".into());
+    if n > u16::MAX as usize + 1 {
+        return Err("replay: more than 65536 nodes".into());
     }
     let scales: Vec<f64> = frames.iter().map(|(_, u)| u.iter().fold(0.0f64, |m, v| m.max(v.abs()))).collect();
     let header = Header {
@@ -125,6 +125,17 @@ pub fn decode(bytes: &[u8]) -> Result<(Header, Vec<[f64; 2]>, Vec<[usize; 4]>, V
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn node_count_accepts_all_u16_indices() {
+        let mut mesh = Mesh { nodes: vec![[0.0, 0.0]; 65536], elements: vec![[0, 1, 65534, 65535]] };
+        let bytes = encode(&mesh, serde_json::json!({}), &[], &[]).unwrap();
+        let (header, _, elements, _) = decode(&bytes).unwrap();
+        assert_eq!(header.nodes, 65536);
+        assert_eq!(elements, mesh.elements);
+        mesh.nodes.push([0.0, 0.0]);
+        assert!(encode(&mesh, serde_json::json!({}), &[], &[]).is_err());
+    }
 
     #[test]
     fn truncated_and_forged_replays_return_errors() {

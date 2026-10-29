@@ -105,6 +105,7 @@
   let mounted = $state(false);
   let ro: ResizeObserver | null = null;
   let damping = 0;
+  let pendingFit = true;
   let projection = $state<'plan' | 'orbit'>('plan');
   let menuOpen = $state(false);
   let pointer = $state<string>('—');
@@ -141,6 +142,9 @@
   /** Fit the region: in the plan view the app's top view (tipped 1° so Z stays the orbit axis), in 3D an oblique view. */
   export function fit() {
     if (!renderer) return;
+    pendingFit = true;
+    if (container.clientWidth <= 0 || container.clientHeight <= 0) return;
+    pendingFit = false;
     const [x0, y0, x1, y1] = bounds();
     const cx = (x0 + x1) / 2;
     const cy = (y0 + y1) / 2;
@@ -179,6 +183,7 @@
     field?.setResolution(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    if (pendingFit) fit();
     invalidate();
   }
 
