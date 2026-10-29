@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import replay from '../../research/stability/ferrari-sigmund-2025/results/stabileo_results.json';
+import replay from '../../research/stability/ferrari-sigmund-2025/results/stabileo_results.json' with { type: 'json' };
 
 const canvas = (page: Page) => page.locator('.sfv-canvas canvas');
 async function expectFrame(page: Page, displacement: number[]) {
