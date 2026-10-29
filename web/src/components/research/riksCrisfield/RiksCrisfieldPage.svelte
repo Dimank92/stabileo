@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { articleStrings } from './article';
+  const copy = $derived(articleStrings(publicI18n.locale));
+  import { publicI18n } from '../../../lib/i18n/store.svelte';
   import { onDestroy, onMount } from 'svelte';
   import caseJson from '../../../../../research/numerical-methods/riks-crisfield/reference-results/arc_length_snap_through.json';
   import ExperimentShell from '../shell/ExperimentShell.svelte';
@@ -170,49 +173,49 @@
 
 <ExperimentShell
   paperId="riks-1979"
-  name="Arc-length snap-through: Riks and Crisfield"
-  lead="Two-bar equilibrium paths with the production spherical arc-length solver. The shallow rigid-jointed frame is compared with its own energy derivative; the von Mises geometry is compared with the axial-only pin-jointed truss reference."
+  name={copy.arcLengthSnapThroughRiksAndCrisfield}
+  lead={copy.twoBarEquilibriumPathsWithTheProduction}
   checks={checkCount}
   referenceLabel={strings.againstBenchmark}
   {actions}
   sourcePath="research/numerical-methods/riks-crisfield"
 >
   {#snippet article()}
-    <h2>What the method does</h2>
-    <p>Load control cannot continue past a vertical tangent in a load–displacement path. Arc-length continuation constrains the combined displacement and load-factor increment instead. The production engine assembles the corotational tangent and solves Crisfield’s spherical constraint, ‖Δu‖² + Δλ²‖f<sub>ref</sub>‖² = Δs², with adaptive Δs.</p>
-    <p>The method papers are E. Riks, <a href="https://doi.org/10.1016/0020-7683(79)90081-7" rel="noreferrer" target="_blank">“An incremental approach to the solution of snapping and buckling problems”</a> (1979), and M.A. Crisfield, <a href="https://doi.org/10.1016/0045-7949(81)90108-5" rel="noreferrer" target="_blank">“A fast incremental/iterative solution procedure that handles ‘snap-through’”</a> (1981). This page benchmarks the engine; it does not reproduce a numerical example from either paper.</p>
+    <h2>{copy.whatTheMethodDoes}</h2>
+    <p>{copy.loadControlCannotContinuePastAVertical}<sub>{copy.ref}</sub>{copy.sWithAdaptiveS}</p>
+    <p>{copy.theMethodPapersAreERiks}<a href="https://doi.org/10.1016/0020-7683(79)90081-7" rel="noreferrer" target="_blank">{copy.anIncrementalApproachToTheSolutionOf}</a>{copy.andMACrisfield}<a href="https://doi.org/10.1016/0045-7949(81)90108-5" rel="noreferrer" target="_blank">{copy.aFastIncrementalIterativeSolutionProcedureThat}</a>{copy.thisPageBenchmarksTheEngineItDoes}</p>
 
-    <h2>The shared cases</h2>
-    <p>The shallow toggle is the rigid-jointed frame formerly used by the production arc-length validation test, with pinned bases and a rigid apex. The von Mises truss uses the geometry of the existing nonlinear engine benchmark. Both use frame elements, pinned supports and a vertical apex load. The case JSON is the single input to the native test, native/WASM parity check and this page.</p>
-    <p>For half-span <var>s</var>, initial rise <var>h</var>, deformed rise <var>y</var>, L = √(s² + y²), L₀ = √(s² + h²), and axial rigidity EA, the pin-jointed truss reference is P(y) = 2EA(1 − L/L₀)y/L. Its upper limit satisfies L³ = s²L₀. The page measures downward apex displacement v = h − y and downward load P = λP<sub>ref</sub>. <ExperimentLink tab="path">See the model-specific reference paths</ExperimentLink>.</p>
+    <h2>{copy.theSharedCases}</h2>
+    <p>{copy.theShallowToggleIsTheRigidJointed}</p>
+    <p>{copy.forHalfSpan}<var>s</var>{copy.initialRise}<var>h</var>{copy.deformedRise}<var>y</var>{copy.lSYLSHAnd}<sub>{copy.ref}</sub>. <ExperimentLink tab="path">{copy.seeTheModelSpecificReferencePaths}</ExperimentLink>.</p>
 
-    <h2>How the replay and live run are produced</h2>
+    <h2>{copy.howTheReplayAndLiveRunAre}</h2>
     <ol>
-      <li>The native harness calls the production <code>solve_arc_length</code>. For frame k it reruns with <code>maxSteps = k</code>, checks the path prefix, and stores the final nodal displacements. This supplies animation without adding a research solver or changing engine results.</li>
-      <li>The browser worker calls the same production WASM wrapper and repeats those prefix solves. Recompute, Stop, Restart and cached runs always identify their source.</li>
-      <li>The Node check compares WASM path steps, iterations, convergence and final displacements with native output. Research, not a design tool: closed-form agreement is not experimental validation or certification.</li>
+      <li>{copy.theNativeHarnessCallsTheProduction}<code>{copy.solveArcLength}</code>{copy.forFrameKItRerunsWith}<code>{copy.maxstepsK}</code>{copy.checksThePathPrefixAndStoresThe}</li>
+      <li>{copy.theBrowserWorkerCallsTheSameProduction}</li>
+      <li>{copy.theNodeCheckComparesWasmPathSteps}</li>
     </ol>
 
-    <h2 id="checks">Comparison on the displayed run</h2>
-    <p>{headline}. Tolerances come from the shared case file. A limit check is not passed when the computed path stops before the limit.</p>
-    <div class="rs-table-scroll" role="region" aria-label="Benchmark checks">
+    <h2 id="checks">{copy.comparisonOnTheDisplayedRun}</h2>
+    <p>{headline}{copy.tolerancesComeFromTheSharedCaseFile}</p>
+    <div class="rs-table-scroll" role="region" aria-label={copy.benchmarkChecks}>
       <table class="rs-checks">
-        <thead><tr><th>Check</th><th class="num">Observed error</th><th class="num">Tolerance</th><th>Result</th></tr></thead>
+        <thead><tr><th>{copy.check}</th><th class="num">{copy.observedError}</th><th class="num">{copy.tolerance}</th><th>{copy.result}</th></tr></thead>
         <tbody>{#each checks as check (check.id)}<tr><td>{check.label}</td><td class="num"><Sci value={check.error} /></td><td class="num"><Sci value={check.tolerance} sig={1} /></td><td class={check.passed ? 'pass' : 'fail'}>{check.passed ? '✓ pass' : check.reached ? '✗ fail' : '✗ not reached'}</td></tr>{/each}</tbody>
       </table>
     </div>
-    <p>For the von Mises geometry, the axial truss comparison omits frame bending; that model difference remains explicit. The shallow frame uses its own energy reference instead.</p>
-    <p><strong>Shallow-toggle correction (#852):</strong> this rigid-jointed frame has no limit point over inversion at the default geometry. Its reference is the derivative of U = EA(L−L₀)²/L₀ + 3EIβ²/L₀, with β = atan(y/s) − atan(h/s): P = 2EA(1−L/L₀)y/L − 6EI s β/(L₀L²). The frame curve and accuracy row use that reference. The former discrepancy came from comparing frame bending force with an axial-only truss formula; it is not evidence of a solver defect. The legacy native replay and validation artifacts retain the original comparison as historical evidence. <a href="https://github.com/lambdaclass/stabileo/pull/852">Reference derivation and independent energy check</a>.</p>
+    <p>{copy.forTheVonMisesGeometryTheAxial}</p>
+    <p><strong>{copy.shallowToggleCorrection}</strong>{copy.thisRigidJointedFrameHasNoLimit}<a href="https://github.com/lambdaclass/stabileo/pull/852">{copy.referenceDerivationAndIndependentEnergyCheck}</a>.</p>
 
-    <h2>Comparison with the papers</h2>
-    <p>Not done. No published table, figure or limit load from Riks (1979) or Crisfield (1981) is claimed as reproduced. The bibliographic records and DOIs are checked against Crossref. The numerical references on this page are the closed-form equilibrium and the native production run.</p>
+    <h2>{copy.comparisonWithThePapers}</h2>
+    <p>{copy.notDoneNoPublishedTableFigureOr}</p>
 
-    <h2>Limitations</h2>
+    <h2>{copy.limitations}</h2>
     <ul>
-      <li>Arc-length analysis is two-dimensional. These symmetric two-bar cases do not test asymmetric bifurcation, shells or three-dimensional frames.</li>
-      <li>The von Mises reference is axial engineering-strain equilibrium; its frame elements can add bending. The shallow-frame energy reference includes bending and applies to the symmetric rigid-apex model.</li>
-      <li>Changing to an upward reference load explores another branch; an upper downward limit check is reported as not reached rather than passed.</li>
-      <li>Prefix reruns make each displayed shape a production result, but they repeat computation. No intermediate unconverged iterate is displayed.</li>
+      <li>{copy.arcLengthAnalysisIsTwoDimensionalThese}</li>
+      <li>{copy.theVonMisesReferenceIsAxialEngineering}</li>
+      <li>{copy.changingToAnUpwardReferenceLoadExplores}</li>
+      <li>{copy.prefixRerunsMakeEachDisplayedShapeA}</li>
     </ul>
   {/snippet}
 
@@ -231,7 +234,7 @@
             lineWidth={5}
             values={displacementValues}
             range={displacementRange}
-            title="Displacement magnitude"
+            title={copy.displacementMagnitude}
             unit="m"
             colourMap="sequential"
             displacement={frame?.displacements ?? null}
@@ -242,23 +245,23 @@
             status={frame ? [{ label: 'step', value: `${frame.step}/${frames.length}` }, { label: 'λ', value: num(frame.loadFactor, { sig: 5 }) }, { label: 'v', value: qty(frame.displacement, 'm', { sig: 4 }) }, { label: 'P', value: qty(frame.load, 'kN', { sig: 5 }) }] : []}
             ariaLabel="Stabileo viewer: two-bar deformed shape along the production arc-length path"
             onOpenEditor={() => void openEditor()}
-            openEditorNote="Open this geometry and reference load through Stabileo’s model-code share link"
+            openEditorNote={copy.openThisGeometryAndReferenceLoadThrough}
           />
         </div>
       </div>
 
       <div class="rs-panel" id="rs-panel-path" role="tabpanel" aria-labelledby="rs-tab-path" hidden={tab !== 'path'}>
         <figure>
-          <figcaption>Downward load against downward apex displacement; orange halo = closed form, blue = production engine</figcaption>
+          <figcaption>{copy.downwardLoadAgainstDownwardApexDisplacementOrange}</figcaption>
           <PathChart series={pathSeries} limits={pathMarkers} current={frame ? { x: frame.displacement, y: frame.load } : null} xLabel="apex displacement v (m)" yLabel="load P (kN)" height={300} />
         </figure>
-        <div class="rs-table-scroll" role="region" aria-label="Reference and Stabileo comparison values">
+        <div class="rs-table-scroll" role="region" aria-label={copy.referenceAndStabileoComparisonValues}>
           <table>
-            <thead><tr><th>Check</th><th class="num">{strings.benchmark.reference}</th><th class="num">{strings.benchmark.stabileo}</th><th class="num">{strings.benchmark.error}</th><th>{strings.benchmark.result}</th></tr></thead>
+            <thead><tr><th>{copy.check}</th><th class="num">{strings.benchmark.reference}</th><th class="num">{strings.benchmark.stabileo}</th><th class="num">{strings.benchmark.error}</th><th>{strings.benchmark.result}</th></tr></thead>
             <tbody>{#each checks as check (check.id)}<tr><td>{check.label}</td><td class="num">{check.id === 'equilibrium-path' ? '0' : num(check.reference, { sig: 6 })}</td><td class="num">{check.id === 'equilibrium-path' || Number.isNaN(check.observed) ? '—' : num(check.observed, { sig: 6 })}</td><td class="num">{num(check.error * 100, { sig: 3 })}%</td><td class={check.passed ? 'pass' : 'fail'}>{check.passed ? 'pass' : check.reached ? 'fail' : 'not reached'}</td></tr>{/each}</tbody>
           </table>
         </div>
-        <p class="rs-note">{shown.totalIterations} total Newton iterations; {frames.length} converged path points. Final load factor {num(shown.finalLoadFactor, { sig: 7 })}; solver converged flag: {shown.converged ? 'true' : 'false'}.</p>
+        <p class="rs-note">{shown.totalIterations}{copy.totalNewtonIterations}{frames.length}{copy.convergedPathPointsFinalLoadFactor}{num(shown.finalLoadFactor, { sig: 7 })}{copy.solverConvergedFlag}{shown.converged ? 'true' : 'false'}.</p>
       </div>
 
       <div class="rs-panel rs-params" id="rs-panel-parameters" role="tabpanel" aria-labelledby="rs-tab-parameters" hidden={tab !== 'parameters'} oninputcapture={scheduleLive} onchangecapture={scheduleLive}>
@@ -288,11 +291,9 @@
           <button class="btn btn-ghost btn-sm" type="button" onclick={reset}>{strings.benchmark.reset}</button>
         </div>
         <p class="rs-status" aria-live="polite">
-          {#if runner.status === 'running'}Solving {frames.length} path points with production WASM…
-          {:else if runner.status === 'stopped'}Stopped after {frames.length} path points.
-          {:else if runner.status === 'error'}<span class="fail">{runner.error}</span>
-          {:else if runner.status === 'done'}Live run complete: {frames.length} path points ({runner.origin}).
-          {:else}Reference replay. Changing a valid control recomputes with production WASM.{/if}
+          {#if runner.status === 'running'}{copy.solving}{frames.length}{copy.pathPointsWithProductionWasm}{:else if runner.status === 'stopped'}{copy.stoppedAfter}{frames.length}{copy.pathPoints}{:else if runner.status === 'error'}<span class="fail">{runner.error}</span>
+          {:else if runner.status === 'done'}{copy.liveRunComplete}{frames.length}{copy.pathPoints2}{runner.origin}).
+          {:else}{copy.referenceReplayChangingAValidControlRecomputes}{/if}
         </p>
       </div>
 
