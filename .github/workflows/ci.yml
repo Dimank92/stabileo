@@ -24,13 +24,21 @@ env:
 # Every job installs the toolchain from flake.nix and runs a make target, so a
 # job that passes here passes on a developer's machine with the same command.
 #
-# Self-hosted runners (Stabileo's own server stabileo-ci-1, dotfiles servers/runners-stabileo.sh,
-# label `stabileo`): lint, the suite, the metamorphic tests and the WASM build run there when the
-# repository variable STABILEO_SELF_HOSTED is 'true', and only for trusted events (the merge queue,
-# pushes to main), never for pull_request: the repo is public. Their build output and the host's
-# /nix/store stay warm between jobs, so they skip rust-cache, magic-nix-cache (its import needs a
-# trusted Nix user, which the runner users are not) and free-disk (GitHub's image only). Unset or
-# 'false', every job runs on GitHub's runners as before: the variable is the switch, both ways.
+# Self-hosted runners (six on Stabileo's stabileo-ci-1, an AX102 running Arch Linux;
+# dotfiles servers/runners-stabileo.sh, labels `self-hosted`, `stabileo`): Lint Repo,
+# Lint Engine, Engine Suite, Engine Metamorphic, WASM, Research WASM and Results Snapshot
+# run there when STABILEO_SELF_HOSTED is 'true', only for merge_group and pushes to main.
+# Every pull_request, including fork PRs, stays on GitHub; forks cannot trigger merge_group.
+# Each runner keeps its own CARGO_TARGET_DIR; checkout explicitly cleans each job's workspace.
+# Nix is already installed on the host. Tools come from the flake; self-hosted jobs skip the
+# installer, rust-cache, magic-nix-cache (runner users are not trusted Nix users) and free-disk.
+# Engine Gates and both Web Unit shards stay on GitHub: their timing budgets have failed
+# beside other busy jobs on the shared host. Research validation and route budgets stay there too.
+# Web Build, E2E Site, E2E and Determinism stay on GitHub: the flake currently supplies no
+# Playwright driver/browsers or browser libraries. PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS
+# only skips validation; their install-deps steps still need Ubuntu's apt/sudo.
+# Docker build smoke stays on GitHub because Docker is not guaranteed on stabileo-ci-1.
+# Other jobs remain on GitHub. Unset or 'false', the variable sends every job to GitHub.
 jobs:
   changes:
     name: Detect Changes
@@ -130,25 +138,27 @@ jobs:
   # workflows), and changelog.d/ fragments well formed. On every run: neither has a path filter.
   lint-repo:
     name: Lint Repo
-    runs-on: ubuntu-latest
+    runs-on: ${{ (vars.STABILEO_SELF_HOSTED == 'true' && github.event_name != 'pull_request') && fromJSON('["self-hosted","stabileo"]') || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          clean: true
           persist-credentials: false
       - if: runner.environment == 'github-hosted'
         uses: ./.github/actions/free-disk
-      - uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
+      - if: runner.environment == 'github-hosted'
+        uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
       - if: runner.environment == 'github-hosted'
         uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
       - name: Toolchain pins agree
-        run: make check-pins
+        run: nix develop --command make check-pins NIX_RUN=
       - name: Changelog fragments are well formed
-        run: make check.changelog
+        run: nix develop --command make check.changelog NIX_RUN=
       # The engine's test files are modules of a few listed binaries (autotests = false): a file
       # in no binary would never run, one in two would run twice.
       - name: Every engine test file is in exactly one test binary
-        run: make check.test-targets
+        run: nix develop --command make check.test-targets NIX_RUN=
 
   test-ci-scripts:
     name: Test CI Scripts
@@ -176,10 +186,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          clean: true
           persist-credentials: false
       - if: runner.environment == 'github-hosted'
         uses: ./.github/actions/free-disk
-      - uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
+      - if: runner.environment == 'github-hosted'
+        uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
       - if: runner.environment == 'github-hosted'
         uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
       - if: runner.environment == 'github-hosted'
@@ -230,10 +242,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          clean: true
           persist-credentials: false
       - if: runner.environment == 'github-hosted'
         uses: ./.github/actions/free-disk
-      - uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
+      - if: runner.environment == 'github-hosted'
+        uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
       - if: runner.environment == 'github-hosted'
         uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
       - if: runner.environment == 'github-hosted'
@@ -255,10 +269,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          clean: true
           persist-credentials: false
       - if: runner.environment == 'github-hosted'
         uses: ./.github/actions/free-disk
-      - uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
+      - if: runner.environment == 'github-hosted'
+        uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
       - if: runner.environment == 'github-hosted'
         uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
       - if: runner.environment == 'github-hosted'
@@ -420,10 +436,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          clean: true
           persist-credentials: false
       - if: runner.environment == 'github-hosted'
         uses: ./.github/actions/free-disk
-      - uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
+      - if: runner.environment == 'github-hosted'
+        uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
       - if: runner.environment == 'github-hosted'
         uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
       - if: runner.environment == 'github-hosted'
@@ -446,18 +464,23 @@ jobs:
   # test runs the real simulation.
   research-wasm:
     name: Research WASM
-    runs-on: ubuntu-latest
+    runs-on: ${{ (vars.STABILEO_SELF_HOSTED == 'true' && github.event_name != 'pull_request') && fromJSON('["self-hosted","stabileo"]') || 'ubuntu-latest' }}
     timeout-minutes: 30
     needs: [changes]
     if: needs.changes.outputs.web == 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          clean: true
           persist-credentials: false
-      - uses: ./.github/actions/free-disk
-      - uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
-      - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - if: runner.environment == 'github-hosted'
+        uses: ./.github/actions/free-disk
+      - if: runner.environment == 'github-hosted'
+        uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
+      - if: runner.environment == 'github-hosted'
+        uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
+      - if: runner.environment == 'github-hosted'
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: |
             research/fracture/shauer-2025/wasm
@@ -634,19 +657,21 @@ jobs:
   # result-changes.json and a "BREAKING (results)" changelog fragment).
   results-snapshot:
     name: Results Snapshot
-    runs-on: ubuntu-latest
+    runs-on: ${{ (vars.STABILEO_SELF_HOSTED == 'true' && github.event_name != 'pull_request') && fromJSON('["self-hosted","stabileo"]') || 'ubuntu-latest' }}
     timeout-minutes: 20
     needs: [changes, wasm]
     if: needs.changes.outputs.web == 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          clean: true
           persist-credentials: false
           # The merge commit and its first parent, the base the pull request is compared with.
           fetch-depth: 2
       - if: runner.environment == 'github-hosted'
         uses: ./.github/actions/free-disk
-      - uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
+      - if: runner.environment == 'github-hosted'
+        uses: DeterminateSystems/nix-installer-action@c5a866b6ab867e88becbed4467b93592bce69f8a # v21
       - if: runner.environment == 'github-hosted'
         uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
