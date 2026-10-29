@@ -38,8 +38,11 @@ export class SimulationController {
   private ensureWorker(): Worker {
     if (this.worker) return this.worker;
     const w = new Worker(new URL('./sim.worker.ts', import.meta.url), { type: 'module' });
-    w.onmessage = (e: MessageEvent<WorkerOut>) => this.receive(e.data);
+    w.onmessage = (e: MessageEvent<WorkerOut>) => {
+      if (this.worker === w) this.receive(e.data);
+    };
     w.onerror = (e) => {
+      if (this.worker !== w) return;
       this.failWorker(e.message || 'the simulation worker failed to start');
     };
     this.worker = w;
@@ -65,9 +68,9 @@ export class SimulationController {
       return;
     }
     if (m.type === 'reference-config') return;
-    this.available = true;
     const run = this.live.get(m.runId);
     if (!run) return;
+    this.available = true;
     if (m.type === 'mesh') {
       run.nodes = m.nodes;
       run.elements = m.elements;
@@ -97,6 +100,7 @@ export class SimulationController {
   run(config: PlateConfig, force = false) {
     const key = JSON.stringify(config);
     const cached = this.runs.get(key);
+    this.stop();
     if (!force && cached && cached.status === 'done') {
       this.runs.delete(key);
       this.runs.set(key, cached);
@@ -104,7 +108,6 @@ export class SimulationController {
       this.current = cached;
       return;
     }
-    this.stop();
     const run = new Run(key, config);
     const id = this.nextId++;
     this.live.set(id, run);
@@ -112,7 +115,11 @@ export class SimulationController {
     while (this.runs.size > CACHE_RUNS) this.runs.delete(this.runs.keys().next().value!);
     this.current = run;
     const msg: WorkerIn = { type: 'run', runId: id, config: key };
-    this.ensureWorker().postMessage(msg);
+    try {
+      this.ensureWorker().postMessage(msg);
+    } catch (error) {
+      this.failWorker(error instanceof Error ? error.message : String(error));
+    }
   }
 
   /** Stopping terminates the worker: a load step cannot be interrupted from outside. */
@@ -134,7 +141,15 @@ export class SimulationController {
   }
 
   dispose() {
+    this.stop();
     this.worker?.terminate();
     this.worker = null;
   }
+}
+
+export function pendingMeshMessage(run: Run | null, replayError: string | null): string {
+  if (run?.status === 'stopped') return 'Stopped. Press Recompute live to restart.';
+  if (run?.error) return `The solver failed: ${run.error}. Retry or return to the replay in Parameters.`;
+  if (replayError) return 'The precomputed replay couldn’t be loaded. Press Recompute live to compute it in your browser.';
+  return run ? 'Loading the solver…' : 'Loading the replay…';
 }

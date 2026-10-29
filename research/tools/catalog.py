@@ -11,6 +11,9 @@ every DOI from Crossref and fails unless title, authors, year and venue match ex
 also fetches each GitHub code link (set GITHUB_TOKEN to avoid the anonymous rate limit) and fails unless its detected license matches the catalog.
 `show` prints the Crossref block for a DOI, to paste into a new entry.
 """
+import copy
+import hashlib
+import math
 import html
 import json
 import os
@@ -34,8 +37,10 @@ AREAS = {
 }
 STATUSES = [
     "proposed", "reference-reproduced", "implementation-in-progress",
-    "numerically-validated", "interactive",
+    "numerically-validated", "published-figures-compared", "interactive",
 ]
+# Keep this explicit: catalog edits must not expand their own URL allowlist.
+CODE_HOSTS = {"github.com", "gitlab.com", "zenodo.org", "doi.org"}
 COMPLEXITY = {"low", "medium", "high"}
 SUMMARY_SOURCES = {"crossref-abstract", "publisher-abstract", "repository-readme", "full-text", "reference-code"}
 REQUIRED = [
@@ -89,6 +94,32 @@ def crossref_block(doi):
     }
 
 
+def valid_checks(checks, published=False):
+    def finite_number(value):
+        return type(value) in (int, float) and math.isfinite(value)
+
+    return isinstance(checks, list) and bool(checks) and all(
+        isinstance(c, dict) and c.get("passed") is True and
+        isinstance(c.get("metric"), str) and bool(c["metric"].strip()) and
+        finite_number(c.get("observed")) and finite_number(c.get("tolerance")) and
+        0 <= c["observed"] <= c["tolerance"] and
+        (not published or isinstance(c.get("source"), str) and bool(c["source"].strip()))
+        for c in checks
+    )
+
+
+def valid_code_url(value):
+    if not isinstance(value, str) or any(c.isspace() or ord(c) < 32 for c in value):
+        return False
+    try:
+        url = urllib.parse.urlsplit(value)
+        return (url.scheme == "https" and url.hostname in CODE_HOSTS
+                and url.username is None and url.password is None
+                and url.port in (None, 443) and "\\" not in value)
+    except ValueError:
+        return False
+
+
 def check_entry(p, errors):
     pid = p.get("id", "?")
     for k in REQUIRED:
@@ -109,6 +140,8 @@ def check_entry(p, errors):
     if status not in STATUSES:
         errors.append(f"{pid}: status '{status}' not in {STATUSES}")
         return
+    if type(p.get("reproduced_published_results")) is not bool:
+        errors.append(f"{pid}: reproduced_published_results must be a boolean")
     rank = STATUSES.index(status)
     impl = p.get("implementation")
     if rank >= 1:
@@ -118,6 +151,24 @@ def check_entry(p, errors):
         manifest = os.path.join(ROOT, impl, "reference-results", "MANIFEST.json")
         if not os.path.isfile(manifest):
             errors.append(f"{pid}: status '{status}' needs {os.path.relpath(manifest, ROOT)}")
+        else:
+            with open(manifest) as f:
+                evidence = json.load(f)
+            hashes = evidence.get("files_sha256")
+            if not isinstance(hashes, dict) or not hashes:
+                errors.append(f"{pid}: manifest needs nonempty files_sha256")
+            else:
+                for name, digest in hashes.items():
+                    root = os.path.realpath(os.path.dirname(manifest))
+                    target = os.path.realpath(os.path.join(root, name))
+                    if (not target.startswith(root + os.sep) or
+                            not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest) or
+                            not os.path.isfile(target)):
+                        errors.append(f"{pid}: invalid reference hash entry {name}")
+                    else:
+                        with open(target, "rb") as f:
+                            if hashlib.sha256(f.read()).hexdigest() != digest:
+                                errors.append(f"{pid}: reference hash mismatch for {name}")
     if rank >= 3:
         tests = os.path.join(ROOT, impl, "VALIDATION.json")
         if not os.path.isfile(tests):
@@ -125,11 +176,31 @@ def check_entry(p, errors):
         else:
             with open(tests) as f:
                 v = json.load(f)
-            if not v.get("checks") or not all(c.get("passed") for c in v["checks"]):
+            if not valid_checks(v.get("checks")):
                 errors.append(f"{pid}: status '{status}' but VALIDATION.json has a failing or no check")
+    if status == "published-figures-compared" or p.get("reproduced_published_results") is True:
+        comparison = os.path.join(ROOT, impl or "", "PUBLISHED_COMPARISON.json")
+        if p.get("reproduced_published_results") is not True:
+            errors.append(f"{pid}: published comparison requires reproduced_published_results: true")
+        if not os.path.isfile(comparison):
+            errors.append(f"{pid}: published comparison needs PUBLISHED_COMPARISON.json")
+        else:
+            with open(comparison) as f:
+                evidence = json.load(f)
+            checks = evidence.get("checks", [])
+            if not valid_checks(checks, published=True):
+                errors.append(f"{pid}: published comparison needs passing checks with sources, metrics, observations and tolerances")
+    if status == "interactive":
+        page = p.get("page")
+        if not page or not os.path.isfile(os.path.join(ROOT, "..", page)):
+            errors.append(f"{pid}: interactive status needs an existing page")
     for c in p.get("code") or []:
-        if not {"url", "license"} <= set(c):
-            errors.append(f"{pid}: code entry needs url and license")
+        if not valid_code_url(c.get("url")):
+            errors.append(f"{pid}: code URL must use HTTPS on an allowed host")
+        if not {"url", "license", "commit"} <= set(c):
+            errors.append(f"{pid}: code entry needs url, license and commit")
+        if not re.fullmatch(r"[0-9a-f]{40}", c.get("commit", "")):
+            errors.append(f"{pid}: code commit must be a full 40-character revision")
     for c in p.get("contacts") or []:
         if not c.get("source"):
             errors.append(f"{pid}: contact without a verifying source")
@@ -152,9 +223,13 @@ def check_links(p, errors):
         if not m:
             errors.append(f"{p['id']}: only GitHub repository links are checked; got {c['url']}")
             continue
-        repo = get_json(f"https://api.github.com/repos/{m[1]}/{m[2]}")
+        commit = c.get("commit", "")
+        if not re.fullmatch(r"[0-9a-f]{40}", commit):
+            errors.append(f"{p['id']}: licence check requires a pinned commit")
+            continue
+        repo = get_json(f"https://api.github.com/repos/{m[1]}/{m[2]}/license?ref={commit}")
         if repo is None:
-            errors.append(f"{p['id']}: {c['url']} does not exist")
+            errors.append(f"{p['id']}: {c['url']} has no detected licence at {commit}")
             continue
         spdx = (repo.get("license") or {}).get("spdx_id") or "none"
         if spdx == "NOASSERTION":
@@ -164,6 +239,9 @@ def check_links(p, errors):
 
 
 def export_text(papers):
+    papers = copy.deepcopy(papers)
+    for paper in papers:
+        paper["crossref"]["title"] = norm(re.sub(r"</?i>", "", paper["crossref"]["title"]))
     return json.dumps({"generated_from": "research/papers.yaml", "papers": papers}, indent=1, ensure_ascii=False) + "\n"
 
 

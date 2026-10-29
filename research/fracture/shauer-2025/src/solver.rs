@@ -146,8 +146,8 @@ impl Solver {
     pub fn new(problem: Problem) -> Result<Solver, String> {
         problem.material.validate()?;
         let c = &problem.controls;
-        if !(c.dt > 0.0 && c.total_time > 0.0 && c.tolerance > 0.0 && c.max_iterations > 0) {
-            return Err("controls: need dt > 0, total_time > 0, tolerance > 0, max_iterations > 0".into());
+        if !([c.dt, c.total_time, c.tolerance].iter().all(|v| v.is_finite() && *v > 0.0) && c.max_iterations > 0) {
+            return Err("controls: need finite positive dt, total_time, tolerance, max_iterations > 0".into());
         }
         let n = problem.mesh.n_nodes();
         for bc in &problem.dirichlet {
@@ -304,6 +304,16 @@ impl Solver {
             self.u = self.elastic.solve(&rhs)?;
             self.solve_damage()?;
         }
+        if !converged {
+            // The last solve changed u and d: report the residual of those returned fields.
+            self.assemble_elastic()?;
+            let mut rhs = vec![0.0; self.u.len()];
+            let fixed = self.fixed();
+            apply_dirichlet(&mut self.elastic.matrix, &mut rhs, &fixed);
+            let ku = self.elastic.matrix.sym_mat_vec(&self.u);
+            residual = norm(&ku.iter().zip(&rhs).map(|(a, b)| a - b).collect::<Vec<_>>());
+        }
+        converged = residual < tol;
         self.failed = !converged;
         if converged && self.problem.controls.irreversibility == Irreversibility::History {
             for e in 0..self.coords.len() {
@@ -348,10 +358,92 @@ mod tests {
     use crate::examples::bar_reference;
 
     #[test]
+    fn negative_mixed_energy_cannot_lower_history_or_change_damage() {
+        let mut problem = bar_reference();
+        problem.material.e = 30.0;
+        problem.material.nu = 0.2;
+        problem.controls.irreversibility = Irreversibility::History;
+        assert!((fe::psi_plus(&problem.material, &[0.001, -0.1, 0.0]) + 0.000296875).abs() < 1e-15);
+        for initial in [0.0, 0.002] {
+            let mut solver = Solver::new(problem.clone()).unwrap();
+            solver.history.fill([initial; 4]);
+            solver.solve_damage().unwrap();
+            let baseline = solver.d.clone();
+            for (i, [x, y]) in solver.problem.mesh.nodes.iter().enumerate() {
+                solver.u[2 * i] = 0.001 * x;
+                solver.u[2 * i + 1] = -0.1 * y;
+            }
+            for e in 0..solver.coords.len() {
+                let p = solver.psi_plus_qp(e).unwrap();
+                assert!(p.iter().all(|v| *v < 0.0));
+            }
+            solver.problem.dirichlet = solver.u.iter().enumerate().map(|(dof, &value)| crate::model::Dirichlet { dof, value }).collect();
+            solver.problem.controls.dt = 1.0;
+            solver.problem.controls.total_time = 2.0;
+            assert!(solver.advance().unwrap().unwrap().converged);
+            assert_eq!(solver.d, baseline);
+            assert!(solver.history.iter().flatten().all(|h| *h == initial && *h >= 0.0));
+        }
+    }
+
+    #[test]
+    fn rejects_nonfinite_or_nonpositive_controls() {
+        for value in [f64::INFINITY, f64::NEG_INFINITY, f64::NAN, 0.0, -1.0] {
+            for control in 0..3 {
+                let mut problem = bar_reference();
+                match control {
+                    0 => problem.controls.dt = value,
+                    1 => problem.controls.total_time = value,
+                    _ => problem.controls.tolerance = value,
+                }
+                assert!(Solver::new(problem).is_err(), "control {control}: {value}");
+            }
+        }
+    }
+
+    #[test]
+    fn converges_on_final_permitted_iteration() {
+        let mut unlimited = Solver::new(bar_reference()).unwrap();
+        let expected = unlimited.advance().unwrap().unwrap();
+        assert!(expected.converged);
+        let mut problem = bar_reference();
+        problem.controls.max_iterations = expected.iterations;
+        let mut limited = Solver::new(problem).unwrap();
+        let actual = limited.advance().unwrap().unwrap();
+        assert!(actual.converged);
+        assert_eq!(actual.iterations, expected.iterations);
+        assert_eq!(actual.residual, expected.residual);
+        assert_eq!(limited.u, unlimited.u);
+        assert_eq!(limited.d, unlimited.d);
+        assert!(limited.advance().unwrap().is_some());
+    }
+
+    #[test]
+    fn failed_step_residual_describes_returned_fields() {
+        for max_iterations in [1, 2] {
+            let mut problem = bar_reference();
+            problem.controls.max_iterations = max_iterations;
+            problem.controls.tolerance = 1e-30;
+            let mut solver = Solver::new(problem).unwrap();
+            let step = solver.advance().unwrap().unwrap();
+            assert!(!step.converged);
+            assert!(step.residual.is_finite());
+            solver.assemble_elastic().unwrap();
+            let fixed = solver.fixed();
+            let mut rhs = vec![0.0; solver.u.len()];
+            apply_dirichlet(&mut solver.elastic.matrix, &mut rhs, &fixed);
+            let ku = solver.elastic.matrix.sym_mat_vec(&solver.u);
+            let expected = norm(&ku.iter().zip(&rhs).map(|(a, b)| a - b).collect::<Vec<_>>());
+            assert_eq!(step.residual, expected);
+        }
+    }
+
+    #[test]
     fn failed_step_does_not_commit_history_or_advance_on_unloading() {
         let mut problem = bar_reference();
         problem.controls.irreversibility = Irreversibility::History;
         problem.controls.max_iterations = 1;
+        problem.controls.tolerance = 1e-30;
         let mut solver = Solver::new(problem).unwrap();
         let before = solver.history.clone();
         let step = solver.advance().unwrap().unwrap();

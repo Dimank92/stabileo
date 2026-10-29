@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { SimulationController } from '../simulation.svelte';
+import { SimulationController, pendingMeshMessage } from '../simulation.svelte';
 import type { PlateConfig, Step, WorkerOut } from '../protocol';
 
 class FakeWorker {
@@ -54,4 +54,53 @@ describe('simulation failures', () => {
     expect(sim.current?.origin).toBe('cached');
     expect(sim.available).toBe(true);
   });
+});
+
+
+it('stops an active run before selecting a cached result and ignores abandoned worker messages', () => {
+  vi.stubGlobal('Worker', FakeWorker);
+  const sim = new SimulationController();
+  sim.run(config);
+  const worker = FakeWorker.instances[0];
+  worker.send({ type: 'done', runId: 1, seconds: 1 });
+  const cached = sim.current;
+  sim.run({ ...config, top_displacement: 0.02 });
+  const abandoned = sim.current;
+  sim.run(config);
+  expect(worker.terminate).toHaveBeenCalledOnce();
+  expect(abandoned?.status).toBe('stopped');
+  expect(sim.current).toBe(cached);
+  worker.send({ type: 'step', runId: 2, step, damage: new Float32Array(1), displacement: new Float32Array(2), syy: new Float32Array(1) });
+  worker.send({ type: 'done', runId: 2, seconds: 2 });
+  worker.send({ type: 'unavailable', message: 'late failure' });
+  worker.onerror?.({ message: 'late crash' });
+  expect(abandoned?.frames).toHaveLength(0);
+  expect(abandoned?.status).toBe('stopped');
+  expect(sim.current).toBe(cached);
+  expect(sim.available).toBe(true);
+  expect(sim.unavailableReason).toBeNull();
+  sim.dispose();
+});
+
+it('records a synchronous Worker constructor failure before mesh creation', () => {
+  vi.stubGlobal('Worker', class { constructor() { throw new Error('Worker blocked'); } });
+  const sim = new SimulationController();
+  expect(() => sim.run(config)).not.toThrow();
+  expect(sim.current?.nodes).toBeNull();
+  expect(sim.current?.status).toBe('error');
+  expect(sim.current?.error).toBe('Worker blocked');
+  sim.dispose();
+});
+
+it('stops before a delayed mesh arrives and ignores that mesh', () => {
+  vi.stubGlobal('Worker', FakeWorker);
+  const sim = new SimulationController();
+  sim.run(config);
+  const worker = FakeWorker.instances[0];
+  sim.stop();
+  worker.send({ type: 'mesh', runId: 1, nodes: new Float64Array(8), elements: new Uint32Array(4) });
+  expect(sim.current?.nodes).toBeNull();
+  expect(sim.current?.status).toBe('stopped');
+  expect(pendingMeshMessage(sim.current, null)).toBe('Stopped. Press Recompute live to restart.');
+  expect(worker.terminate).toHaveBeenCalledOnce();
 });

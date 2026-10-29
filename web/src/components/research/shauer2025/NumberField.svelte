@@ -1,23 +1,27 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { publicI18n } from '../../../lib/i18n/store.svelte';
   import { formatDecimal, parseDecimal } from './numeric';
 
-  let { value = $bindable(), min, max, label, id = undefined }: { value: number; min: number; max: number; label: string; id?: string } = $props();
+  let { value = $bindable(), invalid = $bindable(false), min, max, label, id = undefined }: { value: number; invalid?: boolean; min: number; max: number; label: string; id?: string } = $props();
   let text = $state('');
-  let invalid = $state(false);
   let focused = $state(false);
 
+  let lastInputValue = untrack(() => value);
   $effect(() => {
-    if (!focused) {
+    if (value !== lastInputValue) {
+      lastInputValue = value;
+      invalid = !Number.isFinite(value) || value < min || value > max;
       text = formatDecimal(value, publicI18n.locale);
-      invalid = false;
+    } else if (!focused && !invalid) {
+      text = formatDecimal(value, publicI18n.locale);
     }
   });
 
-  function onInput() {
-    const v = parseDecimal(text);
+  function onInput(event: Event & { currentTarget: HTMLInputElement }) {
+    const v = parseDecimal(event.currentTarget.value);
     invalid = v === null || v < min || v > max;
-    if (v !== null) value = v;
+    if (v !== null) { lastInputValue = v; value = v; }
   }
 </script>
 
