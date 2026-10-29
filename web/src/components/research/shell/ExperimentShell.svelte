@@ -29,8 +29,9 @@
     app: Snippet;
     /** One column with the app first and not sticky (e.g. while an embedded editor is shown). */
     wide?: boolean;
+    compactHeader?: boolean;
   };
-  let { paperId, name, lead, checks = null, verification = null, actions, sourcePath, article, app, wide = false }: Props = $props();
+  let { paperId, name, lead, checks = null, verification = null, actions, sourcePath, article, app, wide = false, compactHeader = false }: Props = $props();
   provideExperiment(actions);
 
   const paper = catalog.papers.find((p) => p.id === paperId)!;
@@ -42,7 +43,7 @@
 
 <section class="sec sec--ink rs-shell">
   <div class="wrap rs-shell-wrap">
-    <header class="rs-shell-head">
+    <header class="rs-shell-head" class:rs-compact={compactHeader}>
       <p class="rs-crumb"><PublicLink to="/research">{s.research}</PublicLink> / {fieldName(paper.area)}</p>
       <h1 lang={researchLocale()}>{name}</h1>
       <p class="rs-cite">
@@ -89,6 +90,9 @@
     line-height: 1.1;
     margin: 0.25rem 0 0.75rem;
     color: var(--fg);
+  }
+  @media (max-width: 700px) {
+    .rs-compact .rs-cite { display: none; }
   }
   .rs-crumb,
   .rs-cite {
