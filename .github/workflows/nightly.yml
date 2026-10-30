@@ -183,10 +183,10 @@ jobs:
           echo "METAMORPHIC_SEED=$METAMORPHIC_SEED" >> "$GITHUB_ENV"
           mkdir -p "$METAMORPHIC_REPORT_DIR"
           echo "$METAMORPHIC_SEED" | tee "$METAMORPHIC_REPORT_DIR/seed.txt"
-          cargo test --release --test metamorphic --no-run --message-format=json > "$RUNNER_TEMP/nightly-build.jsonl"
+          cargo test --locked --release --test metamorphic --no-run --message-format=json > "$RUNNER_TEMP/nightly-build.jsonl"
           python3 -c 'import json,os; rows=[json.loads(l) for l in open(os.environ["RUNNER_TEMP"]+"/nightly-build.jsonl")]; exe=next(r["executable"] for r in rows if r.get("executable") and r.get("target",{}).get("name")=="metamorphic"); print("NIGHTLY_REPLAY_BIN="+exe)' >> "$GITHUB_ENV"
-          cargo build --release --example solve_json
-          timeout --signal=TERM --kill-after=30s 110m cargo test --release --test metamorphic -- --ignored --nocapture --test-threads 2
+          cargo build --locked --release --example solve_json
+          timeout --signal=TERM --kill-after=30s 110m cargo test --locked --release --test metamorphic metamorphic_nightly_ -- --ignored --nocapture --test-threads 2
       - name: Reduce and package metamorphic findings
         if: failure()
         timeout-minutes: 15
