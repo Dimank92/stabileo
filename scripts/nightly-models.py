@@ -62,12 +62,13 @@ def main():
             raise RuntimeError(f'{a.check} is not installed')
         checks = [a.check]
     print('Checks:', checks, '; skipped:', sorted(set(['opensees', 'codeaster']) - set(checks)), flush=True)
-    summary = {'seed': a.seed, 'requested': a.count, 'valid': 0, 'rejected': 0, 'findings': 0, 'checks': checks}
+    summary = {'seed': a.seed, 'requested': a.count, 'valid': 0, 'rejected': 0, 'findings': 0, 'checks': checks,
+               'comparisons': {c: {'completed': 0, 'skipped': [], 'inconclusive': [], 'errors': []} for c in checks}}
     deadline = time.monotonic() + a.seconds
     with tempfile.TemporaryDirectory() as tmp:
         model_path, result_path = Path(tmp) / 'model.json', Path(tmp) / 'result.json'
 
-        def evaluate(model, check, seed):
+        def evaluate(model, check, seed, record=False):
             model_path.write_text(canonical(model))
             result_path.unlink(missing_ok=True)
             if check == 'metamorphic':
@@ -75,6 +76,8 @@ def main():
                 proc = run([replay, '--ignored', '--exact', 'metamorphic_replay', '--nocapture'], env=env)
                 if not result_path.exists():
                     raise RuntimeError(f'invariance harness failed: {proc.stdout}\n{proc.stderr}')
+                if record:
+                    summary['comparisons'][check]['completed'] += 1
                 return json.loads(result_path.read_text())
             script = 'tools/opensees/compare.py' if check == 'opensees' else 'tools/differential/codeaster/run.py'
             proc = run([sys.executable, str(ROOT / script), str(model_path), '--bin', binary, '-j', '1', '--report', str(result_path)])
@@ -82,8 +85,26 @@ def main():
                 raise RuntimeError(f'{check} harness failed: {proc.stdout}\n{proc.stderr}')
             rows = json.loads(result_path.read_text())
             bad = {'mismatch', 'false_reject', 'false_warning', 'silent_singular'}
-            if any(r['status'] in {'harness_error', 'aster_failed'} for r in rows):
-                raise RuntimeError(f'{check} harness error: {rows}')
+            if not rows:
+                raise RuntimeError(f'{check} harness returned no outcomes')
+            for row in rows:
+                status = row['status']
+                if status in bad or status == 'ok':
+                    category = 'completed'
+                elif status in {'unsupported', 'not_applicable', 'unloaded'}:
+                    category = 'skipped'
+                elif status in {'ill_conditioned', 'near_singular', 'unstable', 'stabileo_failed', 'refused'}:
+                    category = 'inconclusive'
+                else:
+                    category = 'errors'
+                if record:
+                    counts = summary['comparisons'][check]
+                    if category == 'completed':
+                        counts[category] += 1
+                    else:
+                        counts[category].append(dict(row, seed=seed))
+                if category == 'errors':
+                    raise RuntimeError(f'{check} harness error: {rows}')
             return [{'test': f'{check}/{r["status"]}', 'details': r} for r in rows if r['status'] in bad]
 
         def valid(model):
@@ -132,8 +153,9 @@ def main():
                 for check in checks:
                     # Code_Aster adapter implements 3D only.
                     if check == 'codeaster' and not any('y' in n and 'z' in n for n in model['nodes'].values()):
+                        summary['comparisons'][check]['skipped'].append({'seed': seed, 'status': 'unsupported_2d'})
                         continue
-                    failures = evaluate(model, check, seed)
+                    failures = evaluate(model, check, seed, record=True)
                     pending = []
                     # Persist every failure before reduction, so a timeout cannot
                     # erase siblings. Replace each record atomically as it shrinks.

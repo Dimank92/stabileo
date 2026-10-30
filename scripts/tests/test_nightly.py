@@ -48,10 +48,20 @@ class Models(unittest.TestCase):
                     '--out', str(out), '--reduce-seconds', str(budget)]
             with patch.object(sys, 'argv', argv), patch.object(models, 'run', side_effect=fake_run), \
                     patch.dict(os.environ, {'ASTER_PYTHON': ''}), contextlib.redirect_stdout(io.StringIO()):
-                if status == 'harness_error' or harness_exit == 2:
+                if status in {'harness_error', 'opensees_failed', 'aster_failed', 'unknown'} or harness_exit == 2:
                     with self.assertRaisesRegex(RuntimeError, 'harness'):
                         models.main()
                     self.assertEqual(list(out.glob('*.finding.json')), [])
+                    summary = json.loads((out / 'summary.json').read_text())
+                    self.assertEqual(summary['comparisons']['opensees']['completed'], 0)
+                    return
+                if status in {'unsupported', 'ill_conditioned', 'ok'}:
+                    self.assertEqual(models.main(), 0)
+                    counts = json.loads((out / 'summary.json').read_text())['comparisons']['opensees']
+                    category = {'unsupported': 'skipped', 'ill_conditioned': 'inconclusive', 'ok': 'completed'}[status]
+                    self.assertEqual(counts[category] if category == 'completed' else len(counts[category]), 1)
+                    if category != 'completed':
+                        self.assertEqual(counts['completed'], 0)
                     return
                 self.assertEqual(models.main(), 1)
             records = list(out.glob('*.finding.json'))
@@ -82,8 +92,13 @@ class Models(unittest.TestCase):
                 self.replay('false_reject', wrapped)
 
     def test_harness_errors_are_not_findings(self):
-        self.replay('harness_error')
+        for status in ('harness_error', 'opensees_failed', 'aster_failed', 'unknown'):
+            self.replay(status)
         self.replay('mismatch', harness_exit=2)
+
+    def test_reference_coverage_separates_skipped_and_inconclusive(self):
+        for status in ('unsupported', 'ill_conditioned', 'ok'):
+            self.replay(status)
 
     def test_budget_does_not_claim_minimality(self):
         self.replay('mismatch', budget=0)
@@ -123,14 +138,72 @@ class Artifacts(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             for name in ('a', 'b', 'c'):
                 (Path(tmp) / f'{name}.json').write_text('{}')
-            results = [subprocess.CompletedProcess([], code) for code in (1, 2, 0)]
-            with patch.object(sys, 'argv', ['collect', '--models', tmp, '--check', 'opensees', '--seed', '42']), \
+            results = [subprocess.CompletedProcess([], code) for code in (1, 2, 0, 1, 2, 0)]
+            with patch.object(sys, 'argv', ['collect', '--models', tmp, '--check', 'opensees', '--seed', '42', '--out', str(Path(tmp) / 'out')]), \
                     patch('subprocess.run', side_effect=results) as run:
                 with self.assertRaises(SystemExit) as exc:
                     runpy.run_path(str(ROOT / 'scripts/nightly-collect.py'), run_name='__main__')
                 self.assertEqual(exc.exception.code, 1)
-                self.assertEqual(run.call_count, 3)
-                self.assertEqual([Path(c.args[0][3]).name for c in run.call_args_list], ['a.json', 'b.json', 'c.json'])
+                self.assertEqual(run.call_count, 6)
+                self.assertEqual([Path(c.args[0][3]).name for c in run.call_args_list], ['a.json', 'b.json', 'c.json'] * 2)
+
+    def test_every_original_is_reportable_when_reduction_is_interrupted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            out = base / 'out'
+            originals = [{'nodes': {}, 'loads': [i]} for i in range(3)]
+            for i, model in enumerate(originals):
+                (base / f'{i}.json').write_text(json.dumps(model))
+            budgets = []
+
+            def replay(cmd, **kwargs):
+                budgets.append(kwargs['timeout'])
+                records = list(out.rglob('*.finding.json'))
+                self.assertEqual(len(records), 3)
+                if cmd[-1] == '120':
+                    raise subprocess.TimeoutExpired(cmd, kwargs['timeout'])
+                destination = Path(cmd[cmd.index('--out') + 1])
+                record = json.loads((destination / 'original.finding.json').read_text())
+                record['test'] = 'opensees/mismatch'
+                (destination / 'replayed.finding.json').write_text(json.dumps(record))
+                return subprocess.CompletedProcess(cmd, 1)
+
+            with patch.object(sys, 'argv', ['collect', '--models', tmp, '--check', 'opensees',
+                                           '--seed', '42', '--out', str(out)]), \
+                    patch('subprocess.run', side_effect=replay):
+                with self.assertRaises(SystemExit) as exc:
+                    runpy.run_path(str(ROOT / 'scripts/nightly-collect.py'), run_name='__main__')
+            self.assertEqual(exc.exception.code, 1)
+            records = [json.loads(p.read_text()) for p in out.rglob('*.finding.json')]
+            self.assertCountEqual([r['model'] for r in records], originals)
+            self.assertTrue(all(r['test'] and r['command'] and r['seed'] for r in records))
+            self.assertTrue(all(r['test'] == 'opensees/mismatch' for r in records))
+            self.assertEqual(len(budgets), 4)
+            self.assertEqual(budgets, sorted(budgets, reverse=True))
+
+    def test_codeaster_null_pivot_dump_reaches_collector(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            spec = importlib.util.spec_from_file_location('aster_run', ROOT / 'tools/differential/codeaster/run.py')
+            adapter = importlib.util.module_from_spec(spec)
+            with patch.object(sys, 'path', list(sys.path)):
+                spec.loader.exec_module(adapter)
+            model = {'nodes': {'n': {'x': 0, 'y': 0, 'z': 0}}, 'elements': {}, 'loads': []}
+            (base / 'error.txt').write_text('<FACTOR_11> null pivot')
+            dumps = base / 'dumps'
+            result = adapter.finish({'name': 'singular', 'job': str(base), 'sres': {}, 'meta': {}},
+                                    1e-6, str(dumps), model)
+            self.assertEqual(result['status'], 'silent_singular')
+            self.assertEqual(json.loads((dumps / 'singular.json').read_text()), model)
+            out = base / 'out'
+            with patch.object(sys, 'argv', ['collect', '--models', str(dumps), '--check', 'codeaster',
+                                           '--seed', '42', '--out', str(out)]), \
+                    patch('subprocess.run', side_effect=subprocess.TimeoutExpired('replay', 1)):
+                with self.assertRaises(SystemExit):
+                    runpy.run_path(str(ROOT / 'scripts/nightly-collect.py'), run_name='__main__')
+            record = json.loads(next(out.rglob('*.finding.json')).read_text())
+            self.assertEqual(record['model'], model)
+            self.assertEqual(record['test'], 'codeaster/dumped_failure')
 
 
 class Workflow(unittest.TestCase):

@@ -54,10 +54,18 @@ valid/rejected models and requires the requested number of solvable models
 (with at most ten attempts per requested model). These same models run through
 the existing metamorphic checks, including symmetry, and installed differential
 adapters (Code_Aster supports 3D only). Every model/reference invocation has a
-180-second timeout. Harness errors and generator failures fail the job.
+180-second timeout. Harness errors, reference execution errors (including
+`opensees_failed`), and generator failures fail the job. Per-check comparison
+counts distinguish completed comparisons from skipped and inconclusive outcomes;
+valid generated inputs alone do not establish reference comparison coverage.
 
 Failed exhaustive metamorphic models and differential dumps are also replayed
-and reduced. Metamorphic exports retain the case name and densities because
+and reduced. Collection first packages every original dump as a reportable
+`dumped_failure`, then replays all models without reduction before reducing them.
+A classified replay finding replaces its original placeholder; unsuccessful or
+interrupted replays retain the original model and reproduction command. Replay
+and reduction share a 14-minute budget within the 15-minute collection step.
+Metamorphic exports retain the case name and densities because
 those affect transformations and dynamic checks. A numerical finding is keyed
 by **test name + SHA-256 of canonical model JSON**. The reporting job recomputes
 the hash; filenames and artifact-supplied hashes are not trusted. Each issue has
