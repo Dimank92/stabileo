@@ -21,6 +21,29 @@ it('smoke specs respect the timeout cap or explain an exception on the same line
 });
 
 describe('policy regression cases', () => {
+  it.each([
+    '${locale} @smoke example',
+    '${locale} @smoke ${example}',
+    'example ${locale} suffix ${example} @smoke',
+  ])('detects smoke tags after interpolations: %s', title => {
+    expect(inspectE2E('test(`' + title + '`, () => { test.setTimeout(120_000); });').smokeTimeouts).toHaveLength(1);
+  });
+  it.each(['serial', 'parallel'])('recognizes slow describe.%s scopes without exempting smoke siblings', modifier => {
+    expect(inspectE2E(`
+      test.describe.${modifier}('@slow journey', () => {
+        test('long test', () => { test.setTimeout(120_000); });
+      });
+      test.describe.${modifier}('@smoke checks', () => {
+        test('over budget', () => { test.setTimeout(120_000); });
+      });
+      test('@smoke sibling', () => { test.setTimeout(120_000); });
+    `).smokeTimeouts).toHaveLength(2);
+  });
+  it.each(['@slow', '@flaky'])('recognizes %s tags in template middles and tails', tag => {
+    for (const title of ['${locale} ' + tag + ' journey', '${locale} ' + tag + ' ${journey}']) {
+      expect(inspectE2E("test('@smoke check', () => {}); test(`" + title + '`, () => { test.setTimeout(120_000); });').smokeTimeouts).toEqual([]);
+    }
+  });
   it('parses multiline imports, side effects and attributes; ignores comments and dynamic imports', () => {
     expect(inspectE2E(`
       // import fake from './fake.json';

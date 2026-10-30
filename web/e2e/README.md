@@ -40,6 +40,16 @@ tables are refreshed (`node scripts/e2e-shard.mjs [--suite slow] --update <repor
 run's `playwright-artifacts-*`, `.results/<suite>.json`). Keep spec files under about 10 minutes:
 a shard cannot be shorter than its longest file.
 
+The smoke-to-slow migrations in PR #869 use provisional estimates because no fresh
+per-suite reports were available. Each migrated file adds its previous whole-file smoke
+weight to its slow weight; where that smoke weight was absent or zero, the estimate is
+21 seconds (the previous positive smoke-weight median). Mixed files retain their whole-file
+smoke weight, using the same fallback if needed; files with no remaining smoke tests get
+zero smoke weight. This deliberately overestimates mixed files rather than guessing the
+duration of individual tests, and gives all 29 files gaining slow declarations a positive
+slow weight, including files missing from the old tables. Replace these estimates in both
+tables with a complete set of smoke and slow JSON reports from the next CI run.
+
 ## Fast source guards
 
 Run `npm run test:e2e:guards` from `web/`. These Vitest checks scan source only: no

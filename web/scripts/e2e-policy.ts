@@ -12,7 +12,7 @@ export function inspectE2E(source: string, file = 'spec.ts') {
   const tags = (node: ts.Node): string[] => {
     const found: string[] = [];
     const visit = (n: ts.Node) => {
-      if (ts.isStringLiteralLike(n) || ts.isTemplateHead(n)) found.push(...(n.text.match(/@(smoke|slow|flaky)\b/g) ?? []));
+      if (ts.isStringLiteralLike(n) || ts.isTemplateHead(n) || ts.isTemplateMiddle(n) || ts.isTemplateTail(n)) found.push(...(n.text.match(/@(smoke|slow|flaky)\b/g) ?? []));
       ts.forEachChild(n, visit);
     };
     visit(node);
@@ -34,7 +34,7 @@ export function inspectE2E(source: string, file = 'spec.ts') {
       const attrs = node.attributes;
       if (attrs?.token !== ts.SyntaxKind.WithKeyword || !attrs.elements.some(a => a.name.text === 'type' && ts.isStringLiteral(a.value) && a.value.text === 'json')) jsonImports.push(location(node));
     }
-    if (ts.isCallExpression(node) && /^test(?:\.(?:describe|only|skip|fixme))*$/.test(node.expression.getText(root))) {
+    if (ts.isCallExpression(node) && /^test(?:\.(?:describe|serial|parallel|only|skip|fixme))*$/.test(node.expression.getText(root))) {
       const ownTags = node.arguments.filter(a => !ts.isArrowFunction(a) && !ts.isFunctionExpression(a)).flatMap(tags);
       slow ||= ownTags.includes('@slow') || ownTags.includes('@flaky');
     }
