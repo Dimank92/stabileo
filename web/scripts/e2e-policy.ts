@@ -42,6 +42,12 @@ export function inspectE2E(source: string, file = 'spec.ts') {
       let value: ts.Expression | undefined;
       if (ts.isPropertyAssignment(node) && (ts.isIdentifier(node.name) || ts.isStringLiteral(node.name)) && node.name.text === 'timeout') value = node.initializer;
       if (ts.isCallExpression(node) && /^(?:test|testInfo|info)\.setTimeout$/.test(node.expression.getText(root))) value = node.arguments[0];
+      if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'setTimeout') {
+        const receiver = node.expression.expression;
+        if (ts.isCallExpression(receiver) && receiver.arguments.length === 0 && ts.isPropertyAccessExpression(receiver.expression)
+          && ts.isIdentifier(receiver.expression.expression) && receiver.expression.expression.text === 'test'
+          && receiver.expression.name.text === 'info') value = node.arguments[0];
+      }
       if (value && ts.isNumericLiteral(value) && (Number(value.text) > SMOKE_TIMEOUT_MS || Number(value.text) === 0) && !exempt(node)) smokeTimeouts.push(location(node));
       if (ts.isCallExpression(node) && node.expression.getText(root) === 'test.slow' && !exempt(node)) smokeTimeouts.push(location(node));
     }

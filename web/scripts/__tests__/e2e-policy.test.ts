@@ -21,6 +21,33 @@ it('smoke specs respect the timeout cap or explain an exception on the same line
 });
 
 describe('policy regression cases', () => {
+  it.each(['0', '45_001', '120_000'])('checks test.info().setTimeout(%s) and its exceptions', timeout => {
+    const call = `test.info().setTimeout(${timeout});`;
+    expect(inspectE2E(`test('@smoke example', () => { ${call} });`).smokeTimeouts).toEqual(['spec.ts:1']);
+    expect(inspectE2E(`test('@smoke example', () => {
+      ${call} // slow-ok: live solve
+    });`).smokeTimeouts).toEqual([]);
+    for (const reason of ['', ' // slow-ok:', " const reason = '// slow-ok: fake';"]) {
+      expect(inspectE2E(`test('@smoke example', () => {
+        // slow-ok: previous line is insufficient
+        ${call}${reason}
+      });`).smokeTimeouts).toEqual(['spec.ts:3']);
+    }
+    for (const tag of ['@slow', '@flaky']) {
+      expect(inspectE2E(`test('@smoke check', () => {});
+        test.describe('${tag} journey', () => { test('long test', () => { ${call} }); });
+      `).smokeTimeouts).toEqual([]);
+    }
+  });
+  it.each(['1', '45_000'])('allows test.info().setTimeout(%s) within the smoke budget', timeout => {
+    expect(inspectE2E(`test('@smoke example', () => { test.info().setTimeout(${timeout}); });`).smokeTimeouts).toEqual([]);
+  });
+  it('recognizes test.info timeout calls across whitespace and comments', () => {
+    expect(inspectE2E(`test('@smoke example', () => {
+      test.info( /* current test */ )
+        .setTimeout(0);
+    });`).smokeTimeouts).toEqual(['spec.ts:2']);
+  });
   it.each([
     '${locale} @smoke example',
     '${locale} @smoke ${example}',
