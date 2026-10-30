@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import replay from '../../research/benchmarks/dadeppo-arch-1975/results/stabileo_results.json';
+import replay from '../../research/benchmarks/dadeppo-arch-1975/results/stabileo_results.json' with { type: 'json' };
 
 test.describe('@smoke DaDeppo arch first version', () => {
   for (const width of [360, 390, 810]) {

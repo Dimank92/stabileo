@@ -172,64 +172,110 @@ fn macneal_parallelogram_out() {
     macneal_displacement(2, false);
 }
 
-// Mattiasson (1981), IJNME 17, 145–153, DOI 10.1002/nme.1620170113.
-// BENCHMARK_REFERENCES.md: Mattiasson Elastica; attributed to Table 1,
-// NOT checked against paper text. Preserve the page's provisional values.
-fn elastica(parameter: f64, u: f64, v: f64) {
+// Fixed-direction tip-force elastica (not a follower force). References are
+// independently evaluated elliptic integrals, not the old provisional table.
+// See BENCHMARK_REFERENCES.md, "Mattiasson Elastica", for the derivation,
+// reproducible generator, axial-extension correction and refinement measurements.
+fn elastica_response(parameter: f64, n: usize, area: f64, steps: usize) -> (f64, f64) {
+    // E is in MPa; the engine converts it to kN/m². EI=20000 kN m²,
+    // L=2 m, hence P=parameter*5000 kN. No shear area => Euler–Bernoulli.
     let input = make_beam(
-        16,
+        n,
         2.,
         200000.,
-        0.01,
+        area,
         1e-4,
         "fixed",
         None,
         vec![SolverLoad::Nodal(SolverNodalLoad {
-            node_id: 17,
+            node_id: n + 1,
             fx: 0.,
             fz: -parameter * 5000.,
             my: 0.,
         })],
     );
-    let r = corotational::solve_corotational_2d(&input, 50, 1e-6, 10, false).unwrap();
+    let r = corotational::solve_corotational_2d(&input, 50, 1e-8, steps, false).unwrap();
     let d = r
         .results
         .displacements
         .iter()
-        .find(|d| d.node_id == 17)
+        .find(|d| d.node_id == n + 1)
         .unwrap();
     eprintln!(
-        "elastica {parameter}: u/L={}, v/L={}, converged={}, load={}",
-        -d.ux / 2.,
-        -d.uz / 2.,
-        r.converged,
-        r.load_factor
+        "elastica q={parameter}, n={n}, A={area}, steps={steps}: u/L={:.12}, w/L={:.12}, converged={}, load={}",
+        -d.ux / 2., -d.uz / 2., r.converged, r.load_factor
     );
     assert!(
         r.converged && (r.load_factor - 1.).abs() < 1e-6,
         "full load required"
     );
-    relative(-d.ux / 2., u, 0.02);
-    relative(-d.uz / 2., v, 0.02);
+    (-d.ux / 2., -d.uz / 2.)
+}
+
+fn elastica(parameter: f64, u: f64, w: f64) {
+    // A=1 reduces P/EA to <=0.00025; residual extensibility changes either
+    // reference by <=0.025%. Retain the original A=.01 model separately below.
+    // Measured worst errors at 16/32/64 elements: .0801/.0384/.0281%.
+    // All tolerances are tighter than the former 2%; refinement must improve
+    // BOTH signed displacements, not merely land inside an acceptance band.
+    let mut previous = (f64::INFINITY, f64::INFINITY);
+    for (n, tolerance) in [(16, 0.001), (32, 0.0005), (64, 0.0003)] {
+        let actual = elastica_response(parameter, n, 1., 100);
+        relative(actual.0, u, tolerance);
+        relative(actual.1, w, tolerance);
+        let error = ((actual.0 - u).abs(), (actual.1 - w).abs());
+        assert!(
+            error.0 < previous.0 && error.1 < previous.1,
+            "mesh refinement: {previous:?} -> {error:?}"
+        );
+        previous = error;
+    }
 }
 #[test]
 fn mattiasson_1() {
-    elastica(1., 0.0566, 0.3015);
+    elastica(1., 0.056433236283377, 0.301720773799814);
 }
 #[test]
-#[ignore = "new finding: provisional Table 1 shortening differs by 2.456%"]
 fn mattiasson_2() {
-    elastica(2., 0.1632, 0.4929);
+    elastica(2., 0.160641720825167, 0.493457480396712);
 }
 #[test]
-#[ignore = "new finding: provisional Table 1 displacements differ by 4.954% and 8.767%"]
 fn mattiasson_5() {
-    elastica(5., 0.4054, 0.6647);
+    elastica(5., 0.387628360724430, 0.713791523611913);
 }
 #[test]
-#[ignore = "new finding: nonconverged at load factor 0.1"]
 fn mattiasson_10() {
-    elastica(10., 0.5584, 0.6854);
+    elastica(10., 0.554995597753751, 0.810609024880296);
+}
+
+#[test]
+fn mattiasson_original_area_extensible() {
+    // Independent extensible Kirchhoff-rod BVP, not engine-generated snapshots.
+    // Keep the original A=.01 inputs, including q=10, with a 0.01% check at
+    // 64 elements. This prevents suppressing an axial-stiffness defect by only
+    // testing a nearly inextensible beam.
+    for (q, u, w) in [
+        (1., 0.055819791294775, 0.302213694059550),
+        (2., 0.159261091516678, 0.495690076153543),
+        (5., 0.385373098137779, 0.722663728094834),
+        (10., 0.552095793299974, 0.830630993307244),
+    ] {
+        let actual = elastica_response(q, 64, 0.01, 100);
+        relative(actual.0, u, 0.0001);
+        relative(actual.1, w, 0.0001);
+    }
+}
+
+#[test]
+fn mattiasson_load_step_independence() {
+    // The original 10 increments (delta q=1) exhausted 50 Newton iterations.
+    // Smaller steps reach the SAME full-load equilibrium for both areas.
+    for area in [0.01, 1.] {
+        let coarse = elastica_response(10., 16, area, 20);
+        let fine = elastica_response(10., 16, area, 100);
+        relative(coarse.0, fine.0, 1e-8);
+        relative(coarse.1, fine.1, 1e-8);
+    }
 }
 fn roorda(n: usize, eccentricity: f64) -> SolverInput {
     assert!((2..=80).contains(&n));

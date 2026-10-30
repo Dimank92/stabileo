@@ -15,6 +15,7 @@ const PAGES: Array<[string, string | null]> = [
   ['/en/blog/the-determinism-boundary/', 'blog'],
   ['/en/cirsoc/', null],
   ['/en/changelog/', 'changelog'],
+  ['/en/paper/', 'paper'],
   ['/en/research/', 'research'],
   ['/en/tools/', 'tools'],
   ...EXPERIMENTS.map(({ path }): [string, string] => [`/en${path}/`, 'research']),
