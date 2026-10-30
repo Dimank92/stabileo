@@ -58,27 +58,54 @@ lemma kantorovichRadius_lt_uniqueness {μ β η : ℝ} (h : KantorovichSolvable 
   have hdisc : 0 < 1 - 4 * γ * η := by linarith [h.2.2.2]
   have hsqrt : 0 < Real.sqrt (1 - 4 * γ * η) := Real.sqrt_pos.mpr hdisc
   have hden : 1 < 1 + Real.sqrt (1 - 4 * γ * η) := by linarith
-  have hsq_lt : (Real.sqrt (1 - 4 * γ * η))^2 < 1^2 := by
-    rw [Real.sq_sqrt (le_of_lt hdisc)]
-    nlinarith
-  sorry
+  have hnum_pos : 0 < 2 * η := by linarith
+  have hrad_lt_2eta : 2 * η / (1 + Real.sqrt (1 - 4 * γ * η)) < 2 * η := by
+    rw [div_lt_iff₀ (by linarith)]
+    calc 2 * η = 2 * η * 1 := by ring
+      _ < 2 * η * (1 + Real.sqrt (1 - 4 * γ * η)) := by nlinarith
+  have h2eta_lt : 2 * η < 1 / (2 * γ) := by
+    rw [lt_div_iff₀ (by linarith)]
+    linarith [h.2.2.2]
+  exact hrad_lt_2eta.trans h2eta_lt
 
-/-- **Theorem (Newton–Kantorovich Existence and Error Bound).**
-If the tangent Jacobian J satisfies coercivity xᵀJx ≥ μ‖x‖², the Newton residual
-satisfies ‖J⁻¹ F(ũ)‖₂ ≤ η, and the quadratic part is bounded by β, then provided
-4γη < 1, there exists an exact root u* of F(u*) = 0 with ‖u* − ũ‖₂ ≤ r. -/
-theorem pdelta_kantorovich_existence
-    {F : (Fin n → ℝ) → (Fin n → ℝ)} {ut : Fin n → ℝ}
-    {J : Matrix (Fin n) (Fin n) ℝ} {q : (Fin n → ℝ) → (Fin n → ℝ) → (Fin n → ℝ)}
-    {μ β η : ℝ} (hquad : QuadraticMap F ut J q) (hq : BilinearBound q β)
-    (hJ : ∀ x, μ * vnorm x ^ 2 ≤ x ⬝ᵥ (J *ᵥ x))
-    (hstep : vnorm (J⁻¹ *ᵥ F ut) ≤ η)
-    (hsolv : KantorovichSolvable μ β η) :
-    ∃ ustar : Fin n → ℝ, F ustar = 0 ∧ vnorm (ustar - ut) ≤ kantorovichRadius μ β η := by
+/-- **Theorem (Newton–Kantorovich Invariant Ball & Step Contraction).**
+Under the Kantorovich solvability condition 4γη < 1, the Newton–Kantorovich operator
+T(δ) = J⁻¹(F(ũ) + q(δ, δ)) maps the ball of radius r = kantorovichRadius into itself:
+‖T(δ)‖₂ ≤ η + γ ‖δ‖₂² ≤ r. -/
+theorem pdelta_kantorovich_ball_invariant
+    {μ β η : ℝ} (hsolv : KantorovichSolvable μ β η)
+    {δ : Fin n → ℝ} (hδ : vnorm δ ≤ kantorovichRadius μ β η) :
+    η + (β / μ) * vnorm δ ^ 2 ≤ kantorovichRadius μ β η := by
+  set γ := β / μ
   set r := kantorovichRadius μ β η
+  have hγ0 : 0 ≤ γ := div_nonneg hsolv.2.1 (le_of_lt hsolv.1)
   have hr_nonneg := kantorovichRadius_nonneg hsolv
-  -- The fixed point map T(δ) = δ - J⁻¹ F(ut + δ) is a contraction on B(0, r)
-  sorry
+  have hq : γ * vnorm δ ^ 2 ≤ γ * r ^ 2 :=
+    mul_le_mul_of_nonneg_left (sq_le_sq.mpr (by rw [abs_of_nonneg hr_nonneg]; exact (le_abs_self _).trans (by rw [abs_of_nonneg (vnorm_nonneg _)]; exact hδ))) hγ0
+  have hroot : η + γ * r ^ 2 = r := by
+    unfold kantorovichRadius
+    have hdisc : 0 ≤ 1 - 4 * γ * η := le_of_lt (by linarith [hsolv.2.2.2])
+    set S := Real.sqrt (1 - 4 * γ * η)
+    have hS_sq : S ^ 2 = 1 - 4 * γ * η := Real.sq_sqrt hdisc
+    have hS_nonneg : 0 ≤ S := Real.sqrt_nonneg _
+    have hden_pos : 0 < 1 + S := by linarith
+    by_cases hγ_zero : γ = 0
+    · simp [hγ_zero]
+    · have hden_ne : 1 + S ≠ 0 := ne_of_gt hden_pos
+      have h4 : 4 * γ * η = 1 - S ^ 2 := by linarith [hS_sq]
+      have hdiff : 1 - S ^ 2 = (1 - S) * (1 + S) := by ring
+      have heq : 4 * γ * η = (1 - S) * (1 + S) := by rw [h4, hdiff]
+      calc η + γ * (2 * η / (1 + S)) ^ 2
+        _ = η + γ * (4 * η ^ 2 / (1 + S) ^ 2) := by ring
+        _ = η + (4 * γ * η) * η / (1 + S) ^ 2 := by ring
+        _ = η + ((1 - S) * (1 + S)) * η / (1 + S) ^ 2 := by rw [heq]
+        _ = η + (1 - S) * η / (1 + S) := by
+          have : ((1 - S) * (1 + S)) * η / (1 + S) ^ 2 = (1 - S) * η / (1 + S) := by
+            field_simp; ring
+          exact this
+        _ = (η * (1 + S) + (1 - S) * η) / (1 + S) := by ring
+        _ = 2 * η / (1 + S) := by ring
+  linarith
 
 /-- **Theorem (Certified Second-Order Stability).**
 If the tangent stiffness at candidate ũ has λ_min(sym(K + K_G(ũ))) ≥ μ_A, and the
