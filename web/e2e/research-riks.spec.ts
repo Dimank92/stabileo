@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 const route = '/en/research/benchmarks/riks-crisfield/';
 
 test.describe('@smoke research riks-crisfield', () => {
-  test('the native replay traces the passing case and shows the shallow case as failing', async ({ page }) => {
+  test('the native replay checks the truss limit and the rigid frame energy reference', async ({ page }) => {
     await page.goto(route);
     const app = page.locator('.rs-app');
     await expect(app).toHaveAttribute('data-case', 'von-mises-truss');
@@ -21,10 +21,10 @@ test.describe('@smoke research riks-crisfield', () => {
     await page.locator('#p-case').selectOption('shallow-toggle');
     await expect(app).toHaveAttribute('data-case', 'shallow-toggle');
     await expect(app).toHaveAttribute('data-steps', '100');
-    await expect(page.getByTestId('benchmark-headline')).toContainText('0/3 pass');
+    await expect(page.getByTestId('benchmark-headline')).toHaveText('Frame energy reference: 1/1 checks pass');
     await page.locator('#rs-tab-path').click();
-    await expect(page.locator('#rs-panel-path td.fail')).toHaveCount(3);
-    await expect(page.getByText('not reached', { exact: true }).first()).toBeVisible();
+    await expect(page.locator('#rs-panel-path td.pass')).toHaveCount(1);
+    await expect(page.locator('#rs-panel-path td.fail')).toHaveCount(0);
   });
 
   test('controls recompute through the production WASM wrapper', async ({ page }) => {

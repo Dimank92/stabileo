@@ -1,4 +1,4 @@
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { decompressSnapshot } from '../../../lib/utils/url-sharing';
 import { modelStore } from '../../../lib/store/model.svelte';
 import { solve, solveBuckling, initSolver } from '../../../lib/engine/wasm-solver';
@@ -41,4 +41,15 @@ for (const id of BATCH_IDS) it(`imports ${id} preserving member type, loads, sup
     expect(density * DEFAULT_BATCH.area).toBeCloseTo(DEFAULT_BATCH.mass, 10);
     expect(solveModal(imported, new Map([[1, density]]), 3).modes.map((m: any) => m.frequency)).toEqual(solveModal(original, new Map([[1, DEFAULT_BATCH.mass / DEFAULT_BATCH.area]]), 3).modes.map((m: any) => m.frequency));
   }
+});
+
+
+it('preserves an explicitly requested E2E gate across the shared-model handoff', () => {
+  try {
+    const model = batchModel('continuous-beam', DEFAULT_BATCH);
+    vi.stubGlobal('location', { search: '?e2e=1' });
+    expect(editorUrl(model, 'beam')).toMatch(/^\/app\/basic\?e2e=1#data=2\./);
+    vi.stubGlobal('location', { search: '' });
+    expect(editorUrl(model, 'beam')).toMatch(/^\/app\/basic#data=2\./);
+  } finally { vi.unstubAllGlobals(); }
 });

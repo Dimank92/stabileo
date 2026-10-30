@@ -1,5 +1,6 @@
 export const strings = {
   en: {
+    livePath: 'Live path', shortPath: 'Short path · 20 steps (before the peak)', fullPath: 'Full benchmark · 400 steps',
     inspect: 'Inspect the arch near its peak (step 260)',
     title: 'DaDeppo–Schmidt: a deep arch at its limit', hook: 'A 215° arch, a crown load, and the production arc-length solver.',
     stage: 'First version · 0 reviews', model: 'One clamped–hinged arch',
@@ -13,6 +14,7 @@ export const strings = {
     replay: 'Precomputed replay (same solver)', live: 'Live computation', cached: 'Cached browser result', run: 'Recompute live', stop: 'Stop', restart: 'Restart', step: 'Step', mesh: 'Mesh', displacement: 'Displacement magnitude', pass: 'Within 1%; descending branch reached', fail: 'Comparison failed or path incomplete', running: 'Computing…', sourceLink: 'Read Schmidt’s quoted values',
   },
   es: {
+    livePath: 'Trayectoria en vivo', shortPath: 'Trayectoria corta · 20 pasos (antes del máximo)', fullPath: 'Benchmark completo · 400 pasos',
     inspect: 'Ver el arco cerca del máximo (paso 260)',
     title: 'DaDeppo–Schmidt: un arco profundo en su límite', hook: 'Un arco de 215°, una carga en la clave y el solver de longitud de arco de producción.',
     stage: 'Primera versión · 0 revisiones', model: 'Un arco empotrado–articulado',
@@ -26,6 +28,7 @@ export const strings = {
     replay: 'Reproducción precalculada (mismo solver)', live: 'Cálculo en vivo', cached: 'Resultado guardado del navegador', run: 'Recalcular en vivo', stop: 'Detener', restart: 'Reiniciar', step: 'Paso', mesh: 'Malla', displacement: 'Magnitud del desplazamiento', pass: 'Dentro del 1%; rama descendente alcanzada', fail: 'Comparación fallida o trayectoria incompleta', running: 'Calculando…', sourceLink: 'Leer los valores citados por Schmidt',
   },
   pt: {
+    livePath: 'Trajetória ao vivo', shortPath: 'Trajetória curta · 20 passos (antes do máximo)', fullPath: 'Benchmark completo · 400 passos',
     inspect: 'Ver o arco perto do máximo (passo 260)',
     title: 'DaDeppo–Schmidt: um arco profundo no seu limite', hook: 'Um arco de 215°, uma carga no topo e o solver de comprimento de arco de produção.',
     stage: 'Primeira versão · 0 revisões', model: 'Um arco engastado–articulado',

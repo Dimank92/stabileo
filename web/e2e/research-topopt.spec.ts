@@ -13,7 +13,7 @@ test('MBB replay, both filters and live solve @smoke', async ({ page }) => {
   await page.getByRole('button', { name: 'Recompute live' }).click();
   await expect(page.getByText('Cached result', { exact: true })).toBeVisible({ timeout: 120000 });
   await expect(page.getByText(/Compliance: 233\.7146/)).toBeVisible();
-  await page.getByLabel('nelx', { exact: true }).fill('100000');
+  await page.getByLabel('Horizontal elements', { exact: true }).fill('100000');
   await expect(page.getByRole('button', { name: 'Recompute live' })).toBeDisabled();
   await expect(page.getByRole('alert')).toContainText('Invalid');
 });

@@ -398,3 +398,13 @@ for (const interaction of ['viewer', 'wheel', 'camera', 'tab', 'keyboard tab', '
     await expect.poll(() => slider.inputValue()).not.toBe(step);
   });
 }
+
+test('@smoke public-page entry installs editor hooks after its lazy mount', async ({ page }) => {
+  await page.goto('/en/research/?e2e=1');
+  await expect(page.getByRole('heading', { name: 'Stabileo Research' })).toBeVisible();
+  const origin = await page.evaluate(() => performance.timeOrigin);
+  await page.locator('.nav-actions > button.btn-primary').click();
+  await expect.poll(() => page.evaluate(() => !!window.__stabileo)).toBe(true);
+  await expect(page.locator('canvas').first()).toBeVisible();
+  expect(await page.evaluate(() => performance.timeOrigin)).toBe(origin);
+});

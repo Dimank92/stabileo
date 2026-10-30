@@ -9,9 +9,9 @@ test('Mattiasson live results, playback interaction and editor handoff @smoke', 
   await page.waitForTimeout(900);
   await expect(slider).toHaveValue('1');
   await page.getByRole('tab', { name: /Results|Resultados/ }).click();
-  await expect(page.getByTestId('force-1')).toContainText(/0[.,]0566/);
+  await expect(page.getByTestId('force-1')).toContainText(/0[.,]056433/);
   await expect(page.getByTestId('force-1')).toContainText(/0[.,]05578272/);
-  await expect(page.getByTestId('mattiasson-summary')).toContainText('1/4');
+  await expect(page.getByTestId('mattiasson-summary')).toContainText('3/4');
   await expect(page.getByTestId('force-1')).not.toContainText(/Not computed|Sin calcular|Não calculado/);
   await expect(page.getByTestId('force-10').getByRole('link')).toHaveAttribute('href', /KNOWN_ISSUES.md#mattiasson-reference-and-accuracy/);
   await page.getByRole('button', { name: /Run again|Ejecutar de nuevo|Executar novamente/ }).click();

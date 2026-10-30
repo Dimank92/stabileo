@@ -15,6 +15,7 @@
   let steps = $state<Step[]>(replay.steps);
   let source = $state<Source>('replay');
   let busy = $state(false);
+  let liveSteps = $state(400);
   let error = $state('');
   let mesh = $state(true);
   let host: HTMLDivElement;
@@ -42,6 +43,7 @@
       if (data.done) stop();
     };
     worker.onerror = event => { error = event.message; stop(); };
+    worker.postMessage({ maxSteps: liveSteps });
   }
   function restart() {
     stop(); frames = replay.frames; steps = replay.steps; error = ''; source = 'replay';
@@ -74,6 +76,12 @@
   {#snippet app()}
     <div class="arch-app" bind:this={host} data-source={source} data-busy={busy}>
       <p role="status">{s[source]}{busy ? ` · ${s.running}` : ''}</p>
+      <label>{s.livePath}
+        <select aria-label={s.livePath} bind:value={liveSteps} disabled={busy}>
+          <option value={20}>{s.shortPath}</option>
+          <option value={400}>{s.fullPath}</option>
+        </select>
+      </label>
       <div class="controls">
         <button onclick={run} disabled={busy}>{s.run}</button><button onclick={stop}>{s.stop}</button><button onclick={restart}>{s.restart}</button>
       </div>
@@ -98,6 +106,7 @@
 <style>
   .arch-app { max-height: 100%; overflow-y: auto; }
   .controls { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .75rem; }
+  select { min-height: 44px; font: inherit; max-width: 100%; }
   button { font: inherit; padding: .55rem .7rem; min-height: 44px; }
   label { display: block; margin: .5rem 0; }
   input[type=range] { display: block; width: 100%; min-height: 30px; }

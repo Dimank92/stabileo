@@ -75,7 +75,10 @@
     if (app) return;
     // App.svelte decides its mode from the address, so the address goes first: the one App's own
     // enterApp() pushes from a public page.
-    if (routeKind().kind !== 'app') history.pushState(null, '', modeToPath('basico'));
+    if (routeKind().kind !== 'app') {
+      const e2e = new URLSearchParams(location.search).get('e2e') === '1' ? '?e2e=1' : '';
+      history.pushState(null, '', modeToPath('basico') + e2e);
+    }
     sync();
   }
   function onPopState() {

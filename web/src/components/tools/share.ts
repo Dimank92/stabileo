@@ -18,5 +18,6 @@ export function editorUrl(model: SolverInput, name: string, options?: { massPerL
   const bytes = deflateSync(new TextEncoder().encode(JSON.stringify(compact)));
   let bin = '';
   for (const b of bytes) bin += String.fromCharCode(b);
-  return `/app/basic#data=2.${btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
+  const query = typeof location !== 'undefined' && new URLSearchParams(location.search).get('e2e') === '1' ? '?e2e=1' : '';
+  return `/app/basic${query}#data=2.${btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
 }

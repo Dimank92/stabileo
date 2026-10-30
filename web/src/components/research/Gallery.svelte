@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { articleStrings as shellStrings } from './shell1985/article';
   import { archStrings } from './biggins2026/strings';
   /**
    * /research: the experiments that run here first, then what is being built, then the
@@ -51,7 +52,8 @@
       const dictionary = e.paperId === 'mattiasson-elastica' ? mattiassonStrings : macnealStrings;
       return dictionary[publicI18n.locale as keyof typeof dictionary] ?? dictionary.en;
     }
-    if (e.paperId === 'shell-obstacle-course' || e.paperId === 'riks-1979') return { title: e.name, hook: e.hook };
+    if (e.paperId === 'shell-obstacle-course') return { title: shellStrings(publicI18n.locale).shellObstacleCourseBelytschkoEtAl, hook: e.hook };
+    if (e.paperId === 'riks-1979') return { title: e.name, hook: e.hook };
     if (e.paperId === 'ferrari-2025') return { title: s.ferrariTitle, hook: s.ferrariLead };
     return e.paperId === 'grossman-2026' ? { title: s.springsTitle, hook: s.springsHook } : { title: s.shauerTitle, hook: s.shauerHook };
   }

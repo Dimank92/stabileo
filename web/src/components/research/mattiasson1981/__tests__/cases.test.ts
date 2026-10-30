@@ -49,6 +49,8 @@ describe('Mattiasson evidence', () => {
   it('keeps failures visible and supports cancellation between solves', async () => {
     const rows = await runCases();
     expect(rows).toHaveLength(cases.length);
+    expect(rows.filter(r => r.pass).map(r => r.id)).toEqual(['force-1', 'force-2', 'force-5']);
+    expect(rows.find(r => r.id === 'force-1')!.u).toBeCloseTo(.055782721871, 9);
     expect(rows.every(r => r.failure ? r.pass === false && r.displacement === undefined : Number.isFinite(r.u) && Number.isFinite(r.v))).toBe(true);
     expect(await runCases(undefined, () => true)).toEqual([]);
   });
