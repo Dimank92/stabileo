@@ -41,7 +41,7 @@ test.describe('@smoke Ferrari research', () => {
     await page.getByRole('button', { name: 'Restart replay', exact: true }).click();
     await expect(page.getByTestId('ferrari-source')).toContainText('Precomputed replay');
   });
-  for (const [width, height] of [[390, 844], [810, 1080]]) {
+  for (const [width, height] of [[360, 800], [390, 844], [810, 1080]]) {
     for (const locale of ['en', 'es', 'pt']) {
       test(`${locale} layout ${width}x${height}`, async ({ page }, testInfo) => {
         await page.setViewportSize({ width, height });
