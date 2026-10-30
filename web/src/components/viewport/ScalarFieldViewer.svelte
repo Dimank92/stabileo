@@ -72,6 +72,8 @@
     openEditorNote?: string;
     /** Show the status bar's "Open in the editor" button (false when the page offers its own editor). */
     editorButton?: boolean;
+    /** Geometry overlays use colour categories, not a physical scalar field. */
+    geometryOnly?: boolean;
   };
   let {
     xy,
@@ -100,6 +102,7 @@
     onOpenEditor = null,
     openEditorNote,
     editorButton = true,
+    geometryOnly = false,
   }: Props = $props();
 
   let container: HTMLDivElement;
@@ -317,7 +320,7 @@
       <button class="sfv-mode" onclick={() => setProjection(projection === 'plan' ? 'orbit' : 'plan')} title={t('scalarViewer.switchProjection')}>{projection === 'plan' ? '2D' : '3D'}</button>
       <button class="sfv-mode" onclick={() => fit()} title={t('scalarViewer.fit')} aria-label={t('scalarViewer.fit')}>⤢</button>
     </div>
-    {#if displayMode === 'field' && values}
+    {#if displayMode === 'field' && values && !geometryOnly}
       <ContourLegend {title} {unit} min={range.min} max={range.max} {bands} footer={legendFooter} {colourMap} />
     {/if}
     <span class="sfv-mark">{t('scalarViewer.viewer')}</span>
@@ -325,7 +328,7 @@
   <div class="status-bar sfv-status">
     <div class="status-item"><span class="status-label">{t('scalarViewer.position')}</span><span class="status-value">{pointer}</span></div>
     <div class="status-item"><span class="status-label">{t('scalarViewer.zoom')}</span><span class="status-value">{zoomText}</span></div>
-    <div class="status-item"><span class="status-label">{t('scalarViewer.model')}</span><span class="status-value">{tp(cellSize === 2 ? 'scalarViewer.bars' : 'scalarViewer.elements', { nodes: nodeCount, cells: cellCount })}</span></div>
+    {#if !geometryOnly}<div class="status-item"><span class="status-label">{t('scalarViewer.model')}</span><span class="status-value">{tp(cellSize === 2 ? 'scalarViewer.bars' : 'scalarViewer.elements', { nodes: nodeCount, cells: cellCount })}</span></div>{/if}
     {#each status as s (s.label)}
       <div class="status-item"><span class="status-label">{s.label}:</span><span class="status-value">{s.value}</span></div>
     {/each}
