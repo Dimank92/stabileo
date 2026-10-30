@@ -160,6 +160,10 @@ export class Simulation {
 
   private handleMessage(msg: WorkerOut) {
     if (msg.type === 'ready') return;
+    if (msg.type === 'unavailable') {
+      this.handleError(msg.message);
+      return;
+    }
     if (msg.id !== this.activeId) return;
 
     if (msg.type === 'result') {

@@ -97,7 +97,10 @@ function serveDist(port: number) {
       if (!extname(file) || !existsSync(file)) file = join(DIST, 'index.html');
       try {
         const body = await readFile(file);
-        res.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream' });
+        res.writeHead(200, {
+          'content-type': MIME[extname(file)] ?? 'application/octet-stream',
+          'content-length': String(body.length),
+        });
         res.end(body);
       } catch {
         res.writeHead(404).end();
