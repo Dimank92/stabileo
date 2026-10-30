@@ -24,16 +24,10 @@ for source in sorted(Path(f'engine/fuzz/artifacts/{target}').glob('*')):
     if minimized.exists():
         source = minimized
     else:
-        reduction = 'original crashing input; minimizer produced no smaller artifact' 
-    command = f'cd engine && cargo +nightly-2026-10-15 fuzz run --target x86_64-unknown-linux-gnu {target} ../model.json'
-    try:
-        model = json.loads(source.read_bytes())
-        json.dumps(model, allow_nan=False)
-    except (ValueError, UnicodeDecodeError):
-        # The JSON envelope preserves exact bytes, including invalid UTF-8.
-        model = {'raw_hex': source.read_bytes().hex()}
-        command = ("python3 -c 'import json; from pathlib import Path; Path(\"crash.bin\").write_bytes(bytes.fromhex(json.load(open(\"model.json\"))[\"raw_hex\"]))'\n"
-                   + f'cd engine && cargo +nightly-2026-10-15 fuzz run --target x86_64-unknown-linux-gnu {target} ../crash.bin')
+        reduction = 'original crashing input; minimizer produced no smaller artifact'
+    model = {'raw_hex': source.read_bytes().hex()}
+    command = ("python3 -c 'import json; from pathlib import Path; Path(\"crash.bin\").write_bytes(bytes.fromhex(json.load(open(\"model.json\"))[\"raw_hex\"]))'\n"
+               + f'cd engine && cargo +nightly-2026-10-15 fuzz run --target x86_64-unknown-linux-gnu {target} ../crash.bin')
     key = hashlib.sha256(source.read_bytes()).hexdigest()
     (out / f'{key}.finding.json').write_text(json.dumps(dict(
         test=f'fuzz/{target}', seed=seed, model=model, reduction=reduction,

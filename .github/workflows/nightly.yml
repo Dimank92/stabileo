@@ -297,7 +297,7 @@ jobs:
       - if: runner.environment == 'github-hosted'
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Install Code_Aster (pins as in tools/differential/codeaster/setup.sh)
-        uses: mamba-org/setup-micromamba@v3
+        uses: mamba-org/setup-micromamba@f457c30a868e4760d3a6fcea5f25dc655b8edf39 # v3
         with:
           environment-name: aster
           create-args: -c conda-forge code-aster=18.1.10 python=3.12
@@ -406,6 +406,14 @@ jobs:
           cargo +nightly-2026-10-15 fuzz run --target "$FUZZ_TARGET_TRIPLE" ${{ matrix.target }} -- \
             -seed="$FUZZ_SEED" -max_total_time="$FUZZ_SECONDS" -rss_limit_mb=2048 -timeout=60 \
             -print_final_stats=1
+      - name: Retain original fuzz crashes
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: fuzz-crashes-${{ matrix.target }}
+          path: engine/fuzz/artifacts/${{ matrix.target }}/
+          retention-days: 90
+          if-no-files-found: ignore
       - name: Package individual crash findings
         if: failure() && steps.fuzz.outcome == 'failure'
         env:
@@ -587,6 +595,7 @@ jobs:
         with:
           toolchain: 1.99.1
       - name: Property soak (two hours, 30 minutes on fallback)
+        shell: bash
         env:
           NIGHTLY_FINDINGS_DIR: ${{ github.workspace }}/nightly-findings
           PROPTEST_CASES: ${{ runner.environment == 'self-hosted' && '10000' || '1000' }}

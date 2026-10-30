@@ -23,6 +23,10 @@ def run(cmd, **kwargs):
     return subprocess.run(cmd, capture_output=True, text=True, timeout=180, **kwargs)
 
 
+def structural_model(model):
+    return model['model'] if 'analysis' in model and 'model' in model else model
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--count', type=int, default=1000)
@@ -83,28 +87,27 @@ def main():
             return [{'test': f'{check}/{r["status"]}', 'details': r} for r in rows if r['status'] in bad]
 
         def valid(model):
-            result = run([binary], input=canonical(model))
+            result = run([binary], input=canonical(structural_model(model)))
             return result.returncode == 0 and 'error' not in json.loads(result.stdout)
 
         def reduce(model, check, seed, test):
-            # Greedy deletion to a fixed point: 1-minimal under load/member
-            # deletion, preserving a solvable model and this specific failure.
             end = min(deadline, time.monotonic() + a.reduce_seconds)
             changed = True
             while changed:
                 changed = False
                 for field in ('loads', 'elements'):
-                    values = model.get(field, [])
+                    values = structural_model(model).get(field, [])
                     for key in list(range(len(values))) if isinstance(values, list) else list(values):
                         if time.monotonic() >= end:
                             return model, 'budget-limited reduction'
                         candidate = copy.deepcopy(model)
                         if isinstance(values, list):
-                            candidate[field].pop(key)
+                            structural_model(candidate)[field].pop(key)
                         else:
-                            del candidate[field][key]
+                            del structural_model(candidate)[field][key]
                         try:
-                            reproduces = valid(candidate) and any(f['test'] == test for f in evaluate(candidate, check, seed))
+                            admissible = check != 'metamorphic' or valid(candidate)
+                            reproduces = admissible and any(f['test'] == test for f in evaluate(candidate, check, seed))
                         except subprocess.TimeoutExpired:
                             return model, 'budget-limited reduction (candidate timed out)'
                         if reproduces:
@@ -112,7 +115,7 @@ def main():
                             break
                     if changed:
                         break
-            return model, '1-minimal under load/member deletion (validity and failure preserved)'
+            return model, '1-minimal under load/member deletion (admissibility and failure preserved)'
 
         try:
             attempts = 1 if a.model else a.count * 10
