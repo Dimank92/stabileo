@@ -65,7 +65,7 @@ for (const id of BATCH_IDS) test(`@smoke tools ${id} prerender and editor handof
   expect(Number(await page.getByTestId('agreement').getAttribute('data-difference'))).toBeLessThan(id === 'portal-frame' ? .002 : .00002);
   await page.getByTestId('e').fill('100000');
   await expect(page.getByTestId('agreement')).toBeVisible();
-  await page.getByRole('link', { name: 'Open in Stabileo', exact: true }).click();
+  await page.getByRole('link', { name: /^Open in Stabileo/ }).click();
   await expect(page).toHaveURL(/\/app\/basic\?e2e=1#data=2\./);
   await expect.poll(() => page.evaluate(() => (window as any).__stabileo?.memberAxialForces()?.length ?? 0), { timeout: 60000 }).toBeGreaterThan(0);
   const materials = await page.evaluate(() => (window as any).__stabileo.entityData('setting', 'materials'));
@@ -75,7 +75,7 @@ for (const id of BATCH_IDS) test(`@smoke tools ${id} prerender and editor handof
 // Exercise Root's in-place lazy mount separately from the ordinary full-document links.
 test('@smoke tools shared model survives a client-side editor transition', async ({ page }) => {
   await page.goto('/en/tools/continuous-beam/?e2e=1');
-  const link = page.getByRole('link', { name: 'Open in Stabileo', exact: true });
+  const link = page.getByRole('link', { name: /^Open in Stabileo/ });
   await expect(link).toHaveAttribute('href', /#data=2\./);
   const origin = await page.evaluate(() => performance.timeOrigin);
   await page.evaluate(href => {

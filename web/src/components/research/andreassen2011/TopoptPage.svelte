@@ -6,6 +6,7 @@
   import { num } from '../shell/format';
   import NumberField from '../shauer2025/NumberField.svelte';
   import LineChart from '../shauer2025/LineChart.svelte';
+  import ConvergenceLegend from './ConvergenceLegend.svelte';
   import type { Series } from '../shauer2025/protocol';
   import { publicI18n } from '../../../lib/i18n/store.svelte';
   import { defaults, validConfig, validFrame, referenceMatches, mesh, decodeReplay, type Config, type Frame } from './model';
@@ -129,7 +130,7 @@
       {#if tab === 'density'}
         <StabileoViewer {...geometry} values={frame?.density ?? null} perCell={true} range={{ min: 0, max: 1 }} title={s.density} colourMap="sequential-grey" legendFooter={s.material} {showMesh} height="360px" />
       {:else}
-        <p>{#if overlay.length}{s.reference} · {/if}Stabileo</p>
+        <ConvergenceLegend reference={s.reference} hasReference={overlay.length > 0} />
         <LineChart series={series('compliance')} xLabel={s.iteration} yLabel={s.compliance} marker={frame?.iteration} />
         <LineChart series={series('volume')} xLabel={s.iteration} yLabel={s.volume} marker={frame?.iteration} />
         {#if !overlay.length}<p>{s.noOverlay}</p>{/if}
