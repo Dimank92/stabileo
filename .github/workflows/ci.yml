@@ -447,7 +447,7 @@ jobs:
   research-wasm:
     name: Research WASM
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60  # ~15 research crates since 2026-10-29; cached build in PR #866
     needs: [changes]
     if: needs.changes.outputs.web == 'true'
     steps:
