@@ -111,7 +111,7 @@ def main():
             result = run([binary], input=canonical(structural_model(model)))
             return result.returncode == 0 and 'error' not in json.loads(result.stdout)
 
-        def reduce(model, check, seed, test):
+        def reduce(model, check, seed, failure):
             end = min(deadline, time.monotonic() + a.reduce_seconds)
             changed = True
             while changed:
@@ -128,7 +128,7 @@ def main():
                             del structural_model(candidate)[field][key]
                         try:
                             admissible = check != 'metamorphic' or valid(candidate)
-                            reproduces = admissible and any(f['test'] == test for f in evaluate(candidate, check, seed))
+                            reproduces = admissible and any(f == failure for f in evaluate(candidate, check, seed))
                         except subprocess.TimeoutExpired:
                             return model, 'budget-limited reduction (candidate timed out)'
                         if reproduces:
@@ -162,13 +162,13 @@ def main():
                     for failure in failures:
                         key = hashlib.sha256((failure['test'] + '\n' + canonical(model)).encode()).hexdigest()
                         command = f'python3 scripts/nightly-models.py --model model.json --seed {seed} --check {check} --count 1'
-                        record = dict(failure, seed=seed, model=model, reduction='not reduced yet (job may have timed out)', command=command)
+                        record = dict(failure, seed=seed, original_model_hash=hashlib.sha256(canonical(model).encode()).hexdigest(), model=model, reduction='not reduced yet (job may have timed out)', command=command)
                         path = a.out / f'{key}.finding.json'
                         path.write_text(json.dumps(record, indent=2))
                         pending.append((failure, record, path))
                         summary['findings'] += 1
                     for failure, record, path in pending:
-                        minimal, reduction = reduce(model, check, seed, failure['test'])
+                        minimal, reduction = reduce(model, check, seed, failure)
                         record.update(model=minimal, reduction=reduction)
                         temporary = path.with_suffix('.tmp')
                         temporary.write_text(json.dumps(record, indent=2))

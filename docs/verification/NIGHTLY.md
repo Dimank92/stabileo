@@ -66,17 +66,23 @@ A classified replay finding replaces its original placeholder; unsuccessful or
 interrupted replays retain the original model and reproduction command. Replay
 and reduction share a 14-minute budget within the 15-minute collection step.
 Metamorphic exports retain the case name and densities because
-those affect transformations and dynamic checks. A numerical finding is keyed
-by **test name + SHA-256 of canonical model JSON**. The reporting job recomputes
-the hash; filenames and artifact-supplied hashes are not trusted. Each issue has
-labels `safety` and `nightly-finding`, the seed, test, commit/run link, reduction
-status, JSON model and local reproduction command. Oversized JSON remains
+those affect transformations and dynamic checks. A finding is keyed by **check + failure kind + normalized root-cause message**,
+independent of model, analysis, relation and seed. Normalization strips case
+wrappers, IDs and numbers while preserving semantic distinctions such as tangent
+versus effective stiffness. Transformed-model failures after an accepted original
+are input-consistency findings labeled `invariance-refusal`; numeric mismatches
+are labeled `wrong-result-candidate`. Each issue also has `safety` and
+`nightly-finding` labels, per-run finding/analysis/relation/model counts, and one
+smallest available reduced reproducer with its seed, commit/run link, reduction
+status and replay command. Original model hashes retain model counts across
+reduction (older artifacts fall back to the reduced model hash).
+Oversized JSON remains
 complete in the linked artifact. Repeated findings update the same issue;
 closed findings are reopened when they recur. Rerunning the reporter does not
 repeat the same run-attempt comment. Green nights never close issues.
 
 The reducer repeatedly deletes loads or members while preserving solvability
-and the **same** failing test. Completed reductions are 1-minimal under those
+and the **same** failing test and details (including the cause). Completed reductions are 1-minimal under those
 deletions, not mathematically smallest models. It has a 300-second per-finding
 budget in the random job (120 seconds for existing dumps); budget-limited
 results are explicitly marked. Fuzzer crashes use bounded libFuzzer reduction.

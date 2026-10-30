@@ -52,18 +52,18 @@ test('dry run deduplicates reordered models without writing labels, issues or co
   assert.deepEqual(JSON.parse(logs[0].split('```json\n')[1].split('\n```')[0]), finding.model);
 }));
 
-test('write creates one issue per test/model and required labels', () => fixture(async ({args, calls, save}) => {
+test('write creates one issue per root cause and required labels', () => fixture(async ({args, calls, save}) => {
   save('a');
   save('b', {...finding, model: {elements: {a: {}}, loads: [1]}});
   save('c', {...finding, test: 'opensees/false_reject'});
   await report(args);
-  assert.deepEqual(calls.filter(c => c.name === 'createLabel').map(c => c.args.name), ['safety', 'nightly-finding']);
+  assert.deepEqual(calls.filter(c => c.name === 'createLabel').map(c => c.args.name), ['safety', 'nightly-finding', 'wrong-result-candidate']);
   const created = calls.filter(c => c.name === 'create');
   assert.equal(created.length, 2);
   assert.match(created[0].args.body, /Seed: `42`/);
   assert.match(created[0].args.body, /actions\/runs\/123/);
   assert.deepEqual(JSON.parse(created[0].args.body.split('```json\n')[1].split('\n```')[0]), finding.model);
-  assert.deepEqual(created[0].args.labels, ['safety', 'nightly-finding']);
+  assert.deepEqual(created[0].args.labels, ['safety', 'nightly-finding', 'wrong-result-candidate']);
 }));
 
 test('existing closed issue gets occurrence comment and reopens; repeated run is idempotent', () => fixture(async ({args, calls, issues, comments, save}) => {
@@ -96,5 +96,74 @@ test('empty artifacts produce no writes and malformed findings fail', () => fixt
   assert.match(logs[0], /No structured numerical findings/);
   save('bad', {test: 'missing model'});
   await assert.rejects(report(args), /Invalid finding/);
+  assert.equal(calls.length, 0);
+}));
+
+const tonight = [
+  [19, 'mirror', 'Node 4 has several supports (2, 3, 4) and not all are plain rigid restraints (springs, prescribed displacemen'],
+  [19, 'rotation', 'Node 4 has several supports (2, 3, 4) and not all are plain rigid restraints (springs, prescribed displacemen'],
+  [6, 'units', 'Singular stiffness matrix — structure is a mechanism'],
+  [3, 'mirror', 'Singular stiffness matrix — structure is a mechanism'],
+  [2, 'units', 'Eigenvalue decomposition failed'],
+  [2, 'rotation', 'Singular stiffness matrix — structure is a mechanism'],
+  [2, 'mirror', 'Eigenvalue decomposition failed'],
+  [2, 'rotation', 'Eigenvalue decomposition failed'],
+  [1, 'units', 'Singular stiffness matrix'],
+  [1, 'units', 'Singular stiffness in SSI iteration'],
+  [1, 'mirror', 'Singular tangent stiffness matrix'],
+  [1, 'mirror', 'Singular stiffness in SSI iteration'],
+  [1, 'rotation', "Failed to solve case 'A': Singular stiffness matrix — structure is a mechanism"],
+  [1, 'rotation', 'Complex system solve failed'],
+  [1, 'mirror', 'Complex system solve failed'],
+  [1, 'units', 'Complex system solve failed'],
+  [1, 'mirror', 'Singular effective stiffness matrix -- check constraints and mass'],
+  [1, 'rotation', "Failed to solve case 'A': Node 4 has several supports (2, 3, 4) and not all are plain rigid restraints (springs, prescribed displacemen"],
+  [1, 'mirror', "Failed to solve case 'A': Node 4 has several supports (2, 3, 4) and not all are plain rigid restraints (springs, prescribed displacemen"],
+];
+
+test('tonight: 66 findings become eight input-consistency issues across relations and analyses', () => fixture(async ({args, calls, save}) => {
+  let index = 0;
+  for (const [count, relation, message] of tonight) for (let i = 0; i < count; i++) {
+    save(String(index), {...finding, test: `metamorphic/analysis${i}/${relation}`, seed: 20261030 + index,
+      model: {nodes: {1: {}}, loads: Array(i + 1).fill(1)}, original_model_hash: `original-${index % 5}`,
+      details: [`random-${index++}: original solved but transformed model failed: ${message}`]});
+  }
+  assert.equal(index, 66);
+  await report(args);
+  const created = calls.filter(c => c.name === 'create');
+  assert.equal(created.length, 8);
+  assert.deepEqual(created.map(c => Number(c.args.body.match(/\*\*(\d+) findings/)[1])).sort((a,b) => a-b), [1,1,1,2,3,6,12,40]);
+  for (const c of created) {
+    assert.ok(c.args.labels.includes('invariance-refusal'));
+    assert.ok(!c.args.labels.includes('wrong-result-candidate'));
+    assert.equal(c.args.body.split('```json').length, 2);
+    const model = JSON.parse(c.args.body.split('```json\n')[1].split('\n```')[0]);
+    assert.equal(model.loads.length, 1);
+  }
+  const supports = created.find(c => c.args.body.includes('**40 findings**')).args.body;
+  assert.match(supports, /\*\*19 analyses\*\*, \*\*2 relations\*\*, \*\*5 models\*\*/);
+}));
+
+test('IDs, numbers, seeds and models do not change cause; numeric mismatches stay separate', () => fixture(async ({args, calls, issues, save}) => {
+  const refusal = (message, seed) => ({...finding, seed, test: 'metamorphic/static/mirror', model: {loads: [seed]}, details: [`case-${seed}: original solved but transformed model failed: ${message}`]});
+  save('a', refusal('Node 4 has several supports (2, 3, 4)', 1));
+  await report(args);
+  const first = calls.find(c => c.name === 'create');
+  issues.push({number: 9, state: 'open', body: first.args.body});
+  args.context.runId = 456;
+  calls.length = 0;
+  save('a', refusal("Failed to solve case 'B': Node 99 has several supports (8, 9)", 2));
+  save('numeric', {...finding, test: 'metamorphic/static/rotation', details: ['case-2: displacement error 0.002 exceeds tolerance 1e-6']});
+  await report(args);
+  assert.equal(calls.filter(c => c.name === 'createComment').length, 1);
+  const created = calls.filter(c => c.name === 'create');
+  assert.equal(created.length, 1);
+  assert.ok(created[0].args.labels.includes('wrong-result-candidate'));
+}));
+
+test('reporter defaults to dry run', () => fixture(async ({args, calls, save}) => {
+  save('a');
+  delete process.env.FINDINGS_DRY_RUN;
+  await report(args);
   assert.equal(calls.length, 0);
 }));
