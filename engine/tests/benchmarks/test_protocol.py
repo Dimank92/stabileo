@@ -1,6 +1,8 @@
 import json
 import math
 import unittest
+from unittest.mock import patch
+from itertools import permutations
 from protocol import lint, generate, precheck, convergence, check_result, ROOT
 
 
@@ -61,6 +63,46 @@ class ProtocolTests(unittest.TestCase):
         for values in ([v+.01]*3,[v+.001,v+.002,v+.004],[v-.01,v+.005,v-.0025],[float('nan')]*3):
             with self.assertRaises(ValueError):convergence(s,values)
         with self.assertRaisesRegex(ValueError,'suspect'):convergence(s,[-v+.004,-v+.001,-v+.00025])
+
+    def test_informational_references_do_not_change_convergence(self):
+        s=spec();v=s['references'][0]['value']
+        passing=[v+.004,v+.001,v+.00025]
+        failing=[v+.001,v+.002,v+.004]
+        baseline=convergence(s,passing)
+        admitted=s['references'][:]
+        informational=[dict(admitted[0], value=100., provisional=provisional, pass_fail=False)
+                       for provisional in (True, False)]
+        for refs in permutations(admitted+informational):
+            if refs.index(admitted[0]) > refs.index(admitted[1]): continue
+            s['references']=list(refs)
+            lint(s)
+            self.assertEqual(convergence(s,passing),baseline)
+            with self.assertRaises(ValueError):convergence(s,failing)
+
+    def test_four_mesh_early_reversal(self):
+        s=spec();s['mesh_sequence']=[2,4,8,16]
+        lint(s)
+        with self.assertRaisesRegex(ValueError,'non-asymptotic'):
+            convergence(s,[-.3104,-.2984,-.3014,-.30215])
+        v=s['references'][0]['value']
+        self.assertAlmostEqual(convergence(s,[v+.016,v+.004,v+.001,v+.00025])['extrapolated'],v)
+        with self.assertRaisesRegex(ValueError,'non-asymptotic'):
+            convergence(s,[v+.016,v+.015,v+.004,v+.001])
+
+    def test_normal_generator_extra_restraint(self):
+        original=generate
+        def broken(*args, **kwargs):
+            e=original(*args, **kwargs)
+            e['model']['supports']['1']['rz']=True
+            return e
+        with patch('protocol.generate', side_effect=broken) as generator:
+            with self.assertRaisesRegex(ValueError,'support/reaction contract'):
+                precheck(generator(spec(),4))
+            self.assertEqual(generator.call_count,1)
+
+    def test_full_support_contract(self):
+        for name in ('scordelis-lo','pinched-cylinder'):
+            precheck(generate(spec(name),4,full=True))
 
     def test_discrete_reference_never_admits_continuum(self):
         s=spec('shallow-toggle-frame');v=s['references'][0]['value']

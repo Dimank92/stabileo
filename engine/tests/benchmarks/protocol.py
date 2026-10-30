@@ -192,6 +192,36 @@ def rank(rows, width):
     return pivot
 
 
+def expected_supports(e):
+    s, g = e['spec'], e['spec']['geometry']
+    expected = {}
+    def near(a, b):
+        return math.isclose(a, b, rel_tol=1e-12, abs_tol=1e-12)
+    for key, p in e['model']['nodes'].items():
+        if g['kind'] == 'polyline':
+            for rule in s['supports']:
+                vertex = g['points'][rule['vertex']]
+                if near(p['x'], vertex[0]) and near(p['z'], vertex[2]):
+                    expected[key] = dict(id=p['id'], nodeId=p['id'], type=rule['type'])
+            continue
+        full = e['full']
+        roof = g['kind'] == 'roof'
+        theta = math.atan2(p['y'], p['z']+g['radius']) if roof else math.atan2(p['z'], p['y'])
+        edges = {
+            'x_end': near(abs(p['x']) if full else p['x'], g['half_length']),
+            'x_zero': near(p['x'], -g['half_length'] if full else 0.),
+            'theta_zero': near(theta, -g['angle'] if full and roof else 0.),
+            'theta_end': near(theta, g['angle'] if not full or roof else 0.),
+        }
+        fixed = {dof for rule in s['supports'] + ([] if full else s['symmetry_planes'])
+                 if edges[rule['edge']] for dof in rule['dofs']}
+        if full and near(p['x'], 0.) and edges['theta_zero']:
+            fixed.add('rx')
+        if fixed:
+            expected[key] = dict(nodeId=p['id'], **{d:d in fixed for d in ('rx','ry','rz','rrx','rry','rrz')})
+    return expected
+
+
 def precheck(e):
     m, s = e['model'], e['spec']
     force = [sum(l['data'].get(k,0.) for l in m['loads']) for k in ('fx','fy','fz')]
@@ -210,7 +240,7 @@ def precheck(e):
     modes = (3 if e['dimension']==2 else 6)-rank(rows,3 if e['dimension']==2 else 6)
     require(modes == s['expected_rigid_modes'], f'rigid-body modes: expected {s["expected_rigid_modes"]}, got {modes}')
     # Equilibrium and rigid-motion rank cannot detect an extra constraint.
-    expected = generate(s,e['mesh'],e['full'])['model']['supports']
+    expected = expected_supports(e)
     require(m['supports'] == expected, 'support/reaction contract mismatch (extra or missing restraint)')
 
 
@@ -228,7 +258,7 @@ def check_result(e, result):
     def position(node_id):
         p = m['nodes'][str(node_id)]
         d = displacements[node_id]
-        return [p.get(k,0.)+(d.get('u'+k,0.) if e['dimension']==2 else 0.) for k in ('x','y','z')]
+        return [p.get(k,0.)+(d.get('u'+k,0.) if e['spec']['analysis']=='corotational' else 0.) for k in ('x','y','z')]
     def cross(p,f):
         return [p[1]*f[2]-p[2]*f[1],p[2]*f[0]-p[0]*f[2],p[0]*f[1]-p[1]*f[0]]
     moments = [0.,0.,0.]
@@ -252,17 +282,22 @@ def check_result(e, result):
 def convergence(s, values):
     require(s.get('reference_scope') != 'two-elements-only', 'model or reference suspect: discrete reference cannot gate continuum refinement')
     require(len(values)==len(s['mesh_sequence']) and all(math.isfinite(v) for v in values), 'invalid convergence samples')
-    ref = s['references'][0]['value']
+    admitted = [r for r in s['references'] if r['pass_fail'] and not r['provisional']]
+    require(admitted, 'no admitted references')
+    ref = admitted[0]['value']
     errors = [abs(v-ref) for v in values]
     require(all(b < a for a,b in zip(errors, errors[1:])), 'model or reference suspect: plateau or growing error')
     require(errors[-1] <= s['tolerance']['relative']*abs(ref), 'model or reference suspect: finest mesh misses reference')
+    differences = [b-a for a,b in zip(values, values[1:])]
+    require(all(((a > 0 and b > 0) or (a < 0 and b < 0)) and abs(b) < abs(a)
+                for a,b in zip(differences, differences[1:])),
+            'model or reference suspect: non-asymptotic sequence')
     a,b,c = values[-3:]
     ratio = (a-b)/(b-c) if b != c else 0
     require(ratio > 1 and math.isfinite(ratio), 'model or reference suspect: non-asymptotic sequence')
     extrapolated = c+(c-b)/(ratio-1)
-    for r in s['references']:
-        if r['pass_fail']:
-            require(abs(extrapolated-r['value']) <= s['tolerance']['relative']*abs(r['value']), 'model or reference suspect: extrapolation misses reference')
+    for r in admitted:
+        require(abs(extrapolated-r['value']) <= s['tolerance']['relative']*abs(r['value']), 'model or reference suspect: extrapolation misses reference')
     return dict(values=values, errors=errors, order=math.log2(ratio), extrapolated=extrapolated)
 
 

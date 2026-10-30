@@ -48,14 +48,31 @@ fn model(name: &str, n: usize, full: bool, mutant: &str) -> Value {
     )
     .unwrap()
 }
+#[derive(Debug, PartialEq)]
+enum AnalysisMode {
+    Linear2D,
+    Corotational2D,
+    Linear3D,
+}
+fn analysis_mode(e: &Value) -> Result<AnalysisMode, String> {
+    match (e["dimension"].as_u64(), e["spec"]["analysis"].as_str()) {
+        (Some(2), Some("linear")) => Ok(AnalysisMode::Linear2D),
+        (Some(2), Some("corotational")) => Ok(AnalysisMode::Corotational2D),
+        (Some(3), Some("linear")) => Ok(AnalysisMode::Linear3D),
+        (dimension, analysis) => Err(format!(
+            "unsupported benchmark analysis: dimension={dimension:?}, analysis={analysis:?}"
+        )),
+    }
+}
 fn solve(e: &Value, check: bool) -> f64 {
     try_solve(e, check).unwrap()
 }
 fn try_solve(e: &Value, check: bool) -> Result<f64, String> {
+    let mode = analysis_mode(e)?;
     if check {
         protocol(&["precheck"], Some(e))?;
     }
-    let result = if e["dimension"] == 2 {
+    let result = if mode == AnalysisMode::Corotational2D {
         let input: SolverInput =
             serde_json::from_value(e["model"].clone()).map_err(|error| error.to_string())?;
         let r = corotational::solve_corotational_2d(
@@ -70,6 +87,14 @@ fn try_solve(e: &Value, check: bool) -> Result<f64, String> {
             return Err("model or reference suspect: full-load convergence required".into());
         }
         serde_json::to_value(r.results).unwrap()
+    } else if mode == AnalysisMode::Linear2D {
+        let input: SolverInput =
+            serde_json::from_value(e["model"].clone()).map_err(|error| error.to_string())?;
+        serde_json::to_value(
+            linear::solve_2d(&input)
+                .map_err(|error| format!("model or reference suspect: {error:?}"))?,
+        )
+        .unwrap()
     } else {
         let input: SolverInput3D =
             serde_json::from_value(e["model"].clone()).map_err(|error| error.to_string())?;
@@ -220,5 +245,50 @@ fn benchmark_protocol_toggle_refinement_is_not_a_continuum_gate() {
                 .contains("model or reference suspect"));
             eprintln!("{name}: {values:?}; model or reference suspect (discrete reference)");
         }
+    }
+}
+
+#[test]
+fn benchmark_protocol_analysis_dispatch() {
+    let mut frame = model("mattiasson-1", 1, false, "");
+    assert_eq!(analysis_mode(&frame).unwrap(), AnalysisMode::Corotational2D);
+    let nonlinear = solve(&frame, true);
+    frame["spec"]["analysis"] = json!("linear");
+    frame["spec"].as_object_mut().unwrap().remove("solver");
+    assert_eq!(analysis_mode(&frame).unwrap(), AnalysisMode::Linear2D);
+    let input: SolverInput = serde_json::from_value(frame["model"].clone()).unwrap();
+    let direct = serde_json::to_value(linear::solve_2d(&input).unwrap()).unwrap();
+    let expected = protocol(&["check"], Some(&json!({"envelope":frame,"result":direct})))
+        .unwrap()
+        .as_f64()
+        .unwrap();
+    let actual = solve(&frame, true);
+    assert_eq!(actual, expected);
+    assert!((actual - nonlinear).abs() > 1e-4);
+    let shell = model("scordelis-lo", 4, false, "");
+    assert_eq!(analysis_mode(&shell).unwrap(), AnalysisMode::Linear3D);
+    let input: SolverInput3D = serde_json::from_value(shell["model"].clone()).unwrap();
+    let direct = serde_json::to_value(linear::solve_3d(&input).unwrap()).unwrap();
+    let expected = protocol(&["check"], Some(&json!({"envelope":shell,"result":direct})))
+        .unwrap()
+        .as_f64()
+        .unwrap();
+    assert_eq!(solve(&shell, true), expected);
+}
+
+#[test]
+fn benchmark_protocol_unsupported_analysis() {
+    let mut shell = model("scordelis-lo", 4, false, "");
+    shell["spec"]["analysis"] = json!("corotational");
+    shell["spec"]["solver"] = model("mattiasson-1", 1, false, "")["spec"]["solver"].clone();
+    protocol(&["precheck"], Some(&shell)).unwrap();
+    assert!(try_solve(&shell, true)
+        .unwrap_err()
+        .contains("unsupported benchmark analysis"));
+    for (dimension, analysis) in [(4, "linear"), (2, "unknown")] {
+        let e = json!({"dimension":dimension,"spec":{"analysis":analysis},"model":null});
+        assert!(try_solve(&e, true)
+            .unwrap_err()
+            .contains("unsupported benchmark analysis"));
     }
 }

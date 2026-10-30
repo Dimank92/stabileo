@@ -8,7 +8,9 @@ roadmap. Production solver code and existing tests/tolerances are unchanged.
 
 `engine/tests/benchmarks/spec/schema.json` describes the version-one JSON format.
 `protocol.py` is the single shared generator and checker; `runner.rs` adapts its
-models to the production Rust solvers. Python uses only the standard library.
+models to the production Rust solvers. The adapter dispatches 2D linear and
+corotational analysis and 3D linear analysis; unsupported combinations report
+an error before solving. Python uses only the standard library.
 The lint validates the schema's supported vocabulary, fails on unknown schema
 assertions, then applies cross-field and numerical admission rules.
 
@@ -45,7 +47,8 @@ The runtime order is:
    The full model has one axial translation gauge at midspan, not artificial
    vertical crown support. Full/reduced agreement is required within 1e-6.
 5. Run the mesh sequence. Require strictly decreasing reference error, shrinking
-   same-sign successive differences, and a finite positive observed order.
+   same-sign successive differences across the entire sequence, and a finite
+   positive observed order.
    For doubled meshes, `p=log2((u_h-u_h/2)/(u_h/2-u_h/4))` and
    `u_inf=u_h/4+(u_h/4-u_h/2)/(2^p-1)`. Both the finest value and extrapolation
    must satisfy the unchanged tolerance. A plateau, growing error, oscillatory
@@ -113,8 +116,7 @@ Run from the repository root:
 ```sh
 python3 engine/tests/benchmarks/protocol.py lint
 python3 engine/tests/benchmarks/test_protocol.py
-CARGO_BUILD_JOBS=2 CARGO_TARGET_DIR=/private/tmp/claude-501/codex-benchcorrect-target \
-  cargo test -p dedaliano-engine --test validation benchmark_protocol -- --nocapture --test-threads=2
+CARGO_BUILD_JOBS=2 make test.engine.benchmark-protocol
 python3 -I scripts/check-test-targets.py
 ```
 
