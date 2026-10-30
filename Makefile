@@ -366,7 +366,11 @@ web.run: wasm research.wasm
 # The Stabileo Research page's own WASM (web/public/research-wasm/), fetched only on /research pages.
 research.wasm: web.deps
 	$(NIX_RUN) research/fracture/shauer-2025/wasm/build.sh
+	$(NIX_RUN) research/optimization/andreassen-2011/wasm/build.sh
+	$(NIX_RUN) research/mechanics/biggins-2026/build.sh
 	$(NIX_RUN) research/metamaterials/grossman-2026/wasm/build.sh
+	$(NIX_RUN) research/form-finding/pastrana-2026/wasm/build.sh
+	$(NIX_RUN) research/optimisation/fairclough-2026/wasm/build.sh
 
 # Typesets the paper page's text (web/src/lib/paper) into its PDF with Tectonic.
 paper.pdf: web.deps
