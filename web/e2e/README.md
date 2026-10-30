@@ -72,13 +72,18 @@ are available. Slow, flaky and untagged tests retain the `chromium` project's 60
 and their existing explicit longer budgets. The projects partition the tests without duplication.
 Use the npm suite commands or `--grep @smoke`; `--project chromium` now excludes ordinary smoke.
 
-In a spec containing smoke tests, explicit numeric `timeout` options above 45,000 ms (or zero,
-which disables the timeout), `test.setTimeout` overrides and `test.slow()` must move to an
-explicit `@slow`/`@flaky` scope or carry `// slow-ok: <real reason>` on the same line. Shared
-helpers in these files are checked too; comments mentioning tags do not make a file a smoke
-spec. A reason on a preceding line or in a string does not exempt the timeout. Use literal
-millisecond values so the source guard can inspect them. Keep slow tags out of smoke-tagged
-parent suites: give the individual tests their own suite tags when splitting a mixed group.
+In a spec containing smoke tests, test-budget overrides (including `test.info().setTimeout`
+and `test.describe.configure`) must use positive literal milliseconds no greater than 45,000.
+Parenthesized literals are accepted; arithmetic and identifiers are rejected because the source
+guard cannot establish their values. `test.slow()` is forbidden outside explicit `@slow`/`@flaky`
+scopes. A `// slow-ok:` comment never exempts a test-budget override or `test.slow()`.
+
+Individual numeric wait options above 45,000 ms (or zero, which disables the wait timeout)
+may carry `// slow-ok: <real reason>` on the same line. Shared helpers are checked too.
+A reason on a preceding line or in a string does not exempt the wait. Scope tags come only
+from test/suite titles and their actual `tag` property; comments and annotation text do not
+count. Keep slow tags out of smoke-tagged parent suites: give the individual tests their own
+suite tags when splitting a mixed group.
 
 Ordinary startup/UI waits should fit inside the smoke budget. Long journeys, full model sweeps,
 live design/detailing and large exports belong in `@slow`. A shared helper may document why its

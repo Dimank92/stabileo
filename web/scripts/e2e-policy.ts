@@ -18,7 +18,26 @@ export function inspectE2E(source: string, file = 'spec.ts') {
     visit(node);
     return found;
   };
-  const fileHasSmoke = tags(root).includes('@smoke');
+  const isScope = (node: ts.Node): node is ts.CallExpression =>
+    ts.isCallExpression(node) && /^test(?:\.(?:describe|serial|parallel|only|skip|fixme))*$/.test(node.expression.getText(root));
+  const scopeTags = (node: ts.CallExpression) => {
+    const title = node.arguments[0];
+    const found = title && (ts.isStringLiteralLike(title) || ts.isTemplateExpression(title)) ? tags(title) : [];
+    const details = node.arguments[1];
+    if (details && ts.isObjectLiteralExpression(details)) {
+      for (const property of details.properties) {
+        if (ts.isPropertyAssignment(property) && (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name))
+          && property.name.text === 'tag') found.push(...tags(property.initializer));
+      }
+    }
+    return found;
+  };
+  let fileHasSmoke = false;
+  const findSmoke = (node: ts.Node) => {
+    if (isScope(node) && scopeTags(node).includes('@smoke')) fileHasSmoke = true;
+    ts.forEachChild(node, findSmoke);
+  };
+  findSmoke(root);
   const exempt = (node: ts.Node) => {
     const line = root.getLineAndCharacterOfPosition(node.getStart(root)).line;
     const start = root.getPositionOfLineAndCharacter(line, 0);
@@ -34,22 +53,33 @@ export function inspectE2E(source: string, file = 'spec.ts') {
       const attrs = node.attributes;
       if (attrs?.token !== ts.SyntaxKind.WithKeyword || !attrs.elements.some(a => a.name.text === 'type' && ts.isStringLiteral(a.value) && a.value.text === 'json')) jsonImports.push(location(node));
     }
-    if (ts.isCallExpression(node) && /^test(?:\.(?:describe|serial|parallel|only|skip|fixme))*$/.test(node.expression.getText(root))) {
-      const ownTags = node.arguments.filter(a => !ts.isArrowFunction(a) && !ts.isFunctionExpression(a)).flatMap(tags);
+    if (isScope(node)) {
+      const ownTags = scopeTags(node);
       slow ||= ownTags.includes('@slow') || ownTags.includes('@flaky');
     }
     if (fileHasSmoke && !slow) {
       let value: ts.Expression | undefined;
-      if (ts.isPropertyAssignment(node) && (ts.isIdentifier(node.name) || ts.isStringLiteral(node.name)) && node.name.text === 'timeout') value = node.initializer;
-      if (ts.isCallExpression(node) && /^(?:test|testInfo|info)\.setTimeout$/.test(node.expression.getText(root))) value = node.arguments[0];
+      let testBudget = false;
+      if (ts.isPropertyAssignment(node) && (ts.isIdentifier(node.name) || ts.isStringLiteral(node.name)) && node.name.text === 'timeout') {
+        value = node.initializer;
+        const options = node.parent;
+        const call = options.parent;
+        testBudget = ts.isObjectLiteralExpression(options) && ts.isCallExpression(call)
+          && /^test\.describe(?:\.(?:serial|parallel))?\.configure$/.test(call.expression.getText(root));
+      }
+      if (ts.isCallExpression(node) && /^(?:test|testInfo|info)\.setTimeout$/.test(node.expression.getText(root))) { value = node.arguments[0]; testBudget = true; }
       if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'setTimeout') {
         const receiver = node.expression.expression;
         if (ts.isCallExpression(receiver) && receiver.arguments.length === 0 && ts.isPropertyAccessExpression(receiver.expression)
           && ts.isIdentifier(receiver.expression.expression) && receiver.expression.expression.text === 'test'
-          && receiver.expression.name.text === 'info') value = node.arguments[0];
+          && receiver.expression.name.text === 'info') { value = node.arguments[0]; testBudget = true; }
       }
-      if (value && ts.isNumericLiteral(value) && (Number(value.text) > SMOKE_TIMEOUT_MS || Number(value.text) === 0) && !exempt(node)) smokeTimeouts.push(location(node));
-      if (ts.isCallExpression(node) && node.expression.getText(root) === 'test.slow' && !exempt(node)) smokeTimeouts.push(location(node));
+      // Parentheses do not change a literal's value. Other expressions must use
+      // literal milliseconds so an unresolved test budget cannot evade the cap.
+      while (value && ts.isParenthesizedExpression(value)) value = value.expression;
+      const invalid = value && (!ts.isNumericLiteral(value) || Number(value.text) > SMOKE_TIMEOUT_MS || Number(value.text) <= 0);
+      if (testBudget ? !value || invalid : value && ts.isNumericLiteral(value) && invalid && !exempt(node)) smokeTimeouts.push(location(node));
+      if (ts.isCallExpression(node) && node.expression.getText(root) === 'test.slow') smokeTimeouts.push(location(node));
     }
     ts.forEachChild(node, child => visit(child, slow));
   };
