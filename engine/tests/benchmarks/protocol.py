@@ -279,6 +279,15 @@ def check_result(e, result):
     return value
 
 
+def discrete_reference(s, value):
+    require(math.isfinite(value), 'nonfinite measured response')
+    admitted = [r for r in s['references'] if r['pass_fail'] and not r['provisional']]
+    require(admitted, 'no admitted references')
+    for r in admitted:
+        require(abs(value-r['value']) <= s['tolerance']['relative']*abs(r['value']),
+                'model or reference suspect: discrete response misses reference')
+
+
 def convergence(s, values):
     require(s.get('reference_scope') != 'two-elements-only', 'model or reference suspect: discrete reference cannot gate continuum refinement')
     require(len(values)==len(s['mesh_sequence']) and all(math.isfinite(v) for v in values), 'invalid convergence samples')
@@ -316,6 +325,9 @@ if __name__ == '__main__':
     elif action == 'check':
         payload = json.load(sys.stdin)
         print(json.dumps(check_result(payload['envelope'],payload['result'])))
+    elif action == 'discrete':
+        p = json.load(sys.stdin)
+        print(json.dumps(discrete_reference(p['spec'],p['value'])))
     elif action == 'convergence':
         p = json.load(sys.stdin)
         print(json.dumps(convergence(p['spec'],p['values'])))

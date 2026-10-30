@@ -194,11 +194,11 @@ fn benchmark_protocol_toggle_discrete_reference() {
     for element in ["truss", "frame"] {
         let e = model(&format!("shallow-toggle-{element}"), 1, false, "");
         let value = solve(&e, true);
-        let reference = e["spec"]["references"][0]["value"].as_f64().unwrap();
-        assert!(
-            (value / reference - 1.).abs() < 1e-8,
-            "{element}: {value} vs {reference}"
-        );
+        protocol(
+            &["discrete"],
+            Some(&json!({"spec":e["spec"],"value":value})),
+        )
+        .unwrap();
     }
 }
 #[test]

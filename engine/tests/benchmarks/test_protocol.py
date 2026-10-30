@@ -3,7 +3,7 @@ import math
 import unittest
 from unittest.mock import patch
 from itertools import permutations
-from protocol import lint, generate, precheck, convergence, check_result, ROOT
+from protocol import lint, generate, precheck, convergence, discrete_reference, check_result, ROOT
 
 
 def spec(name='scordelis-lo'):
@@ -120,6 +120,40 @@ class ProtocolTests(unittest.TestCase):
     def test_full_support_contract(self):
         for name in ('scordelis-lo','pinched-cylinder'):
             precheck(generate(spec(name),4,full=True))
+
+    def test_discrete_reference_permutations_and_informational_references(self):
+        for element in ('truss', 'frame'):
+            s=spec('shallow-toggle-'+element)
+            value=s['references'][0]['value']
+            admitted=s['references'][:]
+            informational=[dict(admitted[0], value=100., provisional=provisional, pass_fail=False)
+                           for provisional in (True, False)]
+            for refs in permutations(admitted+informational):
+                s['references']=list(refs)
+                lint(s)
+                discrete_reference(s,value)
+                with self.assertRaisesRegex(ValueError,'discrete response misses reference'):
+                    discrete_reference(s,value*(1+2*s['tolerance']['relative']))
+
+    def test_discrete_reference_disagreement_inside_uncertainty(self):
+        s=spec('shallow-toggle-frame')
+        value=s['references'][0]['value']
+        s['references'][1]['value']+=8e-11
+        for refs in permutations(s['references']):
+            s['references']=list(refs)
+            lint(s)
+            for response in (value, value+8e-11):
+                with self.assertRaisesRegex(ValueError,'discrete response misses reference'):
+                    discrete_reference(s,response)
+
+    def test_discrete_reference_uses_declared_tolerance(self):
+        s=spec('shallow-toggle-frame')
+        value=s['references'][0]['value']*(1+5e-9)
+        discrete_reference(s,value)
+        s['tolerance']['relative']=1e-9
+        lint(s)
+        with self.assertRaisesRegex(ValueError,'discrete response misses reference'):
+            discrete_reference(s,value)
 
     def test_discrete_reference_never_admits_continuum(self):
         s=spec('shallow-toggle-frame');v=s['references'][0]['value']
