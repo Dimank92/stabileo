@@ -58,6 +58,11 @@ adapters (Code_Aster supports 3D only). Every model/reference invocation has a
 `opensees_failed`), and generator failures fail the job. Per-check comparison
 counts distinguish completed comparisons from skipped and inconclusive outcomes;
 valid generated inputs alone do not establish reference comparison coverage.
+Metamorphic replay exports per-analysis/invariant verdict counts. Only passing
+and failing invariants count as completed; every replayed model must have at
+least one such verdict, or the job fails for insufficient coverage. Refusals and
+conditioning failures remain inconclusive; unrepresentable and inapplicable
+checks remain skipped.
 
 Failed exhaustive metamorphic models and differential dumps are also replayed
 and reduced. Collection first packages every original dump as a reportable
@@ -67,7 +72,10 @@ interrupted replays retain the original model and reproduction command. Replay
 and reduction share a 14-minute budget within the 15-minute collection step.
 Metamorphic exports retain the case name and densities because
 those affect transformations and dynamic checks. A finding is keyed by **check + failure kind + normalized root-cause message**,
-independent of model, analysis, relation and seed. Normalization strips case
+independent of model and seed. Differential numerical signatures include the
+analysis, failing quantity and component from `worst`, excluding instance IDs,
+time-step indices and numeric results. Other normalized causes aggregate across
+analyses and relations. Normalization strips case
 wrappers, IDs and numbers while preserving semantic distinctions such as tangent
 versus effective stiffness. Transformed-model failures after an accepted original
 are input-consistency findings labeled `invariance-refusal`; numeric mismatches
@@ -82,7 +90,9 @@ closed findings are reopened when they recur. Rerunning the reporter does not
 repeat the same run-attempt comment. Green nights never close issues.
 
 The reducer repeatedly deletes loads or members while preserving solvability
-and the **same** failing test and details (including the cause). Completed reductions are 1-minimal under those
+and the **same** failing test and stable failure signature. Candidates must still
+produce a failure from the adapter or invariant check; error magnitudes,
+conditioning estimates and numeric message details may change. Completed reductions are 1-minimal under those
 deletions, not mathematically smallest models. It has a 300-second per-finding
 budget in the random job (120 seconds for existing dumps); budget-limited
 results are explicitly marked. Fuzzer crashes use bounded libFuzzer reduction.

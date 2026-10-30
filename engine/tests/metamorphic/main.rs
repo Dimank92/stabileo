@@ -191,13 +191,9 @@ fn metamorphic_replay() {
             }
         }
     }
-    let cells = t.cells.lock().unwrap();
-    let failures: Vec<_> = cells.iter().filter(|(_, c)| !c.fails.is_empty())
-        .map(|((analysis, invariant), c)| serde_json::json!({
-            "test": format!("metamorphic/{analysis}/{invariant}"), "details": c.fails
-        })).collect();
-    std::fs::write(std::env::var("NIGHTLY_RESULTS").unwrap(), serde_json::to_vec(&failures).unwrap()).unwrap();
-    assert!(failures.is_empty(), "metamorphic violations: {failures:?}");
+    let results = t.replay_results();
+    std::fs::write(std::env::var("NIGHTLY_RESULTS").unwrap(), serde_json::to_vec(&results).unwrap()).unwrap();
+    assert!(t.failures().is_empty(), "metamorphic violations: {results}");
 }
 
 fn save_failing_model<T: serde::Serialize>(name: &str, index: usize, model: &T, case_name: &str, dens: &std::collections::HashMap<String, f64>) {

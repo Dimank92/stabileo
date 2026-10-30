@@ -6,6 +6,7 @@ import datetime
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -25,6 +26,22 @@ def run(cmd, **kwargs):
 
 def structural_model(model):
     return model['model'] if 'analysis' in model and 'model' in model else model
+
+
+def failure_signature(failure):
+    details = failure['details']
+    if isinstance(details, dict) and details.get('worst'):
+        causes = {(w[0], re.sub(r'step\d+', 'step#', str(w[2]))) for w in details['worst']}
+        return failure['test'], details.get('analysis', 'static'), tuple(sorted(causes))
+    messages = details if isinstance(details, (list, str)) else (
+        details.get('why') or [details.get('message') or details.get('status')])
+    if isinstance(messages, str):
+        messages = [messages]
+    def normalize(message):
+        if failure['test'].startswith('metamorphic/'):
+            message = message.split(': ', 1)[-1]
+        return re.sub(r'[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?', '#', message)
+    return failure['test'], tuple(sorted(set(normalize(m) for m in messages)))
 
 
 def main():
@@ -76,9 +93,23 @@ def main():
                 proc = run([replay, '--ignored', '--exact', 'metamorphic_replay', '--nocapture'], env=env)
                 if not result_path.exists():
                     raise RuntimeError(f'invariance harness failed: {proc.stdout}\n{proc.stderr}')
+                result = json.loads(result_path.read_text())
+                if proc.returncode not in (0, 101) or not isinstance(result, dict):
+                    raise RuntimeError('invariance harness returned invalid outcomes')
+                if proc.returncode != (101 if result['failures'] else 0):
+                    raise RuntimeError('invariance harness exit disagrees with outcomes')
+                verdicts = result['verdicts']
+                completed = sum(row['pass'] + row['fail'] for row in verdicts)
                 if record:
-                    summary['comparisons'][check]['completed'] += 1
-                return json.loads(result_path.read_text())
+                    counts = summary['comparisons'][check]
+                    counts['completed'] += completed
+                    counts['covered_models'] = counts.get('covered_models', 0) + int(completed > 0)
+                    for row in verdicts:
+                        if row['refused'] or row['inconclusive']:
+                            counts['inconclusive'].append(dict(row, seed=seed))
+                        if row['unrepresentable'] or row['not_applicable']:
+                            counts['skipped'].append(dict(row, seed=seed))
+                return result['failures']
             script = 'tools/opensees/compare.py' if check == 'opensees' else 'tools/differential/codeaster/run.py'
             proc = run([sys.executable, str(ROOT / script), str(model_path), '--bin', binary, '-j', '1', '--report', str(result_path)])
             if proc.returncode not in (0, 1) or not result_path.exists():
@@ -128,7 +159,7 @@ def main():
                             del structural_model(candidate)[field][key]
                         try:
                             admissible = check != 'metamorphic' or valid(candidate)
-                            reproduces = admissible and any(f == failure for f in evaluate(candidate, check, seed))
+                            reproduces = admissible and any(failure_signature(f) == failure_signature(failure) for f in evaluate(candidate, check, seed))
                         except subprocess.TimeoutExpired:
                             return model, 'budget-limited reduction (candidate timed out)'
                         if reproduces:
@@ -178,6 +209,8 @@ def main():
                     break
             else:
                 raise RuntimeError('too many rejected models; requested valid-model count not reached')
+            if 'metamorphic' in checks and summary['comparisons']['metamorphic'].get('covered_models', 0) < summary['valid']:
+                raise RuntimeError('insufficient metamorphic coverage: each model requires a usable invariant')
         finally:
             (a.out / 'summary.json').write_text(json.dumps(summary, indent=2))
             print(json.dumps(summary), flush=True)

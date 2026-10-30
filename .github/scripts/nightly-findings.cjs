@@ -24,6 +24,13 @@ function normalize(message) {
 function causes(f) {
   const [check, analysis, relation] = f.test.split('/');
   const d = f.details;
+  if (d?.worst?.length) {
+    const analysis = d.analysis || f.model.analysis || 'static';
+    return [...new Set(d.worst.map(w => `${w[0]}/${String(w[2]).replace(/step\d+/g, 'step#')}`))].sort().map(quantity => ({
+      check, kind: d.status === 'mismatch' ? 'wrong-result-candidate' : d.status, message: `${analysis}: ${quantity}`,
+      analysis, relation: 'unspecified'
+    }));
+  }
   const messages = Array.isArray(d) ? d : typeof d === 'string' ? [d] :
     d?.why || [d?.message || d?.status || analysis || 'failure'];
   return messages.map(raw => {

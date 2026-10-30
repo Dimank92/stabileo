@@ -167,3 +167,22 @@ test('reporter defaults to dry run', () => fixture(async ({args, calls, save}) =
   await report(args);
   assert.equal(calls.length, 0);
 }));
+
+for (const adapter of ['opensees', 'codeaster']) test(`${adapter}: adapter quantities and analyses separate defects and deduplicate instances`, () => fixture(async ({args, calls, save}) => {
+  const cases = adapter === 'codeaster' ? [
+    [1, undefined, 'disp', 'ux'], [2, undefined, 'disp', 'ux'],
+    [3, undefined, 'reac', 'fx'], [4, undefined, 'force', 'nStart']
+  ] : [
+    [1, 'modal', 'eig', 'value'], [2, 'modal', 'eig', 'value'],
+    [3, 'pdelta', 'disp', 'ux'], [4, 'pdelta', 'reac', 'fx'],
+    [5, 'pdelta', 'force', 'nStart'], [6, 'static', 'disp', 'ux']
+  ];
+  for (const [i, analysis, quantity, component] of cases) save(String(i), {...finding, test: `${adapter}/mismatch`, details: {
+    name: `instance-${i}`, status: 'mismatch', analysis, dim: 3, tol: 1e-6, kappa: i * 100,
+    n_bad: 1, max_err: [{eig: i * .01}, {disp_t: i * .01}, {reac_f: i * .01}, {force_f: i * .01}][['eig', 'disp', 'reac', 'force'].indexOf(quantity)], worst: [[quantity, i, component, i, i + 1, i * .01]]
+  }});
+  await report(args);
+  const created = calls.filter(c => c.name === 'create');
+  assert.equal(created.length, adapter === 'codeaster' ? 3 : 5);
+  assert.equal(created.filter(c => c.args.body.includes('**2 findings**')).length, 1);
+}));

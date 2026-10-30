@@ -38,7 +38,13 @@ class Models(unittest.TestCase):
                     evaluated.append(candidate)
                     d = models.structural_model(candidate)
                     result = status if 'needed' in d['elements'] and 1 in d['loads'] else 'refused'
-                    Path(cmd[-1]).write_text(json.dumps([{'status': result}]))
+                    row = {'status': result}
+                    if status == 'mismatch':
+                        row.update(status='mismatch', analysis='modal' if wrapped else 'static',
+                                   max_err={'disp': len(d['loads']) * .01}, kappa=len(d['elements']) * 100,
+                                   tol=1e-6, worst=[['disp' if result == status else 'reac',
+                                                     len(d['elements']), 'ux', .1, .2, len(d['loads']) * .01]])
+                    Path(cmd[-1]).write_text(json.dumps([row]))
                     return subprocess.CompletedProcess(cmd, harness_exit, '', '')
                 if status == 'false_reject':
                     return subprocess.CompletedProcess(cmd, 1, '{"error":"rejected"}', '')
@@ -102,6 +108,74 @@ class Models(unittest.TestCase):
 
     def test_budget_does_not_claim_minimality(self):
         self.replay('mismatch', budget=0)
+
+    def test_metamorphic_signature_ignores_numeric_details_but_preserves_check(self):
+        def failure(message):
+            return {'test': 'metamorphic/static/rotation', 'details': [message]}
+        a = failure('case-42: displacement error 0.002 exceeds tolerance 1e-6')
+        b = failure('case-9: displacement error 0.001 exceeds tolerance 2e-6')
+        c = failure('case-9: reaction error 0.001 exceeds tolerance 2e-6')
+        self.assertEqual(models.failure_signature(a), models.failure_signature(b))
+        self.assertNotEqual(models.failure_signature(a), models.failure_signature(c))
+
+    def test_metamorphic_reduction_preserves_violation_and_admissibility(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            source = base / 'model.json'
+            source.write_text(json.dumps({'loads': [1, 2], 'elements': {'needed': {}, 'extra': {}}}))
+            out = base / 'out'
+            evaluated = []
+            def replay(cmd, **kwargs):
+                if '-c' in cmd:
+                    return subprocess.CompletedProcess(cmd, 1)
+                if 'input' in kwargs:
+                    model = json.loads(kwargs['input'])
+                    return subprocess.CompletedProcess(cmd, 0 if 'needed' in model['elements'] else 1, '{}', '')
+                model = json.loads(Path(kwargs['env']['NIGHTLY_MODEL']).read_text())
+                evaluated.append(model)
+                quantity = 'displacement' if 1 in model['loads'] else 'reaction'
+                failure = {'test': 'metamorphic/static/rotation',
+                           'details': [f"replay: {quantity} error {len(model['loads']) * .01} exceeds tolerance 1e-6"]}
+                row = dict.fromkeys(['pass', 'fail', 'refused', 'inconclusive', 'unrepresentable', 'not_applicable'], 0)
+                row['fail'] = 1
+                Path(kwargs['env']['NIGHTLY_RESULTS']).write_text(json.dumps({'failures': [failure], 'verdicts': [row]}))
+                return subprocess.CompletedProcess(cmd, 101, '', '')
+            with patch.object(sys, 'argv', ['nightly', '--model', str(source), '--check', 'metamorphic', '--out', str(out)]), \
+                    patch.dict(os.environ, {'NIGHTLY_REPLAY_BIN': 'replay', 'ASTER_PYTHON': ''}), \
+                    patch.object(models, 'run', side_effect=replay), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(models.main(), 1)
+            finding = json.loads(next(out.glob('*.finding.json')).read_text())
+            self.assertEqual(finding['model'], {'loads': [1], 'elements': {'needed': {}}})
+            self.assertTrue(all('needed' in model['elements'] for model in evaluated))
+
+    def test_metamorphic_coverage_requires_usable_verdicts(self):
+        for verdict in ('pass', 'refused', 'inconclusive', 'unrepresentable', 'not_applicable'):
+            with self.subTest(verdict=verdict), tempfile.TemporaryDirectory() as tmp:
+                base = Path(tmp)
+                source = base / 'model.json'
+                source.write_text('{}')
+                out = base / 'out'
+                row = dict.fromkeys(['pass', 'fail', 'refused', 'inconclusive', 'unrepresentable', 'not_applicable'], 0)
+                row[verdict] = 3
+                row.update(analysis='static', invariant='rotation')
+                def replay(cmd, **kwargs):
+                    if '-c' in cmd:
+                        return subprocess.CompletedProcess(cmd, 1)
+                    Path(kwargs['env']['NIGHTLY_RESULTS']).write_text(json.dumps({'failures': [], 'verdicts': [row]}))
+                    return subprocess.CompletedProcess(cmd, 0, '', '')
+                with patch.object(sys, 'argv', ['nightly', '--model', str(source), '--check', 'metamorphic', '--out', str(out)]), \
+                        patch.dict(os.environ, {'NIGHTLY_REPLAY_BIN': 'replay', 'ASTER_PYTHON': ''}), \
+                        patch.object(models, 'run', side_effect=replay), contextlib.redirect_stdout(io.StringIO()):
+                    if verdict == 'pass':
+                        self.assertEqual(models.main(), 0)
+                    else:
+                        with self.assertRaisesRegex(RuntimeError, 'insufficient metamorphic coverage'):
+                            models.main()
+                counts = json.loads((out / 'summary.json').read_text())['comparisons']['metamorphic']
+                self.assertEqual(counts['completed'], 3 if verdict == 'pass' else 0)
+                category = 'inconclusive' if verdict in ('refused', 'inconclusive') else 'skipped'
+                if verdict != 'pass':
+                    self.assertEqual(counts[category][0][verdict], 3)
 
 
 class Artifacts(unittest.TestCase):
