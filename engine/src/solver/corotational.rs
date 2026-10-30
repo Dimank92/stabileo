@@ -91,7 +91,6 @@ pub fn solve_corotational_2d(
     // heated member that rotates is pushed by its own (fictitious) thermal
     // axial force: 12% on the tip rotation of a heated, bent cantilever.
     super::feature_gates::refuse_2d(input, "Corotational analysis", &[
-        super::feature_gates::Feature::PrescribedDisplacements,
         super::feature_gates::Feature::ThermalLoads,
     ])?;
     crate::element::connector::refuse_for_corotational_2d(input, "Corotational analysis")?;
@@ -104,6 +103,8 @@ pub fn solve_corotational_2d(
 
     let n = dof_num.n_total;
     let nf = dof_num.n_free;
+    let nr = n - nf;
+    let u_r = super::linear::prescribed_displacements_2d(input, &dof_num);
 
     // Build constraint system (if constraints present)
     let cs = FreeConstraintSystem::build_2d(&input, &dof_num)?;
@@ -132,6 +133,11 @@ pub fn solve_corotational_2d(
     // Incremental-iterative procedure
     for increment in 1..=n_increments {
         let load_factor = increment as f64 / n_increments as f64;
+
+        // Apply this increment's prescribed displacements to the restrained DOFs
+        for i in 0..nr {
+            u_full[nf + i] = load_factor * u_r[i];
+        }
 
         // Scaled external forces for this increment
         let f_ext: Vec<f64> = f_total.iter().map(|&f| load_factor * f).collect();
@@ -369,6 +375,11 @@ fn scaled_loads_2d(input: &SolverInput, factor: f64) -> SolverInput {
             SolverLoad::Thermal(_) => {}
         }
     }
+    for sup in m.supports.values_mut() {
+        if let Some(dx) = sup.dx { sup.dx = Some(dx * factor); }
+        if let Some(dz) = sup.dz { sup.dz = Some(dz * factor); }
+        if let Some(dry) = sup.dry { sup.dry = Some(dry * factor); }
+    }
     m
 }
 
@@ -392,6 +403,14 @@ fn scaled_loads_3d(input: &SolverInput3D, factor: f64) -> SolverInput3D {
             SolverLoad3D::PointOnElement(p) => { p.py *= factor; p.pz *= factor; }
             _ => {}
         }
+    }
+    for sup in m.supports.values_mut() {
+        if let Some(dx) = sup.dx { sup.dx = Some(dx * factor); }
+        if let Some(dy) = sup.dy { sup.dy = Some(dy * factor); }
+        if let Some(dz) = sup.dz { sup.dz = Some(dz * factor); }
+        if let Some(drx) = sup.drx { sup.drx = Some(drx * factor); }
+        if let Some(dry) = sup.dry { sup.dry = Some(dry * factor); }
+        if let Some(drz) = sup.drz { sup.drz = Some(drz * factor); }
     }
     m
 }
@@ -1313,7 +1332,8 @@ pub fn solve_corotational_3d(
     // As in 2D: no prescribed-displacement term, and
     // temperature as fixed global forces.
     super::feature_gates::refuse_3d(input, "Corotational analysis", &[
-        super::feature_gates::Feature::PrescribedDisplacements, super::feature_gates::Feature::ThermalLoads,
+        super::feature_gates::Feature::PrescribedDisplacements,
+        super::feature_gates::Feature::ThermalLoads,
         // The 3D co-rotational element has no warping DOF.
         super::feature_gates::Feature::Warping,
     ])?;
@@ -1327,6 +1347,8 @@ pub fn solve_corotational_3d(
 
     let n = dof_num.n_total;
     let nf = dof_num.n_free;
+    let nr = n - nf;
+    let u_r = super::linear::prescribed_displacements_3d(input, &dof_num);
     let left_hand = input.left_hand.unwrap_or(false);
 
     // Build constraint system (if constraints present)
@@ -1350,6 +1372,11 @@ pub fn solve_corotational_3d(
 
     for increment in 1..=n_increments {
         let load_factor = increment as f64 / n_increments as f64;
+
+        // Apply this increment's prescribed displacements to the restrained DOFs
+        for i in 0..nr {
+            u_full[nf + i] = load_factor * u_r[i];
+        }
         let f_ext: Vec<f64> = f_total.iter().map(|&f| load_factor * f).collect();
 
         let mut nr_converged = false;

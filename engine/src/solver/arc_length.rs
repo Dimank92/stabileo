@@ -126,7 +126,6 @@ pub fn solve_arc_length(input: &ArcLengthInput) -> Result<ArcLengthResult, Strin
     // solved in their frames (fix/inclined-supports, checked against the
     // rotated model).
     super::feature_gates::refuse_2d(&input.solver, "Arc-length analysis", &[
-        super::feature_gates::Feature::PrescribedDisplacements,
         super::feature_gates::Feature::ThermalLoads,
     ])?;
     crate::element::connector::refuse_for_corotational_2d(&input.solver, "Arc-length analysis")?;
@@ -161,14 +160,17 @@ pub fn solve_arc_length(input: &ArcLengthInput) -> Result<ArcLengthResult, Strin
     let asm = assembly::assemble_2d(&input.solver, &dof_num);
     let art = assembly::artificial_stiffness_entries(&asm);
     let its = asm.inclined_transforms_2d;
+    let nr = n - nf;
+    let u_r = super::linear::prescribed_displacements_2d(&input.solver, &dof_num);
+    let has_prescribed = u_r.iter().any(|&v| v != 0.0);
     let f_ref: Vec<f64> = asm.f[..nf].to_vec();
-    let f_ref_s = if let Some(ref cs) = cs {
+    let _f_ref_s = if let Some(ref cs) = cs {
         cs.reduce_vector(&f_ref)
     } else {
         f_ref.clone()
     };
     let f_ref_norm = vec_norm(&f_ref);
-    if f_ref_norm < 1e-15 {
+    if f_ref_norm < 1e-15 && !has_prescribed {
         return Err("Zero reference load".into());
     }
 
@@ -185,13 +187,16 @@ pub fn solve_arc_length(input: &ArcLengthInput) -> Result<ArcLengthResult, Strin
 
     let mut step = 0;
     while step < input.max_steps {
-        // Predictor: solve K_T * δu_hat = f_ref
+        // Predictor: solve K_T * δu_hat = f_t (f_ref with tangent's prescribed-DOF coupling)
         let asm_t = assemble_tangent(&input.solver, &dof_num, &u_full, &art, sparse, &its);
+        let k_fr_ur = asm_t.k_fr_mul(n, nf, &u_r);
+        let f_t: Vec<f64> = (0..nf).map(|i| f_ref[i] - k_fr_ur[i]).collect();
+        let f_t_s = if let Some(ref cs) = cs { cs.reduce_vector(&f_t) } else { f_t.clone() };
 
         let du_hat_s = {
             // New tangent each step: factor once, solve the predictor RHS.
             let tangent = factor_assembled(&asm_t, n, nf, ns, &cs, &mut sparse_sym_cache)?;
-            solve_with_tangent(&tangent, &f_ref_s, ns)?
+            solve_with_tangent(&tangent, &f_t_s, ns)?
         };
         let du_hat = if let Some(ref cs) = cs { cs.expand_solution(&du_hat_s) } else { du_hat_s };
 
@@ -215,6 +220,9 @@ pub fn solve_arc_length(input: &ArcLengthInput) -> Result<ArcLengthResult, Strin
             u_full[i] += delta_u[i];
         }
         lambda += delta_lambda;
+        for i in 0..nr {
+            u_full[nf + i] = lambda * u_r[i];
+        }
 
         // Corrector: N-R iterations with arc-length constraint
         let mut step_converged = false;
@@ -252,7 +260,10 @@ pub fn solve_arc_length(input: &ArcLengthInput) -> Result<ArcLengthResult, Strin
             let residual_s = if let Some(ref cs) = cs { cs.reduce_vector(&residual) } else { residual.clone() };
             let tangent = factor_assembled(&asm_t, n, nf, ns, &cs, &mut sparse_sym_cache)?;
             let du_r_s = solve_with_tangent(&tangent, &residual_s, ns)?;
-            let du_t_s = solve_with_tangent(&tangent, &f_ref_s, ns)?;
+            let k_fr_ur = asm_t.k_fr_mul(n, nf, &u_r);
+            let f_t: Vec<f64> = (0..nf).map(|i| f_ref[i] - k_fr_ur[i]).collect();
+            let f_t_s = if let Some(ref cs) = cs { cs.reduce_vector(&f_t) } else { f_t };
+            let du_t_s = solve_with_tangent(&tangent, &f_t_s, ns)?;
             let du_r = if let Some(ref cs) = cs { cs.expand_solution(&du_r_s) } else { du_r_s };
             let du_t = if let Some(ref cs) = cs { cs.expand_solution(&du_t_s) } else { du_t_s };
 
@@ -292,6 +303,9 @@ pub fn solve_arc_length(input: &ArcLengthInput) -> Result<ArcLengthResult, Strin
             }
             lambda += d_lambda;
             delta_lambda += d_lambda;
+            for i in 0..nr {
+                u_full[nf + i] = lambda * u_r[i];
+            }
         }
 
         if !step_converged {
@@ -303,6 +317,9 @@ pub fn solve_arc_length(input: &ArcLengthInput) -> Result<ArcLengthResult, Strin
                 u_full[i] -= delta_u[i];
             }
             lambda -= delta_lambda;
+            for i in 0..nr {
+                u_full[nf + i] = lambda * u_r[i];
+            }
 
             // Halve arc-length and retry (don't consume step budget)
             ds *= 0.5;
@@ -336,9 +353,21 @@ pub fn solve_arc_length(input: &ArcLengthInput) -> Result<ArcLengthResult, Strin
     }
 
     // Build final results using corotational forces (not linear)
-    let u_global = assembly::to_global(&u_full[..nf], n, &its);
+    let mut u_global = u_full.clone();
+    for it in &its {
+        it.reverse(&mut u_global);
+    }
     let displacements = super::linear::build_displacements_2d(&dof_num, &u_global);
     let element_forces = super::corotational::compute_corotational_forces(&input.solver, &dof_num, &u_global);
+    let asm_final = assemble_tangent(&input.solver, &dof_num, &u_full, &art, sparse, &its);
+    let mut reactions_vec = vec![0.0; nr];
+    for i in 0..nr {
+        reactions_vec[i] = asm_final.f_int[nf + i] - lambda * asm.f[nf + i];
+    }
+    let mut reactions = super::linear::build_reactions_2d_inclined(
+        &input.solver, &dof_num, &reactions_vec, &asm.f[nf..n], nf, &u_global, &its,
+    );
+    reactions.sort_by_key(|r| r.node_id);
 
     // Compute constraint forces using final tangent stiffness
     let constraint_forces = if let Some(ref fcs) = cs {
@@ -363,7 +392,7 @@ pub fn solve_arc_length(input: &ArcLengthInput) -> Result<ArcLengthResult, Strin
     Ok(ArcLengthResult {
         results: AnalysisResults {
             displacements,
-            reactions: vec![],
+            reactions,
             element_forces,
             constraint_forces,
             diagnostics: vec![],
@@ -384,7 +413,6 @@ pub fn solve_displacement_control(input: &DisplacementControlInput) -> Result<Di
     // As above: validated before assembly indexes by id.
     super::linear::validate_input_2d(&input.solver)?;
     super::feature_gates::refuse_2d(&input.solver, "Displacement-control analysis", &[
-        super::feature_gates::Feature::PrescribedDisplacements,
         super::feature_gates::Feature::InclinedSupports, super::feature_gates::Feature::ThermalLoads,
     ])?;
     crate::element::connector::refuse_for_corotational_2d(&input.solver, "Displacement-control analysis")?;
@@ -446,24 +474,26 @@ pub fn solve_displacement_control(input: &DisplacementControlInput) -> Result<Di
     let asm = assembly::assemble_2d(&input.solver, &dof_num);
     let art = assembly::artificial_stiffness_entries(&asm);
     let its = asm.inclined_transforms_2d;
-    let f_ref: Vec<f64> = asm.f[..nf].to_vec();
+    let nr = n - nf;
+    let u_r = super::linear::prescribed_displacements_2d(&input.solver, &dof_num);
+    let mut f_ref: Vec<f64> = asm.f[..nf].to_vec();
+    let mut f_ref_norm = vec_norm(&f_ref);
+    if f_ref_norm < 1e-15 {
+        // If no external loads are defined, set a unit reference load at the control DOF
+        // so displacement control drives the specified DOF.
+        f_ref[ctrl] = if input.target_displacement < 0.0 { -1.0 } else { 1.0 };
+        f_ref_norm = vec_norm(&f_ref);
+    }
     let f_ref_s_dc = if let Some(ref cs) = cs_dc {
         cs.reduce_vector(&f_ref)
     } else {
         f_ref.clone()
     };
-    // Loop-invariant: f_ref is built once and never mutated.
-    let f_ref_norm = vec_norm(&f_ref);
-    // Same guard `solve_arc_length` applies. Without a reference load the
-    // tangent correction du_t is zero, so d_lambda is pinned at zero and the
-    // control DOF is never driven anywhere — the solver would burn
-    // n_steps * max_iter corotational assemblies to report a failure whose
-    // cause was in the input all along.
-    if f_ref_norm < 1e-15 {
-        return Err("Zero reference load".into());
-    }
 
     let mut u_full = vec![0.0; n];
+    for i in 0..nr {
+        u_full[nf + i] = u_r[i];
+    }
     let mut lambda = 0.0_f64;
     let mut steps = Vec::new();
     let mut total_iters = 0;
@@ -581,9 +611,21 @@ pub fn solve_displacement_control(input: &DisplacementControlInput) -> Result<Di
         }
     }
 
-    let u_global = assembly::to_global(&u_full[..nf], n, &its);
+    let mut u_global = u_full.clone();
+    for it in &its {
+        it.reverse(&mut u_global);
+    }
     let displacements = super::linear::build_displacements_2d(&dof_num, &u_global);
     let element_forces = super::corotational::compute_corotational_forces(&input.solver, &dof_num, &u_global);
+    let asm_final = assemble_tangent(&input.solver, &dof_num, &u_full, &art, sparse, &its);
+    let mut reactions_vec = vec![0.0; nr];
+    for i in 0..nr {
+        reactions_vec[i] = asm_final.f_int[nf + i] - lambda * asm.f[nf + i];
+    }
+    let mut reactions = super::linear::build_reactions_2d_inclined(
+        &input.solver, &dof_num, &reactions_vec, &asm.f[nf..n], nf, &u_global, &its,
+    );
+    reactions.sort_by_key(|r| r.node_id);
 
     // Compute constraint forces using final tangent stiffness
     let constraint_forces = if let Some(ref fcs) = cs_dc {
@@ -608,7 +650,7 @@ pub fn solve_displacement_control(input: &DisplacementControlInput) -> Result<Di
     Ok(DisplacementControlResult {
         results: AnalysisResults {
             displacements,
-            reactions: vec![],
+            reactions,
             element_forces,
             constraint_forces,
             diagnostics: vec![],
@@ -793,6 +835,34 @@ struct TangentAssembly {
     trip_vals: Vec<f64>,
 }
 
+impl TangentAssembly {
+    fn k_fr_mul(&self, n: usize, nf: usize, u_r: &[f64]) -> Vec<f64> {
+        let mut out = vec![0.0; nf];
+        if u_r.iter().all(|&v| v == 0.0) {
+            return out;
+        }
+        if !self.k_t.is_empty() {
+            let nr = n - nf;
+            for i in 0..nf {
+                let start = i * n + nf;
+                out[i] = self.k_t[start..start + nr].iter().zip(u_r).map(|(a, b)| a * b).sum::<f64>();
+            }
+        } else {
+            for k in 0..self.trip_rows.len() {
+                let i = self.trip_rows[k];
+                let j = self.trip_cols[k];
+                let val = self.trip_vals[k];
+                if i >= nf && j < nf {
+                    out[j] += val * u_r[i - nf];
+                } else if j >= nf && i < nf {
+                    out[i] += val * u_r[j - nf];
+                }
+            }
+        }
+        out
+    }
+}
+
 /// `u_frame` and the returned tangent and `f_int` are in the inclined-roller
 /// frames `its`; the elements see the displacement in global axes.
 fn assemble_tangent(
@@ -804,7 +874,10 @@ fn assemble_tangent(
     its: &[InclinedTransformData2D],
 ) -> TangentAssembly {
     let n = dof_num.n_total;
-    let u_global = assembly::to_global(&u_frame[..dof_num.n_free], n, its);
+    let mut u_global = u_frame.to_vec();
+    for it in its {
+        it.reverse(&mut u_global);
+    }
     let u_full = &u_global[..];
     let mut f_int = vec![0.0; n];
     let mut k_t: Vec<f64> = Vec::new();

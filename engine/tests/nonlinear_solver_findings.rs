@@ -846,3 +846,113 @@ fn corotational_small_load_converges_to_tight_tolerance() {
     let uz = |res: &AnalysisResults3D| res.displacements.iter().find(|d| d.node_id == 2).unwrap().uz;
     close(uz(&r.results), uz(&linear::solve_3d(&s3).unwrap()), 1e-6, "3D tip");
 }
+
+
+/// Issue #858: Fehér (2026) elastica strip bent into vertical clamps by prescribed end
+/// rotations. A straight flat strip of length L bent by ±π/2 at its ends into a clamped
+/// arch forms an exact semicircle of radius R = L / π, apex height R, and end moment M = π·EI/L.
+#[test]
+fn elastica_bent_into_clamped_arch_by_prescribed_rotation() {
+    use dedaliano_engine::solver::corotational;
+    use std::f64::consts::PI;
+
+    let l = 1.0;
+    let n = 20;
+    let elem_len = l / n as f64;
+    let e_mpa = 200_000.0;
+    let iz = 1e-6; // m⁴ -> EI = 200 kN·m²
+    let a = 0.01;
+
+    let nodes: Vec<_> = (0..=n).map(|i| (i + 1, i as f64 * elem_len, 0.0)).collect();
+    let elems: Vec<_> = (0..n).map(|i| (i + 1, "frame", i + 1, i + 2, 1, 1, false, false)).collect();
+
+    // Node 1: clamped at +π/2 rotation.
+    // Node n+1: guided in X (restrains dz and dry, allows dx), clamped at -π/2 rotation.
+    let sups = vec![
+        (1, 1, "fixed"),
+        (2, n + 1, "guidedX"),
+    ];
+
+    let mut input = make_input(
+        nodes,
+        vec![(1, e_mpa, 0.3)],
+        vec![(1, a, iz)],
+        elems,
+        sups,
+        vec![],
+    );
+
+    // Apply prescribed end rotations of ±π/2
+    input.supports.get_mut("1").unwrap().dry = Some(PI / 2.0);
+    input.supports.get_mut("2").unwrap().dry = Some(-PI / 2.0);
+
+    let res = corotational::solve_corotational_2d(&input, 50, 1e-7, 20, false)
+        .expect("corotational solver should accept prescribed support rotations");
+    assert!(res.converged, "Elastica bending by prescribed rotation should converge");
+
+    // Exact analytical semicircle: R = L / π
+    let r_exact = l / PI;
+    let mid_node = n / 2 + 1;
+    let apex_uz = res.results.displacements.iter().find(|d| d.node_id == mid_node).unwrap().uz;
+    close(apex_uz, r_exact, 0.005, "Apex height matches exact semicircle R = L/π");
+
+    // Tip shortening: initial X = 1.0, final X = 2*R = 2/π -> ux = -(1 - 2/π)
+    let tip_ux = res.results.displacements.iter().find(|d| d.node_id == n + 1).unwrap().ux;
+    let shortening_exact = -(l - 2.0 * r_exact);
+    close(tip_ux, shortening_exact, 0.005, "Tip shortening matches exact 2R span");
+
+    // Clamp reaction moment M = π·EI / L = 200 * π ≈ 628.3185 kN·m
+    let m_exact = PI * (e_mpa * 1000.0 * iz) / l;
+    let r1 = res.results.reactions.iter().find(|r| r.node_id == 1).unwrap();
+    close(r1.my, m_exact, 0.01, "Left clamp reaction moment matches exact M = πEI/L");
+}
+
+/// Issue #858: Nonlinear snap-through under displacement control with prescribed support rotations
+#[test]
+fn elastica_snap_through_displacement_control_with_prescribed_supports() {
+    use dedaliano_engine::solver::arc_length::{solve_displacement_control, DisplacementControlInput};
+    use std::f64::consts::PI;
+
+    let l = 1.0;
+    let n = 10;
+    let elem_len = l / n as f64;
+    let e_mpa = 200_000.0;
+    let iz = 1e-6;
+    let a = 0.01;
+
+    let nodes: Vec<_> = (0..=n).map(|i| (i + 1, i as f64 * elem_len, 0.0)).collect();
+    let elems: Vec<_> = (0..n).map(|i| (i + 1, "frame", i + 1, i + 2, 1, 1, false, false)).collect();
+
+    let sups = vec![
+        (1, 1, "fixed"),
+        (2, n + 1, "guidedX"),
+    ];
+
+    let mut input = make_input(
+        nodes,
+        vec![(1, e_mpa, 0.3)],
+        vec![(1, a, iz)],
+        elems,
+        sups,
+        vec![],
+    );
+
+    input.supports.get_mut("1").unwrap().dry = Some(PI / 6.0);
+    input.supports.get_mut("2").unwrap().dry = Some(-PI / 6.0);
+
+    let mid_node = n / 2 + 1;
+    let dc_input = DisplacementControlInput {
+        solver: input,
+        control_node: mid_node,
+        control_dof: 1, // uz
+        target_displacement: 0.05,
+        n_steps: 10,
+        max_iter: 30,
+        tolerance: 1e-6,
+    };
+
+    let res = solve_displacement_control(&dc_input)
+        .expect("displacement control should accept prescribed support displacements/rotations");
+    assert!(res.converged, "Displacement control step should converge");
+    assert!(!res.steps.is_empty());
+}
