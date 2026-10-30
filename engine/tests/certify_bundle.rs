@@ -536,3 +536,113 @@ fn export_bundles_2d_with_settlements() {
     (s.support_type, s.angle) = ("inclinedRoller".into(), Some(0.3));
     assert!(export_linear_bundle_2d(&inclined).unwrap_err().contains("inclined"));
 }
+
+
+#[test]
+fn test_certcheck_linear_bundles_valid_and_tampered() {
+    for name in FIXTURES {
+        let input = load(name);
+        let b = export_linear_bundle_3d(&input).unwrap();
+        let json = b.to_json();
+
+        // 1. Valid bundle must pass certcheck
+        let rep = dedaliano_engine::certify::certcheck::check_bundle_json(&json).unwrap();
+        assert!(rep.valid, "{name} valid check failed: {}", rep.summary);
+        assert_eq!(rep.format, dedaliano_engine::certify::bundle::BUNDLE_FORMAT);
+        assert!(rep.checks.iter().all(|c| c.passed));
+
+        // 2. Tampered bound must fail
+        let mut t_bound = b.clone();
+        let bound = from_dyadic(b.bound).unwrap();
+        t_bound.bound = to_dyadic(bound / 1024.0).unwrap();
+        let rep_tampered_bound = dedaliano_engine::certify::certcheck::check_linear_bundle(&t_bound).unwrap();
+        assert!(!rep_tampered_bound.valid, "{name} tampered bound must be rejected");
+
+        // 3. Tampered displacement u must fail
+        let mut t_u = b.clone();
+        let u: Vec<f64> = b.u.iter().map(|&d| from_dyadic(d).unwrap()).collect();
+        let k = (0..u.len()).max_by(|&i, &j| u[i].abs().total_cmp(&u[j].abs())).unwrap();
+        t_u.u[k] = to_dyadic(u[k] + 4.0 * bound).unwrap();
+        let rep_tampered_u = dedaliano_engine::certify::certcheck::check_linear_bundle(&t_u).unwrap();
+        assert!(!rep_tampered_u.valid, "{name} tampered u must be rejected");
+
+        // 4. Tampered mu must fail (Gershgorin failure)
+        let mut t_mu = b.clone();
+        let mut dmin = f64::INFINITY;
+        for j in 0..b.n {
+            for p in b.k.col_ptr[j]..b.k.col_ptr[j + 1] {
+                if b.k.row_idx[p] == j {
+                    dmin = dmin.min(from_dyadic(b.k.values[p]).unwrap());
+                }
+            }
+        }
+        t_mu.mu = to_dyadic(2.0 * dmin).unwrap();
+        let rep_tampered_mu = dedaliano_engine::certify::certcheck::check_linear_bundle(&t_mu).unwrap();
+        assert!(!rep_tampered_mu.valid, "{name} tampered mu must be rejected");
+    }
+}
+
+#[test]
+fn test_certcheck_plastic_bundles_valid_and_tampered() {
+    let input = plastic_portal_2d();
+    let b = export_plastic_bundle_2d(&input).unwrap();
+    let json = b.to_json();
+
+    // 1. Valid plastic bundle must pass certcheck
+    let rep = dedaliano_engine::certify::certcheck::check_bundle_json(&json).unwrap();
+    assert!(rep.valid, "plastic 2d portal valid check failed: {}", rep.summary);
+    assert_eq!(rep.format, dedaliano_engine::certify::plastic_bundle::PLASTIC_BUNDLE_FORMAT);
+    assert!(rep.checks.iter().all(|c| c.passed));
+
+    // 2. Crossed bounds lambda_lo > lambda_up must fail
+    let mut t_bounds = b.clone();
+    t_bounds.static_cert.lambda = scale_q(&b.kinematic.lambda, &qr(2, 1));
+    let rep_tampered = dedaliano_engine::certify::certcheck::check_plastic_bundle(&t_bounds).unwrap();
+    assert!(!rep_tampered.valid, "plastic crossed bounds must be rejected");
+
+    // 3. Equilibrium violation must fail
+    let mut t_eq = b.clone();
+    t_eq.static_cert.x[0] = scale_q(&t_eq.static_cert.x[0], &qr(2, 1));
+    let rep_tampered_eq = dedaliano_engine::certify::certcheck::check_plastic_bundle(&t_eq).unwrap();
+    assert!(!rep_tampered_eq.valid, "plastic equilibrium violation must be rejected");
+}
+
+#[test]
+fn test_certcheck_combination_bundles_valid_and_tampered() {
+    let input = multi_case_2d("ex-frame-cirsoc-dl", 2);
+    let b = export_combination_bundle_2d(&input).unwrap();
+    let json = b.to_json();
+
+    // 1. Valid combination bundle must pass certcheck
+    let rep = dedaliano_engine::certify::certcheck::check_bundle_json(&json).unwrap();
+    assert!(rep.valid, "combo valid check failed: {}", rep.summary);
+    assert_eq!(rep.format, dedaliano_engine::certify::combination_bundle::COMBINATION_BUNDLE_FORMAT);
+    assert!(rep.checks.iter().all(|c| c.passed));
+
+    // 2. Tampered combo bound (shrunk below linear sum) must fail
+    let mut t_combo = b.clone();
+    let b_val = from_dyadic(t_combo.combos[0].bound).unwrap();
+    t_combo.combos[0].bound = to_dyadic(b_val / 100.0).unwrap();
+    let rep_tampered = dedaliano_engine::certify::certcheck::check_combination_bundle(&t_combo).unwrap();
+    assert!(!rep_tampered.valid, "tampered combo bound must be rejected");
+}
+
+#[test]
+fn test_certcheck_universal_dispatch_and_adversarial() {
+    let input = load(FIXTURES[0]);
+    let b = export_linear_bundle_3d(&input).unwrap();
+    let json = b.to_json();
+    let rep = dedaliano_engine::certify::certcheck::check_bundle_json(&json).unwrap();
+    assert!(rep.valid);
+
+    // Test malformed JSON
+    assert!(dedaliano_engine::certify::certcheck::check_bundle_json("not json").is_err());
+    assert!(dedaliano_engine::certify::certcheck::check_bundle_json(r#"{"format": "unknown.v999"}"#).is_err());
+
+    // Test invalid permutation
+    let mut bad_perm = b.clone();
+    bad_perm.perm[0] = 999999;
+    let rep = dedaliano_engine::certify::certcheck::check_linear_bundle(&bad_perm).unwrap();
+    assert!(!rep.valid);
+    assert!(rep.summary.contains("perm"));
+}

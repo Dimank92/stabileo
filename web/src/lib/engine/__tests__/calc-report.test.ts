@@ -156,3 +156,19 @@ describe('the report figure of a 2D model shown upright in 3D', () => {
     expect(Math.abs(y1! - y2!)).toBeGreaterThan(10);
   });
 });
+
+describe('calc-report certificate bundle embedding', () => {
+  it('embeds the certificate bundle JSON and offline verify button', () => {
+    const bundleJson = JSON.stringify({
+      format: 'stabileo.linear-certificate.v2',
+      n: 42,
+      info: { mu: 1.25e3, bound: 4.56e-5 },
+    });
+    const html = generateCalcReportHtml(baseData({ certificateBundle: bundleJson }));
+    expect(html).toContain('Proof-Carrying Certificate Bundle');
+    expect(html).toContain('Verify this report offline');
+    expect(html).toContain('<script type="application/json" id="stabileo-certificate-bundle">');
+    expect(html).toContain('stabileo.linear-certificate.v2');
+    expect(html).toContain('42');
+  });
+});

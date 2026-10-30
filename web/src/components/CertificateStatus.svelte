@@ -17,6 +17,8 @@
   const shown = $derived(certificateStore.shown(is3D));
   const tooltip = $derived(t(shown.status !== 'idle' && shown.scope && shown.scope !== 'single' ? 'certificate.comboTooltip' : 'certificate.tooltip'));
   let exporting = $state(false);
+  let verifying = $state(false);
+  let verifiedSummary = $state<string | null>(null);
 
   function text(c: { absBound: number; relBound: number | null }): string {
     const scope = shown.status === 'done' ? shown.scope : undefined;
@@ -45,6 +47,26 @@
       exporting = false;
     }
   }
+
+  async function verifyOffline() {
+    verifying = true;
+    verifiedSummary = null;
+    try {
+      const bundle = await certificateStore.exportBundle(is3D);
+      if (!bundle) throw new Error('No bundle available');
+      const rep = await certificateStore.verifyBundle(bundle);
+      if (rep.valid) {
+        verifiedSummary = `✓ Offline verified (${rep.checks.length} checks, ${rep.elapsedMs.toFixed(1)}ms)`;
+        uiStore.toast(rep.summary, 'success');
+      } else {
+        uiStore.toast(rep.summary || rep.error || 'Verification failed', 'error');
+      }
+    } catch (e) {
+      uiStore.toast(errorText(e, 'Verification error'), 'error');
+    } finally {
+      verifying = false;
+    }
+  }
 </script>
 
 {#if shown.status === 'pending'}
@@ -54,9 +76,13 @@
     <div class="cert ok" title={tooltip} data-testid="certificate-status">
       {text(shown.certificate)}
       {#if certificateStore.canExportBundle(is3D)}
-        <button class="cert-dl" title={t('certificate.bundleTooltip')} disabled={exporting} onclick={download} data-testid="certificate-download">{t('certificate.download')}</button>
+        <button class="cert-dl" title={t('certificate.bundleTooltip')} disabled={exporting || verifying} onclick={download} data-testid="certificate-download">{t('certificate.download')}</button>
+        <button class="cert-dl" title="Verify certificate bundle offline in browser using WASM certcheck" disabled={verifying || exporting} onclick={verifyOffline} data-testid="certificate-verify">Verify offline</button>
       {/if}
     </div>
+    {#if verifiedSummary}
+      <div class="cert ok" style="color:var(--st-ok);font-weight:600" data-testid="certificate-verified-badge">{verifiedSummary}</div>
+    {/if}
     {#if e2e && e2eText(e2e)}
       <div class="cert" class:ok={e2e.status === 'certified'} class:no={e2e.status === 'failed'} title={t('certificate.e2eTooltip')} data-testid="certificate-e2e">
         {e2eText(e2e)}

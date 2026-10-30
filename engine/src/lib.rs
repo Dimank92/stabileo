@@ -191,6 +191,18 @@ pub fn export_combination_bundle_3d(json: &str) -> Result<String, JsValue> {
     Ok(bundle.to_json())
 }
 
+/// Re-verify an exported certificate bundle offline in exact arithmetic
+/// (stabileo.linear-certificate.v1/v2, stabileo.combination-certificate.v1,
+/// stabileo.plastic-certificate.v1, docs/verification/CERTIFY.md).
+/// JSON bundle string in -> JSON VerificationReport string out.
+#[wasm_bindgen]
+pub fn verify_certificate_bundle_wasm(json: &str) -> Result<String, JsValue> {
+    let report = certify::certcheck::check_bundle_json(json)
+        .map_err(|e| JsValue::from_str(&e))?;
+    serde_json::to_string(&report)
+        .map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
 /// Solve 2D P-Delta and certify the displacements: a Newton–Kantorovich bound on
 /// the distance to the exact fixed point of the P-Delta model, its uniqueness
 /// radius and certified stability (docs/verification/CERTIFY.md).

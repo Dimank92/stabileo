@@ -2,6 +2,7 @@
 
 pub mod buckling;
 pub mod bundle;
+pub mod certcheck;
 pub mod combination_bundle;
 pub mod combinations;
 pub mod constrained;
@@ -35,4 +36,8 @@ pub use solver::{
     certify_linear_2d, certify_linear_2d_full, certify_linear_3d, certify_linear_3d_full, certify_results_2d,
     certify_results_3d, certify_load_cases_2d, certify_load_cases_3d, solver_assembly_2d, solver_assembly_3d, CertificateLevel,
     CertifiedResults2D, CertifiedResults3D, SolverAssembly,
+};
+
+pub use certcheck::{
+    check_bundle_json, check_linear_bundle, check_combination_bundle, check_plastic_bundle, VerificationReport,
 };

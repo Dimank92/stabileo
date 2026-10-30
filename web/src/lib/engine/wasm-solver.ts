@@ -990,6 +990,7 @@ const CERTIFY_EXPORTS = [
   'export_linear_bundle_2d', 'export_linear_bundle_3d',
   'export_plastic_bundle_2d', 'export_plastic_bundle_3d',
   'export_combination_bundle_2d', 'export_combination_bundle_3d',
+  'verify_certificate_bundle_wasm',
   // Not a certificate, but the same kind of job: a re-solve to hash, run off the main thread
   // (`store/result-provenance.ts` ensureEngineHashes).
   'engine_reproduce_hashes',
@@ -2408,4 +2409,30 @@ export function analyzeSectionPlastic(input: {
 }): PlasticResponse {
   if (!wasmReady || !wasmAnalyzeSectionPlastic) throw new Error('WASM solver not initialized. Call initSolver() first.');
   return JSON.parse(wasmAnalyzeSectionPlastic(JSON.stringify(input)));
+}
+
+export interface VerificationReport {
+  valid: boolean;
+  format: string;
+  summary: string;
+  elapsedMs: number;
+  checks: Array<{
+    name: string;
+    passed: boolean;
+    detail: string;
+  }>;
+  provenance?: {
+    inputSha256: string;
+    engineVersion: string;
+    engineCommit: string;
+    kinds: string[];
+  };
+  error?: string;
+}
+
+/**
+ * Re-checks any certificate bundle JSON offline in exact arithmetic.
+ */
+export function verifyCertificateBundle(json: string): VerificationReport {
+  return callCertify('verify_certificate_bundle_wasm', [json]);
 }

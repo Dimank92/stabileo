@@ -20,7 +20,7 @@ import { certifyInWorker, PoolUnavailableError } from '../engine/solver-pool';
 import {
   certifyLinearWire, hasCertifyExport, type EndToEnd, type LinearCertificate, type LinearCertificateOnly,
   type ForceBound2D, type ForceBound3D, type ShellBound, type MultiCaseCertificate, type CombinationCertificate,
-  type StationBound2D, type StationBound3D, type ReactionBound2D, type ReactionBound3D, type ShownBounds,
+  type StationBound2D, type StationBound3D, type ReactionBound2D, type ReactionBound3D, type ShownBounds, type VerificationReport,
 } from '../engine/wasm-solver';
 import { runCertify, hasCertify } from '../engine/certify-jobs';
 import { errorText } from '../utils/error-text';
@@ -303,9 +303,16 @@ function createCertificateStore() {
       if (!input || !this.canExportBundle(is3D)) return null;
       return runCertify(BUNDLE_EXPORT[input.dim], [JSON.stringify(input.wire())]);
     },
+
+    /**
+     * Re-verify an exported certificate bundle offline in exact arithmetic using the WASM certcheck.
+     */
+    async verifyBundle(bundleJson: string): Promise<VerificationReport> {
+      return runCertify('verify_certificate_bundle_wasm', [bundleJson]);
+    },
   };
 }
 
 export const certificateStore = createCertificateStore();
 
-export type { LinearCertificate };
+export type { LinearCertificate, VerificationReport };
