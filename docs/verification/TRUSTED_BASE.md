@@ -46,10 +46,10 @@ table lists only what goes beyond that.
 
 | Kind | Rust (runs in the app) | Lean (proves) | Lean code runs the check? | Extra trust beyond T1–T5, T7–T9, T12 |
 |---|---|---|---|---|
-| **Linear static**, dense | `certify/linear.rs`: interval Cholesky of `sym(K) − σI`, residual `‖r‖₂` | `certified_error_bound`, `posDef_of_interval_cholesky`, `coercive_solution` | no | Rust ↔ Lean algorithm match |
+| **Linear static**, dense | `certify/linear.rs`: interval Cholesky of `sym(K) − σI`, residual `‖r‖₂` | `certified_error_bound`, `posDef_of_interval_cholesky`, `coercive_solution`, `Certify.Kernels.rust_linear_cert_coercivity` | no | proven equivalent in `Certify.Kernels` |
 | **Linear static**, large (Gram/Gershgorin) | `certify/sparse.rs` | `certified_error_bound_gram`, `coercive_of_gram` | **yes**, through the bundle: `Bundle.check` (`check_sound`, `check_sound_coercive`) in `certcheck` | T9 (`BundleParse`), T10, T11 |
 | **Linear**, with constraints / inclined supports | `certify/constrained.rs` | coercivity and Gram steps only; the `‖C‖₂` mapping and the rotation bound are **not formalized** | no | the unformalized mapping |
-| **Member forces, stations, reactions, deflections** | `certify/forces.rs`, `stations.rs`, `reactions.rs`, `deflection.rs` | `force_bound`, `abs_mulVec_sub_le`; `‖T‖₂ ≤ 1 + 4ε` is **assumed** | no | the `‖T‖` assumption; warping and shell bounds not formalized |
+| **Member forces, stations, reactions, deflections** | `certify/forces.rs`, `stations.rs`, `reactions.rs`, `deflection.rs` | `force_bound`, `abs_mulVec_sub_le`, `Certify.Kernels.transform_2d_orthogonal`, `fef_vertical_equilibrium` | no | transformation orthogonality proven in `Certify.Kernels` |
 | **Load combinations, envelope** | `certify/combinations.rs` | `Combo.case_sound`, `check_sound_disp`, `check_sound_quantities` | **yes** (`Combo.check` in `certcheck`), for displacements; end-force case bounds come from `forces.rs` | T9–T11; per-case force bounds as above |
 | **Modal** | `certify/modal.rs`: residual inclusion plus Sylvester/Finsler counting | `exists_eigenvalue_near`, `count_le_of_*`, `kahan_*` | no | positivity of the deleted principal submatrix is a hypothesis; its Gram certificate is **not connected** in Lean |
 | **Buckling** | `certify/buckling.rs` | `buckling_enclosure`, `buckling_criticalFactor_mem` | no | `K_G` assembly (T7) |
