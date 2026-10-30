@@ -1,3 +1,4 @@
+import copy
 import json
 import math
 import unittest
@@ -17,6 +18,20 @@ class ProtocolTests(unittest.TestCase):
             s = lint(json.loads(p.read_text()))
             for n in s['mesh_sequence']:
                 precheck(generate(s,n))
+
+    def test_polyline_out_of_plane_contract(self):
+        for name in ('mattiasson-1', 'shallow-toggle-frame', 'shallow-toggle-truss'):
+            for field in ('geometry', 'force', 'analytic_total'):
+                s=spec(name)
+                if field == 'geometry': s['geometry']['points'][1][1]=2000
+                else: s['loads'][field][1]=2000
+                with self.subTest(name=name, field=field):
+                    with self.assertRaisesRegex(ValueError, 'out-of-plane'): lint(s)
+                    with self.assertRaisesRegex(ValueError, 'out-of-plane'): generate(s,2)
+            s=spec(name)
+            baseline=generate(s,2)['model']
+            for point in s['geometry']['points']: point[1]=2000
+            self.assertEqual(generate(s,2)['model'],baseline)
 
     def test_missing_references(self):
         s=spec();s['references'].pop()
@@ -171,6 +186,71 @@ class ProtocolTests(unittest.TestCase):
                     displacements=[dict(nodeId=k,ux=0.,uz=0.,ry=0.) for k in (1,2)])
         with self.assertRaisesRegex(ValueError,'reaction moments'):
             check_result(e,result)
+
+    def roof_result(self):
+        e=generate(spec(),2,full=True)
+        m=e['model']
+        result=dict(displacements=[dict(nodeId=p['id'], ux=0.,uy=0.,uz=0.,rx=0.,ry=0.,rz=0.)
+                                   for p in m['nodes'].values()], reactions=[])
+        # Transfer each vertical load to the two end diaphragms by statics.
+        reactions={int(k):dict(nodeId=int(k),fx=0.,fy=0.,fz=0.,mx=0.,my=0.,mz=0.)
+                   for k in m['supports']}
+        length=e['spec']['geometry']['half_length']
+        for load in m['loads']:
+            p=m['nodes'][str(load['data']['nodeId'])]
+            for end in (-length,length):
+                support=next(q for q in m['nodes'].values()
+                             if q['x']==end and q['y']==p['y'] and q['z']==p['z'])
+                reactions[support['id']]['fz']-=load['data']['fz']*(1+p['x']/end)/2
+        result['reactions']=list(reactions.values())
+        self.assertEqual(check_result(e,result),0.)
+        return e,result
+
+    def test_balanced_reactions_at_unsupported_nodes(self):
+        e,result=self.roof_result()
+        result['reactions']=[dict(nodeId=l['data']['nodeId'],fz=-l['data']['fz'])
+                             for l in e['model']['loads']]
+        with self.assertRaisesRegex(ValueError,'reaction at unsupported node'):
+            check_result(e,result)
+
+    def test_balanced_reactions_on_free_components(self):
+        e,result=self.roof_result()
+        ends=[r for r in result['reactions']
+              if not e['model']['supports'][str(r['nodeId'])]['rrx']]
+        ends[0]['mx']=1.;ends[1]['mx']=-1.
+        with self.assertRaisesRegex(ValueError,'reaction on unrestrained DOF'):
+            check_result(e,result)
+        e=generate(spec('shallow-toggle-truss'),1)
+        result=dict(displacements=[dict(nodeId=k,ux=0.,uz=0.,ry=0.) for k in (1,2,3)],
+                    reactions=[dict(nodeId=k,rx=0.,rz=25.,my=0.) for k in (1,3)])
+        check_result(e,result)
+        result['reactions'][0]['my']=1.;result['reactions'][1]['my']=-1.
+        with self.assertRaisesRegex(ValueError,'reaction on unrestrained DOF'):
+            check_result(e,result)
+
+    def test_prescribed_displacements(self):
+        # The reduced roof includes all six restraint components. Zero loading
+        # isolates kinematic admissibility from force and moment equilibrium.
+        e=generate(spec(),2)
+        e['model']['loads']=[];e['analytic_total']=[0.,0.,0.]
+        result=dict(reactions=[],displacements=[
+            dict(nodeId=p['id'],ux=0.,uy=0.,uz=0.,rx=0.,ry=0.,rz=0.)
+            for p in e['model']['nodes'].values()])
+        check_result(e,result)
+        for support_key, displacement_key in zip(('rx','ry','rz','rrx','rry','rrz'),
+                                                 ('ux','uy','uz','rx','ry','rz')):
+            support=next(s for s in e['model']['supports'].values() if s[support_key])
+            bad=copy.deepcopy(result)
+            next(d for d in bad['displacements'] if d['nodeId']==support['nodeId'])[displacement_key]=.01
+            with self.subTest(component=displacement_key):
+                with self.assertRaisesRegex(ValueError,'prescribed displacement'): check_result(e,bad)
+        e=generate(spec('mattiasson-1'),1)
+        result=dict(reactions=[dict(nodeId=1,rx=0.,rz=5000.,my=10000.)],
+                    displacements=[dict(nodeId=k,ux=0.,uz=0.,ry=0.) for k in (1,2)])
+        check_result(e,result)
+        for component in ('ux','uz','ry'):
+            bad=copy.deepcopy(result);bad['displacements'][0][component]=.01
+            with self.assertRaisesRegex(ValueError,'prescribed displacement'): check_result(e,bad)
 
     def test_schema_rejects_typos_and_invalid_geometry(self):
         s=spec();s['material']['youngs']=s['material'].pop('e')

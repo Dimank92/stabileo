@@ -218,33 +218,40 @@ fn benchmark_protocol_lint_and_negative_tests() {
 }
 
 #[test]
+fn benchmark_protocol_toggle_frame_refinement() {
+    // Every mesh must converge at full load and satisfy the result contract.
+    for n in [1, 2, 4] {
+        let value = solve(&model("shallow-toggle-frame", n, false, ""), true);
+        eprintln!("shallow-toggle-frame, mesh {n}: {value}");
+    }
+}
+
+#[test]
+fn benchmark_protocol_toggle_truss_refinement_mechanism() {
+    for n in [1, 2] {
+        solve(&model("shallow-toggle-truss", n, false, ""), true);
+    }
+    // Only the four-subdivision mesh fails the tangent solve; the two-subdivision
+    // mesh above must still reach full load rather than accepting any error.
+    let error = try_solve(&model("shallow-toggle-truss", 4, false, ""), true)
+        .expect_err("four-subdivision truss must expose its transverse mechanism");
+    assert_eq!(error, "model or reference suspect: \"Singular tangent stiffness — structure may be a mechanism or load increment too large\"");
+}
+
+#[test]
 fn benchmark_protocol_toggle_refinement_is_not_a_continuum_gate() {
     for element in ["truss", "frame"] {
-        let name = format!("shallow-toggle-{element}");
-        let e = model(&name, 1, false, "");
-        let mut values = Vec::new();
-        let mut refused = false;
-        for n in [1, 2, 4] {
-            match try_solve(&model(&name, n, false, ""), true) {
-                Ok(v) => values.push(v),
-                Err(error) => {
-                    assert!(error.contains("model or reference suspect"), "{error}");
-                    eprintln!("{name}, mesh {n}: {error}");
-                    refused = true;
-                }
-            }
-        }
-        if !refused {
-            let report = protocol(
-                &["convergence"],
-                Some(&json!({"spec":e["spec"],"values":values})),
-            );
-            assert!(report
-                .as_ref()
-                .unwrap_err()
-                .contains("model or reference suspect"));
-            eprintln!("{name}: {values:?}; model or reference suspect (discrete reference)");
-        }
+        let e = model(&format!("shallow-toggle-{element}"), 1, false, "");
+        let value = e["spec"]["references"][0]["value"].as_f64().unwrap();
+        let error = protocol(
+            &["convergence"],
+            Some(&json!({"spec":e["spec"],"values":[value, value, value]})),
+        )
+        .unwrap_err();
+        assert!(
+            error.contains("discrete reference cannot gate continuum refinement"),
+            "{error}"
+        );
     }
 }
 

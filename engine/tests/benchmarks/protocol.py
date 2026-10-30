@@ -78,6 +78,12 @@ def lint(s):
     require((g['kind']=='polyline') == (g['element'] in ('frame','truss')), 'geometry/element mismatch')
     required_geometry = ('points',) if g['kind']=='polyline' else ('radius','half_length','angle')
     require(all(k in g for k in required_geometry), 'missing geometry parameters')
+    if g['kind'] == 'polyline':
+        # A constant Y offset is a rigid translation of the supported XZ plane.
+        require(all(p[1] == g['points'][0][1] for p in g['points']),
+                'out-of-plane polyline geometry cannot be represented in 2D')
+        require(s['loads']['force'][1] == 0 and s['loads']['analytic_total'][1] == 0,
+                'out-of-plane load cannot be represented in 2D')
     required_section = ('a','iz') if g['kind']=='polyline' else ('thickness',)
     require(all(k in s['section'] for k in required_section), 'missing section parameters')
     return s
@@ -255,6 +261,29 @@ def check_result(e, result):
     require(all(abs(a+b) <= 1e-8*scale for a,b in zip(reaction,e['analytic_total'])), 'reactions do not balance loads')
     # Moment equilibrium uses current positions for geometrically nonlinear frames.
     displacements = {d['nodeId']: d for d in result['displacements']}
+    # These benchmarks prescribe exactly zero at restrained DOFs. The solver
+    # assembles them as zero, and reports zero reaction on free components.
+    if e['dimension'] == 2:
+        reaction_keys, displacement_keys = ('rx','rz','my'), ('ux','uz','ry')
+    else:
+        reaction_keys = ('fx','fy','fz','mx','my','mz')
+        displacement_keys = ('ux','uy','uz','rx','ry','rz')
+    restraints = {}
+    for support in m['supports'].values():
+        fixed = ([True, True, support['type']=='fixed'] if e['dimension']==2 else
+                 [support[k] for k in ('rx','ry','rz','rrx','rry','rrz')])
+        restraints[support['nodeId']] = fixed
+        d = displacements.get(support['nodeId'])
+        require(d is not None, 'missing restrained displacement')
+        for k, constrained in zip(displacement_keys, fixed):
+            if constrained:
+                require(d.get(k) == 0., f'nonzero or missing prescribed displacement: {k}')
+    for r in result['reactions']:
+        require(r['nodeId'] in restraints, 'reaction at unsupported node')
+        for k, constrained in zip(reaction_keys, restraints[r['nodeId']]):
+            require(math.isfinite(r.get(k, 0.)), 'nonfinite reaction')
+            if not constrained:
+                require(r.get(k, 0.) == 0., f'reaction on unrestrained DOF: {k}')
     def position(node_id):
         p = m['nodes'][str(node_id)]
         d = displacements[node_id]
