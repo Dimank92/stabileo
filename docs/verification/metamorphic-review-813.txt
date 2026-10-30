@@ -1,0 +1,41 @@
+PR #813 review-fix verification, 2026-10-30
+Base HEAD: 8452271e2db7850d2e159311bef72a8cec03a97d
+Tested uncommitted working tree; no commit was created (file-only task).
+Only the following Rust files differ from HEAD; SHA-256:
+5252721f2df2c5337e2ab3bb1e53d98470825eb71e757cc51ba80be022edb73e  engine/tests/metamorphic/generated.rs
+52c1b2da1ef434d58f626459371c3dc6da99a8e0568d5e1defb648d02f90f1b7  engine/tests/metamorphic/checks2.rs
+c478f4099bc7eeeb380ccf205145c2575b460eb9ff5bf51ad8b17ea47359157a  engine/tests/metamorphic/checks3.rs
+
+CARGO_BUILD_JOBS=2
+CARGO_TARGET_DIR=/private/tmp/claude-501/codex-813rfix-target
+METAMORPHIC_SEED default: 20261018; METAMORPHIC_ONLY unset.
+Temporary Make target executed from engine/:
+  cargo test --locked --release --test metamorphic FILTER -- ARGS
+Local cargo used with NIX_RUN=; cargo-nextest unavailable.
+
+FILTER=absolute_oracles: 2 passed, 0 failed (0.01 s).
+FILTER=response_shape_rejects_missing_data: 1 passed, 0 failed (0.37 s).
+FILTER=metamorphic_nightly_; ARGS=--ignored --nocapture --test-threads 2:
+test metamorphic_nightly_2d ... FAILED
+generated sweep: 4096 seeds, 394.513543083s
+test generated::metamorphic_nightly_generated ... ok
+test metamorphic_nightly_3d ... FAILED
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 43 filtered out; finished in 446.11s
+
+Generated sweep: 4096 seeds in each dimension, 8192 models, all required
+coverage assertions passed, with the issue-linked #761 cells still ignored.
+Both broad corpus sweeps failed. Representative failures:
+[linear (sparse path) × energy] fuzz_rich_2d/20261134: ΣP·u = 1.6539908230e3 but Σ f_e·u_e + springs = 1.6539845743e3, |diff| 6.249e-3 > tol 2.631e-9
+[time history × units] fuzz_rich_2d/20261051: original solved but transformed model failed: Singular effective stiffness matrix -- check constraints and mass
+[linear (sparse path) × relabel] fuzz_rich_3d/20261028: stress: 0 values vs 1 expected
+[modal × modal orthogonality] feature_matrix/3d-warping-torsion-restrained-cantilever-with: modes 2 and 3 not M-orthogonal: φᵢᵀMφⱼ/√(mᵢmⱼ) = 1.685e-2 > 2.674e-8
+
+The broad corpus run_2d/run_3d paths do not enter generated::Strict.
+The only changes in checks2/checks3 are inside the strict-mode branch;
+production solver code and tolerances were not changed.
+No full required suite or UI checks were run.
+make check.changelog NIX_RUN=: passed.
+git diff --check: passed.
+
+Full local nightly output: /private/tmp/813-nightly.log
+SHA-256: 301e70aa133619262ff984587f6d24140e7de81e8bdc5d53ad2be13defcd619a
