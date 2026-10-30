@@ -39,3 +39,38 @@ Each shard runs whole spec files, chosen from the measured durations in `shard-t
 tables are refreshed (`node scripts/e2e-shard.mjs [--suite slow] --update <reports>`, from a CI
 run's `playwright-artifacts-*`, `.results/<suite>.json`). Keep spec files under about 10 minutes:
 a shard cannot be shorter than its longest file.
+
+## Fast source guards
+
+Run `npm run test:e2e:guards` from `web/`. These Vitest checks scan source only: no
+Playwright, preview server, or WASM build is needed. They also run in the normal unit suite.
+Failures list every offending file and line.
+
+Every static JSON import anywhere under `e2e/**/*.ts` must use Node's import attribute,
+including side-effect imports and multiline declarations:
+
+```ts
+import model from './model.json' with { type: 'json' };
+```
+
+`assert { type: 'json' }` is not a substitute. Comments and dynamic imports are not static imports.
+
+Smoke tests have a **45,000 ms total test budget**, enforced by the `smoke` Playwright project.
+The committed shard timings aggregate whole files and include failures, so they cannot establish
+the slowest healthy individual test; 45 seconds is the fallback until healthy per-test reports
+are available. Slow, flaky and untagged tests retain the `chromium` project's 60-second default
+and their existing explicit longer budgets. The projects partition the tests without duplication.
+Use the npm suite commands or `--grep @smoke`; `--project chromium` now excludes ordinary smoke.
+
+In a spec containing smoke tests, explicit numeric `timeout` options above 45,000 ms (or zero,
+which disables the timeout), `test.setTimeout` overrides and `test.slow()` must move to an
+explicit `@slow`/`@flaky` scope or carry `// slow-ok: <real reason>` on the same line. Shared
+helpers in these files are checked too; comments mentioning tags do not make a file a smoke
+spec. A reason on a preceding line or in a string does not exempt the timeout. Use literal
+millisecond values so the source guard can inspect them. Keep slow tags out of smoke-tagged
+parent suites: give the individual tests their own suite tags when splitting a mixed group.
+
+Ordinary startup/UI waits should fit inside the smoke budget. Long journeys, full model sweeps,
+live design/detailing and large exports belong in `@slow`. A shared helper may document why its
+slow callers need a longer wait; that exception does not increase a smoke caller's total budget.
+Do not raise the cap to accommodate a failing test.
