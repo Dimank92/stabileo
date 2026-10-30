@@ -140,7 +140,7 @@
       <div class="buttons"><button data-play onclick={() => playback.playing ? playback.pause() : playback.play()}>{playback.playing ? s.pause : s.play}</button><button onclick={run} disabled={disabled || running || !base}>{s.run}</button><button onclick={stop}>{s.stop}</button><button onclick={() => replay()} disabled={!base}>{s.restart}</button></div>
       <div class="parameters">
         {#each fields as field, i}<label>{field.key === 'volfrac' ? s.volume : field.key === 'penal' ? s.penal : field.key === 'rmin' ? s.radius : s[field.key]}<NumberField bind:value={config[field.key]} bind:invalid={invalid[i]} min={field.min} max={field.max} label={s[field.key === 'volfrac' ? 'volume' : field.key === 'rmin' ? 'radius' : field.key]} /></label>{/each}
-        <label>{s.filter}<select bind:value={config.ft}><option value={1}>{s.sensitivity}</option><option value={2}>{s.density}</option></select></label>
+        <label><span id="topopt-filter-label">{s.filter}</span><select aria-labelledby="topopt-filter-label" bind:value={config.ft}><option value={1}>{s.sensitivity}</option><option value={2}>{s.density}</option></select></label>
         <label>{s.load}<select><option>{s.mbb}</option></select></label>
         <label><input type="checkbox" bind:checked={showMesh} />{s.mesh}</label>
       </div>
