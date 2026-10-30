@@ -381,14 +381,18 @@ research-only crates or formula-only `reference` tests. `R::` below means
 | Ferrari–Sigmund #836: Roorda λ1, ten elements/member | `R::ferrari_roorda_numerical` | pass |
 | Ferrari–Sigmund #836: reported closed form, forty/member | `R::ferrari_roorda_closed_form` | pass |
 | Arches #835: first two thermal buckling modes, published 70% threshold | `R::arches::production_modes_and_published_threshold` | pass |
-| Gridshell #837: exported frame volume and equilibrium | `R::fairclough_frame_equilibrium` | pass |
+| Gridshell #837: exported frame volume, equilibrium and structural response | `R::fairclough_frame_equilibrium` | pass |
 | Supplemental #818 (not the Roorda page result) | `R::buckling_818_exact_reference` | ignored #818 |
 
 The continuous Fairclough volume **13.8394 ±0.00005** is an isolated Clarabel
 optimization result, not a production-engine output. The engine test uses the
 page's **0.2% frame discretization** and **1e-8 equilibrium** bounds. Its fixture
 contains only curve coordinates and section areas from PR #837, not displacements,
-forces or an optimizer dependency. Ferrari's **2.431355677** is pinned as a page
+forces or an optimizer dependency. Structural response of the reconstructed frame
+is validated independently: apex vertical displacement and maximum displacement
+**1.267072e-6 m** (bound 1e-4), 4-fold diagonal support reaction symmetry with zero
+net horizontal thrust, zero pinned support moment, and base and crown axial forces
+**−5.573478 kN** and **−1.007322 kN**. Ferrari's **2.431355677** is pinned as a page
 regression separately from the paper's rounded **2.4313 ±0.0001**.
 
 The MacNeal frame checks above enforce true relative error; the older shared

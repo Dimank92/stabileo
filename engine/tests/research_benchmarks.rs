@@ -677,6 +677,41 @@ fn fairclough_frame_equilibrium() {
         .sum();
     let reaction: f64 = r.reactions.iter().map(|r| r.fz).sum();
     relative(reaction, -applied, 1e-8);
+    relative(reaction, 23.85702537, 1e-6);
+
+    // Structural response: apex displacement and maximum resultant displacement
+    // Reference solve from research/optimisation/fairclough-2026/results/stabileo_results.json
+    let d1 = r.displacements.iter().find(|d| d.node_id == 1).expect("apex node 1");
+    let max_d = r.displacements.iter().map(|d| d.ux.hypot(d.uy).hypot(d.uz)).fold(0.0_f64, f64::max);
+    relative(max_d, 1.267072e-6, 1e-4);
+    relative(d1.uz, -1.267072e-6, 1e-4);
+    assert!(d1.ux.abs() < 1e-14, "apex lateral symmetry ux: {}", d1.ux);
+    assert!(d1.uy.abs() < 1e-14, "apex lateral symmetry uy: {}", d1.uy);
+
+    // Support reaction distribution and 4-way diagonal symmetry
+    let net_fx: f64 = r.reactions.iter().map(|rx| rx.fx).sum();
+    let net_fy: f64 = r.reactions.iter().map(|rx| rx.fy).sum();
+    assert!(net_fx.abs() < 1e-10, "net horizontal fx reaction: {}", net_fx);
+    assert!(net_fy.abs() < 1e-10, "net horizontal fy reaction: {}", net_fy);
+    for &nid in &[2, 34, 66, 98] {
+        let rxn = r.reactions.iter().find(|rx| rx.node_id == nid).unwrap();
+        relative(rxn.fz, reaction / 4.0, 1e-6);
+        relative(rxn.fx.abs(), 0.686638, 1e-4);
+        relative(rxn.fy.abs(), 0.686638, 1e-4);
+    }
+
+    // Member internal forces: base segments at pinned supports and crown segments at apex
+    for &base_elem in &[1, 33, 65, 97] {
+        let ef = r.element_forces.iter().find(|e| e.element_id == base_elem).unwrap();
+        relative(ef.n_start, -5.573478, 1e-4);
+        assert!(ef.my_start.abs() < 1e-10, "pinned base moment my: {}", ef.my_start);
+        assert!(ef.mz_start.abs() < 1e-10, "pinned base moment mz: {}", ef.mz_start);
+    }
+    for &crown_elem in &[32, 64, 96, 128] {
+        let ef = r.element_forces.iter().find(|e| e.element_id == crown_elem).unwrap();
+        relative(ef.n_end, -1.007322, 1e-4);
+        relative(ef.my_end.abs(), 0.242017, 1e-4);
+    }
     assert!(r
         .displacements
         .iter()
