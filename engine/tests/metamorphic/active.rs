@@ -36,6 +36,7 @@ fn taut_cable_invariance() {
             format!("taut-cable/{seed}/2d"),
             serde_json::from_value(v).unwrap(),
         );
+        assert_loaded_cable(&(a2[0].run)(&c2).unwrap(), 2, 2);
         checks2::check_case(
             &checks2::Ctx {
                 tally: &t2,
@@ -66,6 +67,7 @@ fn taut_cable_invariance() {
             format!("taut-cable/{seed}/3d"),
             serde_json::from_value(v).unwrap(),
         );
+        assert_loaded_cable(&(a3[0].run)(&c3).unwrap(), 3, 3);
         checks3::check_case(
             &checks3::Ctx {
                 tally: &t3,
@@ -80,6 +82,42 @@ fn taut_cable_invariance() {
     assert_cable_cells(&t3, &["rotation", "relabel", "reversal", "units"]);
     crate::finish("active_cable_2d", &t2);
     crate::finish("active_cable_3d", &t3);
+}
+
+fn loaded_cable_equilibrium(r: &crate::response::Resp, width: usize, members: usize) -> bool {
+    let tensions: Vec<_> = r.0.iter().filter(|i| i.tag == "N").collect();
+    if tensions.len() != members
+        || tensions.iter().any(|i| {
+            i.v.len() != 2 || i.v.iter().any(|v| !v.is_finite() || *v <= 0.0)
+        })
+    {
+        return false;
+    }
+    let mut sum = vec![0.0; width];
+    for reaction in r.0.iter().filter(|i| i.tag == "R") {
+        if reaction.v.len() != width {
+            return false;
+        }
+        for (sum, value) in sum.iter_mut().zip(&reaction.v) {
+            *sum += value;
+        }
+    }
+    sum[width - 1] -= 100.0;
+    sum.iter().all(|v| v.is_finite() && v.abs() <= 100.0 * 1e-10)
+}
+
+fn assert_loaded_cable(r: &crate::response::Resp, width: usize, members: usize) {
+    assert!(loaded_cable_equilibrium(r, width, members), "{r:?}");
+    let mut zeroed = r.clone();
+    for item in &mut zeroed.0 {
+        item.v.fill(0.0);
+    }
+    assert!(!loaded_cable_equilibrium(&zeroed, width, members));
+    let mut missing_reactions = r.clone();
+    for item in missing_reactions.0.iter_mut().filter(|i| i.tag == "R") {
+        item.v.fill(0.0);
+    }
+    assert!(!loaded_cable_equilibrium(&missing_reactions, width, members));
 }
 
 fn assert_cable_adapters(names: &[&str]) {

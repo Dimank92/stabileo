@@ -272,7 +272,8 @@ rather than reporting these transformations as unrepresentable.
 seed and full input JSON; with `METAMORPHIC_REPORT_DIR` it also writes those
 inputs and both matrices. The generated tests fail on refused baseline solves,
 lost coverage, unrepresentable comparisons or inconclusive tolerances.
-Generated response validation also checks absolute references. Influence-line
+Generated response validation checks absolute references for modal, certified-modal,
+harmonic and influence-line adapters. Influence-line
 endpoints are compared with separate nodal unit-load static solves, including
 an independently nonzero ordinate. Zero-frequency harmonic real displacement
 must match the static probe displacement, and its imaginary part must vanish;
@@ -281,8 +282,21 @@ mass and positive ordered frequencies. A separate direct modal solve supplies
 expected entries and values, including effective-mass boundaries, for both
 modal adapters; this is an adapter check, not an independent eigensolver.
 These reference comparisons use relative tolerance 1e-10. Regression tests
-zero each adapter, remove modal effective-mass entries, and corrupt the
+zero those four adapters, remove modal effective-mass entries, and corrupt the
 zero-frequency imaginary response.
+
+The active-foundation fixture additionally checks axial displacements against
+bar equilibrium and compatibility: its transverse bed cannot carry axial load.
+The loaded cable fixtures require positive member tension and support forces
+balancing the applied 100-unit load in every translational direction. Both
+fixture checks reject correctly shaped zero-valued responses.
+
+Shape and metamorphic checks alone do not establish physical correctness.
+In particular, primary linear, buckling, time-history, spectral, moving-load
+and plastic-collapse rows do not each have an independent absolute oracle;
+a consistently zero-valued adapter can satisfy homogeneous invariants.
+A matrix checkmark denotes the stated relation and coverage, not independent
+validation of every response value or protection against every zero mutation.
 
 The broad legacy corpus retains its conditioning-based tolerances and explicit
 feature limitations; its passing cells are not a promise that every possible
@@ -372,43 +386,12 @@ issues remain open. They are deliberately separate from the required run.
 The targeted checks reproduced #758, #759, #760 and #762; the minimal
 co-rotational check reproduced #761.
 
-Historical required run (2026-10-29; not evidence for the current working tree): **30 passed, 12 ignored, 0 failed; 36.80 s**
-(test runtime, release build), on commit `d682fc7c65b1696867e5a3a4e45b04d26eead063`
-with the uncommitted #758 coverage assertions and their regression test.
-The ignores comprise six issue-linked tests, three large sweeps and three pre-existing diagnostic probes. The generated fast sweep
-adds 256 models, plus 32 taut-cable models and 16 independent-time-unit models.
-Historical large-seed run (before the zero-load harness changes): **4096 seeds per dimension (8192 models), passed in
-139.72 s**, including every stored time-history step. These are local release
-test timings, excluding compilation; the broad legacy exhaustive corpus was
-not rerun as part of this change.
+### Verification evidence
 
-### Review-fix verification (2026-10-30)
-
-The final edited Rust sources were tested on base HEAD
-`8452271e2db7850d2e159311bef72a8cec03a97d`, with their SHA-256 hashes,
-commands and result excerpts recorded in
-[the review-fix evidence](metamorphic-review-813.txt). This identifies the
-uncommitted working tree, not a new commit or a CI artifact.
-
-The targeted absolute-reference regressions passed (2 tests), as did the
-existing response-shape regression (1 test). The full nightly selection
-`metamorphic_nightly_ -- --ignored --nocapture --test-threads 2` completed:
-**1 passed, 2 failed, 43 filtered out; 446.11 s**. The generated sweep passed
-**4096 seeds per dimension (8192 models) in 394.51 s**, including the zero-load
-harness checks and the new absolute references. Both broad corpus sweeps
-failed, with examples in the evidence file. Their non-strict execution paths
-do not invoke the changed validators. The nightly selection is therefore
-**not green**. No full required-suite rerun is claimed.
-
-Replacement verification paragraph for the PR description (the live PR was
-not edited under the file-only task constraint):
-
-> Review-fix validation: 3 targeted regression tests passed. The nightly
-> selection completed with 1 pass and 2 failures: the 8192-model generated
-> sweep passed; both broad legacy corpus sweeps failed. See
-> `docs/verification/metamorphic-review-813.txt` for tested source hashes,
-> commands and failure examples. Changelog validation passed. These results
-> replace the stale 22-test count; no full required-suite rerun is claimed.
+Reproducible base/head comparison and known corpus failures are recorded in
+[the verification evidence](metamorphic-review-813.txt). The broad nightly
+corpus is not green; generated coverage must not be presented as a passing
+result for the complete nightly selection.
 
 ### Generated matrix
 

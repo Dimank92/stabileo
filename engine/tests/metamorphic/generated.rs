@@ -1066,6 +1066,16 @@ fn foundation_changed(base: &crate::response::Resp, active: &crate::response::Re
     norm > 0.0 && delta > norm * 0.01
 }
 
+fn foundation_axial_reference(r: &crate::response::Resp, length: f64, ea: f64) -> bool {
+    [(2, -0.3 * length / ea), (3, -0.5 * length / ea)]
+        .into_iter()
+        .all(|(node, expected)| {
+            r.node_vec(node, "u").is_some_and(|u| {
+                u[0].is_finite() && (u[0] - expected).abs() <= 1e-10 * expected.abs()
+            })
+        })
+}
+
 #[test]
 fn active_foundation_changes_displacements() {
     for seed in 0..128 {
@@ -1089,6 +1099,14 @@ fn active_foundation_changes_displacements() {
             ((a2.run)(&c2).unwrap(), foundation_2d(&c2).unwrap()),
             ((a3.run)(&c3).unwrap(), foundation_3d(&c3).unwrap()),
         ] {
+            let length = c2.s.nodes["2"].x;
+            let ea = c2.s.materials["1"].e * 1000.0 * c2.s.sections["1"].a;
+            assert!(foundation_axial_reference(&active, length, ea));
+            let mut zeroed = active.clone();
+            for item in &mut zeroed.0 {
+                item.v.fill(0.0);
+            }
+            assert!(!foundation_axial_reference(&zeroed, length, ea));
             assert!(
                 foundation_changed(&base, &active),
                 "foundation ignored: seed={seed}"
