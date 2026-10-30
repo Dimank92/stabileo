@@ -114,6 +114,20 @@ theorem count_le_of_deleted {A : Matrix (Fin n) (Fin n) ℝ} (I : Finset (Fin n)
     (mem_deletedSubspace.mp (LinearMap.mem_ker.mpr hx))) S hS
   simpa using h
 
+/-- **A2 (Deleted-index Gram certificate).**
+When the principal submatrix of `A` on `{i // i ∉ I}` is shown positive definite
+via a Gram/Gershgorin certificate (bound `g > 0`), every nonpositive subspace
+has dimension `≤ |I|`. -/
+theorem count_le_of_deleted_gram {A : Matrix (Fin n) (Fin n) ℝ} (I : Finset (Fin n))
+    (g : ℝ) (hg0 : 0 < g)
+    (h_sub_pos : ∀ x : Fin n → ℝ, (∀ i ∈ I, x i = 0) → x ≠ 0 → g * vnorm x ^ 2 ≤ x ⬝ᵥ (A *ᵥ x)) :
+    ∀ S, NonposSubspace A S → Module.finrank ℝ S ≤ I.card := by
+  refine count_le_of_deleted I (fun x hI hx => ?_)
+  have hv : 0 < vnorm x := lt_of_le_of_ne (vnorm_nonneg x) (fun h0 => hx (vnorm_eq_zero.mp h0.symm))
+  have hpos : 0 < g * vnorm x ^ 2 := by positivity
+  have hquad := h_sub_pos x hI hx
+  linarith
+
 /-! ### Finsler certificate -/
 
 lemma quad_gram_rect {j : ℕ} (U : Matrix (Fin n) (Fin j) ℝ) (x : Fin n → ℝ) :

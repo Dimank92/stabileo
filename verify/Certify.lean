@@ -15,3 +15,8 @@ import Certify.ComboCheck
 import Certify.ComboSound
 import Certify.BundleParse
 import Certify.EndToEnd
+import Certify.PDelta
+import Certify.Spectral
+import Certify.Harmonic
+import Certify.Dynamics
+import Certify.Constrained
