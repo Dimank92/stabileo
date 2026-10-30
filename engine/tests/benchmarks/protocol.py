@@ -284,10 +284,12 @@ def convergence(s, values):
     require(len(values)==len(s['mesh_sequence']) and all(math.isfinite(v) for v in values), 'invalid convergence samples')
     admitted = [r for r in s['references'] if r['pass_fail'] and not r['provisional']]
     require(admitted, 'no admitted references')
-    ref = admitted[0]['value']
-    errors = [abs(v-ref) for v in values]
-    require(all(b < a for a,b in zip(errors, errors[1:])), 'model or reference suspect: plateau or growing error')
-    require(errors[-1] <= s['tolerance']['relative']*abs(ref), 'model or reference suspect: finest mesh misses reference')
+    reference_errors = [[abs(v-r['value']) for v in values] for r in admitted]
+    for r, errors in zip(admitted, reference_errors):
+        require(all(b < a for a,b in zip(errors, errors[1:])), 'model or reference suspect: plateau or growing error')
+        require(errors[-1] <= s['tolerance']['relative']*abs(r['value']), 'model or reference suspect: finest mesh misses reference')
+    # Report the worst absolute error at each mesh, independently of reference order.
+    errors = [max(sample) for sample in zip(*reference_errors)]
     differences = [b-a for a,b in zip(values, values[1:])]
     require(all(((a > 0 and b > 0) or (a < 0 and b < 0)) and abs(b) < abs(a)
                 for a,b in zip(differences, differences[1:])),

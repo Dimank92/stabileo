@@ -46,13 +46,16 @@ The runtime order is:
    the same physical element sizes and compare the measured signed displacement.
    The full model has one axial translation gauge at midspan, not artificial
    vertical crown support. Full/reduced agreement is required within 1e-6.
-5. Run the mesh sequence. Require strictly decreasing reference error, shrinking
-   same-sign successive differences across the entire sequence, and a finite
-   positive observed order.
+5. Run the mesh sequence. Require strictly decreasing error against every admitted
+   reference, shrinking same-sign successive differences across the entire
+   sequence, and a finite positive observed order.
    For doubled meshes, `p=log2((u_h-u_h/2)/(u_h/2-u_h/4))` and
    `u_inf=u_h/4+(u_h/4-u_h/2)/(2^p-1)`. Both the finest value and extrapolation
-   must satisfy the unchanged tolerance. A plateau, growing error, oscillatory
-   sequence or failed extrapolation reports **model or reference suspect**.
+   must satisfy the unchanged tolerance against every admitted reference. The
+   reported error at each mesh is the maximum absolute error across admitted
+   references, so both the decision and report are independent of reference order.
+   A plateau, growing error, oscillatory sequence or failed extrapolation reports
+   **model or reference suspect**.
 
 The rank check measures rigid motions, not all internal mechanisms or the
 stiffness spectrum. Neither check can prove that a physically incorrect extra support is absent.
@@ -130,7 +133,23 @@ CI coverage lint for legacy benchmark registration, shared research-page
 references, mutation tests of engine implementations, double-entry specs and
 independent engineer sign-off. None of those is claimed complete by this slice.
 
-## Verification record (2026-10-29)
+## Review-fix verification (2026-10-30)
+
+Working-tree changes based on `b03e89268c3cef28f2849d82c6a1fbc5641a4ae4`:
+the five targeted Python convergence tests pass (admitted-reference ordering,
+informational-reference permutations, Richardson/suspect classification,
+four-mesh reversal, and discrete-reference scope). The Rust validation filters
+`benchmark_protocol_mattiasson`, `benchmark_protocol_roof`, and
+`benchmark_protocol_cylinder` each pass one test, with 0 failures and 0 ignored.
+These ran with `CARGO_BUILD_JOBS=2` and
+`CARGO_TARGET_DIR=/private/tmp/claude-501/codex-862rfix-target`.
+All 12 specs pass lint; `git diff --check` passes. No full suites were run.
+
+## Historical verification record (2026-10-29)
+
+This historical record describes commit `a574a70d7` (the initial protocol),
+which contained 16 Python tests and 8 Rust tests. It does not describe the
+subsequent review fixes or the current working tree.
 
 The targeted Cargo filter above passes **8 tests, 0 failures, 0 ignored**.
 The Python suite passes **16 tests**; all 12 specs pass lint. The test-target

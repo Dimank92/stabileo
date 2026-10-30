@@ -82,7 +82,7 @@
   "references": [
     {
       "kind": "paper",
-      "citation": "Nguyen-Van et al. (2009), CMES 49(2), 81\u2013108; https://cdn.techscience.cn/files/CMES/2009/v49n2/cmes.2009.049.081.pdf",
+      "citation": "Nguyen-Van et al. (2009), CMES 49(2), 81\u2013110; https://cdn.techscience.cn/files/CMES/2009/v49n2/cmes.2009.049.081.pdf",
       "location": "Section 4.2, Fig.9, Table 4",
       "value": -1.8248e-05,
       "precision": 5e-10,
@@ -102,12 +102,12 @@
     }
   ],
   "sources": {
-    "geometry": "Nguyen-Van et al. (2009), CMES 49(2), 81\u2013108; https://cdn.techscience.cn/files/CMES/2009/v49n2/cmes.2009.049.081.pdf; Section 4.2, Fig.9, Table 4",
-    "material": "Nguyen-Van et al. (2009), CMES 49(2), 81\u2013108; https://cdn.techscience.cn/files/CMES/2009/v49n2/cmes.2009.049.081.pdf; Section 4.2, Fig.9, Table 4",
-    "section": "Nguyen-Van et al. (2009), CMES 49(2), 81\u2013108; https://cdn.techscience.cn/files/CMES/2009/v49n2/cmes.2009.049.081.pdf; Section 4.2, Fig.9, Table 4",
-    "supports": "Nguyen-Van et al. (2009), CMES 49(2), 81\u2013108; https://cdn.techscience.cn/files/CMES/2009/v49n2/cmes.2009.049.081.pdf; Section 4.2, Fig.9, Table 4",
-    "symmetry_planes": "Nguyen-Van et al. (2009), CMES 49(2), 81\u2013108; https://cdn.techscience.cn/files/CMES/2009/v49n2/cmes.2009.049.081.pdf; Section 4.2, Fig.9, Table 4",
-    "loads": "Nguyen-Van et al. (2009), CMES 49(2), 81\u2013108; https://cdn.techscience.cn/files/CMES/2009/v49n2/cmes.2009.049.081.pdf; Section 4.2, Fig.9, Table 4",
-    "measurement": "Nguyen-Van et al. (2009), CMES 49(2), 81\u2013108; https://cdn.techscience.cn/files/CMES/2009/v49n2/cmes.2009.049.081.pdf; Section 4.2, Fig.9, Table 4"
+    "geometry": "Nguyen-Van et al. (2009), CMES 49(2), 81\u2013110; https://cdn.techscience.cn/files/CMES/2009/v49n2/cmes.2009.049.081.pdf; Section 4.2, Fig.9, Table 4",
+    "material": "Nguyen-Van et al. (2009), CMES 49(2), 81\u2013110; https://cdn.techscience.cn/files/CMES/2009/v49n2/cmes.2009.049.081.pdf; Section 4.2, Fig.9, Table 4",
+    "section": "Nguyen-Van et al. (2009), CMES 49(2), 81\u2013110; https://cdn.techscience.cn/files/CMES/2009/v49n2/cmes.2009.049.081.pdf; Section 4.2, Fig.9, Table 4",
+    "supports": "Nguyen-Van et al. (2009), CMES 49(2), 81\u2013110; https://cdn.techscience.cn/files/CMES/2009/v49n2/cmes.2009.049.081.pdf; Section 4.2, Fig.9, Table 4",
+    "symmetry_planes": "Nguyen-Van et al. (2009), CMES 49(2), 81\u2013110; https://cdn.techscience.cn/files/CMES/2009/v49n2/cmes.2009.049.081.pdf; Section 4.2, Fig.9, Table 4",
+    "loads": "Nguyen-Van et al. (2009), CMES 49(2), 81\u2013110; https://cdn.techscience.cn/files/CMES/2009/v49n2/cmes.2009.049.081.pdf; Section 4.2, Fig.9, Table 4",
+    "measurement": "Nguyen-Van et al. (2009), CMES 49(2), 81\u2013110; https://cdn.techscience.cn/files/CMES/2009/v49n2/cmes.2009.049.081.pdf; Section 4.2, Fig.9, Table 4"
   }
 }

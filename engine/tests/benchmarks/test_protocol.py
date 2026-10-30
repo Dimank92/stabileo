@@ -73,11 +73,28 @@ class ProtocolTests(unittest.TestCase):
         informational=[dict(admitted[0], value=100., provisional=provisional, pass_fail=False)
                        for provisional in (True, False)]
         for refs in permutations(admitted+informational):
-            if refs.index(admitted[0]) > refs.index(admitted[1]): continue
             s['references']=list(refs)
             lint(s)
             self.assertEqual(convergence(s,passing),baseline)
             with self.assertRaises(ValueError):convergence(s,failing)
+
+    def test_admitted_reference_order_does_not_change_convergence(self):
+        s=spec()
+        passing=[-.3064,-.3034,-.30265]
+        baseline=convergence(s,passing)
+        self.assertEqual(baseline['errors'],
+                         [max(abs(v-r['value']) for r in s['references']) for v in passing])
+        for refs in permutations(s['references']):
+            s['references']=list(refs)
+            lint(s)
+            with self.subTest(references=[r['value'] for r in refs]):
+                self.assertEqual(convergence(s,passing),baseline)
+                # Finest mesh passes Altair's gate but misses COMSOL's gate.
+                with self.assertRaisesRegex(ValueError,'finest mesh misses reference'):
+                    convergence(s,[-.315,-.3105,-.3082])
+                # Error decreases toward COMSOL but grows away from Altair.
+                with self.assertRaisesRegex(ValueError,'plateau or growing error'):
+                    convergence(s,[-.3023,-.3021,-.30205])
 
     def test_four_mesh_early_reversal(self):
         s=spec();s['mesh_sequence']=[2,4,8,16]
