@@ -6,7 +6,7 @@ data is in [`dashboard.json`](dashboard.json) for the app and the docs site. CI 
 weekly and on every release tag ([workflow](../../.github/workflows/verification-dashboard.yml)).
 **"not yet measured" means exactly that**: no value is estimated or typed in.
 
-Generated 2026-10-19 01:28 UTC at commit `d5b7e2c05c`.
+Generated 2026-11-02 15:17 UTC at commit `242e943dab`.
 
 These are the metrics behind the exit criteria of the backlog sections of
 [PRODUCT_ROADMAP.md](../roadmap/PRODUCT_ROADMAP.md). Per-item verification levels are in
@@ -16,31 +16,31 @@ These are the metrics behind the exit criteria of the backlog sections of
 
 | Metric | Value | Roadmap section | Source / note |
 |---|---|---|---|
-| Open `safety` issues | **55** | Release safety | GitHub label `safety`; 0 closed |
-| Safety advisories published (GitHub) | **0** | Release safety | GitHub label `safety-advisory` |
-| Engineering logic in Rust (share of lines) | **64.6 %** | Engineering coverage | engine/src vs TS_ENGINE_LOGIC.md classes (b)+(c); TypeScript (b)+(c): 58924 lines in 161 modules; 13 TS modules not yet classified |
-| TypeScript (b)+(c) modules rated high safety | **88 modules, 35935 lines** | Engineering coverage | TS_ENGINE_LOGIC.md inventory (Safety column) |
-| TypeScript engineering arithmetic, classes (b)+(c) (lines) | **58924** | Engineering coverage | TS_ENGINE_LOGIC.md inventory, recounted |
+| Open `safety` issues | **271** | Release safety | GitHub label `safety`; 95 closed |
+| Safety advisories published (GitHub) | **24** | Release safety | GitHub label `safety-advisory` |
+| Engineering logic in Rust (share of lines) | **68.2 %** | Engineering coverage | engine/src vs TS_ENGINE_LOGIC.md classes (b)+(c); TypeScript (b)+(c): 57667 lines in 158 modules; 113 TS modules not yet classified |
+| TypeScript (b)+(c) modules rated high safety | **86 modules, 34569 lines** | Engineering coverage | TS_ENGINE_LOGIC.md inventory (Safety column) |
+| TypeScript engineering arithmetic, classes (b)+(c) (lines) | **57667** | Engineering coverage | TS_ENGINE_LOGIC.md inventory, recounted |
 | Analyses certified | **11 of 27 (40.7 %)** | Trust and verification | MATURITY.md (CERTIFY.md) |
 | Design checks certified | **8 of 16 (50.0 %)** | Trust and verification | MATURITY.md (CERTIFY.md) |
-| Acceptance-suite cases | **not yet measured** | Engineering coverage | suite not on main yet (PR #337) |
-| Acceptance-suite reference values | **not yet measured** | Engineering coverage | suite not on main yet (PR #337) |
-| Mutation score, Rust (cargo-mutants) | **59.9 % (partial: 1251 of 23264 mutants tested)** | Solver and proof depth | verify.yml [2026-10-18](https://github.com/lambdaclass/stabileo/actions/runs/39099586668); caught/(caught+missed); 8 shards; jobs: cancelled |
-| Mutation score, TypeScript (Stryker) | **not yet measured** | Engineering coverage | no successful Stryker run with a defined score found on main |
+| Acceptance-suite cases | **12** | Engineering coverage | engine/tests/acceptance/models; linear 2, modal 10 |
+| Acceptance-suite reference values | **105** | Engineering coverage | engine/tests/acceptance/models |
+| Mutation score, Rust (cargo-mutants) | **not yet measured** | Solver and proof depth | no mutants report with a defined score found on main |
+| Mutation score, TypeScript (Stryker) | **52.7 %** | Engineering coverage | mutation-ts.yml [2026-10-26](https://github.com/lambdaclass/stabileo/actions/runs/40264839508) |
 | Engine line coverage (llvm-cov) | **not yet measured** | Solver and proof depth | no llvm-cov run yet (artifact llvm-cov-summary) |
 | Engine branch coverage (llvm-cov) | **not yet measured** | Solver and proof depth | no llvm-cov run with branch coverage yet |
-| Differential models compared (latest run per harness) | **6317 (6216 agree, 101 mismatch)** | Trust and verification | codeaster, frame3dd, kratos, opensees, pynite; see Details; no report yet: mystran, calculix |
+| Differential models compared (latest run per harness) | **3495 (3386 agree, 109 mismatch)** | Trust and verification | calculix, frame3dd, kratos, mystran, pynite; see Details; no report yet: opensees, codeaster |
 | Fuzz executions (latest nightly) | **not yet measured** | Trust and verification | the nightly fuzz job does not publish execution counts yet (artifact fuzz-stats-<target>) |
 | Feature-matrix cells (2D + 3D) | **R 85, ~ 20, · 267, ✓ 1012** | Engineering coverage | FEATURE_MATRIX.md |
 | Feature-matrix cells E / IGN / BAD / K | **0** | Engineering coverage | FEATURE_MATRIX.md |
-| Engine `#[test]` functions | **7899** | Solver and proof depth | git grep engine |
+| Engine `#[test]` functions | **8384** | Solver and proof depth | git grep engine |
 | Kani harnesses | **54** | Solver and proof depth | git grep `kani::proof` |
-| Lean theorems and lemmas | **177** | Solver and proof depth | verify/*.lean |
-| Backlog issues closed (`roadmap:multiplier`) | **0 of 10** | Multipliers | GitHub label `roadmap:multiplier` |
-| Backlog issues closed (`roadmap:verification`) | **0 of 16** | Trust and verification | GitHub label `roadmap:verification` |
-| Backlog issues closed (`roadmap:coverage`) | **0 of 15** | Engineering coverage | GitHub label `roadmap:coverage` |
-| Backlog issues closed (`roadmap:solver-proofs`) | **0 of 10** | Solver and proof depth | GitHub label `roadmap:solver-proofs` |
-| Backlog issues closed (`roadmap:release-safety`) | **0 of 8** | Release safety | GitHub label `roadmap:release-safety` |
+| Lean theorems and lemmas | **184** | Solver and proof depth | verify/*.lean |
+| Backlog issues closed (`roadmap:multiplier`) | **0 of 13** | Multipliers | GitHub label `roadmap:multiplier` |
+| Backlog issues closed (`roadmap:verification`) | **3 of 26** | Trust and verification | GitHub label `roadmap:verification` |
+| Backlog issues closed (`roadmap:coverage`) | **1 of 15** | Engineering coverage | GitHub label `roadmap:coverage` |
+| Backlog issues closed (`roadmap:solver-proofs`) | **1 of 18** | Solver and proof depth | GitHub label `roadmap:solver-proofs` |
+| Backlog issues closed (`roadmap:release-safety`) | **3 of 20** | Release safety | GitHub label `roadmap:release-safety` |
 
 ## History
 
@@ -54,71 +54,287 @@ One row per release, from the snapshots in [`releases/`](releases/): each is mea
 
 ### Open `safety` issues
 
-- [#343](https://github.com/lambdaclass/stabileo/issues/343) 2D: load along an inclined member doesn't reach the member's axial force; couples on members dropped/mirrored in the 3D solve
 - [#354](https://github.com/lambdaclass/stabileo/issues/354) Verification jobs that run on schedule and alert on failure
 - [#356](https://github.com/lambdaclass/stabileo/issues/356) Discretization error estimates next to certified results
 - [#359](https://github.com/lambdaclass/stabileo/issues/359) Units in the type system (Rust and TypeScript)
-- [#361](https://github.com/lambdaclass/stabileo/issues/361) Re-check prompt when an old project opens in a version with changed results
 - [#366](https://github.com/lambdaclass/stabileo/issues/366) Missing design checks: RC biaxial/torsion/slenderness, CIRSOC 301 F.7-F.11, EC3 6.2.9.1 and more
 - [#369](https://github.com/lambdaclass/stabileo/issues/369) Mechanism detection everywhere, with zero false positives on the corpus
 - [#370](https://github.com/lambdaclass/stabileo/issues/370) Known solver gaps: unconverged nonlinear increments, co-rotational refusals, beam rotary inertia, and more
-- [#375](https://github.com/lambdaclass/stabileo/issues/375) End-to-end certificates: independently re-assemble K and f from the model
 - [#376](https://github.com/lambdaclass/stabileo/issues/376) Trusted computing base of certificates: audited and enforced
 - [#381](https://github.com/lambdaclass/stabileo/issues/381) Nonlinear and dynamic robustness: convergence criteria, step sensitivity, energy drift
 - [#382](https://github.com/lambdaclass/stabileo/issues/382) Numerical stress tests: measure where accuracy degrades and refuse beyond it
 - [#385](https://github.com/lambdaclass/stabileo/issues/385) Staging before production: deploy main to staging, promote tagged releases
-- [#387](https://github.com/lambdaclass/stabileo/issues/387) Tell users of saved projects what changed for their model; mark stale results
 - [#388](https://github.com/lambdaclass/stabileo/issues/388) Dependency upgrades through the same gates; numerics crates must stay bit-identical
 - [#389](https://github.com/lambdaclass/stabileo/issues/389) Keep steel results labelled experimental until independent review of CIRSOC 301
-- [#390](https://github.com/lambdaclass/stabileo/issues/390) Concrete design from the engine: all CIRSOC 201 section shapes, slabs, bar layouts
 - [#391](https://github.com/lambdaclass/stabileo/issues/391) Steel check inputs from the engine: Cb, J/Cw/Z, unbraced lengths, buckling, net area
 - [#392](https://github.com/lambdaclass/stabileo/issues/392) Analysis results from the engine: remove TypeScript analysis duplicates
 - [#393](https://github.com/lambdaclass/stabileo/issues/393) Footings and load generation (wind, snow, seismic, combinations) in Rust
 - [#394](https://github.com/lambdaclass/stabileo/issues/394) No silent fallbacks: say so when the engine is unavailable
-- [#400](https://github.com/lambdaclass/stabileo/issues/400) SHB8 solid-shell is ~18% too stiff in thin-plate bending (thickness locking); benchmark tolerance hides it
-- [#404](https://github.com/lambdaclass/stabileo/issues/404) 3D buckling misses torsional and flexural-torsional buckling (no Wagner term in frame Kg)
-- [#405](https://github.com/lambdaclass/stabileo/issues/405) Response spectrum: base shear always SRSS under CQC; modal participation omits support-coupled mass
-- [#407](https://github.com/lambdaclass/stabileo/issues/407) FR-4: Frame/truss thermal loads use a fixed alpha = 12e-6 and depth sqrt(12I/A); API users get wrong thermal forces silently
 - [#408](https://github.com/lambdaclass/stabileo/issues/408) FR-5: Warping DOF is shared by all members at a node (full warping transmission); no per-member warping release
-- [#410](https://github.com/lambdaclass/stabileo/issues/410) SH-6: Curved shell reports zero bending moments, and its stresses ignore thermal strain
-- [#411](https://github.com/lambdaclass/stabileo/issues/411) SH-7: MITC9 on non-planar geometry does not reproduce rigid-body motion (advertised for curved shells)
-- [#416](https://github.com/lambdaclass/stabileo/issues/416) SP-12: Cable solver tension is too low in indeterminate systems (Ernst tangent used as a secant from the chord)
 - [#417](https://github.com/lambdaclass/stabileo/issues/417) SP-14: Linear solver lets a cable carry compression with no diagnostic
-- [#418](https://github.com/lambdaclass/stabileo/issues/418) SP-15: Curved-beam segment axes depend on plan orientation (Iy/Iz swap on near-vertical segments)
 - [#419](https://github.com/lambdaclass/stabileo/issues/419) SP-17: 3D connector axes are discontinuous in direction and not user-orientable
-- [#421](https://github.com/lambdaclass/stabileo/issues/421) AC-12: p-y curves depart from the cited references (soft clay J term, sand A = 0.9, sand k table)
-- [#422](https://github.com/lambdaclass/stabileo/issues/422) AC-13: "Stiff clay" p-y curve is discontinuous at y50 and is not Reese's stiff-clay curve
-- [#423](https://github.com/lambdaclass/stabileo/issues/423) AC-16: t-z and q-z curves are missing the shaft perimeter / tip area (units kPa x m, not kN)
-- [#425](https://github.com/lambdaclass/stabileo/issues/425) MD-10: TimeHistoryInput.method is ignored; the scheme follows `alpha` alone
 - [#426](https://github.com/lambdaclass/stabileo/issues/426) NL-3: 3D co-rotational uses additive rotation vectors: error for large non-coaxial rotations
-- [#427](https://github.com/lambdaclass/stabileo/issues/427) NL-4: Material-nonlinear solver reports elastic member forces K_el u (100x off after yield)
 - [#428](https://github.com/lambdaclass/stabileo/issues/428) NL-5: Material-nonlinear solver is a whole-member secant (EI -> alpha EI), not plasticity
-- [#429](https://github.com/lambdaclass/stabileo/issues/429) NL-6: 3D material-nonlinear yield surface is unconservative compared with 2D
-- [#431](https://github.com/lambdaclass/stabileo/issues/431) NL-10: Notional loads ignore member (distributed/point) gravity loads
 - [#432](https://github.com/lambdaclass/stabileo/issues/432) NL-13: Contact solver reports converged after freezing a chattering gap at max_flips
 - [#433](https://github.com/lambdaclass/stabileo/issues/433) NL-17: Fiber solver reports an unconverged iterate on failure (no load factor)
-- [#435](https://github.com/lambdaclass/stabileo/issues/435) Flat 2D model solved in 3D: nodal moments and prescribed rotations act mirrored
-- [#439](https://github.com/lambdaclass/stabileo/issues/439) Web: 3D sections send no Cw and fall back to J = 0.001·Iy; with torsional buckling in Kg these now drive 3D buckling/P-Delta
 - [#441](https://github.com/lambdaclass/stabileo/issues/441) Safety advisories: notify users when a released version produced a wrong or unconservative result
-- [#442](https://github.com/lambdaclass/stabileo/issues/442) Imperfection analysis can silently do nothing (3D gravity axis, member loads, residual stresses, plane model along Y)
-- [#443](https://github.com/lambdaclass/stabileo/issues/443) Settlements on a DOF the support leaves free are dropped without a message
-- [#444](https://github.com/lambdaclass/stabileo/issues/444) Winkler member forces leave out the foundation reaction
-- [#445](https://github.com/lambdaclass/stabileo/issues/445) Rigid link and diaphragm mean different things in the 2D and the 3D solve of one model
 - [#447](https://github.com/lambdaclass/stabileo/issues/447) Contain first, fix second: per-feature runtime switches (warn/refuse) for known dangerous results
-- [#452](https://github.com/lambdaclass/stabileo/issues/452) 2D: a nodal moment on a node where every frame is hinged is silently lost
 - [#456](https://github.com/lambdaclass/stabileo/issues/456) 3D buckling: compression gate uses end-force average, misses members compressed only between their ends
 - [#458](https://github.com/lambdaclass/stabileo/issues/458) Existing (assembled-level) certificate certifies singular models: all-hinged 2D node with moment/rigid link; skew unstiffened rotation
-- [#459](https://github.com/lambdaclass/stabileo/issues/459) 3D diaphragm in the XZ plane ties slaves with reversed rotation sign
+- [#466](https://github.com/lambdaclass/stabileo/issues/466) 2D constraint mapping assumes the X–Z plane; models cut along a Y–Z plane are mapped wrongly
+- [#741](https://github.com/lambdaclass/stabileo/issues/741) Certified 3D buckling factor above its own certified upper bound (fuzz json_dynamics)
+- [#745](https://github.com/lambdaclass/stabileo/issues/745) Test gap: 765 missed mutants in 49 functions survive in the plastic-collapse certificates
+- [#746](https://github.com/lambdaclass/stabileo/issues/746) Test gap: 133 missed mutants in 12 functions survive in the plate element kernels (DKT, DKMT, CST)
+- [#747](https://github.com/lambdaclass/stabileo/issues/747) Test gap: 119 missed mutants in 8 functions survive in the cable element (catenary)
+- [#748](https://github.com/lambdaclass/stabileo/issues/748) Test gap: 214 missed mutants in 30 functions survive in the modal, spectral, harmonic and time-history certificates
+- [#749](https://github.com/lambdaclass/stabileo/issues/749) Test gap: 160 missed mutants in 30 functions survive in the certificate's independent re-assembly
+- [#750](https://github.com/lambdaclass/stabileo/issues/750) Test gap: 67 missed mutants in 23 functions survive in the design-check certificates
+- [#751](https://github.com/lambdaclass/stabileo/issues/751) Test gap: 244 missed mutants in 50 functions survive in the static certificate support code
+- [#752](https://github.com/lambdaclass/stabileo/issues/752) Test gap: 260 missed mutants in 21 functions survive in the frame, truss, curved-beam and fiber-beam kernels
+- [#758](https://github.com/lambdaclass/stabileo/issues/758) 2D plastic collapse factor changes with renumbering, member direction and units (up to 4.6x)
+- [#759](https://github.com/lambdaclass/stabileo/issues/759) 3D modal analysis returns modes that are not mass-orthogonal (one mode returned twice)
+- [#760](https://github.com/lambdaclass/stabileo/issues/760) Linear time history violates reciprocity on some models (up to 33x between i<-j and j<-i)
+- [#762](https://github.com/lambdaclass/stabileo/issues/762) Mechanism detection and accuracy change with units and orientation on near-singular models
+- [#798](https://github.com/lambdaclass/stabileo/issues/798) Engine: MITC4 shells are badly stiff for in-plane bending on distorted meshes (MacNeal–Harder: −92% trapezoidal, −90% parallelogram)
+- [#810](https://github.com/lambdaclass/stabileo/issues/810) Engine triage: MITC4 Scordelis–Lo roof plateaus 15% stiff; pinched cylinder error grows with refinement
+- [#818](https://github.com/lambdaclass/stabileo/issues/818) Buckling: the dense reciprocal eigen-solve can report a factor slightly above the true one (0.05% in #741's case)
+- [#903](https://github.com/lambdaclass/stabileo/issues/903) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed dy = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or [a85ca4f72711]
+- [#904](https://github.com/lambdaclass/stabileo/issues/904) Nightly finding: codeaster/false_reject: code_aster solves it (nprec=# singularity check passed) [f0c076666b12]
+- [#905](https://github.com/lambdaclass/stabileo/issues/905) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed dy = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or r [c04293b1592e]
+- [#906](https://github.com/lambdaclass/stabileo/issues/906) Nightly finding: codeaster/wrong-result-candidate: static: disp/rx [f9d562ab9149]
+- [#907](https://github.com/lambdaclass/stabileo/issues/907) Nightly finding: codeaster/wrong-result-candidate: static: disp/ry [f76004b2b7eb]
+- [#908](https://github.com/lambdaclass/stabileo/issues/908) Nightly finding: codeaster/wrong-result-candidate: static: disp/rz [c0848537dbb7]
+- [#909](https://github.com/lambdaclass/stabileo/issues/909) Nightly finding: codeaster/wrong-result-candidate: static: force/myEnd [add0c4153743]
+- [#910](https://github.com/lambdaclass/stabileo/issues/910) Nightly finding: codeaster/wrong-result-candidate: static: force/nStart [1279d18f1b60]
+- [#911](https://github.com/lambdaclass/stabileo/issues/911) Nightly finding: codeaster/wrong-result-candidate: static: force/vzEnd [8ee451467e51]
+- [#912](https://github.com/lambdaclass/stabileo/issues/912) Nightly finding: codeaster/wrong-result-candidate: static: force/vzStart [c03eae293997]
+- [#913](https://github.com/lambdaclass/stabileo/issues/913) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or rem [ce679b94e344]
+- [#914](https://github.com/lambdaclass/stabileo/issues/914) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or r [514bfcae64b4]
+- [#915](https://github.com/lambdaclass/stabileo/issues/915) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or re [5c8cdf0431bc]
+- [#916](https://github.com/lambdaclass/stabileo/issues/916) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed dz = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or r [a7156b8d1609]
+- [#917](https://github.com/lambdaclass/stabileo/issues/917) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed drx = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or [ba5b64e4d4ec]
+- [#918](https://github.com/lambdaclass/stabileo/issues/918) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed dz = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or re [540a8d1d7e32]
+- [#919](https://github.com/lambdaclass/stabileo/issues/919) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settlemen [f0f851a7ea2e]
+- [#920](https://github.com/lambdaclass/stabileo/issues/920) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed dz = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settlemen [45c78cc6ca1d]
+- [#921](https://github.com/lambdaclass/stabileo/issues/921) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed drx = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settleme [624a585d5198]
+- [#922](https://github.com/lambdaclass/stabileo/issues/922) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or [8a1e524aca6f]
+- [#923](https://github.com/lambdaclass/stabileo/issues/923) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settlement [13aac96363fb]
+- [#924](https://github.com/lambdaclass/stabileo/issues/924) Nightly finding: codeaster/wrong-result-candidate: static: force/vyEnd [6a3366bea6b0]
+- [#925](https://github.com/lambdaclass/stabileo/issues/925) Nightly finding: codeaster/wrong-result-candidate: static: force/vyStart [7045938eb1fc]
+- [#926](https://github.com/lambdaclass/stabileo/issues/926) Nightly finding: codeaster/wrong-result-candidate: static: reac/my [2d6fab85daca]
+- [#927](https://github.com/lambdaclass/stabileo/issues/927) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed dry = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or r [2d8ba847ebfb]
+- [#928](https://github.com/lambdaclass/stabileo/issues/928) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed dy = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or re [ecfbe4c78e2b]
+- [#929](https://github.com/lambdaclass/stabileo/issues/929) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed dz = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or [51a1729e9c74]
+- [#930](https://github.com/lambdaclass/stabileo/issues/930) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed dy = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settlemen [df39cd53dd3d]
+- [#931](https://github.com/lambdaclass/stabileo/issues/931) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed dy = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settlement [18a7f561c681]
+- [#932](https://github.com/lambdaclass/stabileo/issues/932) Nightly finding: codeaster/wrong-result-candidate: static: disp/ux [43bc5218d402]
+- [#933](https://github.com/lambdaclass/stabileo/issues/933) Nightly finding: codeaster/wrong-result-candidate: static: disp/uy [a1d8198d1c32]
+- [#934](https://github.com/lambdaclass/stabileo/issues/934) Nightly finding: codeaster/wrong-result-candidate: static: disp/uz [be234305faa3]
+- [#935](https://github.com/lambdaclass/stabileo/issues/935) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settleme [5e3e7085d94c]
+- [#936](https://github.com/lambdaclass/stabileo/issues/936) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed dy = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settleme [1a14dcddc374]
+- [#937](https://github.com/lambdaclass/stabileo/issues/937) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed dry = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or [519e63db9edd]
+- [#938](https://github.com/lambdaclass/stabileo/issues/938) Nightly finding: codeaster/wrong-result-candidate: static: force/nEnd [caba44701989]
+- [#939](https://github.com/lambdaclass/stabileo/issues/939) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed drx = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, o [6acbfbac14d8]
+- [#940](https://github.com/lambdaclass/stabileo/issues/940) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed dz = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settlem [64fc3d67384b]
+- [#941](https://github.com/lambdaclass/stabileo/issues/941) Nightly finding: codeaster/wrong-result-candidate: static: reac/fx [5301f175344f]
+- [#942](https://github.com/lambdaclass/stabileo/issues/942) Nightly finding: codeaster/wrong-result-candidate: static: reac/fy [9fa61ec33e5a]
+- [#943](https://github.com/lambdaclass/stabileo/issues/943) Nightly finding: codeaster/wrong-result-candidate: static: reac/fz [bad829753e0a]
+- [#944](https://github.com/lambdaclass/stabileo/issues/944) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed dz = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settlement [e2b7bd970072]
+- [#945](https://github.com/lambdaclass/stabileo/issues/945) Nightly finding: codeaster/wrong-result-candidate: static: force/mzEnd [b69f276387e4]
+- [#946](https://github.com/lambdaclass/stabileo/issues/946) Nightly finding: codeaster/wrong-result-candidate: static: force/mzStart [dce74428c9c6]
+- [#947](https://github.com/lambdaclass/stabileo/issues/947) Nightly finding: codeaster/wrong-result-candidate: static: force/mxEnd [4855a8966fe3]
+- [#948](https://github.com/lambdaclass/stabileo/issues/948) Nightly finding: codeaster/wrong-result-candidate: static: force/mxStart [dae4a292790e]
+- [#949](https://github.com/lambdaclass/stabileo/issues/949) Nightly finding: codeaster/false_reject: stabileo: support # (node #): the prescribed dry = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, o [7c0f6f2c0fdb]
+- [#950](https://github.com/lambdaclass/stabileo/issues/950) Nightly finding: codeaster/original failure; replay pending: original failure; replay pending [0da913e831b7]
+- [#951](https://github.com/lambdaclass/stabileo/issues/951) Nightly finding: fuzz/json_plastic: oom-137c0dc8daa15f8d7cb171378046650a516b2060 [ecfc9326af96]
+- [#952](https://github.com/lambdaclass/stabileo/issues/952) Nightly finding: fuzz/json_plastic: slow-unit-158a48faf3993f5a9f6efd296446b24ecfe374b2 [5a81353a42d4]
+- [#953](https://github.com/lambdaclass/stabileo/issues/953) Nightly finding: fuzz/json_plastic: slow-unit-d886d7f3d43878f1c4f3a6b5771ebed044d32d99 [ebf6938d7112]
+- [#954](https://github.com/lambdaclass/stabileo/issues/954) Nightly finding: metamorphic/wrong-result-candidate: translation u@n449[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [cb3cf209a7d5]
+- [#955](https://github.com/lambdaclass/stabileo/issues/955) Nightly finding: metamorphic/wrong-result-candidate: force n@e3[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [c77a4b83959d]
+- [#956](https://github.com/lambdaclass/stabileo/issues/956) Nightly finding: metamorphic/wrong-result-candidate: σp·u = # but σ f_e·u_e + springs = #, |diff| # > tol # [eed88e2dcae4]
+- [#959](https://github.com/lambdaclass/stabileo/issues/959) Nightly finding: metamorphic/wrong-result-candidate: scalar lambda0[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [a3e32f4748a0]
+- [#960](https://github.com/lambdaclass/stabileo/issues/960) Nightly finding: metamorphic/wrong-result-candidate: translation h_im1@n3[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [8c8b8c105982]
+- [#963](https://github.com/lambdaclass/stabileo/issues/963) Nightly finding: metamorphic/wrong-result-candidate: scalar f00[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [6e6403711f02]
+- [#964](https://github.com/lambdaclass/stabileo/issues/964) Nightly finding: metamorphic/invariance-refusal: singular stiffness in ssi iteration [b5b98336844a]
+- [#965](https://github.com/lambdaclass/stabileo/issues/965) Nightly finding: metamorphic/invariance-refusal: singular stiffness matrix — structure is a mechanism [985cce405035]
+- [#966](https://github.com/lambdaclass/stabileo/issues/966) Nightly finding: metamorphic/invariance-refusal: eigenvalue decomposition failed — stiffness matrix issue [77b1fd95b96a]
+- [#967](https://github.com/lambdaclass/stabileo/issues/967) Nightly finding: metamorphic/invariance-refusal: singular stiffness in contact iteration [f35877146a1d]
+- [#968](https://github.com/lambdaclass/stabileo/issues/968) Nightly finding: metamorphic/invariance-refusal: singular stiffness at stage 'all' — structure is a mechanism [c303ea9d5692]
+- [#969](https://github.com/lambdaclass/stabileo/issues/969) Nightly finding: metamorphic/wrong-result-candidate: modes # and # not m-orthogonal: φᵢᵀmφⱼ/√(mᵢmⱼ) = # > # [c9bb18bc640b]
+- [#970](https://github.com/lambdaclass/stabileo/issues/970) Nightly finding: metamorphic/wrong-result-candidate: scalar lambda2[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [bc883e58155d]
+- [#971](https://github.com/lambdaclass/stabileo/issues/971) Nightly finding: metamorphic/invariance-refusal: did not converge [1f1c7f0f3a45]
+- [#972](https://github.com/lambdaclass/stabileo/issues/972) Nightly finding: metamorphic/wrong-result-candidate: rotation r@n2[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [cd2a6381c0f3]
+- [#973](https://github.com/lambdaclass/stabileo/issues/973) Nightly finding: metamorphic/invariance-refusal: eigenvalue decomposition failed [630e4950b933]
+- [#974](https://github.com/lambdaclass/stabileo/issues/974) Nightly finding: metamorphic/wrong-result-candidate: stress[#]: label vm_quad@e209[#] vs expected vm_quad@e1[#] [4ed8fae56f9a]
+- [#982](https://github.com/lambdaclass/stabileo/issues/982) Nightly finding: metamorphic/wrong-result-candidate: scalar: # values vs # expected [0d4492d31c20]
+- [#989](https://github.com/lambdaclass/stabileo/issues/989) Nightly finding: fuzz/json_plastic: slow-unit-c507ca7aa2dadaaa15bd1f0561a6286d4f5c4abb [1fd072711f00]
+- [#990](https://github.com/lambdaclass/stabileo/issues/990) Nightly finding: fuzz/json_plastic: oom-c7f1ef441d8ec105f49d584f07bfb981dc219431 [e905edc1a411]
+- [#991](https://github.com/lambdaclass/stabileo/issues/991) Nightly finding: fuzz/json_plastic: slow-unit-5ab3e57be542f3dbd4fd086e72051a1c95ce5dba [efd145cbba97]
+- [#992](https://github.com/lambdaclass/stabileo/issues/992) Nightly finding: metamorphic/wrong-result-candidate: stress: # values vs # expected [af1f7751049f]
+- [#993](https://github.com/lambdaclass/stabileo/issues/993) Nightly finding: metamorphic/wrong-result-candidate: rotation ry@n6[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [1e78bb138482]
+- [#994](https://github.com/lambdaclass/stabileo/issues/994) Nightly finding: metamorphic/wrong-result-candidate: translation h_re0@n4[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [6b02ac79522d]
+- [#1002](https://github.com/lambdaclass/stabileo/issues/1002) Nightly finding: metamorphic/wrong-result-candidate: stress[#]: label vm_plate@e215[#] vs expected vm_quad@e1[#] [f65276544afb]
+- [#1008](https://github.com/lambdaclass/stabileo/issues/1008) Nightly finding: metamorphic/invariance-refusal: singular tangent stiffness — structure may be a mechanism or load increment too large [401d6a1f227a]
+- [#1009](https://github.com/lambdaclass/stabileo/issues/1009) Nightly finding: metamorphic/wrong-result-candidate: u_t020: δ(n4←n2) = # vs δ(n2←n4) = #, |diff| # > tol # [d4ad49d1f184]
+- [#1014](https://github.com/lambdaclass/stabileo/issues/1014) Nightly finding: metamorphic/wrong-result-candidate: r(a+b) ≠ r(a)+r(b)−r(∅): force n@e1[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [4d47bec42586]
+- [#1022](https://github.com/lambdaclass/stabileo/issues/1022) Nightly finding: metamorphic/wrong-result-candidate: force v@e2[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [f0750e2b10a6]
+- [#1028](https://github.com/lambdaclass/stabileo/issues/1028) Nightly finding: metamorphic/invariance-refusal: singular stiffness in constrained system [3aaf19faa1a1]
+- [#1029](https://github.com/lambdaclass/stabileo/issues/1029) Nightly finding: metamorphic/invariance-refusal: singular stiffness matrix [159f1ed09ea8]
+- [#1030](https://github.com/lambdaclass/stabileo/issues/1030) Nightly finding: metamorphic/wrong-result-candidate: symmetric response not symmetric: translation u@n2[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [e490aae45158]
+- [#1034](https://github.com/lambdaclass/stabileo/issues/1034) Nightly finding: metamorphic/wrong-result-candidate: r(a+b) ≠ r(a)+r(b)−r(∅): translation h_im1@n2[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [b71c3398156d]
+- [#1037](https://github.com/lambdaclass/stabileo/issues/1037) Nightly finding: metamorphic/wrong-result-candidate: r(ka) ≠ k·r(a): force n@e1[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [d79776bcf491]
+- [#1040](https://github.com/lambdaclass/stabileo/issues/1040) Nightly finding: metamorphic/wrong-result-candidate: scalar collapse_factor[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [d62a0e222910]
+- [#1041](https://github.com/lambdaclass/stabileo/issues/1041) Nightly finding: metamorphic/invariance-refusal: singular effective stiffness matrix -- check constraints and mass [ef43749d3b75]
+- [#1081](https://github.com/lambdaclass/stabileo/issues/1081) Nightly finding: fuzz/json_plastic: oom-d905f6d561e4606218e5ceaf9bbe229f76ba9278 [9590c7b43594]
+- [#1082](https://github.com/lambdaclass/stabileo/issues/1082) Nightly finding: fuzz/json_plastic: slow-unit-4f033b1e11c83fdae1b76b6982134b7dc42dd22a [4fea12879077]
+- [#1083](https://github.com/lambdaclass/stabileo/issues/1083) Nightly finding: metamorphic/invariance-refusal: complex system solve failed [09049548f72c]
+- [#1084](https://github.com/lambdaclass/stabileo/issues/1084) Nightly finding: metamorphic/wrong-result-candidate: stress[#]: label vm_quad@e#[#] vs expected vm_quad@e#[#] [4bf437c2e34c]
+- [#1085](https://github.com/lambdaclass/stabileo/issues/1085) Nightly finding: metamorphic/wrong-result-candidate: translation u@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [fbe3ae5694e2]
+- [#1086](https://github.com/lambdaclass/stabileo/issues/1086) Nightly finding: metamorphic/wrong-result-candidate: rotation ry@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [ad3678e25162]
+- [#1087](https://github.com/lambdaclass/stabileo/issues/1087) Nightly finding: metamorphic/wrong-result-candidate: rotation ry_t030@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [4f6d9507c3ab]
+- [#1088](https://github.com/lambdaclass/stabileo/issues/1088) Nightly finding: metamorphic/wrong-result-candidate: antisymmetric response not antisymmetric: force v@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [9a1fea737ab9]
+- [#1089](https://github.com/lambdaclass/stabileo/issues/1089) Nightly finding: metamorphic/wrong-result-candidate: antisymmetric response not antisymmetric: force n@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [c803e94fcced]
+- [#1090](https://github.com/lambdaclass/stabileo/issues/1090) Nightly finding: metamorphic/invariance-refusal: singular tangent stiffness matrix [e86aae322293]
+- [#1091](https://github.com/lambdaclass/stabileo/issues/1091) Nightly finding: metamorphic/invariance-refusal: singular stiffness at stage '#' — structure is a mechanism [653fa589d7b9]
+- [#1092](https://github.com/lambdaclass/stabileo/issues/1092) Nightly finding: metamorphic/wrong-result-candidate: stress[#]: label vm_plate@e#[#] vs expected vm_quad@e#[#] [198c5f04e4d3]
+- [#1093](https://github.com/lambdaclass/stabileo/issues/1093) Nightly finding: metamorphic/wrong-result-candidate: original failure; replay pending [062172b45c8e]
+- [#1094](https://github.com/lambdaclass/stabileo/issues/1094) Nightly finding: metamorphic/wrong-result-candidate: rotation r@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [881462cdf2ba]
+- [#1095](https://github.com/lambdaclass/stabileo/issues/1095) Nightly finding: metamorphic/invariance-refusal: no valid modes found [c01829ee8e69]
+- [#1096](https://github.com/lambdaclass/stabileo/issues/1096) Nightly finding: metamorphic/wrong-result-candidate: symmetric response not symmetric: translation u@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [28b54c3278f1]
+- [#1097](https://github.com/lambdaclass/stabileo/issues/1097) Nightly finding: metamorphic/wrong-result-candidate: scalar lambda1[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [047692525954]
+- [#1098](https://github.com/lambdaclass/stabileo/issues/1098) Nightly finding: metamorphic/wrong-result-candidate: scalar f01[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [4580265c6a70]
+- [#1099](https://github.com/lambdaclass/stabileo/issues/1099) Nightly finding: metamorphic/wrong-result-candidate: r(ka) ≠ k·r(a): rotation ry@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [14ef316f5187]
+- [#1100](https://github.com/lambdaclass/stabileo/issues/1100) Nightly finding: metamorphic/wrong-result-candidate: translation u_t010@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [87f25e3d313d]
+- [#1101](https://github.com/lambdaclass/stabileo/issues/1101) Nightly finding: metamorphic/wrong-result-candidate: translation h_im1@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [5481101e057c]
+- [#1102](https://github.com/lambdaclass/stabileo/issues/1102) Nightly finding: metamorphic/wrong-result-candidate: translation u_t030@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [a62ccf674423]
+- [#1103](https://github.com/lambdaclass/stabileo/issues/1103) Nightly finding: metamorphic/invariance-refusal: local mechanism detected: a node with all elements hinged has excessive rotation, indicating local instability. [a0e1fed537f0]
+- [#1104](https://github.com/lambdaclass/stabileo/issues/1104) Nightly finding: metamorphic/wrong-result-candidate: u_t010: δ(n#←n#) = # vs δ(n#←n#) = #, |diff| # > tol # [379130bb5a9a]
+- [#1105](https://github.com/lambdaclass/stabileo/issues/1105) Nightly finding: metamorphic/wrong-result-candidate: force n@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [c51819e2c62e]
+- [#1106](https://github.com/lambdaclass/stabileo/issues/1106) Nightly finding: metamorphic/invariance-refusal: singular stiffness in 3d constrained system [b6063d6ce5b0]
+- [#1107](https://github.com/lambdaclass/stabileo/issues/1107) Nightly finding: metamorphic/wrong-result-candidate: r(a+b) ≠ r(a)+r(b)−r(∅): force n@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [aca33c33889e]
+- [#1108](https://github.com/lambdaclass/stabileo/issues/1108) Nightly finding: metamorphic/wrong-result-candidate: stress[#]: label vm_quad@e#[#] vs expected vm_plate@e#[#] [f570bde4f21f]
+- [#1109](https://github.com/lambdaclass/stabileo/issues/1109) Nightly finding: metamorphic/wrong-result-candidate: r(ka) ≠ k·r(a): force n@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [60812745da50]
+- [#1110](https://github.com/lambdaclass/stabileo/issues/1110) Nightly finding: metamorphic/invariance-refusal: no compressed elements — buckling not applicable [ee95071d03ef]
+- [#1111](https://github.com/lambdaclass/stabileo/issues/1111) Nightly finding: metamorphic/wrong-result-candidate: moment rm@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [4dc8170498fb]
+- [#1112](https://github.com/lambdaclass/stabileo/issues/1112) Nightly finding: metamorphic/invariance-refusal: singular tangent stiffness in fiber n-r [e41c3782b2b8]
+- [#1113](https://github.com/lambdaclass/stabileo/issues/1113) Nightly finding: metamorphic/wrong-result-candidate: force r@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [a8ddd09f18b9]
+- [#1114](https://github.com/lambdaclass/stabileo/issues/1114) Nightly finding: metamorphic/wrong-result-candidate: stress vm_quad@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [7e05a391ac38]
+- [#1115](https://github.com/lambdaclass/stabileo/issues/1115) Nightly finding: metamorphic/wrong-result-candidate: translation h_re1@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [b156f5325c6d]
+- [#1116](https://github.com/lambdaclass/stabileo/issues/1116) Nightly finding: metamorphic/wrong-result-candidate: scalar f02[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [19c358053681]
+- [#1117](https://github.com/lambdaclass/stabileo/issues/1117) Nightly finding: metamorphic/wrong-result-candidate: translation h_im2@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [1e165be76b3f]
+- [#1118](https://github.com/lambdaclass/stabileo/issues/1118) Nightly finding: metamorphic/wrong-result-candidate: rotation r_t010@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [1db8cc8f2713]
+- [#1119](https://github.com/lambdaclass/stabileo/issues/1119) Nightly finding: opensees/false_reject: stabileo: support # (node #, guidedz): the prescribed dz = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove t [8f6b27e08e6e]
+- [#1120](https://github.com/lambdaclass/stabileo/issues/1120) Nightly finding: opensees/false_reject: opensees kappa=# [65c80204c306]
+- [#1121](https://github.com/lambdaclass/stabileo/issues/1121) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dy = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or r [91f073632927]
+- [#1122](https://github.com/lambdaclass/stabileo/issues/1122) Nightly finding: opensees/wrong-result-candidate: buckling: eig/value [ee7817b53d98]
+- [#1123](https://github.com/lambdaclass/stabileo/issues/1123) Nightly finding: opensees/wrong-result-candidate: buckling: mode/1-MAC [f763ddff3708]
+- [#1124](https://github.com/lambdaclass/stabileo/issues/1124) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dy = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or re [07728cd82ba4]
+- [#1125](https://github.com/lambdaclass/stabileo/issues/1125) Nightly finding: opensees/false_reject: stabileo: support # (node #, rollerz): the prescribed dz = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove [6d2d9b9d6b85]
+- [#1126](https://github.com/lambdaclass/stabileo/issues/1126) Nightly finding: opensees/wrong-result-candidate: pdelta: disp/rz [96b38ebe3ccb]
+- [#1127](https://github.com/lambdaclass/stabileo/issues/1127) Nightly finding: opensees/wrong-result-candidate: pdelta: disp/ry [d1685138b047]
+- [#1128](https://github.com/lambdaclass/stabileo/issues/1128) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dy = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or remo [9e0a828085d7]
+- [#1129](https://github.com/lambdaclass/stabileo/issues/1129) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or r [1c721ada0e7d]
+- [#1130](https://github.com/lambdaclass/stabileo/issues/1130) Nightly finding: opensees/false_reject: stabileo: support # (node #, pinned): the prescribed dry = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove [5b6456824776]
+- [#1131](https://github.com/lambdaclass/stabileo/issues/1131) Nightly finding: opensees/wrong-result-candidate: pdelta: disp/rx [0e3890256d93]
+- [#1132](https://github.com/lambdaclass/stabileo/issues/1132) Nightly finding: opensees/false_reject: stabileo: support # (node #, rollerx): the prescribed dx = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove t [4e06f5b269c2]
+- [#1133](https://github.com/lambdaclass/stabileo/issues/1133) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or re [84114a168f06]
+- [#1134](https://github.com/lambdaclass/stabileo/issues/1134) Nightly finding: opensees/false_reject: stabileo: support # (node #, guidedx): the prescribed dx = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove th [b93bebd3accc]
+- [#1135](https://github.com/lambdaclass/stabileo/issues/1135) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settlement o [2cc65e6292cf]
+- [#1136](https://github.com/lambdaclass/stabileo/issues/1136) Nightly finding: opensees/false_reject: stabileo: support # (node #, pinned): the prescribed dry = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove t [d07f367c64da]
+- [#1137](https://github.com/lambdaclass/stabileo/issues/1137) Nightly finding: opensees/wrong-result-candidate: pdelta: disp/ux [bc6ce817883d]
+- [#1138](https://github.com/lambdaclass/stabileo/issues/1138) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dy = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or [1c1fff1ca3fd]
+- [#1139](https://github.com/lambdaclass/stabileo/issues/1139) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed drz = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settleme [85b3d059938c]
+- [#1140](https://github.com/lambdaclass/stabileo/issues/1140) Nightly finding: opensees/false_reject: stabileo: support # (node #, rollerz): the prescribed dz = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove t [711ea1a0113e]
+- [#1141](https://github.com/lambdaclass/stabileo/issues/1141) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dz = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settleme [a6bcee3894ab]
+- [#1142](https://github.com/lambdaclass/stabileo/issues/1142) Nightly finding: opensees/false_reject: stabileo: support # (node #, guidedz): the prescribed dz = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove th [3206f96d9699]
+- [#1143](https://github.com/lambdaclass/stabileo/issues/1143) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dy = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settlemen [7630982a002d]
+- [#1144](https://github.com/lambdaclass/stabileo/issues/1144) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or [94faf6ee8bfa]
+- [#1145](https://github.com/lambdaclass/stabileo/issues/1145) Nightly finding: opensees/wrong-result-candidate: pdelta: disp/uz [e6ee036003c2]
+- [#1146](https://github.com/lambdaclass/stabileo/issues/1146) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dy = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settlement [fe382d0105b8]
+- [#1147](https://github.com/lambdaclass/stabileo/issues/1147) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed drx = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, o [7c01e0665ddf]
+- [#1148](https://github.com/lambdaclass/stabileo/issues/1148) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settlemen [0125df1ef94d]
+- [#1149](https://github.com/lambdaclass/stabileo/issues/1149) Nightly finding: opensees/wrong-result-candidate: pdelta: force/vzStart [beffd20e8c0e]
+- [#1150](https://github.com/lambdaclass/stabileo/issues/1150) Nightly finding: opensees/wrong-result-candidate: pdelta: reac/mx [0487de1d9e3c]
+- [#1151](https://github.com/lambdaclass/stabileo/issues/1151) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dz = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or [6b73e3fe7879]
+- [#1152](https://github.com/lambdaclass/stabileo/issues/1152) Nightly finding: opensees/false_reject: stabileo: support # (node #, rollerz): the prescribed dz = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove the [2c19af2b92f9]
+- [#1153](https://github.com/lambdaclass/stabileo/issues/1153) Nightly finding: opensees/wrong-result-candidate: pdelta: disp/uy [349eaad20340]
+- [#1154](https://github.com/lambdaclass/stabileo/issues/1154) Nightly finding: opensees/wrong-result-candidate: pdelta: force/nEnd [09fdaaccee00]
+- [#1155](https://github.com/lambdaclass/stabileo/issues/1155) Nightly finding: opensees/wrong-result-candidate: pdelta: force/nStart [9d2c1c37d2e6]
+- [#1156](https://github.com/lambdaclass/stabileo/issues/1156) Nightly finding: opensees/wrong-result-candidate: pdelta: reac/fz [dc76bbbf7956]
+- [#1157](https://github.com/lambdaclass/stabileo/issues/1157) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or rem [40d2d6fb20d8]
+- [#1158](https://github.com/lambdaclass/stabileo/issues/1158) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed drz = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or [1dfa3389a0d1]
+- [#1159](https://github.com/lambdaclass/stabileo/issues/1159) Nightly finding: opensees/false_reject: stabileo: support # (node #, rollerz): the prescribed dz = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove th [9397bd52760a]
+- [#1160](https://github.com/lambdaclass/stabileo/issues/1160) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dz = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or r [21a59a0a5ee9]
+- [#1161](https://github.com/lambdaclass/stabileo/issues/1161) Nightly finding: opensees/false_reject: stabileo: support # (node #, guidedx): the prescribed dx = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove t [1546d97d33da]
+- [#1162](https://github.com/lambdaclass/stabileo/issues/1162) Nightly finding: opensees/false_reject: stabileo: support # (node #, rollerx): the prescribed dx = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove th [246398c00caa]
+- [#1163](https://github.com/lambdaclass/stabileo/issues/1163) Nightly finding: opensees/false_reject: stabileo: support # (node #, pinned): the prescribed dry = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remo [79522b72f3f6]
+- [#1164](https://github.com/lambdaclass/stabileo/issues/1164) Nightly finding: opensees/false_reject: stabileo: support # (node #, guidedx): the prescribed dx = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove [eefb50933b49]
+- [#1165](https://github.com/lambdaclass/stabileo/issues/1165) Nightly finding: opensees/false_reject: stabileo: support # (node #, guidedz): the prescribed dz = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove [7da095348c1f]
+- [#1166](https://github.com/lambdaclass/stabileo/issues/1166) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dz = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or rem [27f17833e676]
+- [#1167](https://github.com/lambdaclass/stabileo/issues/1167) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed drx = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or [89ba2b7511bb]
+- [#1168](https://github.com/lambdaclass/stabileo/issues/1168) Nightly finding: opensees/wrong-result-candidate: pdelta: reac/fy [fa61fe9d10bb]
+- [#1169](https://github.com/lambdaclass/stabileo/issues/1169) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settleme [02e3e98ab150]
+- [#1170](https://github.com/lambdaclass/stabileo/issues/1170) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dry = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settlem [edc2434bbbe0]
+- [#1171](https://github.com/lambdaclass/stabileo/issues/1171) Nightly finding: opensees/wrong-result-candidate: pdelta: force/vyStart [8d063c3a5978]
+- [#1172](https://github.com/lambdaclass/stabileo/issues/1172) Nightly finding: opensees/false_reject: stabileo: support # (node #, pinned): the prescribed dry = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove th [723481c887e3]
+- [#1173](https://github.com/lambdaclass/stabileo/issues/1173) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settlement [ec4c85ca3256]
+- [#1174](https://github.com/lambdaclass/stabileo/issues/1174) Nightly finding: opensees/wrong-result-candidate: pdelta: force/mxStart [06222f58795d]
+- [#1175](https://github.com/lambdaclass/stabileo/issues/1175) Nightly finding: opensees/false_reject: stabileo: support # (node #, pinned): the prescribed dry = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove the [d89fc7d8b741]
+- [#1176](https://github.com/lambdaclass/stabileo/issues/1176) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, o [248bd3e38b1c]
+- [#1177](https://github.com/lambdaclass/stabileo/issues/1177) Nightly finding: opensees/false_reject: stabileo: support # (node #, rollerx): the prescribed dx = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove [78262f3761b5]
+- [#1178](https://github.com/lambdaclass/stabileo/issues/1178) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dy = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settlem [c6047b24d84c]
+- [#1179](https://github.com/lambdaclass/stabileo/issues/1179) Nightly finding: opensees/false_reject: stabileo: support # (node #, rollerx): the prescribed dx = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove the [9da5146fb4fe]
+- [#1180](https://github.com/lambdaclass/stabileo/issues/1180) Nightly finding: opensees/wrong-result-candidate: pdelta: reac/fx [b24d943701da]
+- [#1181](https://github.com/lambdaclass/stabileo/issues/1181) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dz = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or re [74b9a1e3a41a]
+- [#1182](https://github.com/lambdaclass/stabileo/issues/1182) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dry = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or r [4ed49980178e]
+- [#1183](https://github.com/lambdaclass/stabileo/issues/1183) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dry = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or [3a668992fc6a]
+- [#1184](https://github.com/lambdaclass/stabileo/issues/1184) Nightly finding: opensees/wrong-result-candidate: pdelta: force/vyEnd [6d5f36344325]
+- [#1185](https://github.com/lambdaclass/stabileo/issues/1185) Nightly finding: opensees/wrong-result-candidate: pdelta: force/vzEnd [0b3946e81915]
+- [#1186](https://github.com/lambdaclass/stabileo/issues/1186) Nightly finding: opensees/wrong-result-candidate: pdelta: force/mxEnd [08827f18980a]
+- [#1187](https://github.com/lambdaclass/stabileo/issues/1187) Nightly finding: opensees/wrong-result-candidate: pdelta: reac/my [ddecf39f6a59]
+- [#1188](https://github.com/lambdaclass/stabileo/issues/1188) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or remo [c3ab8ad2a169]
+- [#1189](https://github.com/lambdaclass/stabileo/issues/1189) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dry = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settleme [715fb89c340b]
+- [#1190](https://github.com/lambdaclass/stabileo/issues/1190) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dz = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settlemen [2f2059bb01db]
+- [#1191](https://github.com/lambdaclass/stabileo/issues/1191) Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed drx = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settleme [0e5d2b3909a9]
+- [#1192](https://github.com/lambdaclass/stabileo/issues/1192) Nightly finding: metamorphic/invariance-refusal: node # has several supports (#) and not all are plain rigid restraints (springs, prescribed displacements or inclined directions); merge them into a single support [5cb1f6ec30af]
+- [#1193](https://github.com/lambdaclass/stabileo/issues/1193) Nightly finding: metamorphic/invariance-refusal: singular stiffness in 3d ssi iteration [6396d5130c9d]
+- [#1194](https://github.com/lambdaclass/stabileo/issues/1194) Nightly finding: metamorphic/wrong-result-candidate: symmetric response not symmetric: rotation ry_t060@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [582f40e7c8e8]
+- [#1195](https://github.com/lambdaclass/stabileo/issues/1195) Nightly finding: metamorphic/wrong-result-candidate: response not antisymmetric: translation u@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [4365371d9ae3]
+- [#1196](https://github.com/lambdaclass/stabileo/issues/1196) Nightly finding: metamorphic/wrong-result-candidate: translation u_t050@n#[#]: got nan, expected nan, |diff| nan > tol # (scale #, rel #) [9d67744137db]
+- [#1197](https://github.com/lambdaclass/stabileo/issues/1197) Nightly finding: metamorphic/wrong-result-candidate: response not c2-symmetric: translation u@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [dbc3cacf23c5]
+- [#1198](https://github.com/lambdaclass/stabileo/issues/1198) Nightly finding: metamorphic/wrong-result-candidate: response not c2-symmetric: rotation r@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [7389a2171b68]
+- [#1199](https://github.com/lambdaclass/stabileo/issues/1199) Nightly finding: metamorphic/wrong-result-candidate: antisymmetric response not antisymmetric: translation u@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [b676bdadcbed]
+- [#1200](https://github.com/lambdaclass/stabileo/issues/1200) Nightly finding: metamorphic/wrong-result-candidate: rotation r_t030@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [55b65f2b5487]
+- [#1201](https://github.com/lambdaclass/stabileo/issues/1201) Nightly finding: metamorphic/wrong-result-candidate: symmetric response not symmetric: rotation ry@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [fc471ba851e7]
+- [#1202](https://github.com/lambdaclass/stabileo/issues/1202) Nightly finding: metamorphic/wrong-result-candidate: scaled loads failed: no compressed elements — buckling not applicable [f971ad151e94]
+- [#1203](https://github.com/lambdaclass/stabileo/issues/1203) Nightly finding: metamorphic/wrong-result-candidate: symmetric response not symmetric: translation h_im1@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [cd410702e83d]
+- [#1204](https://github.com/lambdaclass/stabileo/issues/1204) Nightly finding: metamorphic/wrong-result-candidate: antisymmetric response not antisymmetric: translation h_im1@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [68fc4b81e179]
+- [#1205](https://github.com/lambdaclass/stabileo/issues/1205) Nightly finding: metamorphic/wrong-result-candidate: translation u_t030@n#[#]: got nan, expected nan, |diff| nan > tol # (scale #, rel #) [b97a05a4b2fb]
+- [#1206](https://github.com/lambdaclass/stabileo/issues/1206) Nightly finding: metamorphic/wrong-result-candidate: response not c2-symmetric: translation u_t010@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [f0f88c3ea9c6]
+- [#1207](https://github.com/lambdaclass/stabileo/issues/1207) Nightly finding: metamorphic/wrong-result-candidate: translation u_t030@n#[#]: got nan, expected nan, |diff| nan > tol inf (scale inf, rel #) [3286603dddf5]
+- [#1208](https://github.com/lambdaclass/stabileo/issues/1208) Nightly finding: metamorphic/wrong-result-candidate: translation u_t030@n#[#]: got nan, expected inf, |diff| nan > tol inf (scale inf, rel #) [b2946ae78d1f]
+- [#1209](https://github.com/lambdaclass/stabileo/issues/1209) Nightly finding: metamorphic/wrong-result-candidate: response not c2-symmetric: translation h_im1@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [69768fb1a857]
+- [#1210](https://github.com/lambdaclass/stabileo/issues/1210) Nightly finding: metamorphic/wrong-result-candidate: r(a+b) ≠ r(a)+r(b)−r(∅): translation u_t050@n#[#]: got nan, expected nan, |diff| nan > tol # (scale #, rel #) [22abb534023b]
+- [#1211](https://github.com/lambdaclass/stabileo/issues/1211) Nightly finding: metamorphic/wrong-result-candidate: antisymmetric response not antisymmetric: rotation ry@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [5e3cf7868e14]
+- [#1212](https://github.com/lambdaclass/stabileo/issues/1212) Nightly finding: metamorphic/wrong-result-candidate: translation u_t030@n#[#]: got nan, expected -inf, |diff| nan > tol inf (scale inf, rel #) [9a0015b1a4f2]
+- [#1213](https://github.com/lambdaclass/stabileo/issues/1213) Nightly finding: metamorphic/wrong-result-candidate: symmetric response not symmetric: scalar meff00[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [601a0ba79b57]
+- [#1214](https://github.com/lambdaclass/stabileo/issues/1214) Nightly finding: metamorphic/wrong-result-candidate: symmetric response not symmetric: force n@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [16203e84c260]
+- [#1215](https://github.com/lambdaclass/stabileo/issues/1215) Nightly finding: metamorphic/wrong-result-candidate: response not c2-symmetric: translation h_re2@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [5cdc619e61e1]
+- [#1216](https://github.com/lambdaclass/stabileo/issues/1216) Nightly finding: metamorphic/wrong-result-candidate: translation h_re2@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [295c9132e270]
+- [#1217](https://github.com/lambdaclass/stabileo/issues/1217) Nightly finding: metamorphic/wrong-result-candidate: rotation ry_t010@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [ad9254c4dc97]
+- [#1218](https://github.com/lambdaclass/stabileo/issues/1218) Nightly finding: metamorphic/wrong-result-candidate: response not c2-symmetric: translation h_re1@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [659e3285c667]
+- [#1219](https://github.com/lambdaclass/stabileo/issues/1219) Nightly finding: metamorphic/wrong-result-candidate: symmetric response not symmetric: scalar meff02[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [606433d0cca7]
+- [#1220](https://github.com/lambdaclass/stabileo/issues/1220) Nightly finding: metamorphic/wrong-result-candidate: symmetric response not symmetric: force v@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [f4b2685b7906]
 
 ### Differential testing (latest report per harness on `main`)
 
 | Harness | Run | Models | Compared | Agree (ok) | Mismatch | Other statuses |
 |---|---|---|---|---|---|---|
-| codeaster | [2026-10-18](https://github.com/lambdaclass/stabileo/actions/runs/39099586668) | 932 | 511 | 412 | 99 | aster_failed 1, ill_conditioned 347, near_singular 5, stabileo_failed 62, unloaded 1, unsupported 5 |
-| frame3dd | [2026-10-18](https://github.com/lambdaclass/stabileo/actions/runs/39097987226) | 1114 | 1100 | 1099 | 1 | unstable 4, unsupported 10 |
-| kratos | [2026-10-18](https://github.com/lambdaclass/stabileo/actions/runs/39097987226) | 864 | 712 | 712 | 0 | ill_conditioned 118, stabileo_failed 6, unsupported 28 |
-| opensees | [2026-10-18](https://github.com/lambdaclass/stabileo/actions/runs/39099586668) | 4274 | 3234 | 3233 | 1 | ill_conditioned 524, stabileo_failed 427, unloaded 3, unstable 13, unsupported 73 |
-| pynite | [2026-10-18](https://github.com/lambdaclass/stabileo/actions/runs/39097987226) | 1114 | 760 | 760 | 0 | ill_conditioned 222, stabileo_failed 11, unsupported 121 |
+| calculix | [2026-11-02](https://github.com/lambdaclass/stabileo/actions/runs/41389331691) | 1114 | 1004 | 1004 | 0 | ill_conditioned 32, stabileo_failed 4, unsupported 74 |
+| frame3dd | [2026-11-01](https://github.com/lambdaclass/stabileo/actions/runs/41273688210) | 1114 | 1034 | 925 | 109 | false_reject 60, unstable 10, unsupported 10 |
+| kratos | [2026-11-02](https://github.com/lambdaclass/stabileo/actions/runs/41389331691) | 864 | 645 | 645 | 0 | false_reject 146, ill_conditioned 9, refused 4, stabileo_failed 37, unsupported 23 |
+| mystran | [2026-11-02](https://github.com/lambdaclass/stabileo/actions/runs/41389331691) | 1164 | 700 | 700 | 0 | ill_conditioned 245, reference_failed 3, stabileo_failed 158, unsupported 58 |
+| pynite | [2026-11-02](https://github.com/lambdaclass/stabileo/actions/runs/41389331691) | 114 | 112 | 112 | 0 | unsupported 2 |
 
 *Compared* counts models where both programs produced a comparable answer (ok, mismatch, or known); ill-conditioned, unsupported and refused models are reported but not compared ([statuses](../../tools/differential/README.md#statuses)).
 
@@ -137,23 +353,19 @@ Symbols as in [FEATURE_MATRIX.md](FEATURE_MATRIX.md): ✓ supported and matches 
 
 | Where | Modules | Lines |
 |---|---|---|
-| Rust engine (`engine/src`, all lines incl. unit tests) | — | 107634 |
-| TypeScript (a) delegates to WASM | 23 | 11273 |
-| TypeScript (b) duplicates a Rust check | 59 | 26233 |
-| TypeScript (c) TypeScript-only engineering arithmetic | 102 | 32691 |
-| TypeScript (d) search / presentation | 148 | 41919 |
-| TypeScript not yet classified in TS_ENGINE_LOGIC.md | 13 | 1740 |
+| Rust engine (`engine/src`, all lines incl. unit tests) | — | 123693 |
+| TypeScript (a) delegates to WASM | 23 | 11636 |
+| TypeScript (b) duplicates a Rust check | 59 | 26426 |
+| TypeScript (c) TypeScript-only engineering arithmetic | 99 | 31241 |
+| TypeScript (d) search / presentation | 148 | 44578 |
+| TypeScript not yet classified in TS_ENGINE_LOGIC.md | 113 | 16818 |
 
 Classes from the inventory in [TS_ENGINE_LOGIC.md](TS_ENGINE_LOGIC.md); line counts are recomputed from the files. The Rust share is Rust lines / (Rust lines + TypeScript (b) + (c)).
 
-Inventory entries whose file no longer exists: `pdelta-forces.ts`
+Inventory entries whose file no longer exists: `bar-marks.ts`, `diaphragm-rotation.ts`, `pdelta-forces.ts`, `reinforcement-svg.ts`
 
 ### Design checks against published worked examples (clause rows)
 
-clause test 6, doc 1, ex 2, fixed 10, pass 33, uncovered 11
+clause test 6, doc 2, ex 2, fixed 14, open 1, other 1, pass 58, uncovered 15
 
 From [DESIGN_EXAMPLES.md](DESIGN_EXAMPLES.md): pass, fixed (was wrong, now matches), doc (deliberate, documented deviation), ex (the example is wrong), open (disagreement not fixed), uncovered (no published example found), clause test (hand-derived from the clause).
-
-### Rust mutation testing (cargo-mutants, newest nightly on `main`)
-
-[Run 2026-10-18](https://github.com/lambdaclass/stabileo/actions/runs/39099586668), 8 shards: caught 714, missed 478, timeout 8, unviable 51; 1251 of 23264 planned mutants tested. Missed mutants fail the job and are triaged in [FUZZ_MUTANTS.md](FUZZ_MUTANTS.md).
