@@ -1,21 +1,21 @@
 {
  "schema": 1,
- "generated": "2026-10-19 01:28 UTC",
- "commit": "d5b7e2c05c",
+ "generated": "2026-11-09 15:45 UTC",
+ "commit": "242e943dab",
  "metrics": {
   "safety_open": {
    "label": "Open `safety` issues",
-   "value": 55,
-   "display": "55",
+   "value": 320,
+   "display": "320",
    "status": "measured",
    "source": "GitHub label `safety`",
-   "note": "0 closed",
+   "note": "269 closed",
    "section": "Release safety"
   },
   "advisories": {
    "label": "Safety advisories published (GitHub)",
-   "value": 0,
-   "display": "0",
+   "value": 53,
+   "display": "53",
    "status": "measured",
    "source": "GitHub label `safety-advisory`",
    "note": "",
@@ -23,17 +23,17 @@
   },
   "rust_share": {
    "label": "Engineering logic in Rust (share of lines)",
-   "value": 64.6,
-   "display": "64.6 %",
+   "value": 68.2,
+   "display": "68.2 %",
    "status": "measured",
    "source": "engine/src vs TS_ENGINE_LOGIC.md classes (b)+(c)",
-   "note": "TypeScript (b)+(c): 58924 lines in 161 modules; 13 TS modules not yet classified",
+   "note": "TypeScript (b)+(c): 57667 lines in 158 modules; 113 TS modules not yet classified",
    "section": "Engineering coverage"
   },
   "ts_high_safety": {
    "label": "TypeScript (b)+(c) modules rated high safety",
-   "value": 88,
-   "display": "88 modules, 35935 lines",
+   "value": 86,
+   "display": "86 modules, 34569 lines",
    "status": "measured",
    "source": "TS_ENGINE_LOGIC.md inventory (Safety column)",
    "note": "",
@@ -41,8 +41,8 @@
   },
   "ts_engineering_lines": {
    "label": "TypeScript engineering arithmetic, classes (b)+(c) (lines)",
-   "value": 58924,
-   "display": "58924",
+   "value": 57667,
+   "display": "57667",
    "status": "measured",
    "source": "TS_ENGINE_LOGIC.md inventory, recounted",
    "note": "",
@@ -68,42 +68,42 @@
   },
   "acceptance_cases": {
    "label": "Acceptance-suite cases",
-   "value": null,
-   "display": "not yet measured",
-   "status": "not_measured",
-   "source": "",
-   "note": "suite not on main yet (PR #337)",
+   "value": 12,
+   "display": "12",
+   "status": "measured",
+   "source": "engine/tests/acceptance/models",
+   "note": "linear 2, modal 10",
    "section": "Engineering coverage"
   },
   "acceptance_refs": {
    "label": "Acceptance-suite reference values",
-   "value": null,
-   "display": "not yet measured",
-   "status": "not_measured",
-   "source": "",
-   "note": "suite not on main yet (PR #337)",
+   "value": 105,
+   "display": "105",
+   "status": "measured",
+   "source": "engine/tests/acceptance/models",
+   "note": "",
    "section": "Engineering coverage"
   },
   "mutation_rust": {
    "label": "Mutation score, Rust (cargo-mutants)",
-   "value": 59.9,
-   "display": "59.9 % (partial: 1251 of 23264 mutants tested)",
-   "status": "partial",
-   "source": "verify.yml [2026-10-18](https://github.com/lambdaclass/stabileo/actions/runs/39099586668)",
-   "note": "caught/(caught+missed); 8 shards; jobs: cancelled",
-   "section": "Solver and proof depth",
-   "evidence_sha": [
-    "fa6620a17064ea69258fed65b29f85d663a81010"
-   ]
-  },
-  "mutation_ts": {
-   "label": "Mutation score, TypeScript (Stryker)",
    "value": null,
    "display": "not yet measured",
    "status": "not_measured",
    "source": "",
-   "note": "no successful Stryker run with a defined score found on main",
-   "section": "Engineering coverage"
+   "note": "no mutants report with a defined score found on main",
+   "section": "Solver and proof depth"
+  },
+  "mutation_ts": {
+   "label": "Mutation score, TypeScript (Stryker)",
+   "value": 52.7,
+   "display": "52.7 %",
+   "status": "measured",
+   "source": "mutation-ts.yml [2026-10-26](https://github.com/lambdaclass/stabileo/actions/runs/40264839508)",
+   "note": "",
+   "section": "Engineering coverage",
+   "evidence_sha": [
+    "2f7360eca995575989e00e151d66425885901800"
+   ]
   },
   "coverage_lines": {
    "label": "Engine line coverage (llvm-cov)",
@@ -125,14 +125,14 @@
   },
   "differential_compared": {
    "label": "Differential models compared (latest run per harness)",
-   "value": 6317,
-   "display": "6317 (6216 agree, 101 mismatch)",
+   "value": 4710,
+   "display": "4710 (4708 agree, 2 mismatch)",
    "status": "measured",
-   "source": "codeaster, frame3dd, kratos, opensees, pynite",
-   "note": "see Details; no report yet: mystran, calculix",
+   "source": "calculix, frame3dd, kratos, mystran, pynite",
+   "note": "see Details; no report yet: opensees, codeaster",
    "section": "Trust and verification",
    "evidence_sha": [
-    "fa6620a17064ea69258fed65b29f85d663a81010"
+    "4f9b69cad12cb4bed43703bb7e52366ff77c70dd"
    ]
   },
   "fuzz_execs": {
@@ -164,8 +164,8 @@
   },
   "engine_tests": {
    "label": "Engine `#[test]` functions",
-   "value": 7899,
-   "display": "7899",
+   "value": 8384,
+   "display": "8384",
    "status": "measured",
    "source": "git grep engine",
    "note": "",
@@ -182,8 +182,8 @@
   },
   "lean_theorems": {
    "label": "Lean theorems and lemmas",
-   "value": 177,
-   "display": "177",
+   "value": 184,
+   "display": "184",
    "status": "measured",
    "source": "verify/*.lean",
    "note": "",
@@ -192,7 +192,7 @@
   "issues_multiplier": {
    "label": "Backlog issues closed (`roadmap:multiplier`)",
    "value": 0,
-   "display": "0 of 10",
+   "display": "0 of 13",
    "status": "measured",
    "source": "GitHub label `roadmap:multiplier`",
    "note": "",
@@ -200,8 +200,8 @@
   },
   "issues_verification": {
    "label": "Backlog issues closed (`roadmap:verification`)",
-   "value": 0,
-   "display": "0 of 16",
+   "value": 6,
+   "display": "6 of 34",
    "status": "measured",
    "source": "GitHub label `roadmap:verification`",
    "note": "",
@@ -209,8 +209,8 @@
   },
   "issues_coverage": {
    "label": "Backlog issues closed (`roadmap:coverage`)",
-   "value": 0,
-   "display": "0 of 15",
+   "value": 2,
+   "display": "2 of 15",
    "status": "measured",
    "source": "GitHub label `roadmap:coverage`",
    "note": "",
@@ -218,8 +218,8 @@
   },
   "issues_solver-proofs": {
    "label": "Backlog issues closed (`roadmap:solver-proofs`)",
-   "value": 0,
-   "display": "0 of 10",
+   "value": 1,
+   "display": "1 of 18",
    "status": "measured",
    "source": "GitHub label `roadmap:solver-proofs`",
    "note": "",
@@ -227,8 +227,8 @@
   },
   "issues_release-safety": {
    "label": "Backlog issues closed (`roadmap:release-safety`)",
-   "value": 0,
-   "display": "0 of 8",
+   "value": 3,
+   "display": "3 of 20",
    "status": "measured",
    "source": "GitHub label `roadmap:release-safety`",
    "note": "",
@@ -246,12 +246,7 @@
      "Differential": "[Frame3DD](../../tools/differential/frame3dd/README.md), [PyNite](../../tools/differential/pynite/README.md), [MYSTRAN](../../tools/differential/mystran/README.md), [Kratos](../../tools/differential/kratos/README.md), [CalculiX](../../tools/differential/calculix/README.md), [OpenSees](../../tools/opensees/README.md), [Code_Aster](../../tools/differential/codeaster/README.md)",
      "Tested": "[feature matrix](FEATURE_MATRIX.md) [2D](FEATURE_MATRIX.md#2d), [3D](FEATURE_MATRIX.md#3d)"
     },
-    "issues": [
-     343,
-     435,
-     443,
-     452
-    ]
+    "issues": []
    },
    {
     "name": "Constraints (rigid links, diaphragms, EqualDOF, MPC)",
@@ -262,10 +257,7 @@
      "Differential": "[Code_Aster](../../tools/differential/codeaster/README.md)",
      "Tested": "[feature matrix](FEATURE_MATRIX.md) [2D](FEATURE_MATRIX.md#2d), [3D](FEATURE_MATRIX.md#3d)"
     },
-    "issues": [
-     342,
-     445
-    ]
+    "issues": []
    },
    {
     "name": "Load combinations and envelopes",
@@ -285,9 +277,7 @@
      "Benchmarked": "[BENCHMARKS](../BENCHMARKS.md#solver-capability-matrix): Diagrams / section forces / deformed shape (Strong)",
      "Differential": "[Frame3DD](../../tools/differential/frame3dd/README.md), [PyNite](../../tools/differential/pynite/README.md), [OpenSees](../../tools/opensees/README.md), [Code_Aster](../../tools/differential/codeaster/README.md)"
     },
-    "issues": [
-     343
-    ]
+    "issues": []
    },
    {
     "name": "P-Delta (second order)",
@@ -298,12 +288,7 @@
      "Differential": "[Frame3DD](../../tools/differential/frame3dd/README.md), [OpenSees](../../tools/opensees/README.md)",
      "Tested": "[feature matrix](FEATURE_MATRIX.md) [2D](FEATURE_MATRIX.md#2d), [3D](FEATURE_MATRIX.md#3d)"
     },
-    "issues": [
-     404,
-     431,
-     439,
-     442
-    ]
+    "issues": []
    },
    {
     "name": "Linear buckling",
@@ -314,10 +299,7 @@
      "Differential": "[OpenSees](../../tools/opensees/README.md)",
      "Tested": "[feature matrix](FEATURE_MATRIX.md) [2D](FEATURE_MATRIX.md#2d), [3D](FEATURE_MATRIX.md#3d)"
     },
-    "issues": [
-     404,
-     439
-    ]
+    "issues": []
    },
    {
     "name": "Modal",
@@ -328,11 +310,7 @@
      "Differential": "[Frame3DD](../../tools/differential/frame3dd/README.md), [MYSTRAN](../../tools/differential/mystran/README.md), [OpenSees](../../tools/opensees/README.md)",
      "Tested": "[feature matrix](FEATURE_MATRIX.md) [2D](FEATURE_MATRIX.md#2d), [3D](FEATURE_MATRIX.md#3d)"
     },
-    "issues": [
-     338,
-     341,
-     405
-    ]
+    "issues": []
    },
    {
     "name": "Response spectrum (SRSS / CQC)",
@@ -342,11 +320,7 @@
      "Benchmarked": "[BENCHMARKS](../BENCHMARKS.md#solver-capability-matrix): 2D response spectrum (Strong); 3D response spectrum (Strong)",
      "Tested": "[feature matrix](FEATURE_MATRIX.md) [2D](FEATURE_MATRIX.md#2d), [3D](FEATURE_MATRIX.md#3d)"
     },
-    "issues": [
-     335,
-     405,
-     424
-    ]
+    "issues": []
    },
    {
     "name": "Time history",
@@ -357,9 +331,7 @@
      "Differential": "[OpenSees](../../tools/opensees/README.md)",
      "Tested": "[feature matrix](FEATURE_MATRIX.md) [2D](FEATURE_MATRIX.md#2d), [3D](FEATURE_MATRIX.md#3d)"
     },
-    "issues": [
-     425
-    ]
+    "issues": []
    },
    {
     "name": "Harmonic (steady state)",
@@ -389,8 +361,7 @@
      "Tested": "[feature matrix](FEATURE_MATRIX.md) [2D](FEATURE_MATRIX.md#2d), [3D](FEATURE_MATRIX.md#3d)"
     },
     "issues": [
-     426,
-     442
+     426
     ]
    },
    {
@@ -401,9 +372,7 @@
      "Tested": "[feature matrix](FEATURE_MATRIX.md) [2D](FEATURE_MATRIX.md#2d), [3D](FEATURE_MATRIX.md#3d)"
     },
     "issues": [
-     427,
-     428,
-     429
+     428
     ]
    },
    {
@@ -414,8 +383,7 @@
      "Tested": "[feature matrix](FEATURE_MATRIX.md) [2D](FEATURE_MATRIX.md#2d), [3D](FEATURE_MATRIX.md#3d)"
     },
     "issues": [
-     420,
-     433
+     420
     ]
    },
    {
@@ -452,9 +420,7 @@
      "Benchmarked": "[BENCHMARKS](../BENCHMARKS.md#solver-capability-matrix): Winkler foundation solvers (2D/3D) (Good)",
      "Tested": "[feature matrix](FEATURE_MATRIX.md) [2D](FEATURE_MATRIX.md#2d), [3D](FEATURE_MATRIX.md#3d)"
     },
-    "issues": [
-     444
-    ]
+    "issues": []
    },
    {
     "name": "Contact / gaps",
@@ -474,11 +440,7 @@
      "Benchmarked": "[BENCHMARKS](../BENCHMARKS.md#solver-capability-matrix): Nonlinear SSI beyond Winkler (Good)",
      "Tested": "[feature matrix](FEATURE_MATRIX.md) [2D](FEATURE_MATRIX.md#2d), [3D](FEATURE_MATRIX.md#3d)"
     },
-    "issues": [
-     421,
-     422,
-     423
-    ]
+    "issues": []
    },
    {
     "name": "Creep and shrinkage",
@@ -497,7 +459,6 @@
      "Tested": "[feature matrix](FEATURE_MATRIX.md) [2D](FEATURE_MATRIX.md#2d), [3D](FEATURE_MATRIX.md#3d)"
     },
     "issues": [
-     416,
      417
     ]
    },
@@ -527,7 +488,6 @@
      "Tested": "[feature matrix](FEATURE_MATRIX.md) [2D](FEATURE_MATRIX.md#2d), [3D](FEATURE_MATRIX.md#3d)"
     },
     "issues": [
-     338,
      369
     ]
    },
@@ -560,10 +520,7 @@
      "Differential": "[Frame3DD](../../tools/differential/frame3dd/README.md), [PyNite](../../tools/differential/pynite/README.md), [MYSTRAN](../../tools/differential/mystran/README.md), [Kratos](../../tools/differential/kratos/README.md), [CalculiX](../../tools/differential/calculix/README.md), [OpenSees](../../tools/opensees/README.md), [Code_Aster](../../tools/differential/codeaster/README.md)",
      "Tested": "[feature matrix](FEATURE_MATRIX.md) [2D](FEATURE_MATRIX.md#2d), [3D](FEATURE_MATRIX.md#3d)"
     },
-    "issues": [
-     404,
-     407
-    ]
+    "issues": []
    },
    {
     "name": "Truss",
@@ -598,8 +555,7 @@
      "Tested": "[feature matrix](FEATURE_MATRIX.md) [3D](FEATURE_MATRIX.md#3d)"
     },
     "issues": [
-     408,
-     439
+     408
     ]
    },
    {
@@ -608,9 +564,7 @@
     "evidence": {
      "Tested": "[feature matrix](FEATURE_MATRIX.md) [3D](FEATURE_MATRIX.md#3d)"
     },
-    "issues": [
-     418
-    ]
+    "issues": []
    },
    {
     "name": "Connector (spring element)",
@@ -632,8 +586,6 @@
     },
     "issues": [
      414,
-     415,
-     416,
      417
     ]
    },
@@ -645,8 +597,7 @@
      "Tested": "engine tests of `fiber_beam.rs`"
     },
     "issues": [
-     420,
-     433
+     420
     ]
    },
    {
@@ -681,7 +632,6 @@
      "Tested": "[feature matrix](FEATURE_MATRIX.md) [3D](FEATURE_MATRIX.md#3d)"
     },
     "issues": [
-     411,
      412
     ]
    },
@@ -692,9 +642,7 @@
      "Benchmarked": "[BENCHMARKS](../BENCHMARKS.md#solver-capability-matrix): Curved shell element (Strong)",
      "Tested": "[feature matrix](FEATURE_MATRIX.md) [3D](FEATURE_MATRIX.md#3d)"
     },
-    "issues": [
-     410
-    ]
+    "issues": []
    },
    {
     "name": "Solid shell, SHB8-ANS",
@@ -703,9 +651,7 @@
      "Benchmarked": "[BENCHMARKS](../BENCHMARKS.md#solver-capability-matrix): SHB8-ANS 8-node solid-shell element (Strong)",
      "Tested": "[feature matrix](FEATURE_MATRIX.md) [3D](FEATURE_MATRIX.md#3d)"
     },
-    "issues": [
-     400
-    ]
+    "issues": []
    }
   ],
   "design": [
@@ -714,7 +660,7 @@
     "level": "Certified",
     "evidence": {
      "Certified": "[`certify_steel_members`](CERTIFY.md#certified-design-checks)",
-     "Benchmarked": "[worked examples](DESIGN_EXAMPLES.md#aisc-360-steel_check-rust): 12 of 16 clauses against published examples",
+     "Benchmarked": "[worked examples](DESIGN_EXAMPLES.md#aisc-360-steel_check-rust): 17 of 22 clauses against published examples",
      "Tested": "tests referencing `steel_check`"
     },
     "issues": [
@@ -726,7 +672,7 @@
     "level": "Certified",
     "evidence": {
      "Certified": "[`certify_ec3_members`](CERTIFY.md#certified-design-checks)",
-     "Benchmarked": "[worked examples](DESIGN_EXAMPLES.md#en-1993-1-1-ec3_check-rust): 8 of 12 clauses against published examples",
+     "Benchmarked": "[worked examples](DESIGN_EXAMPLES.md#en-1993-1-1-ec3_check-rust): 9 of 13 clauses against published examples",
      "Tested": "tests referencing `ec3_check`"
     },
     "issues": [
@@ -765,8 +711,7 @@
      "Tested": "tests referencing `cirsoc201_check`"
     },
     "issues": [
-     366,
-     390
+     366
     ]
    },
    {
@@ -774,7 +719,7 @@
     "level": "Certified",
     "evidence": {
      "Certified": "[`certify_cirsoc301_members`](CERTIFY.md#certified-design-checks)",
-     "Benchmarked": "[worked examples](DESIGN_EXAMPLES.md#cirsoc-301-2018-cirsoc301ts-ts): 10 of 14 clauses against published examples",
+     "Benchmarked": "[worked examples](DESIGN_EXAMPLES.md#cirsoc-301-2018-cirsoc301ts-ts): 11 of 15 clauses against published examples",
      "Differential": "[TypeScript vs Rust](TS_ENGINE_LOGIC.md#2-differential-tests-typescript-against-rust): CIRSOC 301",
      "Tested": "tests referencing `cirsoc301`"
     },
@@ -858,9 +803,7 @@
      "Benchmarked": "[worked examples](DESIGN_EXAMPLES.md#cirsoc-201-2005-cirsoc201ts-ts): 2 of 3 clauses against published examples",
      "Tested": "tests referencing `cirsoc201-inti-examples`"
     },
-    "issues": [
-     390
-    ]
+    "issues": []
    },
    {
     "name": "CIRSOC 301 J welds and bolts, TypeScript (`fillet-weld.ts`, `bolted-joint.ts`)",
@@ -941,27 +884,27 @@
  "issue_state": {
   "335": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "Verification failure: Nightly verification / fuzz (json_dynamics)"
   },
   "338": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "Modal analysis silently drops modes on a mechanism (hinged member with a free tip)"
   },
   "341": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "Nodal (lumped) masses and rotary inertia are not supported"
   },
   "342": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "Rigid diaphragm leaves each node's in-plane rotation free (SAP2000/ETABS/OpenSees tie it)"
   },
   "343": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "2D: load along an inclined member doesn't reach the member's axial force; couples on members dropped/mirrored in the 3D solve"
   },
   "366": {
@@ -996,7 +939,7 @@
   },
   "390": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "Concrete design from the engine: all CIRSOC 201 section shapes, slabs, bar layouts"
   },
   "391": {
@@ -1011,17 +954,17 @@
   },
   "400": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "SHB8 solid-shell is ~18% too stiff in thin-plate bending (thickness locking); benchmark tolerance hides it"
   },
   "404": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "3D buckling misses torsional and flexural-torsional buckling (no Wagner term in frame Kg)"
   },
   "405": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "Response spectrum: base shear always SRSS under CQC; modal participation omits support-coupled mass"
   },
   "406": {
@@ -1031,7 +974,7 @@
   },
   "407": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "FR-4: Frame/truss thermal loads use a fixed alpha = 12e-6 and depth sqrt(12I/A); API users get wrong thermal forces silently"
   },
   "408": {
@@ -1046,12 +989,12 @@
   },
   "410": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "SH-6: Curved shell reports zero bending moments, and its stresses ignore thermal strain"
   },
   "411": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "SH-7: MITC9 on non-planar geometry does not reproduce rigid-body motion (advertised for curved shells)"
   },
   "412": {
@@ -1071,12 +1014,12 @@
   },
   "415": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "SP-11: `ernst_tangent_modulus` is not the derivative of the chord-tension law"
   },
   "416": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "SP-12: Cable solver tension is too low in indeterminate systems (Ernst tangent used as a secant from the chord)"
   },
   "417": {
@@ -1086,7 +1029,7 @@
   },
   "418": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "SP-15: Curved-beam segment axes depend on plan orientation (Iy/Iz swap on near-vertical segments)"
   },
   "419": {
@@ -1101,27 +1044,27 @@
   },
   "421": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "AC-12: p-y curves depart from the cited references (soft clay J term, sand A = 0.9, sand k table)"
   },
   "422": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "AC-13: \"Stiff clay\" p-y curve is discontinuous at y50 and is not Reese's stiff-clay curve"
   },
   "423": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "AC-16: t-z and q-z curves are missing the shaft perimeter / tip area (units kPa x m, not kN)"
   },
   "424": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "MD-6: Spectral element forces combined from per-mode absolute end values (CQC cross terms never negative)"
   },
   "425": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "MD-10: TimeHistoryInput.method is ignored; the scheme follows `alpha` alone"
   },
   "426": {
@@ -1131,7 +1074,7 @@
   },
   "427": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "NL-4: Material-nonlinear solver reports elastic member forces K_el u (100x off after yield)"
   },
   "428": {
@@ -1141,12 +1084,12 @@
   },
   "429": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "NL-6: 3D material-nonlinear yield surface is unconservative compared with 2D"
   },
   "431": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "NL-10: Notional loads ignore member (distributed/point) gravity loads"
   },
   "432": {
@@ -1156,55 +1099,47 @@
   },
   "433": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "NL-17: Fiber solver reports an unconverged iterate on failure (no load factor)"
   },
   "435": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "Flat 2D model solved in 3D: nodal moments and prescribed rotations act mirrored"
   },
   "439": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "Web: 3D sections send no Cw and fall back to J = 0.001·Iy; with torsional buckling in Kg these now drive 3D buckling/P-Delta"
   },
   "442": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "Imperfection analysis can silently do nothing (3D gravity axis, member loads, residual stresses, plane model along Y)"
   },
   "443": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "Settlements on a DOF the support leaves free are dropped without a message"
   },
   "444": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "Winkler member forces leave out the foundation reaction"
   },
   "445": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "Rigid link and diaphragm mean different things in the 2D and the 3D solve of one model"
   },
   "452": {
    "pr": false,
-   "state": "open",
+   "state": "closed",
    "title": "2D: a nodal moment on a node where every frame is hinged is silently lost"
   }
  },
  "details": {
   "safety_issues": [
-   {
-    "number": 343,
-    "title": "2D: load along an inclined member doesn't reach the member's axial force; couples on members dropped/mirrored in the 3D solve"
-   },
-   {
-    "number": 354,
-    "title": "Verification jobs that run on schedule and alert on failure"
-   },
    {
     "number": 356,
     "title": "Discretization error estimates next to certified results"
@@ -1212,10 +1147,6 @@
    {
     "number": 359,
     "title": "Units in the type system (Rust and TypeScript)"
-   },
-   {
-    "number": 361,
-    "title": "Re-check prompt when an old project opens in a version with changed results"
    },
    {
     "number": 366,
@@ -1228,10 +1159,6 @@
    {
     "number": 370,
     "title": "Known solver gaps: unconverged nonlinear increments, co-rotational refusals, beam rotary inertia, and more"
-   },
-   {
-    "number": 375,
-    "title": "End-to-end certificates: independently re-assemble K and f from the model"
    },
    {
     "number": 376,
@@ -1250,20 +1177,12 @@
     "title": "Staging before production: deploy main to staging, promote tagged releases"
    },
    {
-    "number": 387,
-    "title": "Tell users of saved projects what changed for their model; mark stale results"
-   },
-   {
     "number": 388,
     "title": "Dependency upgrades through the same gates; numerics crates must stay bit-identical"
    },
    {
     "number": 389,
     "title": "Keep steel results labelled experimental until independent review of CIRSOC 301"
-   },
-   {
-    "number": 390,
-    "title": "Concrete design from the engine: all CIRSOC 201 section shapes, slabs, bar layouts"
    },
    {
     "number": 391,
@@ -1278,192 +1197,1379 @@
     "title": "Footings and load generation (wind, snow, seismic, combinations) in Rust"
    },
    {
-    "number": 394,
-    "title": "No silent fallbacks: say so when the engine is unavailable"
-   },
-   {
-    "number": 400,
-    "title": "SHB8 solid-shell is ~18% too stiff in thin-plate bending (thickness locking); benchmark tolerance hides it"
-   },
-   {
-    "number": 404,
-    "title": "3D buckling misses torsional and flexural-torsional buckling (no Wagner term in frame Kg)"
-   },
-   {
-    "number": 405,
-    "title": "Response spectrum: base shear always SRSS under CQC; modal participation omits support-coupled mass"
-   },
-   {
-    "number": 407,
-    "title": "FR-4: Frame/truss thermal loads use a fixed alpha = 12e-6 and depth sqrt(12I/A); API users get wrong thermal forces silently"
-   },
-   {
     "number": 408,
     "title": "FR-5: Warping DOF is shared by all members at a node (full warping transmission); no per-member warping release"
-   },
-   {
-    "number": 410,
-    "title": "SH-6: Curved shell reports zero bending moments, and its stresses ignore thermal strain"
-   },
-   {
-    "number": 411,
-    "title": "SH-7: MITC9 on non-planar geometry does not reproduce rigid-body motion (advertised for curved shells)"
-   },
-   {
-    "number": 416,
-    "title": "SP-12: Cable solver tension is too low in indeterminate systems (Ernst tangent used as a secant from the chord)"
    },
    {
     "number": 417,
     "title": "SP-14: Linear solver lets a cable carry compression with no diagnostic"
    },
    {
-    "number": 418,
-    "title": "SP-15: Curved-beam segment axes depend on plan orientation (Iy/Iz swap on near-vertical segments)"
-   },
-   {
     "number": 419,
     "title": "SP-17: 3D connector axes are discontinuous in direction and not user-orientable"
-   },
-   {
-    "number": 421,
-    "title": "AC-12: p-y curves depart from the cited references (soft clay J term, sand A = 0.9, sand k table)"
-   },
-   {
-    "number": 422,
-    "title": "AC-13: \"Stiff clay\" p-y curve is discontinuous at y50 and is not Reese's stiff-clay curve"
-   },
-   {
-    "number": 423,
-    "title": "AC-16: t-z and q-z curves are missing the shaft perimeter / tip area (units kPa x m, not kN)"
-   },
-   {
-    "number": 425,
-    "title": "MD-10: TimeHistoryInput.method is ignored; the scheme follows `alpha` alone"
    },
    {
     "number": 426,
     "title": "NL-3: 3D co-rotational uses additive rotation vectors: error for large non-coaxial rotations"
    },
    {
-    "number": 427,
-    "title": "NL-4: Material-nonlinear solver reports elastic member forces K_el u (100x off after yield)"
-   },
-   {
     "number": 428,
     "title": "NL-5: Material-nonlinear solver is a whole-member secant (EI -> alpha EI), not plasticity"
-   },
-   {
-    "number": 429,
-    "title": "NL-6: 3D material-nonlinear yield surface is unconservative compared with 2D"
-   },
-   {
-    "number": 431,
-    "title": "NL-10: Notional loads ignore member (distributed/point) gravity loads"
    },
    {
     "number": 432,
     "title": "NL-13: Contact solver reports converged after freezing a chattering gap at max_flips"
    },
    {
-    "number": 433,
-    "title": "NL-17: Fiber solver reports an unconverged iterate on failure (no load factor)"
-   },
-   {
-    "number": 435,
-    "title": "Flat 2D model solved in 3D: nodal moments and prescribed rotations act mirrored"
-   },
-   {
-    "number": 439,
-    "title": "Web: 3D sections send no Cw and fall back to J = 0.001·Iy; with torsional buckling in Kg these now drive 3D buckling/P-Delta"
-   },
-   {
     "number": 441,
     "title": "Safety advisories: notify users when a released version produced a wrong or unconservative result"
-   },
-   {
-    "number": 442,
-    "title": "Imperfection analysis can silently do nothing (3D gravity axis, member loads, residual stresses, plane model along Y)"
-   },
-   {
-    "number": 443,
-    "title": "Settlements on a DOF the support leaves free are dropped without a message"
-   },
-   {
-    "number": 444,
-    "title": "Winkler member forces leave out the foundation reaction"
-   },
-   {
-    "number": 445,
-    "title": "Rigid link and diaphragm mean different things in the 2D and the 3D solve of one model"
    },
    {
     "number": 447,
     "title": "Contain first, fix second: per-feature runtime switches (warn/refuse) for known dangerous results"
    },
    {
-    "number": 452,
-    "title": "2D: a nodal moment on a node where every frame is hinged is silently lost"
-   },
-   {
-    "number": 456,
-    "title": "3D buckling: compression gate uses end-force average, misses members compressed only between their ends"
-   },
-   {
     "number": 458,
     "title": "Existing (assembled-level) certificate certifies singular models: all-hinged 2D node with moment/rigid link; skew unstiffened rotation"
    },
    {
-    "number": 459,
-    "title": "3D diaphragm in the XZ plane ties slaves with reversed rotation sign"
+    "number": 741,
+    "title": "Certified 3D buckling factor above its own certified upper bound (fuzz json_dynamics)"
+   },
+   {
+    "number": 745,
+    "title": "Test gap: 765 missed mutants in 49 functions survive in the plastic-collapse certificates"
+   },
+   {
+    "number": 746,
+    "title": "Test gap: 133 missed mutants in 12 functions survive in the plate element kernels (DKT, DKMT, CST)"
+   },
+   {
+    "number": 747,
+    "title": "Test gap: 119 missed mutants in 8 functions survive in the cable element (catenary)"
+   },
+   {
+    "number": 748,
+    "title": "Test gap: 214 missed mutants in 30 functions survive in the modal, spectral, harmonic and time-history certificates"
+   },
+   {
+    "number": 749,
+    "title": "Test gap: 160 missed mutants in 30 functions survive in the certificate's independent re-assembly"
+   },
+   {
+    "number": 750,
+    "title": "Test gap: 67 missed mutants in 23 functions survive in the design-check certificates"
+   },
+   {
+    "number": 751,
+    "title": "Test gap: 244 missed mutants in 50 functions survive in the static certificate support code"
+   },
+   {
+    "number": 752,
+    "title": "Test gap: 260 missed mutants in 21 functions survive in the frame, truss, curved-beam and fiber-beam kernels"
+   },
+   {
+    "number": 758,
+    "title": "2D plastic collapse factor changes with renumbering, member direction and units (up to 4.6x)"
+   },
+   {
+    "number": 759,
+    "title": "3D modal analysis returns modes that are not mass-orthogonal (one mode returned twice)"
+   },
+   {
+    "number": 760,
+    "title": "Linear time history violates reciprocity on some models (up to 33x between i<-j and j<-i)"
+   },
+   {
+    "number": 762,
+    "title": "Mechanism detection and accuracy change with units and orientation on near-singular models"
+   },
+   {
+    "number": 798,
+    "title": "Engine: MITC4 shells are badly stiff for in-plane bending on distorted meshes (MacNeal–Harder: −92% trapezoidal, −90% parallelogram)"
+   },
+   {
+    "number": 810,
+    "title": "Engine triage: MITC4 Scordelis–Lo roof plateaus 15% stiff; pinched cylinder error grows with refinement"
+   },
+   {
+    "number": 818,
+    "title": "Buckling: the dense reciprocal eigen-solve can report a factor slightly above the true one (0.05% in #741's case)"
+   },
+   {
+    "number": 932,
+    "title": "Nightly finding: codeaster/wrong-result-candidate: static: disp/ux [43bc5218d402]"
+   },
+   {
+    "number": 938,
+    "title": "Nightly finding: codeaster/wrong-result-candidate: static: force/nEnd [caba44701989]"
+   },
+   {
+    "number": 950,
+    "title": "Nightly finding: codeaster/original failure; replay pending: original failure; replay pending [0da913e831b7]"
+   },
+   {
+    "number": 951,
+    "title": "Nightly finding: fuzz/json_plastic: oom-137c0dc8daa15f8d7cb171378046650a516b2060 [ecfc9326af96]"
+   },
+   {
+    "number": 952,
+    "title": "Nightly finding: fuzz/json_plastic: slow-unit-158a48faf3993f5a9f6efd296446b24ecfe374b2 [5a81353a42d4]"
+   },
+   {
+    "number": 953,
+    "title": "Nightly finding: fuzz/json_plastic: slow-unit-d886d7f3d43878f1c4f3a6b5771ebed044d32d99 [ebf6938d7112]"
+   },
+   {
+    "number": 956,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: σp·u = # but σ f_e·u_e + springs = #, |diff| # > tol # [eed88e2dcae4]"
+   },
+   {
+    "number": 957,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: translation u@n2[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [030b2d83b165]"
+   },
+   {
+    "number": 959,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: scalar lambda0[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [a3e32f4748a0]"
+   },
+   {
+    "number": 964,
+    "title": "Nightly finding: metamorphic/invariance-refusal: singular stiffness in ssi iteration [b5b98336844a]"
+   },
+   {
+    "number": 965,
+    "title": "Nightly finding: metamorphic/invariance-refusal: singular stiffness matrix — structure is a mechanism [985cce405035]"
+   },
+   {
+    "number": 966,
+    "title": "Nightly finding: metamorphic/invariance-refusal: eigenvalue decomposition failed — stiffness matrix issue [77b1fd95b96a]"
+   },
+   {
+    "number": 967,
+    "title": "Nightly finding: metamorphic/invariance-refusal: singular stiffness in contact iteration [f35877146a1d]"
+   },
+   {
+    "number": 968,
+    "title": "Nightly finding: metamorphic/invariance-refusal: singular stiffness at stage 'all' — structure is a mechanism [c303ea9d5692]"
+   },
+   {
+    "number": 970,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: scalar lambda2[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [bc883e58155d]"
+   },
+   {
+    "number": 971,
+    "title": "Nightly finding: metamorphic/invariance-refusal: did not converge [1f1c7f0f3a45]"
+   },
+   {
+    "number": 972,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: rotation r@n2[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [cd2a6381c0f3]"
+   },
+   {
+    "number": 973,
+    "title": "Nightly finding: metamorphic/invariance-refusal: eigenvalue decomposition failed [630e4950b933]"
+   },
+   {
+    "number": 982,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: scalar: # values vs # expected [0d4492d31c20]"
+   },
+   {
+    "number": 989,
+    "title": "Nightly finding: fuzz/json_plastic: slow-unit-c507ca7aa2dadaaa15bd1f0561a6286d4f5c4abb [1fd072711f00]"
+   },
+   {
+    "number": 990,
+    "title": "Nightly finding: fuzz/json_plastic: oom-c7f1ef441d8ec105f49d584f07bfb981dc219431 [e905edc1a411]"
+   },
+   {
+    "number": 991,
+    "title": "Nightly finding: fuzz/json_plastic: slow-unit-5ab3e57be542f3dbd4fd086e72051a1c95ce5dba [efd145cbba97]"
+   },
+   {
+    "number": 1008,
+    "title": "Nightly finding: metamorphic/invariance-refusal: singular tangent stiffness — structure may be a mechanism or load increment too large [401d6a1f227a]"
+   },
+   {
+    "number": 1011,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: translation u@n3[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [4c6c5cd29fb8]"
+   },
+   {
+    "number": 1013,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: force n@e1[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [5f2589de0613]"
+   },
+   {
+    "number": 1028,
+    "title": "Nightly finding: metamorphic/invariance-refusal: singular stiffness in constrained system [3aaf19faa1a1]"
+   },
+   {
+    "number": 1029,
+    "title": "Nightly finding: metamorphic/invariance-refusal: singular stiffness matrix [159f1ed09ea8]"
+   },
+   {
+    "number": 1030,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: symmetric response not symmetric: translation u@n2[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [e490aae45158]"
+   },
+   {
+    "number": 1031,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: rotation ry@n2[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [c6d51d2f576d]"
+   },
+   {
+    "number": 1040,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: scalar collapse_factor[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [d62a0e222910]"
+   },
+   {
+    "number": 1041,
+    "title": "Nightly finding: metamorphic/invariance-refusal: singular effective stiffness matrix -- check constraints and mass [ef43749d3b75]"
+   },
+   {
+    "number": 1081,
+    "title": "Nightly finding: fuzz/json_plastic: oom-d905f6d561e4606218e5ceaf9bbe229f76ba9278 [9590c7b43594]"
+   },
+   {
+    "number": 1082,
+    "title": "Nightly finding: fuzz/json_plastic: slow-unit-4f033b1e11c83fdae1b76b6982134b7dc42dd22a [4fea12879077]"
+   },
+   {
+    "number": 1083,
+    "title": "Nightly finding: metamorphic/invariance-refusal: complex system solve failed [09049548f72c]"
+   },
+   {
+    "number": 1085,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: translation u@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [fbe3ae5694e2]"
+   },
+   {
+    "number": 1086,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: rotation ry@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [ad3678e25162]"
+   },
+   {
+    "number": 1088,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: antisymmetric response not antisymmetric: force v@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [9a1fea737ab9]"
+   },
+   {
+    "number": 1089,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: antisymmetric response not antisymmetric: force n@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [c803e94fcced]"
+   },
+   {
+    "number": 1090,
+    "title": "Nightly finding: metamorphic/invariance-refusal: singular tangent stiffness matrix [e86aae322293]"
+   },
+   {
+    "number": 1091,
+    "title": "Nightly finding: metamorphic/invariance-refusal: singular stiffness at stage '#' — structure is a mechanism [653fa589d7b9]"
+   },
+   {
+    "number": 1093,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: original failure; replay pending [062172b45c8e]"
+   },
+   {
+    "number": 1094,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: rotation r@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [881462cdf2ba]"
+   },
+   {
+    "number": 1095,
+    "title": "Nightly finding: metamorphic/invariance-refusal: no valid modes found [c01829ee8e69]"
+   },
+   {
+    "number": 1096,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: symmetric response not symmetric: translation u@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [28b54c3278f1]"
+   },
+   {
+    "number": 1097,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: scalar lambda1[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [047692525954]"
+   },
+   {
+    "number": 1099,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: r(ka) ≠ k·r(a): rotation ry@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [14ef316f5187]"
+   },
+   {
+    "number": 1100,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: translation u_t010@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [87f25e3d313d]"
+   },
+   {
+    "number": 1101,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: translation h_im1@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [5481101e057c]"
+   },
+   {
+    "number": 1103,
+    "title": "Nightly finding: metamorphic/invariance-refusal: local mechanism detected: a node with all elements hinged has excessive rotation, indicating local instability. [a0e1fed537f0]"
+   },
+   {
+    "number": 1104,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: u_t010: δ(n#←n#) = # vs δ(n#←n#) = #, |diff| # > tol # [379130bb5a9a]"
+   },
+   {
+    "number": 1105,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: force n@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [c51819e2c62e]"
+   },
+   {
+    "number": 1106,
+    "title": "Nightly finding: metamorphic/invariance-refusal: singular stiffness in 3d constrained system [b6063d6ce5b0]"
+   },
+   {
+    "number": 1110,
+    "title": "Nightly finding: metamorphic/invariance-refusal: no compressed elements — buckling not applicable [ee95071d03ef]"
+   },
+   {
+    "number": 1111,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: moment rm@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [4dc8170498fb]"
+   },
+   {
+    "number": 1112,
+    "title": "Nightly finding: metamorphic/invariance-refusal: singular tangent stiffness in fiber n-r [e41c3782b2b8]"
+   },
+   {
+    "number": 1113,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: force r@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [a8ddd09f18b9]"
+   },
+   {
+    "number": 1114,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: stress vm_quad@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [7e05a391ac38]"
+   },
+   {
+    "number": 1119,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #, guidedz): the prescribed dz = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove t [8f6b27e08e6e]"
+   },
+   {
+    "number": 1120,
+    "title": "Nightly finding: opensees/false_reject: opensees kappa=# [65c80204c306]"
+   },
+   {
+    "number": 1121,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dy = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or r [91f073632927]"
+   },
+   {
+    "number": 1122,
+    "title": "Nightly finding: opensees/wrong-result-candidate: buckling: eig/value [ee7817b53d98]"
+   },
+   {
+    "number": 1123,
+    "title": "Nightly finding: opensees/wrong-result-candidate: buckling: mode/1-MAC [f763ddff3708]"
+   },
+   {
+    "number": 1124,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dy = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or re [07728cd82ba4]"
+   },
+   {
+    "number": 1125,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #, rollerz): the prescribed dz = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove [6d2d9b9d6b85]"
+   },
+   {
+    "number": 1128,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dy = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or remo [9e0a828085d7]"
+   },
+   {
+    "number": 1129,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or r [1c721ada0e7d]"
+   },
+   {
+    "number": 1130,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #, pinned): the prescribed dry = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove [5b6456824776]"
+   },
+   {
+    "number": 1132,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #, rollerx): the prescribed dx = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove t [4e06f5b269c2]"
+   },
+   {
+    "number": 1133,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or re [84114a168f06]"
+   },
+   {
+    "number": 1134,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #, guidedx): the prescribed dx = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove th [b93bebd3accc]"
+   },
+   {
+    "number": 1135,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settlement o [2cc65e6292cf]"
+   },
+   {
+    "number": 1136,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #, pinned): the prescribed dry = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove t [d07f367c64da]"
+   },
+   {
+    "number": 1138,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dy = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or [1c1fff1ca3fd]"
+   },
+   {
+    "number": 1139,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed drz = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settleme [85b3d059938c]"
+   },
+   {
+    "number": 1140,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #, rollerz): the prescribed dz = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove t [711ea1a0113e]"
+   },
+   {
+    "number": 1141,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dz = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settleme [a6bcee3894ab]"
+   },
+   {
+    "number": 1142,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #, guidedz): the prescribed dz = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove th [3206f96d9699]"
+   },
+   {
+    "number": 1143,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dy = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settlemen [7630982a002d]"
+   },
+   {
+    "number": 1144,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or [94faf6ee8bfa]"
+   },
+   {
+    "number": 1146,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dy = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settlement [fe382d0105b8]"
+   },
+   {
+    "number": 1147,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed drx = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, o [7c01e0665ddf]"
+   },
+   {
+    "number": 1148,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settlemen [0125df1ef94d]"
+   },
+   {
+    "number": 1151,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dz = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or [6b73e3fe7879]"
+   },
+   {
+    "number": 1152,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #, rollerz): the prescribed dz = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove the [2c19af2b92f9]"
+   },
+   {
+    "number": 1157,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or rem [40d2d6fb20d8]"
+   },
+   {
+    "number": 1158,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed drz = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or [1dfa3389a0d1]"
+   },
+   {
+    "number": 1159,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #, rollerz): the prescribed dz = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove th [9397bd52760a]"
+   },
+   {
+    "number": 1160,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dz = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or r [21a59a0a5ee9]"
+   },
+   {
+    "number": 1161,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #, guidedx): the prescribed dx = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove t [1546d97d33da]"
+   },
+   {
+    "number": 1162,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #, rollerx): the prescribed dx = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove th [246398c00caa]"
+   },
+   {
+    "number": 1163,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #, pinned): the prescribed dry = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remo [79522b72f3f6]"
+   },
+   {
+    "number": 1164,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #, guidedx): the prescribed dx = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove [eefb50933b49]"
+   },
+   {
+    "number": 1165,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #, guidedz): the prescribed dz = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove [7da095348c1f]"
+   },
+   {
+    "number": 1166,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dz = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or rem [27f17833e676]"
+   },
+   {
+    "number": 1167,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed drx = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or [89ba2b7511bb]"
+   },
+   {
+    "number": 1169,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settleme [02e3e98ab150]"
+   },
+   {
+    "number": 1170,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dry = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settlem [edc2434bbbe0]"
+   },
+   {
+    "number": 1172,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #, pinned): the prescribed dry = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove th [723481c887e3]"
+   },
+   {
+    "number": 1173,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settlement [ec4c85ca3256]"
+   },
+   {
+    "number": 1175,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #, pinned): the prescribed dry = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove the [d89fc7d8b741]"
+   },
+   {
+    "number": 1176,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, o [248bd3e38b1c]"
+   },
+   {
+    "number": 1177,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #, rollerx): the prescribed dx = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove [78262f3761b5]"
+   },
+   {
+    "number": 1178,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dy = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settlem [c6047b24d84c]"
+   },
+   {
+    "number": 1179,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #, rollerx): the prescribed dx = # would not be applied, because this support type leaves that dof free. restrain that direction to impose it, or remove the [9da5146fb4fe]"
+   },
+   {
+    "number": 1181,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dz = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or re [74b9a1e3a41a]"
+   },
+   {
+    "number": 1182,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dry = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or r [4ed49980178e]"
+   },
+   {
+    "number": 1183,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dry = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or [3a668992fc6a]"
+   },
+   {
+    "number": 1188,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dx = # would not be applied, because that direction is not restrained (its flag is not set). restrain that direction to impose it, or remo [c3ab8ad2a169]"
+   },
+   {
+    "number": 1189,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dry = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settleme [715fb89c340b]"
+   },
+   {
+    "number": 1190,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed dz = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settlemen [2f2059bb01db]"
+   },
+   {
+    "number": 1191,
+    "title": "Nightly finding: opensees/false_reject: stabileo: support # (node #): the prescribed drx = # would not be applied, because a spring on that direction makes it free (its stiffness is added to the structure) and a settleme [0e5d2b3909a9]"
+   },
+   {
+    "number": 1192,
+    "title": "Nightly finding: metamorphic/invariance-refusal: node # has several supports (#) and not all are plain rigid restraints (springs, prescribed displacements or inclined directions); merge them into a single support [5cb1f6ec30af]"
+   },
+   {
+    "number": 1193,
+    "title": "Nightly finding: metamorphic/invariance-refusal: singular stiffness in 3d ssi iteration [6396d5130c9d]"
+   },
+   {
+    "number": 1194,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: symmetric response not symmetric: rotation ry_t060@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [582f40e7c8e8]"
+   },
+   {
+    "number": 1195,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: response not antisymmetric: translation u@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [4365371d9ae3]"
+   },
+   {
+    "number": 1197,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: response not c2-symmetric: translation u@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [dbc3cacf23c5]"
+   },
+   {
+    "number": 1198,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: response not c2-symmetric: rotation r@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [7389a2171b68]"
+   },
+   {
+    "number": 1199,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: antisymmetric response not antisymmetric: translation u@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [b676bdadcbed]"
+   },
+   {
+    "number": 1201,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: symmetric response not symmetric: rotation ry@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [fc471ba851e7]"
+   },
+   {
+    "number": 1202,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: scaled loads failed: no compressed elements — buckling not applicable [f971ad151e94]"
+   },
+   {
+    "number": 1203,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: symmetric response not symmetric: translation h_im1@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [cd410702e83d]"
+   },
+   {
+    "number": 1204,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: antisymmetric response not antisymmetric: translation h_im1@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [68fc4b81e179]"
+   },
+   {
+    "number": 1206,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: response not c2-symmetric: translation u_t010@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [f0f88c3ea9c6]"
+   },
+   {
+    "number": 1209,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: response not c2-symmetric: translation h_im1@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [69768fb1a857]"
+   },
+   {
+    "number": 1211,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: antisymmetric response not antisymmetric: rotation ry@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [5e3cf7868e14]"
+   },
+   {
+    "number": 1213,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: symmetric response not symmetric: scalar meff00[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [601a0ba79b57]"
+   },
+   {
+    "number": 1214,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: symmetric response not symmetric: force n@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [16203e84c260]"
+   },
+   {
+    "number": 1215,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: response not c2-symmetric: translation h_re2@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [5cdc619e61e1]"
+   },
+   {
+    "number": 1218,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: response not c2-symmetric: translation h_re1@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [659e3285c667]"
+   },
+   {
+    "number": 1219,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: symmetric response not symmetric: scalar meff02[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [606433d0cca7]"
+   },
+   {
+    "number": 1220,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: symmetric response not symmetric: force v@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [f4b2685b7906]"
+   },
+   {
+    "number": 1261,
+    "title": "Nightly finding: fuzz/json_plastic: oom-56705b73f94746d1372044e8e0177f57f253e824 [b4e39bc408a0]"
+   },
+   {
+    "number": 1263,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: symmetric response not symmetric: force r@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [423164f2eb8e]"
+   },
+   {
+    "number": 1264,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: antisymmetric response not antisymmetric: force r@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [1079f52a0424]"
+   },
+   {
+    "number": 1267,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: symmetric response not symmetric: scalar meff01[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [a4647731fb5c]"
+   },
+   {
+    "number": 1268,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: response not antisymmetric: rotation r@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [43c24ce919ee]"
+   },
+   {
+    "number": 1278,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: symmetric response not symmetric: translation h_re1@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [481080727b0b]"
+   },
+   {
+    "number": 1281,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: response not c2-symmetric: translation h_re0@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [96cdefdb1f47]"
+   },
+   {
+    "number": 1316,
+    "title": "RC Axial + Moment row pairs enveloped N and M under one combination name"
+   },
+   {
+    "number": 1318,
+    "title": "Legacy-project migration fingerprint omits material strength (fy / f'c)"
+   },
+   {
+    "number": 1329,
+    "title": "P-Delta (2D and 3D) understates amplification when compression varies along a member under axial span loads (mean-N Kg)"
+   },
+   {
+    "number": 1349,
+    "title": "Nightly finding: fuzz/json_plastic: slow-unit-a3094cc39131a2b3dee2bf144c6e6ce128eaa264 [79368b62d049]"
+   },
+   {
+    "number": 1351,
+    "title": "Nightly finding: metamorphic/invariance-refusal: eigenvalue decomposition failed: could not establish convergence and sturm completeness for # free dofs (factorization failure or iteration limit). check supports and releases for mechanisms, stiffness"
+   },
+   {
+    "number": 1352,
+    "title": "Nightly finding: metamorphic/invariance-refusal: th-massless-mechanism: time history: part of the model has neither mass nor stiffness in some direction (a massless mechanism), so its motion is undetermined; no result is returned [5f704484de54]"
+   },
+   {
+    "number": 1353,
+    "title": "Nightly finding: metamorphic/invariance-refusal: refuse: self-check static_residual: # exceeds #; excessive displacement indicates a likely mechanism or instability [d17ca5bc789e]"
+   },
+   {
+    "number": 1355,
+    "title": "Nightly finding: metamorphic/invariance-refusal: refuse: self-check static_residual: # exceeds # [eb74ea3fa401]"
+   },
+   {
+    "number": 1356,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: stress vm_quad9@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [06d5ea339505]"
+   },
+   {
+    "number": 1357,
+    "title": "Nightly finding: metamorphic/invariance-refusal: th-nonfinite: time history: the response is not finite (nan or infinite) from step # (t = # s); no result is returned [ba284a485009]"
+   },
+   {
+    "number": 1359,
+    "title": "Nightly finding: metamorphic/invariance-refusal: refuse: self-check static_balance: # exceeds # [276ebde862aa]"
+   },
+   {
+    "number": 1362,
+    "title": "Nightly finding: metamorphic/invariance-refusal: refuse: self-check modal_residual:#: # exceeds # [8ee9400644d0]"
+   },
+   {
+    "number": 1363,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: response not antisymmetric: translation u_t010@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [ac72b79a94b1]"
+   },
+   {
+    "number": 1365,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: response not c2-symmetric: scalar meff00[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [9d5c9a7c6812]"
+   },
+   {
+    "number": 1369,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: response not c2-symmetric: rotation r_t060@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [38a773a27207]"
+   },
+   {
+    "number": 1370,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: response not antisymmetric: rotation r_t050@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [125c9daf4594]"
+   },
+   {
+    "number": 1378,
+    "title": "Test gap: 639 missed mutants in 33 functions survive in the static solver core (linear.rs, assembly.rs)"
+   },
+   {
+    "number": 1434,
+    "title": "Harmonic modal superposition is wrong near or above the first omitted mode (warned, not refused)"
+   },
+   {
+    "number": 1445,
+    "title": "2D: refuse a nodal moment on an artificial rotational DOF, as 3D does"
+   },
+   {
+    "number": 1458,
+    "title": "Nightly finding: fuzz/json_plastic: slow-unit-74716f471f915500c1ad5e8820f9cfdf4fd36953 [79a8043728a7]"
+   },
+   {
+    "number": 1459,
+    "title": "Nightly finding: fuzz/json_plastic: oom-65c46ab04bc7187fb9c4e1a9fb98fac072361e14 [6f0167699fc0]"
+   },
+   {
+    "number": 1460,
+    "title": "Nightly finding: fuzz/json_plastic: slow-unit-bc2032107b52c694b435146e26a9ae5c6adf6a4f [aed992bb44b9]"
+   },
+   {
+    "number": 1462,
+    "title": "Nightly finding: metamorphic/invariance-refusal: refuse: self-check modal_mass: non-positive modal mass [20eeb7f4dec1]"
+   },
+   {
+    "number": 1463,
+    "title": "Nightly finding: metamorphic/invariance-refusal: th-mass-singular: time history: the mass matrix is singular in a direction that combines several dofs, so the state at t = # cannot be computed; no result is returned [4730b18ddd95]"
+   },
+   {
+    "number": 1464,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: antisymmetric response not antisymmetric: translation h_re1@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [fbd18ba35c56]"
+   },
+   {
+    "number": 1465,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: scaled loads failed: refuse: self-check static_residual: # exceeds # [0c38b99cdd72]"
+   },
+   {
+    "number": 1477,
+    "title": "Containment test gaps deferred from #807's review"
+   },
+   {
+    "number": 1478,
+    "title": "Containment over-refusals deferred from #807's review"
+   },
+   {
+    "number": 1489,
+    "title": "Benchmark gate: see Rust changes to case-file tolerances and disabled benchmark tests"
+   },
+   {
+    "number": 1490,
+    "title": "Tighten or justify loose benchmark tolerances found by the benchmark gate"
+   },
+   {
+    "number": 1496,
+    "title": "3D: a rotation 1e12 softer than another axis at the same node is locked by the orphan spring"
+   },
+   {
+    "number": 1530,
+    "title": "Nightly finding: codeaster/silent_singular: static: disp/rz [bcecb2015947]"
+   },
+   {
+    "number": 1531,
+    "title": "Nightly finding: codeaster/silent_singular: static: force/nEnd [fd885c80a975]"
+   },
+   {
+    "number": 1532,
+    "title": "Nightly finding: codeaster/silent_singular: static: force/nStart [18bec85aaebb]"
+   },
+   {
+    "number": 1533,
+    "title": "Nightly finding: codeaster/silent_singular: static: reac/fx [6ab4354083a8]"
+   },
+   {
+    "number": 1534,
+    "title": "Nightly finding: codeaster/silent_singular: static: reac/fz [268409c1828f]"
+   },
+   {
+    "number": 1535,
+    "title": "Nightly finding: codeaster/silent_singular: static: force/vzEnd [5a377cce9b88]"
+   },
+   {
+    "number": 1536,
+    "title": "Nightly finding: codeaster/silent_singular: static: force/vzStart [cdbdfe998aec]"
+   },
+   {
+    "number": 1553,
+    "title": "Second-order screen: frame-level critical load factor per load case to clear LIN-SECOND-ORDER-UNBOUNDED"
+   },
+   {
+    "number": 1556,
+    "title": "Second-order screen follow-ups: scope the steel hold, held checks' summaries, signed span compression"
+   },
+   {
+    "number": 1575,
+    "title": "RC pushover example counts the concrete its bars displace (bars counted twice in compression)"
+   },
+   {
+    "number": 1576,
+    "title": "Fibre pushover: largest load carried depends on the step count after the base concrete crushes (1.02x at 80 steps, 1.10x at 160)"
+   },
+   {
+    "number": 1635,
+    "title": "Nightly finding: metamorphic/invariance-refusal: {\"message\":\"eigenvalue decomposition failed: could not establish convergence and sturm completeness for # free dofs (factorization failure or iteration limit). check supports and releases for mechanism"
+   },
+   {
+    "number": 1647,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: xz: 2d solved, 3d failed: did not converge [1457b8ddf139]"
+   },
+   {
+    "number": 1648,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: xz: 2d solved, 3d failed: {\"message\":\"eigenvalue decomposition failed: could not establish convergence and sturm completeness for # free dofs (factorization failure or iteration limit). check suppo"
+   },
+   {
+    "number": 1649,
+    "title": "Nightly finding: opensees/original failure; replay pending: original failure; replay pending [969882c8a84d]"
+   },
+   {
+    "number": 1650,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: h_re0: δ(n#←n#) = # vs δ(n#←n#) = #, |diff| # > tol # [0594a29214da]"
+   },
+   {
+    "number": 1651,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: xz: 2d solved, 3d failed: singular stiffness matrix — structure is a mechanism [a0f2579a6589]"
+   },
+   {
+    "number": 1652,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: scalar m@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [cec7d2b7bfeb]"
+   },
+   {
+    "number": 1653,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: xy: 2d solved, 3d failed: did not converge [f97d9ea79ac1]"
+   },
+   {
+    "number": 1749,
+    "title": "Connector-arm mechanism check skips rotations tied by a constraint (2D)"
+   },
+   {
+    "number": 1751,
+    "title": "3D free twist about a connector: held by the orphan-rotation guard along a global axis, refused about a skew axis"
+   },
+   {
+    "number": 1756,
+    "title": "Buckling round-off bound: any constraint couples every DOF, so large forces in one structure can refuse a resolved compression in another"
+   },
+   {
+    "number": 1760,
+    "title": "Nightly finding: fuzz/json_plastic: oom-1d283e64888730445219207f88a5a98edb5ade90 [1ec18b0ac813]"
+   },
+   {
+    "number": 1762,
+    "title": "Nightly finding: fuzz/model_certify: crash-d6e9c3e654385ed1f9a7e3f26c87e04265fa1e11.min [08bd5f303ffa]"
+   },
+   {
+    "number": 1763,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: xz: scalar lambda1[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [7c2c93c494e3]"
+   },
+   {
+    "number": 1764,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: xz: 2d solved, 3d failed: refuse: self-check static_residual: # exceeds #; excessive displacement indicates a likely mechanism or instability [92a995623a57]"
+   },
+   {
+    "number": 1765,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: θ(n#←f n#) vs u(n#←m n#) ry: # vs #, |diff| # > tol # [3568482fc646]"
+   },
+   {
+    "number": 1766,
+    "title": "Nightly finding: metamorphic/invariance-refusal: fiber-nonlinear analysis: the state at load factor # is not in equilibrium (relative residual #, imbalance #); no result is returned [b7fef4fdb638]"
+   },
+   {
+    "number": 1775,
+    "title": "Nightly finding: OpenSees buckling, 4 mismatches and 4 models still above tolerance on the finest mesh (2026-11-08)"
+   },
+   {
+    "number": 1787,
+    "title": "Nightly finding: metamorphic/invariance-refusal: did not converge [960c98834637]"
+   },
+   {
+    "number": 1788,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: translation u_t#@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [ed9967963e3e]"
+   },
+   {
+    "number": 1789,
+    "title": "Nightly finding: metamorphic/invariance-refusal: {\"message\":\"eigenvalue decomposition failed: could not establish convergence and sturm completeness for # free dofs (factorization failure or iteration limit). check supports and releases for mechanism"
+   },
+   {
+    "number": 1790,
+    "title": "Nightly finding: metamorphic/invariance-refusal: did not converge [0c4bc614861c]"
+   },
+   {
+    "number": 1791,
+    "title": "Nightly finding: metamorphic/invariance-refusal: {\"message\":\"eigenvalue decomposition failed: could not establish convergence and sturm completeness for # free dofs (factorization failure or iteration limit). check supports and releases for mechanism"
+   },
+   {
+    "number": 1792,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: plane: translation u@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [24ffa3980f31]"
+   },
+   {
+    "number": 1793,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: plane: translation u@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [31612f3f4d45]"
+   },
+   {
+    "number": 1794,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: plane: translation u@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [9c239c98d363]"
+   },
+   {
+    "number": 1795,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: plane: translation u@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [41d82b0df4f1]"
+   },
+   {
+    "number": 1796,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: plane: 2d solved, 3d failed: support # (node #): the prescribed dof# = # would not be applied, because a support# on that direction makes it free (its stiffness is added to the structure) and a set"
+   },
+   {
+    "number": 1797,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: plane: 2d solved, 3d failed: support # (node #): the prescribed dof# = # would not be applied, because a support# on that direction makes it free (its stiffness is added to the structure) and a set"
+   },
+   {
+    "number": 1798,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: plane: 2d solved, 3d failed: support # (node #): the prescribed dof# = # would not be applied, because a support# on that direction makes it free (its stiffness is added to the structure) and a set"
+   },
+   {
+    "number": 1799,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: plane: 2d solved, 3d failed: support # (node #): the prescribed dof# = # would not be applied, because a support# on that direction makes it free (its stiffness is added to the structure) and a set"
+   },
+   {
+    "number": 1800,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: plane: 2d solved, 3d failed: support # (node #): the prescribed dof# = # would not be applied, because a support# on that direction makes it free (its stiffness is added to the structure) and a set"
+   },
+   {
+    "number": 1801,
+    "title": "Nightly finding: metamorphic/invariance-refusal: eigenvalue decomposition failed: could not establish convergence and sturm completeness for # free dofs (factorization failure or iteration limit). check supports and releases for mechanisms, stiffness"
+   },
+   {
+    "number": 1802,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: σp·u = # but σ f_e·u_e + springs = #, |diff| # > tol # [50b0f9d8e454]"
+   },
+   {
+    "number": 1803,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: σp·u = # but σ f_e·u_e + springs = #, |diff| # > tol # [52f2726fb087]"
+   },
+   {
+    "number": 1804,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: σp·u = # but σ f_e·u_e + springs = #, |diff| # > tol # [a47423a99ddc]"
+   },
+   {
+    "number": 1805,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: σp·u = # but σ f_e·u_e + springs = #, |diff| # > tol # [be86817ff4f8]"
+   },
+   {
+    "number": 1806,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: σp·u = # but σ f_e·u_e + springs = #, |diff| # > tol # [b981109b2de7]"
+   },
+   {
+    "number": 1807,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: σp·u = # but σ f_e·u_e + springs = #, |diff| # > tol # [a439cc4dec1a]"
+   },
+   {
+    "number": 1808,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: σp·u = # but σ f_e·u_e + springs = #, |diff| # > tol # [08a34e573c01]"
+   },
+   {
+    "number": 1809,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: σp·u = # but σ f_e·u_e + springs = #, |diff| # > tol # [ed37735bb69b]"
+   },
+   {
+    "number": 1810,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: σp·u = # but σ f_e·u_e + springs = #, |diff| # > tol # [9e1c8c69676c]"
+   },
+   {
+    "number": 1811,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: stress vm_quad@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [e943b9364e3a]"
+   },
+   {
+    "number": 1812,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: stress vm_quad@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [91b0a187232d]"
+   },
+   {
+    "number": 1813,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: stress vm_quad@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [e004b53c9d89]"
+   },
+   {
+    "number": 1814,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: stress vm_quad@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [e7d38b43b244]"
+   },
+   {
+    "number": 1815,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: stress vm_quad@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [1355968d27cc]"
+   },
+   {
+    "number": 1816,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: stress vm_quad@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [a4cd56cb0063]"
+   },
+   {
+    "number": 1817,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: stress vm_quad@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [701d115b3683]"
+   },
+   {
+    "number": 1818,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: stress vm_quad@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [a2897f02c1bd]"
+   },
+   {
+    "number": 1819,
+    "title": "Nightly finding: metamorphic/invariance-refusal: eigenvalue decomposition failed: could not establish convergence and sturm completeness for # free dofs (factorization failure or iteration limit). check supports and releases for mechanisms, stiffness"
+   },
+   {
+    "number": 1820,
+    "title": "Nightly finding: metamorphic/invariance-refusal: did not converge [72c76f2b964c]"
+   },
+   {
+    "number": 1821,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: σp·u = # but σ f_e·u_e + springs = #, |diff| # > tol # [6b1ff4ea1ee5]"
+   },
+   {
+    "number": 1822,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: stress vm_quad@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [6498caaac48b]"
+   },
+   {
+    "number": 1823,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: stress vm_quad@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [b6f9034cb181]"
+   },
+   {
+    "number": 1824,
+    "title": "Nightly finding: opensees/converging: meshed buckling factors approach each other (n=#: #, n=#: #) [93682730d987]"
+   },
+   {
+    "number": 1825,
+    "title": "Nightly finding: opensees/converging: meshed buckling factors approach each other (n=#: #, n=#: #, n=#: #) [6f9d0477b10d]"
+   },
+   {
+    "number": 1826,
+    "title": "Nightly finding: metamorphic/invariance-refusal: refuse: self-check modal_residual:#: # exceeds # [0dcc7bc75c37]"
+   },
+   {
+    "number": 1827,
+    "title": "Nightly finding: metamorphic/invariance-refusal: node # has several supports (#) and not all are plain rigid restraints (springs, prescribed displacements or inclined directions); merge them into a single support [8074dfed5f07]"
+   },
+   {
+    "number": 1828,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: rotation r@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [6aa7f5f9179b]"
+   },
+   {
+    "number": 1829,
+    "title": "Nightly finding: metamorphic/invariance-refusal: node # has several supports (#) and not all are plain rigid restraints (springs, prescribed displacements or inclined directions); merge them into a single support [ddb94bbe55d2]"
+   },
+   {
+    "number": 1830,
+    "title": "Nightly finding: metamorphic/invariance-refusal: node # has several supports (#) and not all are plain rigid restraints (springs, prescribed displacements or inclined directions); merge them into a single support [b4aeb4b54e8c]"
+   },
+   {
+    "number": 1831,
+    "title": "Nightly finding: metamorphic/invariance-refusal: node # has several supports (#) and not all are plain rigid restraints (springs, prescribed displacements or inclined directions); merge them into a single support [e97eabb60c07]"
+   },
+   {
+    "number": 1832,
+    "title": "Nightly finding: metamorphic/invariance-refusal: node # has several supports (#) and not all are plain rigid restraints (springs, prescribed displacements or inclined directions); merge them into a single support [ef1b8b2071ef]"
+   },
+   {
+    "number": 1833,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: rotation r@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [9332d0a3fccc]"
+   },
+   {
+    "number": 1834,
+    "title": "Nightly finding: metamorphic/invariance-refusal: node # has several supports (#) and not all are plain rigid restraints (springs, prescribed displacements or inclined directions); merge them into a single support [8b61d95f3f2e]"
+   },
+   {
+    "number": 1835,
+    "title": "Nightly finding: metamorphic/invariance-refusal: node # has several supports (#) and not all are plain rigid restraints (springs, prescribed displacements or inclined directions); merge them into a single support [8352cd6a1e99]"
+   },
+   {
+    "number": 1836,
+    "title": "Nightly finding: metamorphic/invariance-refusal: node # has several supports (#) and not all are plain rigid restraints (springs, prescribed displacements or inclined directions); merge them into a single support [5cd3e2f56da3]"
+   },
+   {
+    "number": 1837,
+    "title": "Nightly finding: metamorphic/invariance-refusal: node # has several supports (#) and not all are plain rigid restraints (springs, prescribed displacements or inclined directions); merge them into a single support [7807878d7769]"
+   },
+   {
+    "number": 1838,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: translation u@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [f9e2c0370b21]"
+   },
+   {
+    "number": 1839,
+    "title": "Nightly finding: metamorphic/invariance-refusal: node # has several supports (#) and not all are plain rigid restraints (springs, prescribed displacements or inclined directions); merge them into a single support [063ef8d020a4]"
+   },
+   {
+    "number": 1840,
+    "title": "Nightly finding: metamorphic/invariance-refusal: node # has several supports (#) and not all are plain rigid restraints (springs, prescribed displacements or inclined directions); merge them into a single support [da1796580ea3]"
+   },
+   {
+    "number": 1841,
+    "title": "Nightly finding: metamorphic/invariance-refusal: node # has several supports (#) and not all are plain rigid restraints (springs, prescribed displacements or inclined directions); merge them into a single support [a2c4d02923cb]"
+   },
+   {
+    "number": 1842,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: plane: 2d solved, 3d failed: refuse: self-check static_residual: # exceeds #; excessive displacement indicates a likely mechanism or instability [fee06f8b1ce3]"
+   },
+   {
+    "number": 1843,
+    "title": "Nightly finding: metamorphic/invariance-refusal: node # has several supports (#) and not all are plain rigid restraints (springs, prescribed displacements or inclined directions); merge them into a single support [6e999bafdc4c]"
+   },
+   {
+    "number": 1844,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: rotation r@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [ad247c4b874f]"
+   },
+   {
+    "number": 1845,
+    "title": "Nightly finding: metamorphic/invariance-refusal: node # has several supports (#) and not all are plain rigid restraints (springs, prescribed displacements or inclined directions); merge them into a single support [8ee98a93f2fa]"
+   },
+   {
+    "number": 1846,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: rotation r@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [d782e983d67a]"
+   },
+   {
+    "number": 1847,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: plane: 2d solved, 3d failed: singular stiffness matrix — structure is a mechanism [d1b4290623c5]"
+   },
+   {
+    "number": 1848,
+    "title": "Nightly finding: metamorphic/invariance-refusal: node # has several supports (#) and not all are plain rigid restraints (springs, prescribed displacements or inclined directions); merge them into a single support [aaf76c78e589]"
+   },
+   {
+    "number": 1849,
+    "title": "Nightly finding: metamorphic/invariance-refusal: node # has several supports (#) and not all are plain rigid restraints (springs, prescribed displacements or inclined directions); merge them into a single support [d0e992f48123]"
+   },
+   {
+    "number": 1850,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: plane: 2d solved, 3d failed: singular stiffness matrix — structure is a mechanism [4efa9048b412]"
+   },
+   {
+    "number": 1851,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: plane: 2d solved, 3d failed: refuse: self-check static_residual: # exceeds #; excessive displacement indicates a likely mechanism or instability [d6443152d807]"
+   },
+   {
+    "number": 1852,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: plane: 2d solved, 3d failed: singular stiffness matrix — structure is a mechanism [dbd7262edc58]"
+   },
+   {
+    "number": 1853,
+    "title": "Nightly finding: metamorphic/invariance-refusal: node # has several supports (#) and not all are plain rigid restraints (springs, prescribed displacements or inclined directions); merge them into a single support [0762cbd91775]"
+   },
+   {
+    "number": 1854,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: rotation r@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [1eedcd49f3bc]"
+   },
+   {
+    "number": 1855,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: rotation r@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [25619030399b]"
+   },
+   {
+    "number": 1856,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: plane: 2d solved, 3d failed: refuse: self-check static_residual: # exceeds #; excessive displacement indicates a likely mechanism or instability [0d5a4c7c2441]"
+   },
+   {
+    "number": 1857,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: force n@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [1a64417b48bf]"
+   },
+   {
+    "number": 1858,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: plane: 2d solved, 3d failed: refuse: self-check static_residual: # exceeds #; excessive displacement indicates a likely mechanism or instability [6bd8ba003d1b]"
+   },
+   {
+    "number": 1859,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: plane: 2d solved, 3d failed: singular stiffness matrix — structure is a mechanism [5dc68f2954d5]"
+   },
+   {
+    "number": 1860,
+    "title": "Nightly finding: metamorphic/invariance-refusal: node # has several supports (#) and not all are plain rigid restraints (springs, prescribed displacements or inclined directions); merge them into a single support [9c34b984a285]"
+   },
+   {
+    "number": 1861,
+    "title": "Nightly finding: metamorphic/invariance-refusal: buckling not determinable: the axial forces of elements # are within round-off, and as compressions of that size they could lower the critical factor from # to # [8f20d87b17f0]"
+   },
+   {
+    "number": 1862,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: rotation dof#@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [666c402749db]"
+   },
+   {
+    "number": 1863,
+    "title": "Nightly finding: metamorphic/invariance-refusal: node # has several supports (#) and not all are plain rigid restraints (springs, prescribed displacements or inclined directions); merge them into a single support [410a3db6e561]"
+   },
+   {
+    "number": 1864,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: force n@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [76c2000b5061]"
+   },
+   {
+    "number": 1865,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: lower bound # exceeds the collapse factor # of the other copy [641a5e1e8815]"
+   },
+   {
+    "number": 1866,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: rotation r@n#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [6c7fc42d501b]"
+   },
+   {
+    "number": 1867,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: force n@e#[#]: got #, expected #, |diff| # > tol # (scale #, rel #) [1f7d011175e7]"
+   },
+   {
+    "number": 1868,
+    "title": "Nightly finding: metamorphic/invariance-refusal: node # has several supports (#) and not all are plain rigid restraints (springs, prescribed displacements or inclined directions); merge them into a single support [545891decf96]"
+   },
+   {
+    "number": 1869,
+    "title": "Nightly finding: metamorphic/wrong-result-candidate: plane: 2d solved, 3d failed: refuse: self-check modal_residual:#: # exceeds # [9d3f29e6e9d5]"
    }
   ],
   "ts": {
    "by_class": {
     "a": {
      "modules": 23,
-     "lines": 11273
+     "lines": 11636
     },
     "b": {
      "modules": 59,
-     "lines": 26233
+     "lines": 26426
     },
     "c": {
-     "modules": 102,
-     "lines": 32691
+     "modules": 99,
+     "lines": 31241
     },
     "d": {
      "modules": 148,
-     "lines": 41919
+     "lines": 44578
     }
    },
    "high_bc": {
-    "modules": 88,
-    "lines": 35935
+    "modules": 86,
+    "lines": 34569
    },
    "unclassified": {
-    "modules": 13,
-    "lines": 1740,
+    "modules": 113,
+    "lines": 16818,
     "files": [
+     "axial-span-2d.ts",
      "pdelta-amplification.ts",
-     "certificate-types.ts",
+     "wood-armer.ts",
      "incremental-outcome.ts",
      "certify-jobs.ts",
-     "certificate-read.ts",
-     "model-sanity.ts",
      "certify-tags.ts",
-     "steel/tension-connection.ts",
-     "steel/angle-section.ts",
-     "codes/argentina/cirsoc301-engine-gate.ts",
-     "codes/argentina/cirsoc301-kernel.ts",
+     "structural-bundle.ts",
+     "model-sanity.ts",
+     "engine-unavailable.ts",
+     "buckling-warping.ts",
+     "plate-results.ts",
+     "known-issues.ts",
+     "certificate-read.ts",
+     "certificate-types.ts",
+     "joists/library.ts",
+     "joists/joist-design.ts",
+     "detailing/line-bars.ts",
+     "detailing/slab-bands.ts",
+     "detailing/beam-groups.ts",
+     "detailing/service-reaction.ts",
+     "detailing/wall-member.ts",
+     "detailing/repair-envelope.ts",
+     "detailing/run-general-footing.ts",
+     "detailing/member-sheets.ts",
+     "detailing/support-anchorage.ts",
+     "detailing/splice-checks.ts",
+     "detailing/joint-threading.ts",
+     "detailing/slab-deflection.ts",
+     "detailing/span-detailing.ts",
+     "detailing/punching-moment.ts",
+     "detailing/slab-panel.ts",
+     "detailing/shaped-ties.ts",
+     "building/level-centres.ts",
+     "design/column-stacks.ts",
+     "design/shaped-column.ts",
+     "design/sway.ts",
+     "design/beam-hangers.ts",
+     "design/repeated-frames.ts",
+     "design/anchorage-hooks.ts",
+     "design/beam-flange.ts",
+     "design/column-interaction.ts",
+     "design/design-spans.ts",
+     "design/rebar-groups.ts",
+     "design/wall-minimum-steel.ts",
+     "design/beam-line-demand.ts",
+     "design/check-clauses.ts",
+     "design/section-bounds.ts",
+     "design/beam-line.ts",
+     "design/joint-check.ts",
+     "design/check-rows.ts",
+     "design/notice-catalogue.ts",
+     "design/joint-threading-check.ts",
+     "design/analysis-validity.ts",
+     "design/end-support-anchorage.ts",
+     "design/lateral-anchorage-row.ts",
+     "design/family-batch.ts",
+     "design/frame-copy.ts",
+     "design/check-rows-families.ts",
+     "design/fire/fire.ts",
+     "design/materials/timber.ts",
+     "design/materials/composite.ts",
+     "design/materials/aluminium.ts",
+     "design/special/corbel.ts",
+     "design/special/coupling-beam.ts",
+     "design/special/beam-opening.ts",
+     "design/masonry/infill-strut.ts",
+     "design/masonry/confined-masonry.ts",
+     "design/slabs/one-way-shear.ts",
+     "design/slabs/stairs.ts",
+     "design/slabs/drop-panels.ts",
+     "design/slabs/post-tensioned.ts",
+     "design/slabs/ribbed.ts",
+     "design/slabs/precast-floors.ts",
+     "design/eurocode/ec2-member.ts",
+     "design/eurocode/ec2-provided.ts",
+     "design/eurocode/ec2-beam.ts",
+     "design/eurocode/ec2-params.ts",
+     "design/eurocode/ec2-column.ts",
+     "design/seismic/soft-storey.ts",
+     "design/seismic/frame-checks.ts",
+     "design/seismic/classify.ts",
+     "design/seismic/capacity.ts",
+     "design/foreign/matrix.ts",
+     "design/foreign/equivalence.ts",
+     "design/connections/timber-dowel.ts",
+     "design/connections/hss-truss.ts",
+     "foundation/overlaps.ts",
+     "foundation/pressure-field.ts",
+     "foundation/sizing.ts",
+     "foundation/geotech.ts",
+     "foundation/rigid-footing.ts",
+     "foundation/general-footing.ts",
+     "foundation/strap-footing.ts",
+     "foundation/pile-cap.ts",
+     "physical/physical-frame.ts",
+     "physical/support-faces.ts",
+     "physical/member-frame.ts",
+     "federation/versions.ts",
+     "federation/linked.ts",
+     "budget/budget.ts",
      "codes/argentina/cirsoc201-engine-gate.ts",
-     "codes/argentina/cirsoc201-beam-kernel.ts"
+     "codes/argentina/cirsoc301-verdict.ts",
+     "codes/argentina/cirsoc301-kernel.ts",
+     "codes/argentina/cirsoc301-weak-shear.ts",
+     "codes/argentina/cirsoc201-beam-kernel.ts",
+     "codes/argentina/cirsoc301-engine-gate.ts",
+     "site/phases.ts",
+     "steel/member-checkers.ts",
+     "steel/steel-utilization.ts",
+     "steel/angle-section.ts",
+     "steel/tension-connection.ts",
+     "steel/takeoff.ts",
+     "architecture/architecture.ts"
     ]
    },
    "missing": [
-    "pdelta-forces.ts"
+    "bar-marks.ts",
+    "diaphragm-rotation.ts",
+    "pdelta-forces.ts",
+    "reinforcement-svg.ts"
    ],
-   "rust_lines": 107634
+   "rust_lines": 123693
   },
   "feature_matrix": {
    "2D": {
@@ -1503,196 +2609,168 @@
    }
   },
   "design_examples": {
-   "pass": 33,
-   "fixed": 10,
-   "doc": 1,
-   "uncovered": 11,
+   "pass": 58,
+   "fixed": 14,
+   "doc": 2,
+   "uncovered": 15,
    "clause test": 6,
-   "ex": 2
+   "open": 1,
+   "ex": 2,
+   "other": 1
   },
   "differential": {
-   "pynite": {
-    "run": "https://github.com/lambdaclass/stabileo/actions/runs/39097987226",
-    "sha": "fa6620a17064ea69258fed65b29f85d663a81010",
-    "date": "2026-10-18",
+   "calculix": {
+    "run": "https://github.com/lambdaclass/stabileo/actions/runs/42562723662",
+    "sha": "4f9b69cad12cb4bed43703bb7e52366ff77c70dd",
+    "date": "2026-11-09",
     "statuses": {
-     "ill_conditioned": 222,
-     "ok": 760,
-     "unsupported": 121,
-     "stabileo_failed": 11
+     "ok": 1009,
+     "unsupported": 59,
+     "ill_conditioned": 21,
+     "stabileo_failed": 24,
+     "mismatch": 1
     },
     "analyses": {
      "static": {
-      "ill_conditioned": 222,
-      "ok": 760,
-      "unsupported": 121,
-      "stabileo_failed": 11
+      "ok": 1009,
+      "unsupported": 59,
+      "ill_conditioned": 21,
+      "stabileo_failed": 24,
+      "mismatch": 1
      }
     },
-    "compared": 760,
-    "ok": 760,
+    "compared": 1010,
+    "ok": 1009,
+    "mismatch": 1,
+    "total": 1114
+   },
+   "mystran": {
+    "run": "https://github.com/lambdaclass/stabileo/actions/runs/42562723662",
+    "sha": "4f9b69cad12cb4bed43703bb7e52366ff77c70dd",
+    "date": "2026-11-09",
+    "statuses": {
+     "ok": 846,
+     "unsupported": 54,
+     "ill_conditioned": 126,
+     "stabileo_failed": 134,
+     "mismatch": 1,
+     "reference_failed": 3
+    },
+    "analyses": {
+     "static": {
+      "ok": 789,
+      "unsupported": 52,
+      "ill_conditioned": 8,
+      "stabileo_failed": 14,
+      "mismatch": 1
+     },
+     "modal": {
+      "ill_conditioned": 118,
+      "stabileo_failed": 120,
+      "ok": 57,
+      "reference_failed": 3,
+      "unsupported": 2
+     }
+    },
+    "compared": 847,
+    "ok": 846,
+    "mismatch": 1,
+    "total": 1164
+   },
+   "pynite": {
+    "run": "https://github.com/lambdaclass/stabileo/actions/runs/42562723662",
+    "sha": "4f9b69cad12cb4bed43703bb7e52366ff77c70dd",
+    "date": "2026-11-09",
+    "statuses": {
+     "ok": 969,
+     "unsupported": 113,
+     "ill_conditioned": 14,
+     "stabileo_failed": 12,
+     "refused": 6
+    },
+    "analyses": {
+     "static": {
+      "ok": 969,
+      "unsupported": 113,
+      "ill_conditioned": 14,
+      "stabileo_failed": 12,
+      "refused": 6
+     }
+    },
+    "compared": 969,
+    "ok": 969,
     "mismatch": 0,
     "total": 1114
    },
-   "kratos": {
-    "run": "https://github.com/lambdaclass/stabileo/actions/runs/39097987226",
-    "sha": "fa6620a17064ea69258fed65b29f85d663a81010",
-    "date": "2026-10-18",
-    "statuses": {
-     "ok": 712,
-     "ill_conditioned": 118,
-     "unsupported": 28,
-     "stabileo_failed": 6
-    },
-    "analyses": {
-     "static": {
-      "ok": 712,
-      "ill_conditioned": 118,
-      "unsupported": 28,
-      "stabileo_failed": 6
-     }
-    },
-    "compared": 712,
-    "ok": 712,
-    "mismatch": 0,
-    "total": 864
-   },
    "frame3dd": {
-    "run": "https://github.com/lambdaclass/stabileo/actions/runs/39097987226",
-    "sha": "fa6620a17064ea69258fed65b29f85d663a81010",
-    "date": "2026-10-18",
+    "run": "https://github.com/lambdaclass/stabileo/actions/runs/42562723662",
+    "sha": "4f9b69cad12cb4bed43703bb7e52366ff77c70dd",
+    "date": "2026-11-09",
     "statuses": {
-     "ok": 1099,
-     "mismatch": 1,
-     "unstable": 4,
-     "unsupported": 10
+     "ok": 1095,
+     "unsupported": 10,
+     "reference_failed": 2,
+     "unstable": 7
     },
     "analyses": {
      "static": {
-      "ok": 803,
-      "mismatch": 1,
-      "unsupported": 10
+      "ok": 802,
+      "unsupported": 10,
+      "reference_failed": 2
      },
      "modal": {
       "ok": 150
      },
      "pdelta": {
-      "ok": 146,
-      "unstable": 4
+      "ok": 143,
+      "unstable": 7
      }
     },
-    "compared": 1100,
-    "ok": 1099,
-    "mismatch": 1,
+    "compared": 1095,
+    "ok": 1095,
+    "mismatch": 0,
     "total": 1114
    },
-   "opensees": {
-    "run": "https://github.com/lambdaclass/stabileo/actions/runs/39099586668",
-    "sha": "fa6620a17064ea69258fed65b29f85d663a81010",
-    "date": "2026-10-18",
+   "kratos": {
+    "run": "https://github.com/lambdaclass/stabileo/actions/runs/42562723662",
+    "sha": "4f9b69cad12cb4bed43703bb7e52366ff77c70dd",
+    "date": "2026-11-09",
     "statuses": {
-     "ok": 3233,
-     "unsupported": 73,
-     "stabileo_failed": 427,
-     "ill_conditioned": 524,
-     "unloaded": 3,
-     "mismatch": 1,
-     "unstable": 13
+     "ok": 789,
+     "unsupported": 49,
+     "ill_conditioned": 11,
+     "stabileo_failed": 8,
+     "refused": 6,
+     "silent_singular": 1
     },
     "analyses": {
      "static": {
-      "ok": 1131,
-      "unsupported": 32,
-      "stabileo_failed": 376,
-      "ill_conditioned": 472,
-      "unloaded": 2,
-      "mismatch": 1
-     },
-     "buckling": {
-      "ok": 552,
-      "stabileo_failed": 48
-     },
-     "modal": {
-      "ok": 504,
-      "ill_conditioned": 52,
-      "stabileo_failed": 3,
-      "unsupported": 41
-     },
-     "pdelta": {
-      "ok": 587,
-      "unstable": 13
-     },
-     "th": {
-      "ok": 399,
-      "unloaded": 1
-     },
-     "shell": {
-      "ok": 60
+      "ok": 789,
+      "unsupported": 49,
+      "ill_conditioned": 11,
+      "stabileo_failed": 8,
+      "refused": 6,
+      "silent_singular": 1
      }
     },
-    "compared": 3234,
-    "ok": 3233,
-    "mismatch": 1,
-    "total": 4274
-   },
-   "codeaster": {
-    "run": "https://github.com/lambdaclass/stabileo/actions/runs/39099586668",
-    "sha": "fa6620a17064ea69258fed65b29f85d663a81010",
-    "date": "2026-10-18",
-    "statuses": {
-     "ok": 412,
-     "stabileo_failed": 62,
-     "ill_conditioned": 347,
-     "unloaded": 1,
-     "unsupported": 5,
-     "mismatch": 99,
-     "near_singular": 5,
-     "aster_failed": 1
-    },
-    "analyses": {
-     "static": {
-      "ok": 412,
-      "stabileo_failed": 62,
-      "ill_conditioned": 347,
-      "unloaded": 1,
-      "unsupported": 5,
-      "mismatch": 99,
-      "near_singular": 5,
-      "aster_failed": 1
-     }
-    },
-    "compared": 511,
-    "ok": 412,
-    "mismatch": 99,
-    "total": 932
+    "compared": 789,
+    "ok": 789,
+    "mismatch": 0,
+    "total": 864
    }
   },
-  "rust_mutants": {
-   "caught": 714,
-   "missed": 478,
-   "timeout": 8,
-   "unviable": 51,
-   "planned": 23264,
-   "tested": 1251,
-   "plan_known": true,
-   "sha": "fa6620a17064ea69258fed65b29f85d663a81010",
-   "shards": 8,
-   "shards_expected": 8,
-   "shards_missing": 0,
-   "complete": false,
-   "jobs": {
-    "mutants (5)": "cancelled",
-    "mutants (6)": "cancelled",
-    "mutants (2)": "cancelled",
-    "mutants (7)": "cancelled",
-    "mutants (4)": "cancelled",
-    "mutants (1)": "cancelled",
-    "mutants (0)": "cancelled",
-    "mutants (3)": "cancelled"
+  "rust_mutants": null,
+  "ts_mutants": {
+   "statuses": {
+    "NoCoverage": 577,
+    "Killed": 1975,
+    "Survived": 1203,
+    "Timeout": 10
    },
-   "run": "https://github.com/lambdaclass/stabileo/actions/runs/39099586668",
-   "date": "2026-10-18"
-  },
-  "ts_mutants": null
+   "score": 52.7,
+   "run": "https://github.com/lambdaclass/stabileo/actions/runs/40264839508",
+   "date": "2026-10-26",
+   "sha": "2f7360eca995575989e00e151d66425885901800"
+  }
  }
 }
